@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "867335626494",
+    "project_id": "classmate-a016a",
+    "storage_bucket": "classmate-a016a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867335626494:android:928f5f583c71529e260faf",
+        "android_client_info": {
+          "package_name": "com.shuaib.classmate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "867335626494-q8feqqve1ikorbih9phv6npsqa5vr315.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shuaib.classmate",
+            "certificate_hash": "afde906e59e008d8211c9c2025d8c2c8602e6ced"
+          }
+        },
+        {
+          "client_id": "867335626494-r9p44n7od85u46c2e37mud87tsp2bl3r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9obm-RkonSoqIJ_R_XqVFESq7lpHthJ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "867335626494-r9p44n7od85u46c2e37mud87tsp2bl3r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

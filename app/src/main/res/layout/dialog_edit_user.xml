@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/dialog_edit_user.xml -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/cm_background"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="User Permissions"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:id="@+id/tvRoleLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Access Level"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/radioGroupRole"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/radioStudent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Student"
+                android:textColor="@color/cm_text_primary"
+                android:buttonTint="@color/cm_primary" />
+
+            <RadioButton
+                android:id="@+id/radioAdmin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Admin"
+                android:textColor="@color/cm_text_primary"
+                android:buttonTint="@color/cm_primary" />
+
+            <RadioButton
+                android:id="@+id/radioSuperadmin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Superadmin"
+                android:textColor="@color/cm_text_primary"
+                android:buttonTint="@color/cm_primary" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Privileges"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchTimetable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can edit class schedule"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchNotices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can post official notices"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchPDF"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can upload study materials"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchLibrary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can manage PDF library"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchCreatePolls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can create and manage polls"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_primary" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchCancel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can issue cancellations"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_cancel_red" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchSeatPlan"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can manage seat plans"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_accent" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can publish exam results"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="@color/cm_accent" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1E293B"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Admin Tools"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchManageUsers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can manage users"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="#8B5CF6" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchManageAdmins"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Can manage administrators"
+            android:textColor="@color/cm_text_primary"
+            app:thumbTint="#8B5CF6" />
+
+    </LinearLayout>
+</ScrollView>

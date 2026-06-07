@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background">
+
+    <com.shuaib.classmate.ui.StarfieldView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:navigationIcon="@drawable/ic_chevron_left"
+            app:navigationIconTint="@color/cm_text_primary"
+            app:title="User Profile"
+            app:titleTextColor="@color/cm_text_primary" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:padding="16dp"
+            android:paddingBottom="28dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_card_primary"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_marginEnd="16dp"
+                        android:background="@drawable/bg_avatar_letter">
+
+                        <TextView
+                            android:id="@+id/tvAvatarLetter"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="22sp"
+                            android:textStyle="bold"
+                            tools:text="A" />
+
+                        <de.hdodenhof.circleimageview.CircleImageView
+                            android:id="@+id/ivAvatar"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:src="@drawable/ic_default_avatar" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="19sp"
+                            android:textStyle="bold"
+                            tools:text="Mahfuj Reza Sir" />
+
+                        <TextView
+                            android:id="@+id/tvEmail"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="13sp"
+                            tools:text="admin@classmate.edu" />
+
+                        <TextView
+                            android:id="@+id/tvRoleBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:paddingHorizontal="11dp"
+                            android:paddingVertical="5dp"
+                            android:textAllCaps="true"
+                            android:textColor="@color/cm_background"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            tools:text="SUPERADMIN" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="Profile"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/profileFields"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_card_primary"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvUid"
+                        style="@style/UserDetailFieldText"
+                        tools:text="UID: abc123" />
+
+                    <TextView
+                        android:id="@+id/tvStudentId"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Student ID: CSE25012" />
+
+                    <TextView
+                        android:id="@+id/tvDepartment"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Department: CSE" />
+
+                    <TextView
+                        android:id="@+id/tvPhone"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Phone: 01XXXXXXXXX" />
+
+                    <TextView
+                        android:id="@+id/tvBloodGroup"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Blood Group: O+" />
+
+                    <TextView
+                        android:id="@+id/tvHomeDistrict"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Home District: Dhaka" />
+
+                    <TextView
+                        android:id="@+id/tvAddress"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Address: Mirpur" />
+
+                    <TextView
+                        android:id="@+id/tvAuthProvider"
+                        style="@style/UserDetailFieldText"
+                        tools:text="Auth Provider: google" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvRoleLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="Role"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <RadioGroup
+                    android:id="@+id/radioGroupRole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_card_primary"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <RadioButton
+                        android:id="@+id/radioStudent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:buttonTint="@color/cm_primary"
+                        android:text="Student"
+                        android:textColor="@color/cm_text_primary" />
+
+                    <RadioButton
+                        android:id="@+id/radioAdmin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:buttonTint="@color/cm_primary"
+                        android:text="Admin"
+                        android:textColor="@color/cm_text_primary" />
+
+                    <RadioButton
+                        android:id="@+id/radioSuperadmin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:buttonTint="@color/cm_primary"
+                        android:text="Superadmin"
+                        android:textColor="@color/cm_text_primary" />
+                </RadioGroup>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="Permissions"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/permissionsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_card_primary"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:id="@+id/tvPermissionHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="8dp"
+                        android:text="No permission controls available for your account."
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchCreatePolls"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can create and manage polls" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchTimetable"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can edit class schedule" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchNotices"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can post official notices" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchCancel"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can issue cancellations" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchPDF"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can upload study materials" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchLibrary"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can manage PDF library" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchResult"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can publish exam results" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchSeatPlan"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can manage seat plans" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchManageUsers"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can manage users" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchManageAdmins"
+                        style="@style/UserPermissionSwitch"
+                        android:text="Can manage administrators" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnSave"
+                    android:layout_width="match_parent"
+                    android:layout_height="54dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_gradient_button"
+                    android:text="Save Changes"
+                    android:textAllCaps="false"
+                    android:textColor="@color/cm_on_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+</FrameLayout>

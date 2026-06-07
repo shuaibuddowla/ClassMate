@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_timetable">
+
+    <!-- Home / Timetable Section -->
+    <fragment
+        android:id="@+id/nav_timetable"
+        android:name="com.shuaib.classmate.fragments.TimetableFragment"
+        android:label="Timetable"
+        tools:layout="@layout/fragment_timetable">
+        <argument
+            android:name="targetDay"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <deepLink app:uri="classmate://timetable" />
+    </fragment>
+
+    <!-- Notices Section -->
+    <fragment
+        android:id="@+id/nav_notices"
+        android:name="com.shuaib.classmate.fragments.NoticeFragment"
+        android:label="Notices"
+        tools:layout="@layout/fragment_notice">
+        <argument
+            android:name="noticeId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <deepLink app:uri="classmate://notices" />
+        <deepLink app:uri="classmate://notice/{noticeId}" />
+    </fragment>
+
+    <!-- Chat Flow -->
+    <fragment
+        android:id="@+id/nav_chat"
+        android:name="com.shuaib.classmate.chat.ChatFragment"
+        android:label="Chat"
+        tools:layout="@layout/fragment_chat">
+        <action
+            android:id="@+id/action_chat_to_group"
+            app:destination="@id/fragment_group_chat"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_chat_to_dm_list"
+            app:destination="@id/fragment_dm_list"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_chat_to_dm_chat"
+            app:destination="@id/fragment_dm_chat"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/fragment_group_chat"
+        android:name="com.shuaib.classmate.chat.GroupChatFragment"
+        android:label="Class Group"
+        tools:layout="@layout/fragment_group_chat" />
+
+    <fragment
+        android:id="@+id/fragment_dm_list"
+        android:name="com.shuaib.classmate.chat.DmListFragment"
+        android:label="New Message"
+        tools:layout="@layout/fragment_dm_list" />
+
+    <fragment
+        android:id="@+id/fragment_dm_chat"
+        android:name="com.shuaib.classmate.chat.DmChatFragment"
+        android:label="{otherUserName}"
+        tools:layout="@layout/fragment_dm_chat">
+        <argument
+            android:name="roomId"
+            app:argType="string" />
+        <argument
+            android:name="otherUserName"
+            app:argType="string"
+            android:defaultValue="Chat" />
+        <argument
+            android:name="otherUserId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <deepLink app:uri="classmate://chat/dm/{roomId}" />
+    </fragment>
+
+    <!-- PDF Library Flow -->
+    <fragment
+        android:id="@+id/nav_pdf"
+        android:name="com.shuaib.classmate.fragments.PdfLibraryFragment"
+        android:label="Library"
+        tools:layout="@layout/fragment_pdf_library">
+        <action
+            android:id="@+id/action_pdf_to_subject_list"
+            app:destination="@id/fragment_subject_pdf_list"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_pdf_to_all_files"
+            app:destination="@id/fragment_library_all_files"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_pdf_to_library_search"
+            app:destination="@id/fragment_library_search"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/fragment_library_all_files"
+        android:name="com.shuaib.classmate.fragments.LibraryAllFilesFragment"
+        android:label="All Uploads"
+        tools:layout="@layout/fragment_library_all_files" />
+
+    <fragment
+        android:id="@+id/fragment_library_search"
+        android:name="com.shuaib.classmate.fragments.LibrarySearchFragment"
+        android:label="Library Search"
+        tools:layout="@layout/fragment_library_search" />
+
+    <fragment
+        android:id="@+id/fragment_subject_pdf_list"
+        android:name="com.shuaib.classmate.fragments.SubjectPdfListFragment"
+        android:label="{subjectName}"
+        tools:layout="@layout/fragment_subject_pdf_list">
+        <argument
+            android:name="subjectName"
+            app:argType="string" />
+    </fragment>
+
+    <!-- Polls -->
+    <fragment
+        android:id="@+id/nav_polls"
+        android:name="com.shuaib.classmate.fragments.PollFragment"
+        android:label="Polls"
+        tools:layout="@layout/fragment_poll" />
+
+    <!-- Friends Flow -->
+    <fragment
+        android:id="@+id/nav_friends"
+        android:name="com.shuaib.classmate.fragments.FriendsFragment"
+        android:label="Friends"
+        tools:layout="@layout/fragment_friends">
+        <action
+            android:id="@+id/action_friends_to_detail"
+            app:destination="@id/fragment_friend_detail"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/fragment_friend_detail"
+        android:name="com.shuaib.classmate.fragments.FriendDetailFragment"
+        android:label="Friend Detail"
+        tools:layout="@layout/fragment_friend_detail">
+        <argument
+            android:name="userId"
+            app:argType="string" />
+    </fragment>
+
+    <!-- Profile -->
+    <fragment
+        android:id="@+id/nav_profile"
+        android:name="com.shuaib.classmate.fragments.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
+
+</navigation>

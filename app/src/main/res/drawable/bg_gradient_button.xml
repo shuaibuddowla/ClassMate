@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/drawable/bg_gradient_button.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="@color/cm_primary"
+        android:centerColor="@color/cm_primary_soft"
+        android:endColor="@color/cm_accent_warm"
+        android:angle="135"/>
+    <corners android:radius="16dp"/>
+</shape>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/item_shimmer_notice.xml -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="120dp"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardBackgroundColor="@color/cm_surface"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:strokeColor="@color/cm_border_glass"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <View
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="@color/cm_text_secondary"
+            android:alpha="0.2"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <View
+                android:layout_width="150dp"
+                android:layout_height="18dp"
+                android:background="@color/cm_text_secondary"
+                android:alpha="0.2" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="12dp"
+                android:layout_marginTop="12dp"
+                android:background="@color/cm_text_secondary"
+                android:alpha="0.1" />
+
+            <View
+                android:layout_width="200dp"
+                android:layout_height="12dp"
+                android:layout_marginTop="6dp"
+                android:background="@color/cm_text_secondary"
+                android:alpha="0.1" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+                <View
+                    android:layout_width="60dp"
+                    android:layout_height="10dp"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.2" />
+                <View
+                    android:layout_width="40dp"
+                    android:layout_height="10dp"
+                    android:layout_alignParentEnd="true"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.2" />
+            </RelativeLayout>
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

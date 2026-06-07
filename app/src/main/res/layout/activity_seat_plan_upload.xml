@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/activity_seat_plan_upload.xml -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background">
+
+    <com.shuaib.classmate.ui.StarfieldView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:title="Upload Seat Plan"
+            app:titleTextColor="@color/cm_text_primary"
+            app:navigationIcon="@drawable/ic_chevron_left"
+            app:navigationIconTint="@color/cm_text_primary" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- Neumorphic Card -->
+                <LinearLayout
+                    android:id="@+id/cardSeatPlanUpload"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_card_primary"
+                    android:orientation="vertical"
+                    android:padding="24dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Exam Title"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etSeatPlanTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapWords"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSelectPdf"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="100dp"
+                        android:layout_marginTop="24dp"
+                        android:text="Tap to Select Seat Plan PDF"
+                        android:textAllCaps="false"
+                        android:textColor="@color/cm_primary"
+                        app:cornerRadius="16dp"
+                        app:icon="@drawable/ic_seat_plan"
+                        app:iconGravity="top"
+                        app:iconPadding="12dp"
+                        app:iconSize="32dp"
+                        app:iconTint="@color/cm_primary"
+                        app:strokeColor="@color/cm_primary"
+                        app:strokeWidth="1dp" />
+
+                    <TextView
+                        android:id="@+id/tvSelectedFileName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_gravity="center"
+                        android:text="No file selected"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="12sp"
+                        android:ellipsize="middle"
+                        android:singleLine="true"/>
+
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnUpload"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="32dp"
+                    android:background="@drawable/bg_gradient_button"
+                    android:text="Deploy Seat Plan"
+                    android:textAllCaps="false"
+                    android:textColor="@color/cm_on_primary"
+                    android:textSize="16sp"
+                    app:backgroundTint="@null"
+                    app:cornerRadius="16dp" />
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvProgressPercent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="4dp"
+                    android:text="0%"
+                    android:textColor="@color/cm_primary"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

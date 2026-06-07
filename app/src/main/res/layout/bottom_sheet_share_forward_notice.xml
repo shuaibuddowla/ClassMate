@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_notice_bottom_sheet"
+    android:orientation="vertical"
+    android:paddingHorizontal="18dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="24dp">
+
+    <View
+        android:layout_width="42dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="#33415F" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Share / Forward Notice"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close"
+            app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/previewCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_notice_elevated_card"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:id="@+id/tvPreviewType"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_notice_badge"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:textColor="@color/cm_primary_soft"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvPreviewTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvPreviewMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowClassGroup"
+        style="@style/NoticeForwardOptionStyle">
+        <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_users" app:tint="@color/cm_primary_soft" />
+        <LinearLayout style="@style/NoticeForwardOptionTextStyle">
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="Class Group" />
+            <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="Forward into the main class room" />
+        </LinearLayout>
+        <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowAnotherGroup"
+        style="@style/NoticeForwardOptionStyle">
+        <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_chat" app:tint="@color/cm_primary_soft" />
+        <LinearLayout style="@style/NoticeForwardOptionTextStyle">
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="Another Group" />
+            <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="No extra groups available yet" />
+        </LinearLayout>
+        <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowSendDm"
+        style="@style/NoticeForwardOptionStyle">
+        <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_person" app:tint="@color/cm_primary_soft" />
+        <LinearLayout style="@style/NoticeForwardOptionTextStyle">
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="Send to DM" />
+            <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="Choose a classmate" />
+        </LinearLayout>
+        <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowCopyLink"
+        style="@style/NoticeForwardOptionStyle">
+        <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_copy" app:tint="@color/cm_primary_soft" />
+        <LinearLayout style="@style/NoticeForwardOptionTextStyle">
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="Copy Link" />
+            <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="classmate://notice/{id}" />
+        </LinearLayout>
+        <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowMoreOptions"
+        style="@style/NoticeForwardOptionStyle">
+        <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_forward" app:tint="@color/cm_primary_soft" />
+        <LinearLayout style="@style/NoticeForwardOptionTextStyle">
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="More Options" />
+            <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="Use Android share sheet" />
+        </LinearLayout>
+        <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
+    </LinearLayout>
+</LinearLayout>

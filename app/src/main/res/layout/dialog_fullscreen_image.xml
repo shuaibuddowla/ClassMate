@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Full screen image -->
+    <ImageView
+        android:id="@+id/ivFullscreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"/>
+
+    <!-- Close button -->
+    <ImageButton
+        android:id="@+id/btnCloseFullscreen"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_close"
+        android:background="#66000000"
+        android:tint="@color/cm_on_primary"
+        android:padding="8dp"/>
+
+    <!-- Tap to close hint -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="32dp"
+        android:text="Tap image to close"
+        android:textColor="#80FFFFFF"
+        android:textSize="12sp"/>
+
+</FrameLayout>

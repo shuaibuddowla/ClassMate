@@ -1,0 +1,56 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/values-night/themes.xml -->
+    <style name="Theme.ClassMate" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Main Palette -->
+        <item name="colorPrimary">@color/cm_primary</item>
+        <item name="colorOnPrimary">@color/cm_on_primary</item>
+        <item name="colorSecondary">@color/cm_accent</item>
+        <item name="colorOnSecondary">@color/cm_on_primary</item>
+
+        <!-- Surfaces (Deep Space Dark) -->
+        <item name="android:windowBackground">@color/cm_bg</item>
+        <item name="colorSurface">@color/cm_surface</item>
+        <item name="colorOnSurface">@color/cm_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/cm_text_secondary</item>
+        <item name="android:textColorPrimary">@color/cm_text_primary</item>
+        <item name="android:textColorSecondary">@color/cm_text_secondary</item>
+
+        <!-- Status Bar -->
+        <item name="android:statusBarColor">@color/cm_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation Bar -->
+        <item name="android:navigationBarColor">@color/cm_bg</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.ClassMate.Dialog" parent="Theme.Material3.DayNight.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:background">@color/cm_surface</item>
+    </style>
+
+    <style name="Theme.ClassMate.TimePicker" parent="Theme.Material3.DayNight.Dialog">
+        <item name="colorAccent">@color/cm_primary</item>
+    </style>
+
+    <!-- Bottom Nav Indicator Style -->
+    <style name="App.CustomIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/cm_bottom_nav_selected</item>
+        <item name="android:width">64dp</item>
+        <item name="android:height">42dp</item>
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">21dp</item>
+        <item name="marginHorizontal">4dp</item>
+    </style>
+
+    <style name="App.BottomNavLabel.Active" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="App.BottomNavLabel.Inactive" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>

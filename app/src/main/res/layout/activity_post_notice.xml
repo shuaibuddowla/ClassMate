@@ -1,0 +1,731 @@
+<!-- com/shuaib/classmate/activities/PostNoticeActivity.kt -->
+<!-- res/layout/activity_post_notice.xml -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background">
+
+    <com.shuaib.classmate.ui.StarfieldView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:title="Post Notice"
+            app:titleTextColor="@color/cm_text_primary"
+            app:navigationIcon="@drawable/ic_chevron_left"
+            app:navigationIconTint="@color/cm_text_primary" />
+
+        <!-- Tab selector for Manual vs AI Compose -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            app:tabTextColor="@color/cm_text_secondary"
+            app:tabSelectedTextColor="@color/cm_text_primary"
+            app:tabIndicatorColor="@color/cm_primary">
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Manual" />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✨ AI Compose" />
+        </com.google.android.material.tabs.TabLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+            <!-- AI Compose section (hidden by default) -->
+            <LinearLayout
+                android:id="@+id/sectionAiComposeContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✨ CLASSMATE AI COMPOSER"
+                    android:textColor="@color/cm_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.15"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Paste messy draft details, dates, cancelled slots, or rough admin scribble. ClassMate AI will automatically structure, format, and prepare the notice fields for you."
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="12.5sp"
+                    android:layout_marginBottom="16dp"
+                    android:lineSpacingMultiplier="1.15" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Paste messy draft details..."
+                    android:textColorHint="@color/cm_text_secondary"
+                    app:boxStrokeColor="@color/cm_primary"
+                    app:hintTextColor="@color/cm_primary"
+                    android:layout_marginBottom="16dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etAiMessyInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minLines="5"
+                        android:gravity="top"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:scrollbars="vertical"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAiAnalyze"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="Draft with AI"
+                    android:textAllCaps="false"
+                    android:textColor="@color/cm_on_primary"
+                    app:backgroundTint="@null"
+                    android:background="@drawable/bg_circle_accent"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- AI Detection Status Card -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card_primary"
+                    android:padding="16dp"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="💡 AI DETECTION METRICS"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/tvAiDetected"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="No draft analyzed yet."
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="13.5sp"
+                        android:lineSpacingMultiplier="1.2" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Manual mode sections -->
+            <LinearLayout
+                android:id="@+id/sectionManualModeContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioGroup
+                    android:id="@+id/rgNoticeType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="24dp">
+                    <RadioButton android:id="@+id/rbNormal" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Normal"
+                        android:textColor="@color/cm_text_primary" android:checked="true" />
+                    <RadioButton android:id="@+id/rbCancel" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Cancellation"
+                        android:textColor="@color/cm_text_primary" />
+                    <RadioButton android:id="@+id/rbSub" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Substitute"
+                        android:textColor="@color/cm_text_primary" />
+                    <RadioButton
+                        android:id="@+id/rbAssignment"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Set Assignment Deadline"
+                        android:textColor="@color/cm_text_primary" />
+                    <RadioButton
+                        android:id="@+id/rbClassTest"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Set Class Test Deadline"
+                        android:textColor="@color/cm_text_primary" />
+                </RadioGroup>
+
+                <!-- Normal section -->
+                <LinearLayout
+                    android:id="@+id/sectionNormal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Notice Title"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Write / Preview Selector -->
+                    <RadioGroup
+                        android:id="@+id/rgBodyMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_settings_card"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:padding="2dp">
+
+                        <RadioButton
+                            android:id="@+id/rbWrite"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_library_icon_button"
+                            android:button="@null"
+                            android:checked="true"
+                            android:gravity="center"
+                            android:text="Write"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <RadioButton
+                            android:id="@+id/rbPreview"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_library_icon_button"
+                            android:button="@null"
+                            android:gravity="center"
+                            android:text="Preview"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </RadioGroup>
+
+                    <!-- Markdown Helper Toolbar -->
+                    <HorizontalScrollView
+                        android:id="@+id/toolbarMarkdown"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none"
+                        android:layout_marginBottom="6dp">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:paddingVertical="4dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnBold"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="B"
+                                android:textStyle="bold"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnItalic"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="I"
+                                android:textStyle="italic"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnHeading"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="H#"
+                                android:textStyle="bold"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnBulletList"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="• List"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnNumberedList"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="1. List"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnQuote"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="Quote"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnInlineCode"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="`Code`"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnLink"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="🔗 Link"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutBodyInput"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Notice Body"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etBody"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minLines="4"
+                            android:gravity="top"
+                            android:inputType="textMultiLine|textCapSentences"
+                            android:scrollbars="vertical"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Live Preview Container -->
+                    <LinearLayout
+                        android:id="@+id/layoutPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        android:background="@drawable/bg_card_primary"
+                        android:padding="16dp"
+                        android:layout_marginBottom="16dp"
+                        android:minHeight="120dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📝 LIVE PREVIEW"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:layout_marginBottom="12dp" />
+
+                        <TextView
+                            android:id="@+id/tvBodyPreview"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="14.5sp"
+                            android:lineSpacingMultiplier="1.2" />
+                    </LinearLayout>
+
+                    <!-- Attachment section (only for normal notices) -->
+                    <LinearLayout
+                        android:id="@+id/sectionAttachment"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_card_primary"
+                        android:padding="16dp"
+                        android:layout_marginBottom="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📎 ATTACHMENT (OPTIONAL)"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:layout_marginBottom="12dp" />
+
+                        <!-- Attachment type selector -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="12dp">
+
+                            <Button
+                                android:id="@+id/btnAttachPdf"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="8dp"
+                                android:background="@drawable/bg_badge_purple"
+                                android:text="PDF"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                            <Button
+                                android:id="@+id/btnAttachImage"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_badge_purple"
+                                android:text="Image"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                        </LinearLayout>
+
+                        <!-- Selected attachment preview -->
+                        <LinearLayout
+                            android:id="@+id/attachmentPreview"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:visibility="gone">
+
+                            <!-- PDF preview -->
+                            <LinearLayout
+                                android:id="@+id/pdfPreview"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:visibility="gone">
+
+                                <FrameLayout
+                                    android:layout_width="40dp"
+                                    android:layout_height="40dp"
+                                    android:background="@drawable/bg_icon_container"
+                                    android:layout_marginEnd="12dp">
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_gravity="center"
+                                        android:text="📄"
+                                        android:textSize="18sp" />
+                                </FrameLayout>
+
+                                <TextView
+                                    android:id="@+id/tvPdfName"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="13sp"
+                                    android:maxLines="1"
+                                    android:ellipsize="end" />
+
+                                <ImageButton
+                                    android:id="@+id/btnRemovePdf"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:src="@drawable/ic_close"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    app:tint="@color/cm_cancel_red" />
+
+                            </LinearLayout>
+
+                            <!-- Image preview -->
+                            <LinearLayout
+                                android:id="@+id/imagePreview"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:id="@+id/ivAttachmentPreview"
+                                    android:layout_width="72dp"
+                                    android:layout_height="72dp"
+                                    android:scaleType="centerCrop"
+                                    android:background="@drawable/bg_settings_card"
+                                    android:layout_marginEnd="12dp" />
+
+                                <TextView
+                                    android:id="@+id/tvImageName"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="13sp"
+                                    android:maxLines="1"
+                                    android:ellipsize="end" />
+
+                                <ImageButton
+                                    android:id="@+id/btnRemoveImage"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:src="@drawable/ic_close"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    app:tint="@color/cm_cancel_red" />
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <!-- Upload progress for attachment -->
+                        <LinearLayout
+                            android:id="@+id/attachmentProgress"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:visibility="gone"
+                            android:layout_marginTop="8dp">
+
+                            <ProgressBar
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:indeterminateTint="@color/cm_primary"
+                                android:layout_marginEnd="12dp" />
+
+                            <TextView
+                                android:id="@+id/tvAttachmentProgress"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="13sp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Cancel/Sub shared section -->
+                <LinearLayout
+                    android:id="@+id/sectionSubjectPicker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Select Subject"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/dropdownSubject"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <RadioGroup
+                        android:id="@+id/rgWhen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="16dp">
+                        <RadioButton android:id="@+id/rbToday" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="Today"
+                            android:textColor="@color/cm_text_primary" android:checked="true" />
+                        <RadioButton android:id="@+id/rbTomorrow"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Tomorrow" android:textColor="@color/cm_text_primary"
+                            android:layout_marginStart="16dp" />
+                    </RadioGroup>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/sectionSubTeacher"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Substitute Teacher Name"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:visibility="gone">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etSubTeacher"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <!-- Assignment section -->
+                <LinearLayout
+                    android:id="@+id/sectionAssignment"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- Subject dropdown -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutAssignmentSubject"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Select Subject"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="12dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/dropdownAssignmentSubject"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Assignment topic -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutTopic"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Assignment Topic"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="12dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etAssignmentTopic"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_primary"
+                            android:inputType="textMultiLine"
+                            android:minLines="2" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Submission date picker button -->
+                    <Button
+                        android:id="@+id/btnPickDate"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_settings_card"
+                        android:text="📅 Pick Submission Date"
+                        android:textColor="@color/cm_primary"
+                        android:layout_marginBottom="8dp"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                    <!-- Selected date display -->
+                    <TextView
+                        android:id="@+id/tvSelectedDate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="No date selected"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="13sp"
+                        android:gravity="center"
+                        android:layout_marginBottom="12dp" />
+
+                </LinearLayout>
+
+                <!-- End of Manual Mode Container -->
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPublish"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="32dp"
+                    android:background="@drawable/bg_gradient_button"
+                    android:text="Publish Notice"
+                    android:textAllCaps="false"
+                    android:textColor="@color/cm_on_primary"
+                    app:backgroundTint="@null" />
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

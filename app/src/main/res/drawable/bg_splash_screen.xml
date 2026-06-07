@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/drawable/bg_splash_screen.xml -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark background shown instantly -->
+    <item>
+        <shape>
+            <gradient
+                android:angle="315"
+                android:startColor="@color/cm_background"
+                android:centerColor="@color/cm_surface"
+                android:endColor="@color/cm_background" />
+        </shape>
+    </item>
+</layer-list>

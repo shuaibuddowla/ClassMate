@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Subject or category"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvNormalSubject"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="General"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvNormalSubjectCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tap to choose category or course"
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

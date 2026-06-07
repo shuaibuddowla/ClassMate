@@ -1,0 +1,180 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/values/themes.xml -->
+    <style name="Theme.ClassMate" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Main Palette -->
+        <item name="colorPrimary">@color/cm_primary</item>
+        <item name="colorOnPrimary">@color/cm_on_primary</item>
+        <item name="colorSecondary">@color/cm_accent</item>
+        <item name="colorOnSecondary">@color/cm_on_primary</item>
+
+        <!-- Surfaces (Adaptive) -->
+        <item name="android:windowBackground">@color/cm_bg</item>
+        <item name="colorSurface">@color/cm_surface</item>
+        <item name="colorOnSurface">@color/cm_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/cm_text_secondary</item>
+        <item name="android:textColorPrimary">@color/cm_text_primary</item>
+        <item name="android:textColorSecondary">@color/cm_text_secondary</item>
+
+        <!-- Status Bar -->
+        <item name="android:statusBarColor">@color/cm_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- Navigation Bar -->
+        <item name="android:navigationBarColor">@color/cm_bg</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- Splash theme — prevents white flash -->
+    <style name="Theme.ClassMate.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/cm_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_classmate_logo</item>
+        <item name="windowSplashScreenAnimationDuration">350</item>
+        <item name="postSplashScreenTheme">@style/Theme.ClassMate.Splash</item>
+    </style>
+
+    <style name="Theme.ClassMate.Splash" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_splash_screen</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@color/cm_bg</item>
+        <item name="android:navigationBarColor">@color/cm_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.ClassMate.Dialog" parent="Theme.Material3.Light.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:background">@color/cm_surface</item>
+    </style>
+
+    <style name="Theme.ClassMate.TimePicker" parent="Theme.Material3.Light.Dialog">
+        <item name="colorAccent">@color/cm_primary</item>
+    </style>
+
+    <!-- Bottom Nav Indicator Style -->
+    <style name="App.CustomIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/cm_bottom_nav_selected</item>
+        <item name="android:width">56dp</item>
+        <item name="android:height">30dp</item>
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">15dp</item>
+        <item name="marginHorizontal">2dp</item>
+    </style>
+
+    <!-- Chip Text Style -->
+    <style name="App.ChipText" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="App.BottomNavLabel.Active" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="App.BottomNavLabel.Inactive" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="RoundedCornersImage">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="NoticeDetailsActionStyle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">84dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="NoticeDetailsActionIconStyle">
+        <item name="android:layout_width">46dp</item>
+        <item name="android:layout_height">46dp</item>
+        <item name="android:background">@drawable/bg_notice_icon_circle</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
+    <style name="NoticeDetailsActionLabelStyle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">7dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textColor">@color/cm_text_secondary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="NoticeForwardOptionStyle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">68dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingHorizontal">4dp</item>
+    </style>
+
+    <style name="NoticeForwardOptionIconStyle">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/bg_notice_icon_circle</item>
+        <item name="android:padding">11dp</item>
+    </style>
+
+    <style name="NoticeForwardOptionTextStyle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="NoticeForwardOptionTitleStyle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/cm_text_primary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="NoticeForwardOptionSubtitleStyle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:textColor">@color/cm_text_secondary</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="NoticeForwardChevronStyle">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">22dp</item>
+    </style>
+
+    <style name="UserDetailFieldText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingVertical">6dp</item>
+        <item name="android:textColor">@color/cm_text_secondary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="UserPermissionSwitch">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textColor">@color/cm_text_primary</item>
+    </style>
+
+    <style name="Theme.ClassMate.BottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/ClassMate.BottomSheet</item>
+    </style>
+    <style name="ClassMate.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+</resources>

@@ -1,0 +1,178 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/values/strings.xml -->
+    <string name="app_name">ClassMate</string>
+    <string name="app_tagline">Your Class Companion</string>
+
+    <!-- Common -->
+    <string name="loading">Loading...</string>
+    <string name="error_fetch">Error: %s</string>
+    <string name="please_fill_all_fields">Please fill all fields</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="update">Update</string>
+    <string name="add">Add</string>
+    <string name="ok">OK</string>
+    <string name="no_thanks">No Thanks</string>
+    <string name="back">Back</string>
+    <string name="favorite">Favorite</string>
+    <string name="notifications">Notifications</string>
+
+    <!-- Auth -->
+    <string name="login">Login</string>
+    <string name="register">Register</string>
+    <string name="create_account">Create Account</string>
+    <string name="login_title">Login to your account</string>
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_full_name">Full Name</string>
+    <string name="already_have_account">Already have an account? Login</string>
+    <string name="dont_have_account">Don\'t have an account? Register</string>
+    <string name="login_failed">Login failed: %s</string>
+    <string name="registration_failed">Registration failed: %s</string>
+    <string name="auth_required">Authentication required</string>
+
+    <!-- Main Navigation -->
+    <string name="nav_timetable">Timetable</string>
+    <string name="nav_notices">Notices</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Notices home -->
+    <string name="notice_home_loading">Fetching the latest…</string>
+    <string name="notice_home_nothing_yet">Nothing published yet</string>
+    <string name="notice_empty_reset">Show all updates</string>
+    <string name="notice_home_cd_scroll_top">Scroll to top</string>
+    <string name="hint_notice_search">Search notices…</string>
+    <string name="notice_home_filtered">Showing %1$d of %2$d · %3$s</string>
+    <string name="notice_home_search_matches">%d matches</string>
+    <string name="notice_home_search_none">No search results</string>
+    <string name="notice_pin_cd">Pin or unpin notice</string>
+
+    <plurals name="notice_home_all_count">
+        <item quantity="one">%d update · Pull to refresh</item>
+        <item quantity="other">%d updates · Pull to refresh</item>
+    </plurals>
+
+    <!-- Timetable -->
+    <string name="today_label">TODAY</string>
+    <string name="no_classes_title">No classes today!</string>
+    <string name="enjoy_free_day">Enjoy your free day with your friends</string>
+    <string name="emoji_party">🎉</string>
+    <string name="no_classes_scheduled">No classes scheduled</string>
+    <string name="no_classes_today">No classes today 🎉</string>
+    <string name="saturday">Saturday</string>
+    <string name="sunday">Sunday</string>
+    <string name="monday">Monday</string>
+    <string name="tuesday">Tuesday</string>
+    <string name="wednesday">Wednesday</string>
+    <string name="thursday">Thursday</string>
+    <string name="friday">Friday</string>
+    <string name="hint_subject_name">Subject Name</string>
+    <string name="hint_teacher_name">Teacher Name</string>
+    <string name="hint_start_time">Start Time</string>
+    <string name="hint_end_time">End Time</string>
+    <string name="period_added">Period added</string>
+    <string name="period_updated">Period updated</string>
+    <string name="period_deleted">Period deleted</string>
+    <string name="delete_period_title">Delete Period</string>
+    <string name="delete_period_msg">Are you sure you want to delete %s?</string>
+
+    <!-- Notices -->
+    <string name="no_notices_yet">No notices yet 📭</string>
+    <string name="notices_title">Notices</string>
+    <string name="post_notice">Post Notice</string>
+    <string name="edit_notice">Edit Notice</string>
+    <string name="notice_title_hint">Notice Title</string>
+    <string name="notice_body_hint">Notice Body</string>
+    <string name="notice_type">Notice Type</string>
+    <string name="type_normal">Normal</string>
+    <string name="type_cancel">Class Cancelled</string>
+    <string name="type_substitute">Substitute Class</string>
+    <string name="notice_posted">Notice posted successfully</string>
+    <string name="notice_updated">Notice updated</string>
+    <string name="notice_deleted">Notice deleted</string>
+    <string name="admin_actions">Admin Actions</string>
+    <string name="delete_notice_title">Delete Notice</string>
+    <string name="delete_notice_msg">Are you sure you want to delete this notice?</string>
+
+    <!-- Library & PDFs -->
+    <string name="pdf_library">PDF Library</string>
+    <string name="no_pdfs_available">No PDFs available</string>
+    <string name="no_pdfs_uploaded">No PDFs uploaded yet 📂</string>
+    <string name="upload_pdf">Upload PDF</string>
+    <string name="tap_select_pdf">Tap to select PDF</string>
+    <string name="hint_file_title">File Title</string>
+    <string name="hint_subject">Subject</string>
+    <string name="btn_upload_library">Upload to Library</string>
+    <string name="pdf_added">PDF added to library</string>
+    <string name="upload_failed">Upload failed: %s</string>
+    <string name="metadata_failed">Failed to save metadata: %s</string>
+    <string name="pdf_icon">PDF Icon</string>
+    <string name="delete_material">Delete material</string>
+
+    <!-- Results & Seat Plans -->
+    <string name="academic_results">Academic Results</string>
+    <string name="no_results_found">No results found</string>
+    <string name="upload_result">Upload Result</string>
+    <string name="tap_select_result">Tap to select Result PDF</string>
+    <string name="hint_result_title">Result Title (e.g. L2S1 Final Results)</string>
+    <string name="result_uploaded">Result uploaded!</string>
+
+    <string name="exam_seat_plans">Exam Seat Plans</string>
+    <string name="no_seat_plans_found">No seat plans found</string>
+    <string name="upload_seat_plan">Upload Seat Plan</string>
+    <string name="tap_select_seat_plan">Tap to select Seat Plan PDF</string>
+    <string name="hint_seat_plan_title">Exam Title (e.g. Midterm Spring 2024)</string>
+    <string name="seat_plan_uploaded">Seat plan uploaded!</string>
+
+    <!-- Profile & Settings -->
+    <string name="settings">Settings</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="resources">Resources</string>
+    <string name="admin_controls">Admin Controls</string>
+    <string name="admin_panel">Admin Panel</string>
+    <string name="manage_users">Manage Users</string>
+    <string name="logout">Logout</string>
+    <string name="permissions_updated">Permissions updated</string>
+
+    <!-- Admin Panel -->
+    <string name="edit_timetable">Edit Timetable</string>
+    <string name="select_role">Select Role</string>
+    <string name="permissions">Permissions</string>
+    <string name="can_edit_timetable">Can Edit Timetable</string>
+    <string name="can_post_notices">Can Post Notices</string>
+    <string name="can_upload_pdf">Can Upload PDF</string>
+    <string name="can_send_cancel">Can Send Class Cancel</string>
+    <string name="can_upload_seat_plan">Can Upload Seat Plan</string>
+    <string name="can_upload_result">Can Upload Result</string>
+    <string name="user_updated">User updated successfully</string>
+
+    <!-- Onboarding -->
+    <string name="next">Next</string>
+    <string name="get_started">Get Started</string>
+    <string name="onboarding_1_title">Never Miss a Class</string>
+    <string name="onboarding_1_subtitle">Your full timetable with automatic reminders 10 minutes before every session.</string>
+    <string name="onboarding_2_title">Stay Updated</string>
+    <string name="onboarding_2_subtitle">Get instant notices and class cancellation alerts directly to your phone.</string>
+    <string name="onboarding_3_title">All Notes in One Place</string>
+    <string name="onboarding_3_subtitle">Access lecture PDFs and study materials uploaded by your teachers anytime.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_name">ClassMate Announcements</string>
+    <string name="notif_channel_desc">Notifications for class schedules and notices</string>
+    <string name="notif_permission_title">Notification Permission Needed</string>
+    <string name="notif_permission_msg">ClassMate needs permission to show you important notices and cancellations in real-time.</string>
+
+    <!-- Widget -->
+    <string name="widget_description">ClassMate - today\'s schedule, deadlines, and latest notices</string>
+
+    <!-- Chat -->
+    <string name="forwarded_from_format">\u21AA Forwarded from %s</string>
+    <string name="message_deleted">This message was deleted</string>
+    <string name="deadline">Deadline</string>
+    <string name="reaction_format">%1$s %2$d</string>
+
+</resources>

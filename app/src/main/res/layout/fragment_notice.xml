@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_notice_home_root">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/noticeHeaderPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_notice_home_panel"
+                android:orientation="vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="7dp">
+
+                <LinearLayout
+                    android:id="@+id/appBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="44dp"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/btnMenu"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/notice_home_cd_scroll_top"
+                        android:padding="8dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_scroll_to_top"
+                        app:tint="@color/cm_text_secondary" />
+
+                    <LinearLayout
+                        android:id="@+id/headerTitleBlock"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvNoticeTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:text="@string/nav_notices"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvNoticeSubtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp"
+                            tools:text="12 updates · Pull to refresh" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/searchContainer"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_notice_search"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_search_modern"
+                            app:tint="@color/cm_text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etNoticeSearch"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:background="@null"
+                            android:hint="@string/hint_notice_search"
+                            android:imeOptions="actionSearch"
+                            android:inputType="text"
+                            android:singleLine="true"
+                            android:textColor="@color/cm_text_primary"
+                            android:textColorHint="@color/cm_text_secondary"
+                            android:textSize="14sp" />
+
+                        <ImageButton
+                            android:id="@+id/btnCloseSearch"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/cancel"
+                            android:src="@drawable/ic_close"
+                            app:tint="@color/cm_text_secondary" />
+                    </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/btnSearch"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/hint_notice_search"
+                        android:padding="9dp"
+                        android:src="@drawable/ic_search_modern"
+                        app:tint="@color/cm_text_secondary" />
+
+                    <TextView
+                        android:id="@+id/btnPostNotice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="34dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_notice_action_pill"
+                        android:gravity="center"
+                        android:paddingHorizontal="12dp"
+                        android:text="+ Post"
+                        android:textColor="@color/cm_on_primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:clipToPadding="false"
+                android:fadingEdgeLength="28dp"
+                android:overScrollMode="never"
+                android:paddingHorizontal="12dp"
+                android:requiresFadingEdge="horizontal"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/filterChipContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:gravity="center_vertical"
+                    android:minHeight="42dp"
+                    android:orientation="horizontal"
+                    android:paddingBottom="5dp"
+                    android:paddingTop="3dp" />
+            </HorizontalScrollView>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvNotices"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="14dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="24dp"
+                    android:scrollbars="vertical"
+                    tools:listitem="@layout/item_notice_modern" />
+
+                <com.facebook.shimmer.ShimmerFrameLayout
+                    android:id="@+id/shimmerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingHorizontal="14dp"
+                    android:paddingTop="8dp"
+                    android:visibility="gone"
+                    app:shimmer_auto_start="true"
+                    app:shimmer_base_alpha="0.4"
+                    app:shimmer_duration="1000"
+                    app:shimmer_highlight_alpha="0.8"
+                    app:shimmer_intensity="0.15">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <include layout="@layout/shimmer_item_notice" />
+                        <include layout="@layout/shimmer_item_notice" />
+                        <include layout="@layout/shimmer_item_notice" />
+                    </LinearLayout>
+                </com.facebook.shimmer.ShimmerFrameLayout>
+
+                <LinearLayout
+                    android:id="@+id/emptyNoticeState"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="24dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_notice_elevated_card"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="22dp"
+                        android:paddingTop="28dp"
+                        android:paddingBottom="24dp">
+
+                        <FrameLayout
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:background="@drawable/bg_notice_icon_circle">
+
+                            <ImageView
+                                android:layout_width="34dp"
+                                android:layout_height="34dp"
+                                android:layout_gravity="center"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_classmate_logo_mark" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tvEmptyTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:gravity="center"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            tools:text="No notices yet" />
+
+                        <TextView
+                            android:id="@+id/tvEmptySubtitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:lineSpacingExtra="2dp"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="14sp"
+                            tools:text="Important class updates will appear here." />
+
+                        <TextView
+                            android:id="@+id/btnEmptyReset"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="8dp"
+                            android:text="@string/notice_empty_reset"
+                            android:textColor="@color/cm_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/btnEmptyPost"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_marginTop="10dp"
+                            android:background="@drawable/bg_notice_action_pill"
+                            android:gravity="center"
+                            android:paddingHorizontal="18dp"
+                            android:text="Post First Notice"
+                            android:textColor="@color/cm_on_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+                    </LinearLayout>
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</FrameLayout>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ClassMate semantic dark palette -->
+    <color name="cm_bg">#020817</color>
+    <color name="cm_bg_secondary">#06101F</color>
+    <color name="cm_surface">#081426</color>
+    <color name="cm_surface_elevated">#0B1730</color>
+    <color name="cm_surface_glass">#CC081426</color>
+    <color name="cm_card">#0B1324</color>
+    <color name="cm_card_alt">#101D35</color>
+
+    <color name="cm_text_primary">#F8FAFC</color>
+    <color name="cm_text_secondary">#CBD5E1</color>
+    <color name="cm_text_muted">#94A3B8</color>
+    <color name="cm_text_disabled">#64748B</color>
+    <color name="cm_text_inverse">#0F172A</color>
+
+    <color name="cm_border">#1E3355</color>
+    <color name="cm_border_strong">#2F4F7F</color>
+    <color name="cm_divider">#1E293B</color>
+
+    <color name="cm_primary">#3B82F6</color>
+    <color name="cm_primary_light">#60A5FA</color>
+    <color name="cm_primary_dark">#1D4ED8</color>
+    <color name="cm_primary_container">#102B5C</color>
+    <color name="cm_on_primary">#FFFFFF</color>
+
+    <color name="cm_success">#22C55E</color>
+    <color name="cm_warning">#F59E0B</color>
+    <color name="cm_error">#EF4444</color>
+    <color name="cm_info">#38BDF8</color>
+
+    <color name="cm_notice_general">#38BDF8</color>
+    <color name="cm_notice_resource">#A855F7</color>
+    <color name="cm_notice_assignment">#F97316</color>
+    <color name="cm_notice_deadline">#F59E0B</color>
+    <color name="cm_notice_cancel">#EF4444</color>
+    <color name="cm_notice_class_test">#60A5FA</color>
+    <color name="cm_notice_general_bg">#082033</color>
+    <color name="cm_notice_general_text">#38BDF8</color>
+    <color name="cm_notice_resource_bg">#24183F</color>
+    <color name="cm_notice_resource_text">#A855F7</color>
+    <color name="cm_notice_assignment_bg">#2E1405</color>
+    <color name="cm_notice_assignment_text">#F97316</color>
+    <color name="cm_notice_deadline_bg">#2D0B0F</color>
+    <color name="cm_notice_deadline_text">#F59E0B</color>
+    <color name="cm_notice_class_test_bg">#0F1E36</color>
+    <color name="cm_notice_class_test_text">#60A5FA</color>
+    <color name="cm_notice_cancel_bg">#2D0B0F</color>
+    <color name="cm_notice_cancel_text">#EF4444</color>
+
+    <color name="cm_file_pdf">#F87171</color>
+    <color name="cm_file_doc">#60A5FA</color>
+    <color name="cm_file_ppt">#F59E0B</color>
+    <color name="cm_file_lab">#34D399</color>
+    <color name="cm_file_other">#94A3B8</color>
+    <color name="cm_file_pdf_bg">#2D0B0F</color>
+    <color name="cm_file_pdf_text">#F87171</color>
+    <color name="cm_file_doc_bg">#102B5C</color>
+    <color name="cm_file_doc_text">#60A5FA</color>
+    <color name="cm_file_ppt_bg">#2E1405</color>
+    <color name="cm_file_ppt_text">#F59E0B</color>
+    <color name="cm_file_lab_bg">#0F2F1D</color>
+    <color name="cm_file_lab_text">#34D399</color>
+    <color name="cm_file_other_bg">#24183F</color>
+    <color name="cm_file_other_text">#A855F7</color>
+
+    <color name="cm_bottom_nav_bg">#E6071323</color>
+    <color name="cm_bottom_nav_selected">#102B5C</color>
+    <color name="cm_bottom_nav_icon_active">#60A5FA</color>
+    <color name="cm_bottom_nav_icon_inactive">#AAB5C6</color>
+    <color name="cm_bottom_nav_text_active">#60A5FA</color>
+    <color name="cm_bottom_nav_text_inactive">#AAB5C6</color>
+
+    <!-- Backward-compatible aliases for existing layouts and drawables. -->
+    <color name="cm_background">@color/cm_bg</color>
+    <color name="cm_primary_soft">#102B5C</color>
+    <color name="cm_primary_glow">#3B82F640</color>
+    <color name="bottom_nav_active">#60A5FA</color>
+    <color name="bottom_nav_inactive">#AAB5C6</color>
+    <color name="bottom_nav_glass">#E6071323</color>
+    <color name="bottom_nav_stroke">#1E3355</color>
+    <color name="cm_accent">#FBBF24</color>
+    <color name="cm_accent_warm">#F59E0B</color>
+    <color name="cm_accent_glow">#FBBF2430</color>
+    <color name="cm_cancel_red">#EF4444</color>
+    <color name="cm_border_glass">#1E3355</color>
+    <color name="cm_gradient_start">#3B82F6</color>
+    <color name="cm_gradient_end">#F59E0B</color>
+
+    <color name="cm_background_light">#F7FAFF</color>
+    <color name="cm_surface_light">#FFFFFF</color>
+    <color name="cm_surface_glass_light">#EFFFFFFF</color>
+    <color name="cm_text_primary_light">#0F172A</color>
+    <color name="cm_text_secondary_light">#334155</color>
+
+    <color name="colorPrimary">#3B82F6</color>
+    <color name="colorPrimaryDark">#020817</color>
+    <color name="colorAccent">#FBBF24</color>
+</resources>

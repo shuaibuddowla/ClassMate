@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="bottom_nav_height">72dp</dimen>
+    <dimen name="bottom_nav_horizontal_margin">10dp</dimen>
+    <dimen name="bottom_nav_bottom_margin">14dp</dimen>
+    <dimen name="bottom_nav_inner_horizontal_padding">6dp</dimen>
+    <dimen name="bottom_nav_inner_vertical_padding">3dp</dimen>
+</resources>

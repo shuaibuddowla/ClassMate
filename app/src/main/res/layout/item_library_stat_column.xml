@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:id="@+id/statIconContainer"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_library_file_icon_blue">
+
+        <ImageView
+            android:id="@+id/ivStatIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_pdf"
+            app:tint="@color/cm_primary" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tvStatValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:fontFamily="serif"
+        android:textColor="@color/cm_text_primary"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        tools:text="128" />
+
+    <TextView
+        android:id="@+id/tvStatLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="@color/cm_text_secondary"
+        android:textSize="9.5sp"
+        tools:text="Total Resources" />
+</LinearLayout>
