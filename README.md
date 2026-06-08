@@ -1,112 +1,80 @@
 # ClassMate
 
-ClassMate is a comprehensive academic companion app built for the MBSTU CSE-22 class community. It brings notices, AI-powered summaries, timetable management, library resources, chat, polls, attendance tools, widgets, and administrative publishing workflows into a unified Firebase-backed platform.
-
-The project was originally designed to simplify academic communication and resource sharing within a university batch while providing a modern, mobile-first experience for students and administrators.
+**ClassMate** is a comprehensive academic companion app built for the MBSTU CSE-22 batch. It unifies notices, timetable management, library resources, real-time chat, polls, attendance tools, and administrative workflows into a single Firebase-backed platform — designed with a mobile-first experience for both students and administrators.
 
 ---
 
-## Highlights
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Local Setup](#local-setup)
+- [Firebase Functions](#firebase-functions)
+- [Deploying Your Own Instance](#deploying-your-own-instance)
+- [Security Notes](#security-notes)
+- [Disclaimer](#disclaimer)
+
+---
+
+## Features
 
 ### Notice Management
-
-* Modern notice feed with pinning, reactions, comments, reminders, sharing, and offline-first caching.
-* AI-generated notice summaries for students.
-* AI-assisted notice drafting for administrators.
-* Rich notice composer with markdown-style formatting.
-* Write and preview modes.
-* Attachment support.
-* Deadline management workflows.
-* Class cancellation and substitute-class notices.
-* Assignment and class-test deadline notices.
+- Modern notice feed with pinning, reactions, comments, reminders, sharing, and offline-first caching
+- AI-generated notice summaries for students
+- AI-assisted notice drafting for administrators
+- Rich notice composer with markdown-style formatting, write/preview modes, and attachment support
+- Deadline management workflows
+- Class cancellation and substitute-class notices
+- Assignment and class-test deadline notices
 
 ### Academic Management
-
-* Complete timetable and schedule management.
-* Home screen timetable widgets.
-* Quick access to ongoing and upcoming classes.
-* Attendance management tools.
-* Seat plan management.
-* Result management and academic utilities.
+- Complete timetable and schedule management
+- Home screen timetable widgets
+- Quick access to ongoing and upcoming classes
+- Attendance management tools
+- Seat plan and result management
 
 ### Library System
-
-* Subject-wise PDF organization.
-* Searchable library.
-* Recent uploads section.
-* Downloaded/offline file visibility.
-* Open, manage, and delete cached resources.
-* GitHub-powered resource distribution workflow.
+- Subject-wise PDF organization with search
+- Recent uploads section
+- Downloaded/offline file visibility
+- Open, manage, and delete cached resources
+- GitHub-powered resource distribution workflow
 
 ### Communication
+- Real-time batch chat and direct messaging
+- Polls and voting system
+- Profile management
+- Administrative moderation tools
 
-* Real-time batch chat.
-* Direct messaging support.
-* Polls and voting system.
-* Profile management.
-* Administrative moderation tools.
-
-### Platform Features
-
-* Offline-first architecture.
-* Background reminders and synchronization.
-* Firebase Cloud Functions support.
-* Firestore security rules included.
-* Notification workflows through OneSignal and Telegram integrations.
+### Platform
+- Offline-first architecture
+- Background reminders and synchronization
+- Firebase Cloud Functions support
+- Firestore security rules
+- Notifications via OneSignal and Telegram integrations
 
 ---
 
 ## Tech Stack
 
-### Android
-
-* Kotlin
-* Android Views
-* Material Components
-* AndroidX Navigation
-
-### Backend
-
-* Firebase Authentication
-* Cloud Firestore
-* Firebase Cloud Functions
-* Firebase Cloud Messaging (FCM)
-* Firebase Storage
-
-### Local Storage
-
-* Room Database
-* Offline-first caching architecture
-
-### Background Processing
-
-* WorkManager
-
-### AI Integrations
-
-* Groq (Primary)
-* Gemini (Fallback)
-
-### Additional Services
-
-* OneSignal
-* Telegram Bot Integration
-
-### UI & Utilities
-
-* Glide
-* Lottie
-* Shimmer
-
-### Build System
-
-* Gradle Kotlin DSL
+| Layer | Technologies |
+|---|---|
+| **Android** | Kotlin, Android Views, Material Components, AndroidX Navigation |
+| **Backend** | Firebase Auth, Cloud Firestore, Cloud Functions, FCM, Firebase Storage |
+| **Local Storage** | Room Database, offline-first caching |
+| **Background** | WorkManager |
+| **AI** | Groq (primary), Gemini (fallback) |
+| **Notifications** | OneSignal, Telegram Bot |
+| **UI & Media** | Glide, Lottie, Shimmer |
+| **Build** | Gradle Kotlin DSL |
 
 ---
 
 ## Project Structure
 
-```text
+```
 app/                    Android application source
 functions/              Firebase Cloud Functions source
 firestore.rules         Firestore security rules
@@ -117,27 +85,15 @@ gradle/                 Gradle wrapper and version catalog
 
 ---
 
-# Local Setup
+## Local Setup
 
-## 1. Install Android Studio
+### 1. Install Android Studio
 
-Install Android Studio and open this repository.
+Install Android Studio and open this repository. Android Studio will generate `local.properties` with your SDK path automatically.
 
----
+### 2. Configure Build Credentials
 
-## 2. Create Local Properties
-
-Allow Android Studio to generate the initial `local.properties` file containing:
-
-```properties
-sdk.dir=YOUR_ANDROID_SDK_PATH
-```
-
----
-
-## 3. Configure Build Credentials
-
-Add the required values to `local.properties`.
+Add the following to `local.properties`:
 
 ```properties
 GITHUB_LIBRARY_TOKEN=your_token
@@ -155,19 +111,15 @@ GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
----
+### 3. Add Firebase Configuration
 
-## 4. Configure Firebase
+Download `google-services.json` from your Firebase project and place it at:
 
-Download your Firebase configuration file and place it inside:
-
-```text
+```
 app/google-services.json
 ```
 
----
-
-## 5. Build the Application
+### 4. Build
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
@@ -175,9 +127,9 @@ app/google-services.json
 
 ---
 
-# Firebase Functions
+## Firebase Functions
 
-Install dependencies:
+Install dependencies and build:
 
 ```powershell
 cd functions
@@ -185,13 +137,13 @@ npm install
 npm run build
 ```
 
-Deploy functions:
+Deploy functions only:
 
 ```powershell
 firebase deploy --only functions
 ```
 
-Deploy the complete Firebase backend:
+Deploy the full Firebase backend:
 
 ```powershell
 firebase deploy
@@ -199,232 +151,137 @@ firebase deploy
 
 ---
 
-# Using ClassMate For Your Own Batch
+## Deploying Your Own Instance
 
-## Important
+> ClassMate is **not** a multi-tenant platform. There is no classroom-code system and no teacher-student invite flow. It was built for a single academic community where all users share one backend managed by administrators.
+>
+> To use ClassMate for your own batch, department, or student community, you must deploy your own instance.
 
-ClassMate is **not** a multi-tenant platform like Google Classroom, Microsoft Teams, Moodle, or Canvas.
+### How It Works
 
-There is no classroom-code system.
+1. Fork or download this repository
+2. Create your own Firebase project and configure all required services
+3. Add your API credentials to `local.properties`
+4. Generate a signed release APK
+5. Distribute the APK to your students
 
-Teachers cannot create classrooms and invite students using join codes.
-
-The application was originally designed for a single academic community (MBSTU CSE-22), where every user connects to the same backend managed by administrators.
-
-If you want to use ClassMate for your own university batch, department, student club, research group, or academic community, you must deploy your own instance of the application.
-
----
-
-## How Deployment Works
-
-1. Download or fork this repository.
-2. Create your own Firebase project.
-3. Configure all required Firebase services.
-4. Configure API credentials.
-5. Generate a signed APK.
-6. Distribute the APK to your students.
-7. Students install the APK and automatically connect to your backend.
-
-After deployment, your users will be completely isolated from other ClassMate deployments.
-
-Your Firebase project becomes your own independent ClassMate ecosystem.
+Once installed, every student automatically connects to your backend. Your Firebase project becomes your own independent ClassMate ecosystem, completely isolated from other deployments.
 
 ---
 
-## Administrator Model
+### Step-by-Step Firebase Setup
 
-Unlike Google Classroom, ClassMate follows a centralized administration model.
+#### Step 1 — Create a Firebase Project
 
-The owner of the deployment becomes the initial Super Admin and controls the platform.
+1. Visit [Firebase Console](https://console.firebase.google.com)
+2. Click **Create Project** and follow the prompts
 
-The Super Admin can:
+#### Step 2 — Register Your Android App
 
-* Publish notices
-* Manage timetable data
-* Upload library resources
-* Manage polls
-* Control attendance systems
-* Manage user permissions
-* Promote or remove administrators
-* Moderate content
-* Manage student accounts
+1. Go to **Project Settings → Add App → Android**
+2. Enter your package name and register
+3. Download `google-services.json` and place it at `app/google-services.json`
 
-Every user of your APK connects only to your configured Firebase backend.
+#### Step 3 — Enable Firebase Services
 
----
+Enable the following in your Firebase project:
 
-# Creating Your Own Firebase Backend
+- **Authentication** — Google Sign-In and Email/Password providers
+- **Cloud Firestore** — create a Firestore database
+- **Firebase Storage** — create a storage bucket
+- **Firebase Cloud Messaging** — for push notifications
+- **Cloud Functions** — for backend operations
 
-## Step 1: Create a Firebase Project
+#### Step 4 — Configure SHA Certificates
 
-1. Visit Firebase Console.
-2. Click **Create Project**.
-3. Enter a project name.
-4. Complete project creation.
-
----
-
-## Step 2: Register Android Application
-
-1. Open Project Settings.
-2. Click **Add App → Android**.
-3. Enter your package name.
-4. Register the application.
-5. Download `google-services.json`.
-
-Place it inside:
-
-```text
-app/google-services.json
-```
-
----
-
-## Step 3: Enable Firebase Services
-
-Enable the following services:
-
-### Authentication
-
-Recommended providers:
-
-* Google Sign-In
-* Email/Password
-
-### Cloud Firestore
-
-Create a Firestore database.
-
-### Firebase Storage
-
-Create a Storage bucket.
-
-### Firebase Cloud Messaging
-
-Enable push notifications.
-
-### Cloud Functions
-
-Enable Cloud Functions for backend operations.
-
----
-
-## Step 4: Configure SHA Certificates
-
-For Google Authentication to work correctly:
-
-### Debug SHA
+Required for Google Authentication:
 
 ```bash
+# Debug SHA
 keytool -list -v -alias androiddebugkey -keystore %USERPROFILE%\.android\debug.keystore
+
+# Release SHA — generate your release keystore and register both SHA-1 and SHA-256 in Firebase Project Settings
 ```
 
-### Release SHA
-
-Generate your release keystore and register its SHA-1 and SHA-256 values inside Firebase Project Settings.
-
----
-
-## Step 5: Deploy Firestore Rules
+#### Step 5 — Deploy Firestore Rules
 
 ```powershell
 firebase deploy --only firestore:rules
 ```
 
----
-
-## Step 6: Deploy Cloud Functions
+#### Step 6 — Deploy Cloud Functions
 
 ```powershell
 cd functions
 npm install
 npm run build
-
 firebase deploy --only functions
 ```
 
----
+#### Step 7 — Configure Third-Party Services
 
-## Step 7: Configure Third-Party Services
+Set up and add credentials for the following to `local.properties`:
 
-Configure:
+- Groq API
+- Gemini API
+- OneSignal
+- Telegram Bot
+- GitHub Release repository (for library file workflows)
 
-* Groq API
-* Gemini API
-* OneSignal
-* Telegram Bot
-* GitHub Release repository (for library workflows if applicable)
+#### Step 8 — Generate a Signed APK
 
-Add all credentials to `local.properties`.
+In Android Studio: **Build → Generate Signed Bundle / APK → APK**
 
----
+Create or select a keystore and build the release APK.
 
-## Step 8: Generate a Signed Release APK
+#### Step 9 — Distribute
 
-Inside Android Studio:
-
-```text
-Build
-└── Generate Signed Bundle / APK
-    └── APK
-```
-
-Create a new keystore or select an existing one.
-
-Build the release APK.
+Share the APK via GitHub Releases, Google Drive, Telegram, WhatsApp, or any channel that works for your community. Students install it and connect to your backend automatically.
 
 ---
 
-## Step 9: Distribute The APK
+### Administrator Model
 
-You may distribute the generated APK using:
+ClassMate uses a centralized administration model. The deployer becomes the initial **Super Admin**.
 
-* GitHub Releases
-* Google Drive
-* Telegram
-* WhatsApp
-* University Groups
-* Institution Websites
-
-Once installed, students automatically connect to your backend and become part of your ClassMate deployment.
+**Super Admin capabilities:**
+- Publish notices and manage timetable data
+- Upload library resources and manage polls
+- Control attendance systems
+- Manage user permissions and roles
+- Promote or remove administrators
+- Moderate content and manage student accounts
 
 ---
 
-# Intended Usage
+### Intended Use Cases
 
 ClassMate is best suited for:
 
-* University batches
-* Academic departments
-* Student clubs
-* Research groups
-* Campus communities
-* Small educational organizations
+- University batches and academic departments
+- Student clubs and research groups
+- Campus communities and small educational organizations
 
-It is designed as a self-hosted academic communication platform rather than a global classroom service.
+It is a self-hosted academic communication platform, not a global classroom service.
 
 ---
 
-# Security Notes
+## Security Notes
 
-Never commit:
+Never commit the following to version control:
 
-* local.properties
-* APK files
-* AAB files
-* Keystores
-* API secrets
-* Service account keys
-* Release artifacts
+- `local.properties`
+- APK or AAB files
+- Keystores
+- API secrets or service account keys
+- Release artifacts
 
-Restrict Firebase API keys and configure Firebase Security Rules properly before production deployment.
+Always configure Firebase Security Rules properly and restrict your Firebase API keys before going to production.
 
 ---
 
-# Disclaimer
+## Disclaimer
 
-ClassMate is not a Software-as-a-Service (SaaS) platform.
+ClassMate is not a SaaS platform. Each institution, department, batch, or community is expected to deploy and maintain its own Firebase project, credentials, backend configuration, and application build.
 
-Each institution, department, batch, or community is expected to deploy and maintain its own Firebase project, credentials, backend configuration, and application build.
-
-By deploying your own instance, you are responsible for maintaining security, user management, infrastructure costs, and operational reliability.
+By deploying your own instance, you are responsible for security, user management, infrastructure costs, and operational reliability.
