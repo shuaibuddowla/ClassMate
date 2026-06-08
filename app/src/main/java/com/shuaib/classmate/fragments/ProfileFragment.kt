@@ -124,7 +124,7 @@ class ProfileFragment : Fragment() {
             requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
 
-        binding.btnAddWidget.setOnClickListener {
+        binding.layoutAddWidget.setOnClickListener {
             val context = requireContext()
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)

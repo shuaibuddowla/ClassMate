@@ -42,7 +42,7 @@ android {
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"${getLocalProperty("GEMINI_API_KEY")}\"")
         buildConfigField("String", "GROQ_API_KEY", "\"${getLocalProperty("GROQ_API_KEY")}\"")
-        buildConfigField("String", "GEMINI_MODEL", "\"gemini-3.5-flash\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"gemini-1.5-flash\"")
         buildConfigField("String", "GROQ_MODEL", "\"llama-3.3-70b-versatile\"")
     }
 

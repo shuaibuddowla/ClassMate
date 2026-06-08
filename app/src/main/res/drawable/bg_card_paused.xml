@@ -1,21 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- res/drawable/bg_card_paused.xml -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Soft glow/shadow layer (Muted) -->
     <item
-        android:left="2dp"
-        android:right="2dp"
-        android:bottom="2dp">
+        android:left="0dp"
+        android:right="0dp"
+        android:top="0dp"
+        android:bottom="0dp">
         <shape>
-            <solid android:color="#0D3B82F6" />
-            <corners android:radius="20dp" />
+            <solid android:color="#0664748B"/> <!-- 2% opacity muted grey -->
+            <corners android:radius="20dp"/>
         </shape>
     </item>
-    <item android:bottom="2dp">
+
+    <!-- Main card background -->
+    <item
+        android:left="1dp"
+        android:right="1dp"
+        android:top="1dp"
+        android:bottom="2dp">
         <shape>
-            <solid android:color="#B80B1220" />
-            <corners android:radius="20dp" />
+            <solid android:color="@color/cm_card"/>
+            <corners android:radius="20dp"/>
             <stroke
                 android:width="1dp"
-                android:color="#2247556B" />
+                android:color="#2664748B"/> <!-- 15% opacity muted grey -->
         </shape>
     </item>
 </layer-list>

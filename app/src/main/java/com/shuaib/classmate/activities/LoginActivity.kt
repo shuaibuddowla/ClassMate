@@ -4,6 +4,7 @@ import android.content.Intent
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.util.Patterns
@@ -13,10 +14,14 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.TranslateAnimation
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -27,6 +32,7 @@ import com.google.firebase.firestore.SetOptions
 import com.onesignal.OneSignal
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityLoginBinding
+import com.shuaib.classmate.databinding.DialogForgotPasswordBinding
 import com.shuaib.classmate.models.User
 import com.shuaib.classmate.utils.AnimUtils
 import com.shuaib.classmate.utils.AuthDebug
@@ -41,6 +47,7 @@ class LoginActivity : AppCompatActivity() {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private var logoPulseAnimator: AnimatorSet? = null
     private var authInProgress = false
+    private var keyboardVisible = false
 
     private val googleSignInLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -83,11 +90,11 @@ class LoginActivity : AppCompatActivity() {
         AuthDebug.logRuntimeConfig(this, auth, "LoginActivity", getString(R.string.default_web_client_id))
         setupAnimations()
         setupKeyboardActions()
+        setupKeyboardAwareLayout()
 
-        binding.etEmail.requestFocus()
         binding.btnLogin.applyClickAnimation { loginUser() }
         binding.tvForgotPassword.setOnClickListener {
-            startActivity(Intent(this, ForgotPasswordActivity::class.java))
+            showForgotPasswordDialog()
         }
         binding.tvRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
@@ -112,6 +119,49 @@ class LoginActivity : AppCompatActivity() {
                 false
             }
         }
+        binding.etPassword.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                applyKeyboardState(true)
+                keepLoginButtonVisible()
+            }
+        }
+        binding.etEmail.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                applyKeyboardState(true)
+            }
+        }
+    }
+
+    private fun setupKeyboardAwareLayout() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { _, insets ->
+            applyKeyboardState(insets.isVisible(WindowInsetsCompat.Type.ime()))
+            if (this.keyboardVisible) {
+                keepLoginButtonVisible()
+            }
+            insets
+        }
+        binding.rootLayout.viewTreeObserver.addOnGlobalLayoutListener {
+            val visibleFrame = Rect()
+            binding.rootLayout.getWindowVisibleDisplayFrame(visibleFrame)
+            val heightDiff = binding.rootLayout.rootView.height - visibleFrame.height()
+            val visible = heightDiff > binding.rootLayout.rootView.height * 0.15f
+            applyKeyboardState(visible)
+            if (visible) {
+                keepLoginButtonVisible()
+            }
+        }
+    }
+
+    private fun applyKeyboardState(visible: Boolean) {
+        keyboardVisible = visible
+        binding.layoutBottomSection.visibility = if (visible) View.GONE else View.VISIBLE
+        binding.dividerBottom.visibility = if (visible) View.GONE else View.VISIBLE
+    }
+
+    private fun keepLoginButtonVisible() {
+        binding.scrollContent.postDelayed({
+            binding.scrollContent.smoothScrollTo(0, binding.cardLogin.bottom)
+        }, 120L)
     }
 
     private fun setupAnimations() {
@@ -424,9 +474,9 @@ class LoginActivity : AppCompatActivity() {
         authInProgress = loading
         binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
         binding.btnLogin.isEnabled = !loading
-        binding.btnGoogle.isEnabled = !loading
         binding.tvForgotPassword.isEnabled = !loading
-        binding.btnLogin.text = if (loading) "" else "Sign In"
+        binding.tvRegister.isEnabled = !loading
+        binding.btnLogin.text = if (loading) "" else "Log in"
     }
 
     private fun shakeForm() {
@@ -459,6 +509,50 @@ class LoginActivity : AppCompatActivity() {
         startActivity(Intent(this, MainActivity::class.java))
         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         finishAffinity()
+    }
+
+    private fun showForgotPasswordDialog() {
+        val dialogBinding = DialogForgotPasswordBinding.inflate(layoutInflater)
+        
+        // Pre-fill the email field if the user already typed a valid email format on login screen
+        val typedInput = binding.etEmail.text.toString().trim()
+        if (Patterns.EMAIL_ADDRESS.matcher(typedInput).matches()) {
+            dialogBinding.etResetEmail.setText(typedInput)
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this, R.style.Theme_ClassMate_Dialog)
+            .setView(dialogBinding.root)
+            .setPositiveButton("Send Reset Link", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val email = dialogBinding.etResetEmail.text.toString().trim()
+            if (email.isEmpty()) {
+                dialogBinding.tilResetEmail.error = "Email is required"
+                return@setOnClickListener
+            }
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                dialogBinding.tilResetEmail.error = "Enter a valid email"
+                return@setOnClickListener
+            }
+            dialogBinding.tilResetEmail.error = null
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+            
+            auth.sendPasswordResetEmail(email)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Password reset link sent. Check your email.", Toast.LENGTH_LONG).show()
+                    dialog.dismiss()
+                }
+                .addOnFailureListener { exception ->
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    val friendlyMsg = AuthErrorMapper.forgotPasswordMessage(exception)
+                    dialogBinding.tilResetEmail.error = friendlyMsg
+                }
+        }
     }
 
     override fun onDestroy() {

@@ -47,6 +47,7 @@ import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.notices.ShareForwardNoticeBottomSheet
 import com.shuaib.classmate.utils.NetworkMonitor
 import com.shuaib.classmate.utils.ThemeColors
+import com.shuaib.classmate.utils.applyClickAnimation
 import com.shuaib.classmate.viewmodels.NoticeViewModel
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -75,6 +76,9 @@ class NoticeFragment : Fragment() {
     private var likedNoticeIds: Set<String> = emptySet()
     private val pendingPinnedState = mutableMapOf<String, Boolean>()
     private var currentRenderedItems: List<Any> = emptyList()
+
+    private var isSummaryCollapsed = true
+    private var todayNoticesToSummarize: List<Notice> = emptyList()
 
     private enum class NoticeFilter(val label: String, val icon: String) {
         ALL("All", "A"),
@@ -110,6 +114,7 @@ class NoticeFragment : Fragment() {
         setupRecyclerView()
         setupTopBar()
         setupSearch()
+        setupAiSummaryCard()
         renderFilterChips()
         observeCachedNotices()
         checkAdminAccess()
@@ -157,14 +162,9 @@ class NoticeFragment : Fragment() {
     }
 
     private fun setupTopBar() {
-        binding.btnPostNotice.setOnClickListener { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
-        binding.btnEmptyPost.setOnClickListener { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
-        binding.btnEmptyReset.setOnClickListener { resetFiltersAndSearch() }
-        binding.btnMenu.setOnClickListener {
-            it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-            binding.rvNotices.stopScroll()
-            binding.rvNotices.smoothScrollToPosition(0)
-        }
+        binding.btnPostNotice.applyClickAnimation { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
+        binding.btnEmptyPost.applyClickAnimation { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
+        binding.btnEmptyReset.applyClickAnimation { resetFiltersAndSearch() }
     }
 
     private fun resetFiltersAndSearch() {
@@ -178,8 +178,8 @@ class NoticeFragment : Fragment() {
     }
 
     private fun setupSearch() {
-        binding.btnSearch.setOnClickListener { setSearchMode(true) }
-        binding.btnCloseSearch.setOnClickListener {
+        binding.btnSearch.applyClickAnimation { setSearchMode(true) }
+        binding.btnCloseSearch.applyClickAnimation {
             binding.etNoticeSearch.text?.clear()
             setSearchMode(false)
         }
@@ -249,6 +249,7 @@ class NoticeFragment : Fragment() {
                         restartEngagementListeners(notices.map { it.id }.filter { it.isNotBlank() }.toSet())
                         renderFilterChips()
                         renderFeed()
+                        processAiSummary(notices)
                     }
                 }
                 launch {
@@ -820,5 +821,149 @@ class NoticeFragment : Fragment() {
 
     private fun actionErrorMessage(error: Exception?): String {
         return error?.message ?: "Unknown error"
+    }
+
+    private fun setupAiSummaryCard() {
+        if (_binding == null) return
+        val card = binding.aiSummaryCard
+        card.layoutAiHeader.setOnClickListener {
+            toggleAiSummaryExpansion()
+        }
+        card.btnAiDismiss.setOnClickListener {
+            dismissAiSummary()
+        }
+        card.btnAiRetry.setOnClickListener {
+            generateAiSummary()
+        }
+        updateAiSummaryUiState()
+    }
+
+    private fun toggleAiSummaryExpansion() {
+        isSummaryCollapsed = !isSummaryCollapsed
+        updateAiSummaryUiState()
+        if (!isSummaryCollapsed) {
+            val hash = getTodayNoticesHash()
+            if (hash.isNotEmpty()) {
+                val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+                val cached = prefs.getString("summary_$hash", null)
+                if (cached.isNullOrEmpty()) {
+                    generateAiSummary()
+                }
+            }
+        }
+    }
+
+    private fun dismissAiSummary() {
+        val hash = getTodayNoticesHash()
+        if (hash.isNotEmpty()) {
+            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("dismissed_$hash", true).apply()
+        }
+        updateAiSummaryUiState()
+    }
+
+    private fun getTodayNoticesHash(): String {
+        if (todayNoticesToSummarize.isEmpty()) return ""
+        val latestTimestamp = todayNoticesToSummarize.maxOfOrNull { itemTimestampMillis(it) } ?: 0L
+        return "${todayNoticesToSummarize.size}_$latestTimestamp"
+    }
+
+    private fun generateAiSummary() {
+        if (todayNoticesToSummarize.isEmpty()) return
+        val hash = getTodayNoticesHash()
+        if (hash.isEmpty()) return
+        val context = context ?: return
+        
+        val card = binding.aiSummaryCard
+        card.layoutAiLoading.visibility = View.VISIBLE
+        card.layoutAiError.visibility = View.GONE
+        card.tvAiSummaryText.visibility = View.GONE
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val concatenatedText = todayNoticesToSummarize.joinToString("\n\n") { notice ->
+                    "Title: ${notice.title}\nContent: ${notice.body}"
+                }
+                val result = com.shuaib.classmate.services.AIService.summarizeNotice(
+                    title = "Today's Updates",
+                    content = concatenatedText,
+                    type = "General",
+                    subject = "Notice Feed Summary"
+                )
+                if (_binding == null) return@launch
+                if (result != null && result.isNotBlank()) {
+                    val prefs = context.getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().putString("summary_$hash", result).apply()
+                    updateAiSummaryUiState()
+                } else {
+                    showAiSummaryError("Failed to generate summary.")
+                }
+            } catch (e: Exception) {
+                if (_binding == null) return@launch
+                showAiSummaryError(e.message ?: "Unknown error occurred.")
+            }
+        }
+    }
+
+    private fun showAiSummaryError(errorMsg: String) {
+        if (_binding == null) return
+        val card = binding.aiSummaryCard
+        card.layoutAiLoading.visibility = View.GONE
+        card.layoutAiError.visibility = View.VISIBLE
+        card.tvAiErrorMsg.text = errorMsg
+        card.tvAiSummaryText.visibility = View.GONE
+    }
+
+    private fun processAiSummary(notices: List<Notice>) {
+        val today = notices.filter { NoticeUi.isToday(itemTimestampMillis(it)) }
+        todayNoticesToSummarize = today
+        updateAiSummaryUiState()
+    }
+
+    private fun updateAiSummaryUiState() {
+        if (_binding == null) return
+        val card = binding.aiSummaryCard
+        if (todayNoticesToSummarize.isEmpty()) {
+            card.cardAiSummary.visibility = View.GONE
+            return
+        }
+        val hash = getTodayNoticesHash()
+        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+        val isDismissed = prefs.getBoolean("dismissed_$hash", false)
+        if (isDismissed) {
+            card.cardAiSummary.visibility = View.GONE
+            return
+        }
+        card.cardAiSummary.visibility = View.VISIBLE
+        if (isSummaryCollapsed) {
+            card.layoutAiContent.visibility = View.GONE
+            card.ivAiChevron.rotation = 0f
+            card.btnAiActionText.text = "Expand"
+            card.btnAiActionText.visibility = View.VISIBLE
+        } else {
+            card.layoutAiContent.visibility = View.VISIBLE
+            card.ivAiChevron.rotation = 90f
+            card.btnAiActionText.text = "Collapse"
+            card.btnAiActionText.visibility = View.VISIBLE
+            val cachedSummary = prefs.getString("summary_$hash", null)
+            if (cachedSummary != null) {
+                card.layoutAiLoading.visibility = View.GONE
+                card.layoutAiError.visibility = View.GONE
+                card.tvAiSummaryText.visibility = View.VISIBLE
+                val context = context
+                if (context != null) {
+                    card.tvAiSummaryText.text = com.shuaib.classmate.notices.NoticeTextFormatter.format(context, cachedSummary)
+                } else {
+                    card.tvAiSummaryText.text = cachedSummary
+                }
+            } else {
+                if (card.layoutAiLoading.visibility != View.VISIBLE && card.layoutAiError.visibility != View.VISIBLE) {
+                    card.layoutAiLoading.visibility = View.GONE
+                    card.layoutAiError.visibility = View.GONE
+                    card.tvAiSummaryText.visibility = View.VISIBLE
+                    generateAiSummary()
+                }
+            }
+        }
     }
 }

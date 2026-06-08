@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/layout/item_day_card.xml -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardDayRoot"
+    android:layout_width="50dp"
+    android:layout_height="60dp"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingTop="12dp"
+    android:paddingBottom="8dp"
+    android:background="@drawable/bg_day_card_unselected"
+    android:elevation="3dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackgroundBorderless">
+
+    <!-- Day name: Sat, Sun, Mon... -->
+    <TextView
+        android:id="@+id/tvDayShort"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="10.5sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/cm_text_disabled"
+        android:letterSpacing="0.05"/>
+
+    <!-- Date number: 07, 08, 09... -->
+    <TextView
+        android:id="@+id/tvDayDate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif"
+        android:textColor="@color/cm_text_primary"
+        android:layout_marginTop="5dp"/>
+
+    <!-- Selected indicator pill -->
+    <View
+        android:id="@+id/vDayIndicator"
+        android:layout_width="16dp"
+        android:layout_height="3dp"
+        android:background="@drawable/bg_day_card_indicator"
+        android:layout_marginTop="7dp"
+        android:visibility="invisible"/>
+
+</LinearLayout>

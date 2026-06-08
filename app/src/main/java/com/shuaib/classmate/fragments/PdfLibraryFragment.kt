@@ -620,20 +620,25 @@ class PdfLibraryFragment : Fragment() {
         return if (unit == 0) "${bytes}B" else String.format(Locale.US, "%.1f %s", value, units[unit])
     }
 
-    private fun lockParentSwipeWhileTouching(view: View) {
-        view.setOnTouchListener { v, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                    (activity as? MainActivity)?.setMainPageSwipeEnabled(false)
+    private fun lockParentSwipeWhileTouching(recyclerView: androidx.recyclerview.widget.RecyclerView) {
+        recyclerView.addOnItemTouchListener(object : androidx.recyclerview.widget.RecyclerView.OnItemTouchListener {
+            override fun onInterceptTouchEvent(rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent): Boolean {
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                        rv.parent?.requestDisallowInterceptTouchEvent(true)
+                        (activity as? MainActivity)?.setMainPageSwipeEnabled(false)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        rv.parent?.requestDisallowInterceptTouchEvent(false)
+                        (activity as? MainActivity)?.setMainPageSwipeEnabled(true)
+                    }
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                    (activity as? MainActivity)?.setMainPageSwipeEnabled(true)
-                }
+                return false
             }
-            false
-        }
+
+            override fun onTouchEvent(rv: androidx.recyclerview.widget.RecyclerView, e: MotionEvent) {}
+            override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
+        })
     }
 
     private fun checkAdminAccess() {

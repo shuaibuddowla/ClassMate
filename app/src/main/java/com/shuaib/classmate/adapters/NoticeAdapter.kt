@@ -679,8 +679,10 @@ class NoticeAdapter(
                 if (hasVoted) "Tap another option to change your vote" else "Select one option"
             }
             val expired = poll.expiresAt?.toDate()?.before(Date()) ?: false
-            binding.tvStatus.text = if (expired) "Poll Expired" else "Poll Active"
-            binding.tvStatus.setTextColor(if (expired) ThemeColors.error(itemView.context) else ThemeColors.success(itemView.context))
+            binding.tvStatus.text = if (expired) "Expired" else "Active"
+            val statusColor = if (expired) ThemeColors.error(itemView.context) else ThemeColors.success(itemView.context)
+            binding.tvStatus.setTextColor(statusColor)
+            binding.tvStatus.background = countdownChip(statusColor)
             val winner = poll.getWinner()
             binding.tvVerdict.isVisible = winner != null && (hasVoted || expired)
             binding.tvVerdict.text = winner?.let { "Winner: $it" }.orEmpty()
@@ -723,7 +725,7 @@ class NoticeAdapter(
                 }
 
                 optionBinding.tvOptionText.setTextColor(
-                    if (selected) ThemeColors.primarySoft(itemView.context)
+                    if (selected) ThemeColors.primary(itemView.context)
                     else ThemeColors.textPrimary(itemView.context)
                 )
 
@@ -763,6 +765,15 @@ class NoticeAdapter(
                         putExtra("ALLOW_MULTIPLE", poll.allowMultipleAnswers)
                     }
                 )
+            }
+        }
+
+        private fun countdownChip(base: Int): GradientDrawable {
+            val fill = ColorUtils.setAlphaComponent(base, 0x24)
+            return GradientDrawable().apply {
+                setColor(fill)
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), ColorUtils.setAlphaComponent(base, 0x92))
             }
         }
     }

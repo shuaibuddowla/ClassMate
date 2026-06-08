@@ -83,7 +83,7 @@
         style="@style/NoticeForwardOptionStyle">
         <ImageView style="@style/NoticeForwardOptionIconStyle" android:src="@drawable/ic_users" app:tint="@color/cm_primary_soft" />
         <LinearLayout style="@style/NoticeForwardOptionTextStyle">
-            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="Class Group" />
+            <TextView style="@style/NoticeForwardOptionTitleStyle" android:text="CODRIX-22" />
             <TextView style="@style/NoticeForwardOptionSubtitleStyle" android:text="Forward into the main class room" />
         </LinearLayout>
         <ImageView style="@style/NoticeForwardChevronStyle" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />

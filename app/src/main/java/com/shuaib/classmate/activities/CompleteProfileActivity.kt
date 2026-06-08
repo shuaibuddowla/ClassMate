@@ -42,31 +42,22 @@ class CompleteProfileActivity : AppCompatActivity() {
         setupUI()
         loadInitialData()
 
-        binding.btnNext1.setOnClickListener { validateAndNextStep1() }
         binding.btnNext2.setOnClickListener { validateAndNextStep2() }
-        binding.tvSkip2.setOnClickListener { nextStep() }
+        binding.tvSkip2.setOnClickListener { navigateToMain() }
+        binding.tvSkipPhoto.setOnClickListener { navigateToMain() }
         binding.btnChangePhoto.setOnClickListener { imagePickerLauncher.launch("image/*") }
         binding.btnFinish.setOnClickListener { uploadAndFinish() }
     }
 
     private fun setupUI() {
-        // Step 1 Dropdown
-        val departments = arrayOf("CSE", "ICT", "MGT", "TE", "Agriculture", "ESRM")
-        val adapterDept = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, departments)
-        binding.spinnerDept.setAdapter(adapterDept)
-
-        // Step 2 Dropdown
+        // Step 2 Dropdown (now Step 1)
         val bloodGroups = arrayOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
         val adapterBlood = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, bloodGroups)
         binding.spinnerBlood.setAdapter(adapterBlood)
-
-        // Student ID auto uppercase and filter
-       // binding.etStudentId.filters = StudentIdUtils.inputFilters
     }
 
     private fun loadInitialData() {
         val user = auth.currentUser ?: return
-        binding.etFullName.setText(user.displayName)
         
         // Load existing photo if available
         user.photoUrl?.let {
@@ -75,53 +66,6 @@ class CompleteProfileActivity : AppCompatActivity() {
                 .placeholder(R.drawable.ic_default_avatar)
                 .into(binding.ivProfile)
         }
-    }
-
-    private fun validateAndNextStep1() {
-        val name = binding.etFullName.text.toString().trim()
-        val studentId = binding.etStudentId.text.toString().trim().uppercase()
-        val dept = binding.spinnerDept.text.toString().trim()
-
-        if (name.isEmpty()) {
-            binding.tilFullName.error = "Name is required"
-            return
-        } else binding.tilFullName.error = null
-
-        if (!StudentIdUtils.isValid(studentId)) {
-            binding.tilStudentId.error = "Invalid Student ID (e.g. CE25012)"
-            return
-        } else binding.tilStudentId.error = null
-
-        if (dept.isEmpty()) {
-            binding.tilDept.error = "Please select department"
-            return
-        } else binding.tilDept.error = null
-
-        val email = auth.currentUser?.email.orEmpty()
-        val uid = auth.currentUser?.uid ?: return
-
-        saveDataToFirestore(mapOf(
-            "name" to name,
-            "fullName" to name,
-            "studentId" to studentId,
-            "department" to dept
-        ))
-
-        if (studentId.isNotBlank() && StudentIdUtils.isValid(studentId)) {
-            val lookupRef = firestore.collection("student_id_lookup").document(studentId)
-            val lookupMap = hashMapOf<String, Any>(
-                "uid" to uid,
-                "email" to email
-            )
-            lookupRef.set(lookupMap)
-                .addOnSuccessListener {
-                    android.util.Log.d("CompleteProfile", "student_id_lookup created successfully")
-                }
-                .addOnFailureListener { e ->
-                    android.util.Log.e("CompleteProfile", "Failed to create student_id_lookup", e)
-                }
-        }
-        nextStep()
     }
 
     private fun validateAndNextStep2() {
@@ -147,7 +91,6 @@ class CompleteProfileActivity : AppCompatActivity() {
     private fun updateProgressDots() {
         binding.dotStep1.setBackgroundResource(if (currentStep == 0) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive)
         binding.dotStep2.setBackgroundResource(if (currentStep == 1) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive)
-        binding.dotStep3.setBackgroundResource(if (currentStep == 2) R.drawable.bg_dot_active else R.drawable.bg_dot_inactive)
     }
 
     private fun uploadAndFinish() {

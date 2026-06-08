@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Shadow/Glow -->
+    <item
+        android:left="2dp"
+        android:right="2dp"
+        android:bottom="2dp"
+        android:top="2dp">
+        <shape>
+            <solid android:color="#1A2563EB"/>
+            <corners android:radius="20dp"/>
+        </shape>
+    </item>
+
+    <!-- Main Card Body -->
+    <item
+        android:bottom="2dp"
+        android:right="2dp">
+        <shape>
+            <solid android:color="@color/cm_surface"/>
+            <corners android:radius="20dp"/>
+            <stroke
+                android:width="2dp"
+                android:color="@color/cm_primary"/>
+        </shape>
+    </item>
+</layer-list>

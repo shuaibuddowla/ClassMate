@@ -181,6 +181,76 @@
                 android:textColor="@color/cm_text_secondary"
                 android:textSize="15sp"
                 android:visibility="gone" />
+
+            <!-- Under Development / Server Offline Card -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardServerOffline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_margin="24dp"
+                android:visibility="gone"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="6dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardPreventCornerOverlap="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="24dp"
+                    android:paddingVertical="32dp">
+
+                    <FrameLayout
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="@drawable/bg_notice_icon_circle">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_classmate_logo_mark" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="Chat Under Development"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="19sp"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="This feature is currently under active development. The local real-time server is offline or unavailable right now."
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="2dp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:id="@+id/btnRetryOffline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="20dp"
+                        android:background="@drawable/bg_notice_action_pill"
+                        android:gravity="center"
+                        android:minWidth="120dp"
+                        android:paddingHorizontal="24dp"
+                        android:text="Retry Connection"
+                        android:textColor="@color/cm_on_primary"
+                        android:textSize="13.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
         </FrameLayout>
     </LinearLayout>
 

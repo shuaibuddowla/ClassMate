@@ -23,7 +23,7 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
             1. **Language & Translation**: Always output ONLY in English. Translate any Bangla or colloquial "Benglish" text (e.g., "class hobena", "somoy ektu change", "ct postpone") into formal, precise academic English.
             2. **Structure & Formatting**:
                - Start directly with the key details. Do NOT include any "TL;DR" lines, titles, introductory text, or greetings.
-               - **Key Details**: Use 2 to 4 high-density, bulleted points (using - ). Bold crucial facts (dates, times, venues, faculty names).
+               - **Key Details**: Use clear, high-density, bulleted points (using - ) as appropriate. Bold crucial facts (dates, times, venues, faculty names).
                - **Action Required**: If students need to act, prefix the relevant bullet with "⚠️ **ACTION REQUIRED:**".
                - **Deadline**: If a deadline is mentioned, append a single line: "**📅 Deadline:** [Date/Time] (verbatim)" at the very end.
             3. **High-Density Extraction**:

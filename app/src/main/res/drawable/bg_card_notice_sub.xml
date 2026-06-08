@@ -1,8 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/cm_card" />
-    <corners android:radius="20dp" />
-    <stroke
-        android:width="1dp"
-        android:color="@color/cm_notice_resource_text" />
-</shape>
+<!-- res/drawable/bg_card_notice_sub.xml -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Soft glow/shadow layer (Amber/Orange) -->
+    <item
+        android:left="0dp"
+        android:right="0dp"
+        android:top="0dp"
+        android:bottom="0dp">
+        <shape>
+            <solid android:color="#0DD97706"/> <!-- 5% opacity orange -->
+            <corners android:radius="20dp"/>
+        </shape>
+    </item>
+
+    <!-- Base opaque card background -->
+    <item
+        android:left="1dp"
+        android:right="1dp"
+        android:top="1dp"
+        android:bottom="2dp">
+        <shape>
+            <solid android:color="@color/cm_card"/>
+            <corners android:radius="20dp"/>
+        </shape>
+    </item>
+
+    <!-- Main card background tint overlay & stroke -->
+    <item
+        android:left="1dp"
+        android:right="1dp"
+        android:top="1dp"
+        android:bottom="2dp">
+        <shape>
+            <solid android:color="#0DD97706"/> <!-- 5% orange background tint -->
+            <corners android:radius="20dp"/>
+            <stroke
+                android:width="1dp"
+                android:color="#26D97706"/> <!-- 15% opacity orange -->
+        </shape>
+    </item>
+</layer-list>

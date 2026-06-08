@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/drawable/bg_day_card_selected.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="#3B82F6"
+        android:endColor="#8B5CF6"
+        android:angle="135"/>
+    <corners android:radius="16dp"/>
+</shape>

@@ -12,14 +12,14 @@
         android:layout_height="wrap_content"
         android:clickable="true"
         android:focusable="true"
-        app:cardBackgroundColor="@color/cm_card"
+        app:cardBackgroundColor="@color/cm_surface_glass"
         app:cardCornerRadius="24dp"
-        app:cardElevation="3dp"
-        app:cardMaxElevation="6dp"
+        app:cardElevation="1dp"
+        app:cardMaxElevation="3dp"
         app:cardPreventCornerOverlap="false"
         app:contentPadding="0dp"
         app:rippleColor="@color/cm_primary_container"
-        app:strokeColor="@color/cm_border"
+        app:strokeColor="@color/bottom_nav_stroke"
         app:strokeWidth="1dp">
 
         <FrameLayout

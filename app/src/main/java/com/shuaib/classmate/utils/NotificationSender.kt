@@ -116,7 +116,7 @@ object NotificationSender {
         val data = mapOf("roomId" to roomId, "senderId" to senderId)
         if (roomId == "group_main") {
             sendToAll(
-                title = "Class Group",
+                title = "CODRIX-22",
                 message = "$senderName: $bodyText",
                 type = "chat_message",
                 extraData = data,

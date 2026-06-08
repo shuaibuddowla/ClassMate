@@ -1,237 +1,256 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/cm_background"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:background="@color/cm_surface">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+    <ScrollView
+        android:id="@+id/scrollContent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        app:layout_constraintBottom_toTopOf="@id/dividerBottom"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="260dp"
-            android:background="@drawable/bg_auth_top">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/ivLogo"
-                    android:layout_width="92dp"
-                    android:layout_height="92dp"
-                    android:contentDescription="@string/app_name"
-                    android:src="@drawable/ic_classmate_logo" />
-
-                <TextView
-                    android:id="@+id/tvTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:text="ClassMate"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="MBSTU CSE Department"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
-            </LinearLayout>
-        </FrameLayout>
-
-        <LinearLayout
-            android:id="@+id/cardLogin"
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="-24dp"
-            android:background="@drawable/bg_auth_card"
-            android:elevation="8dp"
-            android:orientation="vertical"
-            android:padding="24dp">
+            android:minHeight="520dp"
+            android:paddingStart="22dp"
+            android:paddingTop="44dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="20dp">
+
+            <ImageView
+                android:id="@+id/ivLogo"
+                android:layout_width="112dp"
+                android:layout_height="112dp"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_classmate_app_icon"
+                app:layout_constraintBottom_toTopOf="@id/tvTitle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintVertical_chainStyle="packed" />
 
             <TextView
+                android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Welcome Back"
+                android:layout_marginTop="16dp"
+                android:text="@string/app_name"
                 android:textColor="@color/cm_text_primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textSize="26sp"
+                android:textStyle="bold"
+                app:layout_constraintBottom_toTopOf="@id/tvSubtitle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/ivLogo" />
 
             <TextView
+                android:id="@+id/tvSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="24dp"
-                android:text="Sign in to continue"
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="14sp" />
+                android:layout_marginTop="2dp"
+                android:text="An app built for CSE-22, MBSTU"
+                android:textColor="@color/cm_text_disabled"
+                android:textSize="13sp"
+                app:layout_constraintBottom_toTopOf="@id/tilEmail"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvTitle" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilEmail"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
                 android:hint="Email or Student ID"
-                android:textColorHint="@color/cm_text_secondary"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeColor="@color/cm_primary"
-                app:hintTextColor="@color/cm_primary"
-                app:startIconDrawable="@drawable/ic_email"
-                app:startIconTint="@color/cm_text_secondary">
+                app:boxCornerRadiusBottomEnd="28dp"
+                app:boxCornerRadiusBottomStart="28dp"
+                app:boxCornerRadiusTopEnd="28dp"
+                app:boxCornerRadiusTopStart="28dp"
+                app:boxStrokeColor="@color/cm_border"
+                app:boxStrokeWidth="1dp"
+                app:boxStrokeWidthFocused="1.5dp"
+                app:hintTextColor="@color/cm_text_disabled"
+                app:layout_constraintBottom_toTopOf="@id/tilPassword"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etEmail"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="58dp"
+                    android:gravity="center_vertical"
                     android:imeOptions="actionNext"
                     android:inputType="textEmailAddress"
                     android:singleLine="true"
-                    android:textColor="@color/cm_text_primary" />
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="16sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilPassword"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:hint="Password"
-                android:textColorHint="@color/cm_text_secondary"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeColor="@color/cm_primary"
+                app:boxCornerRadiusBottomEnd="28dp"
+                app:boxCornerRadiusBottomStart="28dp"
+                app:boxCornerRadiusTopEnd="28dp"
+                app:boxCornerRadiusTopStart="28dp"
+                app:boxStrokeColor="@color/cm_border"
+                app:boxStrokeWidth="1dp"
+                app:boxStrokeWidthFocused="1.5dp"
                 app:endIconMode="password_toggle"
-                app:endIconTint="@color/cm_text_secondary"
-                app:hintTextColor="@color/cm_primary"
-                app:startIconDrawable="@drawable/ic_lock"
-                app:startIconTint="@color/cm_text_secondary">
+                app:endIconTint="@color/cm_text_disabled"
+                app:hintTextColor="@color/cm_text_disabled"
+                app:layout_constraintBottom_toTopOf="@id/cardLogin"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tilEmail">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etPassword"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="58dp"
+                    android:gravity="center_vertical"
                     android:imeOptions="actionDone"
                     android:inputType="textPassword"
                     android:singleLine="true"
-                    android:textColor="@color/cm_text_primary" />
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="16sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:id="@+id/tvForgotPassword"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginTop="10dp"
-                android:paddingVertical="6dp"
-                android:text="Forgot Password?"
-                android:textColor="@color/cm_primary"
-                android:textSize="13sp" />
-
             <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="16dp">
+                android:id="@+id/cardLogin"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_marginTop="16dp"
+                app:layout_constraintBottom_toTopOf="@id/tvForgotPassword"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tilPassword">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogin"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_gradient_button"
-                    android:text="Sign In"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Log in"
                     android:textAllCaps="false"
                     android:textColor="@color/cm_on_primary"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    app:backgroundTint="@null"
-                    app:cornerRadius="12dp" />
+                    app:backgroundTint="@color/cm_primary"
+                    app:cornerRadius="27dp" />
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/progressBar"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:visibility="gone"
-                    app:indicatorColor="@color/cm_accent"
-                    app:trackColor="#333B82F6" />
+                    app:indicatorColor="@color/cm_on_primary"
+                    app:trackColor="#664D9FFF" />
             </FrameLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tvForgotPassword"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginVertical="22dp"
+                android:layout_marginTop="18dp"
                 android:gravity="center"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:background="#1A2A4A" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="12dp"
-                    android:text="OR"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:background="#1A2A4A" />
-            </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnGoogle"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:background="@drawable/bg_auth_outline_button"
-                android:text="Continue with Google"
-                android:textAllCaps="false"
+                android:minHeight="44dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="Forgot password?"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                app:backgroundTint="@null"
-                app:cornerRadius="12dp"
-                app:icon="@drawable/ic_google"
-                app:iconGravity="textStart"
-                app:iconPadding="12dp"
-                app:iconSize="20dp"
-                app:iconTint="@null"
-                android:visibility="gone" />
-        </LinearLayout>
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/cardLogin" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </ScrollView>
 
-        <TextView
+    <View
+        android:id="@+id/dividerBottom"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:background="@color/cm_divider"
+        app:layout_constraintBottom_toTopOf="@id/layoutBottomSection"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/layoutBottomSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="22dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="22dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/tvRegister"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="Create new account"
+            android:textAllCaps="false"
+            android:textColor="@color/cm_primary"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:backgroundTint="@android:color/transparent"
+            app:cornerRadius="25dp"
+            app:strokeColor="@color/cm_primary"
+            app:strokeWidth="1.5dp" />
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="18dp"
-            android:layout_marginBottom="24dp"
-            android:padding="8dp"
-            android:text="Don't have an account? Sign Up"
-            android:textColor="@color/cm_text_secondary"
-            android:textSize="14sp" />
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_classmate_logo_mark"
+                app:tint="@color/cm_text_disabled" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="@string/app_name"
+                android:textColor="@color/cm_text_disabled"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
-</ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

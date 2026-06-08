@@ -253,7 +253,7 @@ class ChatViewModel : ViewModel() {
             current + ChatRoom(
                 id = message.roomId,
                 type = if (message.roomId == "group_main") "group" else "dm",
-                name = if (message.roomId == "group_main") "Class Group" else "",
+                name = if (message.roomId == "group_main") "CODRIX-22" else "",
                 member1Id = "",
                 member2Id = "",
                 lastMessage = preview,

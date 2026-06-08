@@ -55,6 +55,7 @@
             android:clipToPadding="false"
             android:padding="8dp" />
 
+        <!-- Empty / No results state -->
         <LinearLayout
             android:id="@+id/emptySearchState"
             android:layout_width="match_parent"
@@ -86,6 +87,53 @@
                 android:textSize="14sp"
                 android:layout_marginTop="4dp" />
         </LinearLayout>
+
+        <!-- Locked / Feature Unavailable state -->
+        <LinearLayout
+            android:id="@+id/lockedState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <!-- Icon circle -->
+            <FrameLayout
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:background="@drawable/bg_notice_icon_circle">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_classmate_logo_mark" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center"
+                android:text="Friends List Not Available"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:lineSpacingExtra="3dp"
+                android:text="This feature is controlled by the class admin. It will appear here once it&#8217;s enabled."
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
     </FrameLayout>
 
 </LinearLayout>

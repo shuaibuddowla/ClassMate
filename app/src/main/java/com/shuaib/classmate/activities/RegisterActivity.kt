@@ -1,9 +1,6 @@
 package com.shuaib.classmate.activities
 
 import android.content.Intent
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.os.Bundle
 import android.util.Log
 import android.util.Patterns
@@ -32,7 +29,6 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.databinding.ActivityRegisterBinding
 import com.shuaib.classmate.models.User
-import com.shuaib.classmate.utils.AnimUtils
 import com.shuaib.classmate.utils.AuthDebug
 import com.shuaib.classmate.utils.AuthErrorMapper
 import com.shuaib.classmate.utils.StudentIdUtils
@@ -43,8 +39,8 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegisterBinding
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
-    private var logoPulseAnimator: AnimatorSet? = null
     private var authInProgress = false
+    private var currentStep = 0
 
     private val googleSignInLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -91,9 +87,9 @@ class RegisterActivity : AppCompatActivity() {
         setupPasswordStrength()
         setupKeyboardActions()
         setupStudentIdFormatting()
+        showStep(0, focus = false)
 
-        binding.etName.requestFocus()
-        binding.btnRegister.applyClickAnimation { registerUser() }
+        binding.btnRegister.applyClickAnimation { handlePrimaryAction() }
         binding.tvLogin.setOnClickListener {
             finish()
             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
@@ -101,7 +97,7 @@ class RegisterActivity : AppCompatActivity() {
     }
 
     private fun setupAnimations() {
-        listOf(binding.ivLogo, binding.tvTitle, binding.cardRegister, binding.tvLogin)
+        listOf(binding.cardRegister, binding.tvLogin)
             .forEachIndexed { index, view ->
                 view.translationY = 80f
                 view.alpha = 0f
@@ -113,34 +109,60 @@ class RegisterActivity : AppCompatActivity() {
                     .setInterpolator(DecelerateInterpolator())
                     .start()
             }
-        startLogoBreathing()
-    }
-
-    private fun startLogoBreathing() {
-        if (AnimUtils.isReduceMotionEnabled(this)) return
-        val scaleX = ObjectAnimator.ofFloat(binding.ivLogo, View.SCALE_X, 1f, 1.035f, 1f).apply {
-            duration = 2600
-            startDelay = 700
-            repeatCount = ValueAnimator.INFINITE
-        }
-        val scaleY = ObjectAnimator.ofFloat(binding.ivLogo, View.SCALE_Y, 1f, 1.035f, 1f).apply {
-            duration = 2600
-            startDelay = 700
-            repeatCount = ValueAnimator.INFINITE
-        }
-        logoPulseAnimator = AnimatorSet().apply {
-            playTogether(scaleX, scaleY)
-            start()
-        }
     }
 
     private fun setupKeyboardActions() {
+        binding.etName.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                binding.etStudentId.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
+        binding.etStudentId.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                handlePrimaryAction()
+                true
+            } else {
+                false
+            }
+        }
+        binding.etEmail.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                binding.etPassword.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
+        binding.etPassword.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                binding.etConfirmPassword.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
         binding.etConfirmPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 registerUser()
                 true
             } else {
                 false
+            }
+        }
+        listOf(
+            binding.etName,
+            binding.etStudentId,
+            binding.etEmail,
+            binding.etPassword,
+            binding.etConfirmPassword
+        ).forEach { field ->
+            field.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    keepFieldVisible(view)
+                }
             }
         }
     }
@@ -151,6 +173,47 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun setupStudentIdFormatting() {
         binding.etStudentId.filters = arrayOf(StudentIdUtils.lengthFilter)
+    }
+
+    private fun handlePrimaryAction() {
+        if (authInProgress) return
+        when (currentStep) {
+            0 -> if (validateProfileStep()) showStep(1)
+            else -> registerUser()
+        }
+    }
+
+    private fun showStep(step: Int, focus: Boolean = true) {
+        currentStep = step
+        binding.stepProfile.visibility = if (step == 0) View.VISIBLE else View.GONE
+        binding.stepAccount.visibility = if (step == 1) View.VISIBLE else View.GONE
+
+        binding.stepDotOne.setBackgroundResource(if (step >= 0) R.drawable.bg_step_active else R.drawable.bg_step_inactive)
+        binding.stepDotTwo.setBackgroundResource(if (step >= 1) R.drawable.bg_step_active else R.drawable.bg_step_inactive)
+
+        when (step) {
+            0 -> {
+                binding.tvStepTitle.text = "Tell us who you are"
+                binding.tvStepSubtitle.text = "Start with your name and student ID."
+                binding.btnRegister.text = "Next"
+                if (focus) binding.etName.requestFocus()
+            }
+            else -> {
+                binding.tvStepTitle.text = "Set your login"
+                binding.tvStepSubtitle.text = "Use your email and enter your password twice."
+                binding.btnRegister.text = "Create account"
+                if (focus) binding.etEmail.requestFocus()
+            }
+        }
+        binding.scrollContent.post {
+            binding.scrollContent.smoothScrollTo(0, binding.tvStepTitle.top)
+        }
+    }
+
+    private fun keepFieldVisible(view: View) {
+        binding.scrollContent.postDelayed({
+            binding.scrollContent.smoothScrollTo(0, (view.bottom - 160).coerceAtLeast(0))
+        }, 120L)
     }
 
     private fun registerUser() {
@@ -267,6 +330,7 @@ class RegisterActivity : AppCompatActivity() {
                 "fullName" to finalName,
                 "email" to email,
                 "studentId" to "",
+                "department" to "CSE",
                 "photoUrl" to photoUrl,
                 "role" to "student",
                 "permissions" to User.DEFAULT_PERMISSIONS,
@@ -381,6 +445,7 @@ class RegisterActivity : AppCompatActivity() {
             "fullName" to name,
             "email" to email,
             "studentId" to studentId,
+            "department" to "CSE",
             "photoUrl" to photoUrl,
             "role" to "student",
             "permissions" to User.DEFAULT_PERMISSIONS,
@@ -452,21 +517,8 @@ class RegisterActivity : AppCompatActivity() {
         identifyUserInOneSignal(uid)
         setLoading(false)
         
-        // Always check profile completion after auth flow in RegisterActivity
-        FirebaseFirestore.getInstance().collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                val user = document.toObject(User::class.java)
-                if (user == null || !user.isProfileComplete()) {
-                    startActivity(Intent(this, CompleteProfileActivity::class.java))
-                } else {
-                    startActivity(Intent(this, MainActivity::class.java))
-                }
-                finishAffinity()
-            }
-            .addOnFailureListener {
-                startActivity(Intent(this, MainActivity::class.java))
-                finishAffinity()
-            }
+        startActivity(Intent(this, CompleteProfileActivity::class.java))
+        finishAffinity()
     }
 
     private fun ensureRoleDefaults(uid: String) {
@@ -521,6 +573,25 @@ class RegisterActivity : AppCompatActivity() {
         return valid
     }
 
+    private fun validateProfileStep(): Boolean {
+        var valid = true
+        binding.tilName.error = null
+        binding.tilStudentId.error = null
+
+        val name = binding.etName.text.toString().trim()
+        val studentId = StudentIdUtils.normalize(binding.etStudentId.text.toString())
+        if (name.length < 2) {
+            binding.tilName.error = "Name must be at least 2 characters"
+            valid = false
+        }
+        if (!StudentIdUtils.isValid(studentId)) {
+            binding.tilStudentId.error = "Enter valid student ID (example: CE25045)"
+            valid = false
+        }
+        if (!valid) shakeForm()
+        return valid
+    }
+
     private fun updatePasswordStrength(password: String) {
         val (label, drawable, widthDp) = when {
             password.isBlank() -> Triple("Password strength", R.drawable.bg_password_strength, 0)
@@ -539,8 +610,12 @@ class RegisterActivity : AppCompatActivity() {
         authInProgress = loading
         binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
         binding.btnRegister.isEnabled = !loading
-        binding.btnGoogle.isEnabled = !loading
-        binding.btnRegister.text = if (loading) "" else "Create Account"
+        binding.tvLogin.isEnabled = !loading
+        binding.btnRegister.text = when {
+            loading -> ""
+            currentStep == 0 -> "Next"
+            else -> "Create account"
+        }
     }
 
     private fun shakeForm() {
@@ -576,7 +651,6 @@ class RegisterActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        logoPulseAnimator?.cancel()
         super.onDestroy()
     }
 }

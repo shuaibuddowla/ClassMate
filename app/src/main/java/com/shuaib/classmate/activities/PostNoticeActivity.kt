@@ -178,10 +178,19 @@ class PostNoticeActivity : AppCompatActivity() {
 
     private fun updateExistingNotice(noticeId: String) {
         val titleText = binding.etTitle.text.toString().trim()
-        val bodyText = binding.etBody.text.toString()
+        val bodyText = binding.etBody.text.toString().trim()
 
         if (titleText.isEmpty()) {
             binding.etTitle.error = "Title required"
+            return
+        }
+        if (bodyText.length > 5000) {
+            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (bodyText.length > 5000) {
+            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -293,10 +302,10 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.etBody.setText(result.body)
         binding.dropdownSubject.setText(result.subject ?: "", false)
         binding.dropdownAssignmentSubject.setText(result.subject ?: "", false)
-
+        
         val topic = result.deadline ?: result.date ?: result.title
         binding.etAssignmentTopic.setText(topic)
-
+        
         val displayDate = result.deadline ?: result.date ?: ""
         if (displayDate.isNotBlank()) {
             selectedSubmissionDate = displayDate
@@ -379,13 +388,17 @@ class PostNoticeActivity : AppCompatActivity() {
             return
         }
         val title = binding.etTitle.text.toString().trim()
-        val body = binding.etBody.text.toString()
+        val body = binding.etBody.text.toString().trim()
         if (title.isBlank()) {
             binding.etTitle.error = "Title required"
             return
         }
         if (body.isBlank()) {
             binding.etBody.error = "Body required"
+            return
+        }
+        if (body.length > 5000) {
+            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -560,10 +573,19 @@ class PostNoticeActivity : AppCompatActivity() {
 
     private fun publishNormalNotice() {
         val titleText = binding.etTitle.text.toString().trim()
-        val bodyText = binding.etBody.text.toString()
+        val bodyText = binding.etBody.text.toString().trim()
 
         if (titleText.isEmpty()) {
             binding.etTitle.error = "Title required"
+            return
+        }
+        if (bodyText.length > 5000) {
+            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (bodyText.length > 5000) {
+            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -1091,7 +1113,7 @@ class PostNoticeActivity : AppCompatActivity() {
             binding.layoutPreview.isVisible = !isWriteMode
             if (!isWriteMode) {
                 val bodyText = binding.etBody.text.toString()
-                binding.tvBodyPreview.text = bodyText
+                binding.tvBodyPreview.text = NoticeTextFormatter.format(this, bodyText)
             }
         }
     }

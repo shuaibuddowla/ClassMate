@@ -76,7 +76,7 @@ class SplashActivity : AppCompatActivity() {
                 if (doc.exists()) {
                     routeFromProfile(doc)
                 } else {
-                    navigate(CompleteProfileActivity::class.java)
+                    navigate(MainActivity::class.java)
                 }
             }
             .addOnFailureListener {
@@ -87,12 +87,7 @@ class SplashActivity : AppCompatActivity() {
 
     private fun routeFromProfile(document: DocumentSnapshot) {
         try {
-            val user = document.toObject(User::class.java)
-            if (user == null || !user.isProfileComplete()) {
-                navigate(CompleteProfileActivity::class.java)
-            } else {
-                navigate(MainActivity::class.java)
-            }
+            navigate(MainActivity::class.java)
         } catch (e: Exception) {
             android.util.Log.e("SplashActivity", "Error parsing profile: ${e.message}")
             navigate(MainActivity::class.java)

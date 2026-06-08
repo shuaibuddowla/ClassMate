@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_notice_home_root">
+    android:background="@android:color/transparent">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -16,16 +16,16 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
+            <!-- Notice Page Header: stays pinned, styled exactly like Library -->
             <LinearLayout
                 android:id="@+id/noticeHeaderPanel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_notice_home_panel"
                 android:orientation="vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="7dp">
+                android:paddingStart="24dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp">
 
                 <LinearLayout
                     android:id="@+id/appBar"
@@ -35,22 +35,10 @@
                     android:minHeight="44dp"
                     android:orientation="horizontal">
 
-                    <ImageButton
-                        android:id="@+id/btnMenu"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/notice_home_cd_scroll_top"
-                        android:padding="8dp"
-                        android:scaleType="centerInside"
-                        android:src="@drawable/ic_scroll_to_top"
-                        app:tint="@color/cm_text_secondary" />
-
                     <LinearLayout
                         android:id="@+id/headerTitleBlock"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -58,34 +46,36 @@
                             android:id="@+id/tvNoticeTitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="1dp"
+                            android:fontFamily="serif"
+                            android:includeFontPadding="false"
+                            android:maxLines="1"
                             android:text="@string/nav_notices"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="22sp"
+                            android:textSize="36sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvNoticeSubtitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="3dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp"
+                            android:textSize="12sp"
                             tools:text="12 updates · Pull to refresh" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/searchContainer"
                         android:layout_width="0dp"
-                        android:layout_height="38dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="8dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_notice_search"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="12dp"
+                        android:paddingHorizontal="14dp"
                         android:visibility="gone">
 
                         <ImageView
@@ -120,29 +110,39 @@
                             app:tint="@color/cm_text_secondary" />
                     </LinearLayout>
 
-                    <ImageButton
+                    <FrameLayout
                         android:id="@+id/btnSearch"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/hint_notice_search"
-                        android:padding="9dp"
-                        android:src="@drawable/ic_search_modern"
-                        app:tint="@color/cm_text_secondary" />
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_library_icon_button"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/hint_notice_search"
+                            android:src="@drawable/ic_search_modern"
+                            app:tint="@color/cm_text_secondary" />
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/btnPostNotice"
                         android:layout_width="wrap_content"
-                        android:layout_height="34dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/bg_notice_action_pill"
                         android:gravity="center"
-                        android:paddingHorizontal="12dp"
+                        android:minWidth="76dp"
+                        android:paddingHorizontal="14dp"
                         android:text="+ Post"
                         android:textColor="@color/cm_on_primary"
-                        android:textSize="12sp"
+                        android:textSize="13.5sp"
                         android:textStyle="bold"
-                        android:visibility="gone" />
+                        android:visibility="gone"
+                        tools:visibility="visible" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -153,7 +153,7 @@
                 android:clipToPadding="false"
                 android:fadingEdgeLength="28dp"
                 android:overScrollMode="never"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="14dp"
                 android:requiresFadingEdge="horizontal"
                 android:scrollbars="none">
 
@@ -168,6 +168,10 @@
                     android:paddingBottom="5dp"
                     android:paddingTop="3dp" />
             </HorizontalScrollView>
+
+            <include
+                android:id="@+id/aiSummaryCard"
+                layout="@layout/layout_ai_feed_summary" />
 
             <FrameLayout
                 android:layout_width="match_parent"

@@ -1,11 +1,13 @@
-// C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/TimetableManagementActivity.kt
 package com.shuaib.classmate.activities
 
 import android.app.TimePickerDialog
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -19,6 +21,9 @@ import com.shuaib.classmate.databinding.ActivityTimetableManagementBinding
 import com.shuaib.classmate.databinding.DialogAddPeriodBinding
 import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.utils.SubjectList
+import com.shuaib.classmate.utils.ThemeColors
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.util.Calendar
 
 class TimetableManagementActivity : AppCompatActivity() {
@@ -28,6 +33,10 @@ class TimetableManagementActivity : AppCompatActivity() {
     private lateinit var periodAdapter: PeriodAdapter
     private val periodList = mutableListOf<Period>()
     private var currentDay = "saturday"
+
+    private val days = listOf("saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday")
+    private val dayShort = listOf("SAT", "SUN", "MON", "TUE", "WED", "THU", "FRI")
+    private val dayFull = listOf("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,8 +53,6 @@ class TimetableManagementActivity : AppCompatActivity() {
         }
 
         binding.fabAddPeriod.setOnClickListener { showPeriodDialog(null) }
-
-        binding.chipGroupDays.check(R.id.chipSat)
     }
 
     private fun setupRecyclerView() {
@@ -61,19 +68,111 @@ class TimetableManagementActivity : AppCompatActivity() {
     }
 
     private fun setupDaySelector() {
-        binding.chipGroupDays.setOnCheckedStateChangeListener { _, checkedIds ->
-            currentDay = when (checkedIds.firstOrNull()) {
-                R.id.chipSat -> "saturday"
-                R.id.chipSun -> "sunday"
-                R.id.chipMon -> "monday"
-                R.id.chipTue -> "tuesday"
-                R.id.chipWed -> "wednesday"
-                R.id.chipThu -> "thursday"
-                R.id.chipFri -> "friday"
-                else -> "saturday"
+        val todayIndex = getTodayIndex()
+        currentDay = days[todayIndex]
+        fetchTimetable(currentDay)
+
+        val weekDates = getWeekDates()
+        val margin = (6 * resources.displayMetrics.density).toInt()
+        val inflater = LayoutInflater.from(this)
+
+        binding.daySelector.removeAllViews()
+        days.forEachIndexed { index, _ ->
+            val cardView = inflater.inflate(R.layout.item_day_card, binding.daySelector, false)
+
+            cardView.findViewById<TextView>(R.id.tvDayShort).text = dayShort[index]
+            cardView.findViewById<TextView>(R.id.tvDayDate).text =
+                String.format("%02d", weekDates[index])
+
+            val params = cardView.layoutParams as LinearLayout.LayoutParams
+            params.setMargins(margin, margin / 2, margin, margin / 2)
+            cardView.layoutParams = params
+
+            cardView.setOnClickListener {
+                selectDay(index)
             }
-            fetchTimetable(currentDay)
+
+            binding.daySelector.addView(cardView)
         }
+
+        applyDayCardStyles(todayIndex)
+    }
+
+    private fun selectDay(index: Int) {
+        currentDay = days[index]
+        fetchTimetable(currentDay)
+        applyDayCardStyles(index)
+    }
+
+    private fun applyDayCardStyles(selectedIndex: Int) {
+        val todayIndex = getTodayIndex()
+        for (i in 0 until binding.daySelector.childCount) {
+            val cardView = binding.daySelector.getChildAt(i)
+            val tvDayShort = cardView.findViewById<TextView>(R.id.tvDayShort)
+            val tvDayDate = cardView.findViewById<TextView>(R.id.tvDayDate)
+            val vIndicator = cardView.findViewById<View>(R.id.vDayIndicator)
+
+            when (i) {
+                selectedIndex -> {
+                    cardView.setBackgroundResource(R.drawable.bg_day_card_selected)
+                    cardView.elevation = 5 * resources.displayMetrics.density
+                    tvDayShort.setTextColor(0xCCFFFFFF.toInt())
+                    tvDayDate.setTextColor(Color.WHITE)
+                    vIndicator.visibility = View.VISIBLE
+                }
+                todayIndex -> {
+                    cardView.setBackgroundResource(R.drawable.bg_day_card_unselected)
+                    cardView.elevation = 2 * resources.displayMetrics.density
+                    tvDayShort.setTextColor(ThemeColors.primary(this))
+                    tvDayDate.setTextColor(ThemeColors.primary(this))
+                    vIndicator.visibility = View.INVISIBLE
+                }
+                else -> {
+                    cardView.setBackgroundResource(R.drawable.bg_day_card_unselected)
+                    cardView.elevation = 2 * resources.displayMetrics.density
+                    tvDayShort.setTextColor(ThemeColors.textDisabled(this))
+                    tvDayDate.setTextColor(ThemeColors.textPrimary(this))
+                    vIndicator.visibility = View.INVISIBLE
+                }
+            }
+        }
+    }
+
+    private fun getTodayIndex(): Int {
+        val calendar = Calendar.getInstance()
+        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.SATURDAY -> 0
+            Calendar.SUNDAY -> 1
+            Calendar.MONDAY -> 2
+            Calendar.TUESDAY -> 3
+            Calendar.WEDNESDAY -> 4
+            Calendar.THURSDAY -> 5
+            Calendar.FRIDAY -> 6
+            else -> 0
+        }
+    }
+
+    private fun getWeekDates(): IntArray {
+        val today = LocalDate.now()
+        val currentDayOfWeek = today.dayOfWeek.value
+        
+        val stepsToSaturday = when (currentDayOfWeek) {
+            DayOfWeek.SATURDAY.value -> 0
+            DayOfWeek.SUNDAY.value -> -1
+            DayOfWeek.MONDAY.value -> -2
+            DayOfWeek.TUESDAY.value -> -3
+            DayOfWeek.WEDNESDAY.value -> -4
+            DayOfWeek.THURSDAY.value -> -5
+            DayOfWeek.FRIDAY.value -> -6
+            else -> 0
+        }
+        
+        val dates = IntArray(7)
+        val saturdayDate = today.plusDays(stepsToSaturday.toLong())
+        for (i in 0..6) {
+            dates[i] = saturdayDate.plusDays(i.toLong()).dayOfMonth
+        }
+        return dates
     }
 
     private fun setupSwipeToDelete() {

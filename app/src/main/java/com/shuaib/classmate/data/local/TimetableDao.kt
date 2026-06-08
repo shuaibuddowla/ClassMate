@@ -11,6 +11,9 @@ interface TimetableDao {
     @Query("SELECT * FROM timetable_periods WHERE day = :day ORDER BY startTime")
     fun observePeriods(day: String): Flow<List<TimetableEntity>>
 
+    @Query("SELECT * FROM timetable_periods WHERE day = :day ORDER BY startTime")
+    fun getPeriodsSync(day: String): List<TimetableEntity>
+
     @Upsert
     suspend fun upsertAll(periods: List<TimetableEntity>)
 

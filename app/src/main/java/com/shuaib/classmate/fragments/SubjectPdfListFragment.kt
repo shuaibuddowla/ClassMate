@@ -213,6 +213,12 @@ class SubjectPdfListFragment : Fragment() {
     }
 
     private fun fetchPdfs() {
+        val isSwipeRefreshing = binding.swipeRefresh.isRefreshing
+        if (!isSwipeRefreshing) {
+            binding.shimmerView.isVisible = true
+            binding.shimmerView.startShimmer()
+            binding.rvSubjectPdfs.isVisible = false
+        }
         binding.swipeRefresh.isRefreshing = true
         binding.tvEmptyState.isVisible = false
 
@@ -222,6 +228,9 @@ class SubjectPdfListFragment : Fragment() {
             .get()
             .addOnSuccessListener { snapshot ->
                 if (_binding == null) return@addOnSuccessListener
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                binding.rvSubjectPdfs.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
 
                 allResources = snapshot.documents.map { doc -> doc.toPdfFile() }
@@ -233,6 +242,9 @@ class SubjectPdfListFragment : Fragment() {
             }
             .addOnFailureListener { e ->
                 if (_binding == null) return@addOnFailureListener
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                binding.rvSubjectPdfs.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }

@@ -16,6 +16,7 @@ import android.widget.PopupMenu
 import androidx.constraintlayout.widget.ConstraintLayout
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -164,7 +165,6 @@ class MainActivity : AppCompatActivity() {
             val index = mainTabs.indexOf(item.itemId)
             if (index != -1) {
                 showMainTab(item.itemId)
-                BottomNavAnimator.animateTabSelect(binding.bottomNav.findViewById(item.itemId))
             }
             true
         }
@@ -172,6 +172,28 @@ class MainActivity : AppCompatActivity() {
         handleNotificationIntent(intent)
         observeChatUnreadBadge()
         deferStartupWork()
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (binding.navHostFragment.isVisible) {
+                    val popped = navController.popBackStack()
+                    if (!popped) {
+                        binding.navHostFragment.isVisible = false
+                        binding.mainViewPager.isVisible = true
+                        showMainTab(childParentTabId ?: R.id.nav_timetable)
+                    }
+                } else {
+                    val currentTabId = mainTabs.getOrNull(binding.mainViewPager.currentItem)
+                    if (currentTabId != R.id.nav_timetable) {
+                        showMainTab(R.id.nav_timetable)
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
+                    }
+                }
+            }
+        })
     }
 
     fun setMainPageSwipeEnabled(enabled: Boolean) {
@@ -462,15 +484,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBottomNavItemStates(selectedTabId: Int?) {
+        val activeIndex = mainTabs.indexOf(selectedTabId ?: -1)
+        if (activeIndex != -1) {
+            binding.bottomNav.updateActiveTab(activeIndex, mainTabs.size)
+        }
+
+        if (com.shuaib.classmate.utils.AnimUtils.isReduceMotionEnabled(this)) {
+            MAIN_TAB_DESTINATIONS.forEach { tabId ->
+                val itemView = binding.bottomNav.findViewById<View>(tabId) ?: return@forEach
+                val selected = tabId == selectedTabId
+                itemView.scaleX = if (selected) 1.05f else 1f
+                itemView.scaleY = if (selected) 1.05f else 1f
+                itemView.translationY = if (selected) -dp(3).toFloat() else 0f
+            }
+            return
+        }
+
         MAIN_TAB_DESTINATIONS.forEach { tabId ->
             val itemView = binding.bottomNav.findViewById<View>(tabId) ?: return@forEach
             val selected = tabId == selectedTabId
             itemView.animate().cancel()
+            
+            val targetScale = if (selected) 1.05f else 1f
+            val targetTranslation = if (selected) -dp(3).toFloat() else 0f
+            val duration = if (selected) 250L else 180L
+            val interpolator = if (selected) {
+                android.view.animation.OvershootInterpolator(1.4f)
+            } else {
+                android.view.animation.DecelerateInterpolator()
+            }
+            
             itemView.animate()
-                .scaleX(if (selected) 1.03f else 1f)
-                .scaleY(if (selected) 1.03f else 1f)
-                .translationY(if (selected) -dp(2).toFloat() else 0f)
-                .setDuration(180L)
+                .scaleX(targetScale)
+                .scaleY(targetScale)
+                .translationY(targetTranslation)
+                .setDuration(duration)
+                .setInterpolator(interpolator)
                 .start()
         }
     }

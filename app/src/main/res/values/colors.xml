@@ -66,20 +66,20 @@
     <color name="cm_file_other_bg">#EDE9FE</color>
     <color name="cm_file_other_text">#7C3AED</color>
 
-    <color name="cm_bottom_nav_bg">#FFFFFF</color>
-    <color name="cm_bottom_nav_selected">#DBEAFE</color>
-    <color name="cm_bottom_nav_icon_active">#2563EB</color>
-    <color name="cm_bottom_nav_icon_inactive">#64748B</color>
-    <color name="cm_bottom_nav_text_active">#2563EB</color>
-    <color name="cm_bottom_nav_text_inactive">#64748B</color>
+    <color name="cm_bottom_nav_bg">#FAFCFF</color>
+    <color name="cm_bottom_nav_selected">#C7DBFF</color>
+    <color name="cm_bottom_nav_icon_active">#1D4ED8</color>
+    <color name="cm_bottom_nav_icon_inactive">#475569</color>
+    <color name="cm_bottom_nav_text_active">#1D4ED8</color>
+    <color name="cm_bottom_nav_text_inactive">#475569</color>
 
     <!-- Backward-compatible aliases for existing layouts and drawables. -->
     <color name="cm_background">@color/cm_bg</color>
     <color name="cm_primary_glow">#3B82F626</color>
-    <color name="bottom_nav_active">#2563EB</color>
-    <color name="bottom_nav_inactive">#64748B</color>
-    <color name="bottom_nav_glass">#FFFFFF</color>
-    <color name="bottom_nav_stroke">#D8E4F5</color>
+    <color name="bottom_nav_active">#1D4ED8</color>
+    <color name="bottom_nav_inactive">#475569</color>
+    <color name="bottom_nav_glass">#FAFCFF</color>
+    <color name="bottom_nav_stroke">#8EA2BC</color>
     <color name="cm_accent">#D97706</color>
     <color name="cm_accent_warm">#F59E0B</color>
     <color name="cm_accent_glow">#F59E0B24</color>

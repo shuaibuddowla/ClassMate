@@ -24,6 +24,7 @@ import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.chat.model.ChatRoom
 import com.shuaib.classmate.chat.model.ChatUser
 import com.shuaib.classmate.databinding.FragmentChatBinding
+import com.shuaib.classmate.utils.applyClickAnimation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -36,6 +37,7 @@ class ChatFragment : Fragment() {
 
     private var adapter: ChatListAdapter? = null
     private var refreshTimeoutJob: Job? = null
+    private var connectionTimeoutJob: Job? = null
     private var allItems: List<ChatListItem> = emptyList()
     private var currentQuery: String = ""
     private val currentUserId: String
@@ -61,6 +63,7 @@ class ChatFragment : Fragment() {
         binding.fabNewMessage.setOnClickListener { openNewMessage() }
         binding.btnSearch.setOnClickListener { openSearch() }
         binding.btnCloseChatSearch.setOnClickListener { closeSearch() }
+        binding.btnRetryOffline.applyClickAnimation { refreshChat() }
         
         binding.etSearchChats.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -111,12 +114,51 @@ class ChatFragment : Fragment() {
     private fun collectConnectionState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.connectionState.collect { state ->
+                    when (state) {
+                        ConnectionState.CONNECTED -> {
+                            // Server is up — cancel the pending timeout and hide the card
+                            connectionTimeoutJob?.cancel()
+                            connectionTimeoutJob = null
+                            binding.cardServerOffline.isVisible = false
+                            binding.rvChats.isVisible = true
+                            binding.fabNewMessage.isVisible = true
+                            submitFilteredChats()
+                        }
+                        ConnectionState.DISCONNECTED -> {
+                            // Definitively offline — cancel timeout and show the card
+                            connectionTimeoutJob?.cancel()
+                            connectionTimeoutJob = null
+                            binding.cardServerOffline.isVisible = true
+                            binding.rvChats.isVisible = false
+                            binding.fabNewMessage.isVisible = false
+                            binding.tvEmptyChats.isVisible = false
+                        }
+                        ConnectionState.CONNECTING -> {
+                            // Still trying — start a timeout to show the offline card if it takes too long
+                            if (connectionTimeoutJob == null || connectionTimeoutJob?.isActive == false) {
+                                connectionTimeoutJob = viewLifecycleOwner.lifecycleScope.launch {
+                                    delay(CONNECTION_SHOW_OFFLINE_TIMEOUT_MS)
+                                    // If we're still not connected after the timeout, show offline card
+                                    if (_binding != null && viewModel.connectionState.value != ConnectionState.CONNECTED) {
+                                        binding.cardServerOffline.isVisible = true
+                                        binding.rvChats.isVisible = false
+                                        binding.fabNewMessage.isVisible = false
+                                        binding.tvEmptyChats.isVisible = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.connectionError.collect {
                     refreshTimeoutJob?.cancel()
                     binding.swipeRefresh.isRefreshing = false
-                    Snackbar.make(binding.root, "Chat server is unavailable. Pull down to retry.", Snackbar.LENGTH_LONG)
-                        .setAction("Retry") { refreshChat() }
-                        .show()
                 }
             }
         }
@@ -158,13 +200,18 @@ class ChatFragment : Fragment() {
             if (matches.isEmpty()) emptyList() else listOf(ChatListItem.Header("Search results")) + matches
         }
         adapter?.submitList(items)
-        binding.tvEmptyChats.isVisible = items.isEmpty() && allItems.isNotEmpty()
-        // If allItems is empty, we might still be loading or truly have no chats
-        if (allItems.isEmpty()) {
-            binding.tvEmptyChats.text = "No conversations yet"
-            binding.tvEmptyChats.isVisible = true
+
+        val isOffline = viewModel.connectionState.value == ConnectionState.DISCONNECTED
+        if (isOffline) {
+            binding.tvEmptyChats.isVisible = false
         } else {
-            binding.tvEmptyChats.text = "No chats found"
+            binding.tvEmptyChats.isVisible = items.isEmpty() && allItems.isNotEmpty()
+            if (allItems.isEmpty()) {
+                binding.tvEmptyChats.text = "No conversations yet"
+                binding.tvEmptyChats.isVisible = true
+            } else {
+                binding.tvEmptyChats.text = "No chats found"
+            }
         }
     }
 
@@ -179,11 +226,11 @@ class ChatFragment : Fragment() {
         result.add(ChatListItem.Header("Pinned"))
         
         val groupRoom = rooms.firstOrNull { it.id == GROUP_ROOM_ID }
-            ?: ChatRoom(id = GROUP_ROOM_ID, type = "group", name = "Class Group", member1Id = "", member2Id = "")
+            ?: ChatRoom(id = GROUP_ROOM_ID, type = "group", name = "CODRIX-22", member1Id = "", member2Id = "")
         
         result.add(ChatListItem.Room(
-            room = groupRoom.copy(name = "Class Group"),
-            title = "Class Group",
+            room = groupRoom.copy(name = "CODRIX-22"),
+            title = "CODRIX-22",
             subtitle = groupRoom.lastMessage.ifBlank { "No messages yet" },
             isGroup = true
         ))
@@ -278,6 +325,8 @@ class ChatFragment : Fragment() {
         super.onDestroyView()
         refreshTimeoutJob?.cancel()
         refreshTimeoutJob = null
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = null
         _binding = null
         adapter = null
     }
@@ -285,5 +334,6 @@ class ChatFragment : Fragment() {
     companion object {
         private const val GROUP_ROOM_ID = "group_main"
         private const val REFRESH_TIMEOUT_MS = 8_000L
+        private const val CONNECTION_SHOW_OFFLINE_TIMEOUT_MS = 8_000L
     }
 }

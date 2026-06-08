@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/fragment_profile.xml -->
-<ScrollView
+<androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -537,17 +537,22 @@
                 <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/cm_border" android:layout_marginHorizontal="12dp"/>
 
                 <LinearLayout
+                    android:id="@+id/layoutAddWidget"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingHorizontal="8dp">
+                    android:paddingHorizontal="12dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
                     <ImageView
                         android:layout_width="22dp"
                         android:layout_height="22dp"
                         android:src="@drawable/ic_search_modern"
                         android:tint="@color/cm_primary"
-                        android:layout_marginEnd="12dp"/>
+                        android:layout_marginEnd="16dp"
+                        android:importantForAccessibility="no"/>
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -560,8 +565,11 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_chevron_right"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:tint="@color/cm_primary"/>
+                        android:background="@android:color/transparent"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:tint="@color/cm_primary"
+                        android:importantForAccessibility="no"/>
                 </LinearLayout>
 
             </LinearLayout>
@@ -582,4 +590,4 @@
 
         <ProgressBar android:id="@+id/pbUpload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginTop="20dp" android:visibility="gone"/>
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

@@ -2,16 +2,18 @@
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardBackgroundColor="@color/cm_card"
+    app:cardBackgroundColor="@color/cm_surface_glass"
     app:cardCornerRadius="24dp"
-    app:cardElevation="3dp"
-    app:cardMaxElevation="6dp"
-    app:strokeColor="@color/cm_border"
+    app:cardElevation="1dp"
+    app:cardMaxElevation="3dp"
+    app:cardPreventCornerOverlap="false"
+    app:strokeColor="@color/bottom_nav_stroke"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -30,15 +32,15 @@
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🟢 Active"
-                android:textSize="11sp"
-                android:textStyle="bold"
+                android:layout_height="25dp"
+                android:gravity="center"
+                android:letterSpacing="0.03"
                 android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:background="@drawable/bg_badge_blue"
-                android:textColor="@color/cm_primary"
-                android:textAllCaps="true"/>
+                android:text="Active"
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                tools:text="Active" />
 
             <View
                 android:layout_width="0dp"
@@ -73,10 +75,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/cm_text_primary"
-            android:textSize="20sp"
+            android:textSize="17.5sp"
             android:textStyle="bold"
-            android:lineSpacingExtra="4dp"
-            android:layout_marginBottom="20dp"/>
+            android:fontFamily="sans-serif-medium"
+            android:lineSpacingExtra="2dp"
+            android:layout_marginBottom="16dp"/>
 
         <LinearLayout
             android:id="@+id/optionsContainer"
@@ -88,8 +91,10 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
             android:background="@color/cm_border"
-            android:layout_marginBottom="16dp"/>
+            android:alpha="0.25" />
 
         <LinearLayout
             android:layout_width="match_parent"

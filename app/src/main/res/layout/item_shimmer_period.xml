@@ -1,55 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/item_shimmer_period.xml -->
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- res/layout/item_shimmer_period.xml -->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="100dp"
+    android:layout_height="wrap_content"
     android:layout_marginHorizontal="16dp"
     android:layout_marginVertical="8dp"
     app:cardBackgroundColor="@color/cm_surface"
     app:cardCornerRadius="20dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/cm_border_glass"
-    app:strokeWidth="1dp">
+    app:strokeWidth="1dp"
+    android:clipToOutline="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <View
-            android:layout_width="4dp"
-            android:layout_height="match_parent"
-            android:background="@color/cm_text_secondary" />
-
+        <!-- Top Header Row Placeholder -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_marginBottom="12dp">
 
+            <!-- Indicator tag placeholder -->
+            <View
+                android:layout_width="4dp"
+                android:layout_height="14dp"
+                android:background="@color/cm_text_secondary"
+                android:alpha="0.1"
+                android:layout_marginEnd="8dp" />
+
+            <!-- Time range placeholder -->
             <View
                 android:layout_width="120dp"
-                android:layout_height="16dp"
+                android:layout_height="14dp"
                 android:background="@color/cm_text_secondary"
-                android:alpha="0.2" />
+                android:alpha="0.15" />
 
             <View
-                android:layout_width="80dp"
-                android:layout_height="12dp"
-                android:layout_marginTop="8dp"
-                android:background="@color/cm_text_secondary"
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Badge placeholder -->
+            <View
+                android:layout_width="50dp"
+                android:layout_height="18dp"
+                android:background="@drawable/bg_badge_pill"
                 android:alpha="0.2" />
+
         </LinearLayout>
 
+        <!-- Divider line placeholder -->
         <View
-            android:layout_width="60dp"
-            android:layout_height="12dp"
-            android:layout_gravity="center_vertical"
-            android:layout_marginEnd="16dp"
-            android:background="@color/cm_text_secondary"
-            android:alpha="0.2" />
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/cm_divider"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Main Content Row Placeholder -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Subject Icon placeholder -->
+            <View
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_badge_pill"
+                android:alpha="0.15" />
+
+            <!-- Details Stack placeholder -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <View
+                    android:layout_width="180dp"
+                    android:layout_height="16dp"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.2" />
+
+                <View
+                    android:layout_width="90dp"
+                    android:layout_height="12dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.15" />
+
+            </LinearLayout>
+
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

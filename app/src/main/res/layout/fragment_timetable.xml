@@ -1,354 +1,598 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- res/layout/fragment_timetable.xml -->
-<androidx.core.widget.NestedScrollView
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/cm_background"
-    android:clipToPadding="false"
-    android:clipChildren="false"
-    android:paddingBottom="100dp">
+    android:background="@color/cm_background">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:clipChildren="false"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:orientation="vertical">
+        android:clipChildren="false"
+        android:paddingBottom="104dp">
 
-        <!-- Header: current day name -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="8dp"
-            android:baselineAligned="false">
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="vertical">
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- GREETING HEADER                                     -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="22dp"
+                android:paddingBottom="18dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutGreeting"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@+id/btnNotificationBell"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <TextView
+                        android:id="@+id/tvGreeting"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif"
+                        android:letterSpacing="0.01"
+                        android:text="Hello,"
+                        android:textColor="@color/cm_text_disabled"
+                        android:textSize="17sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvUserName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:fontFamily="sans-serif"
+                            android:letterSpacing="-0.02"
+                            android:maxLines="1"
+                            android:text="Student"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="2dp"
+                            android:text=" 👋"
+                            android:textSize="24sp" />
+
+                    </LinearLayout>
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/btnNotificationBell"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_bell_outline"
+                        app:tint="@color/cm_text_primary" />
+
+                    <View
+                        android:id="@+id/vNotifDot"
+                        android:layout_width="9dp"
+                        android:layout_height="9dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginEnd="5dp"
+                        android:background="@drawable/bg_dot_active"
+                        android:visibility="gone" />
+
+                </FrameLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- DAY SELECTOR — Individual rounded-square cards      -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:paddingHorizontal="14dp"
+                android:paddingBottom="18dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/daySelector"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+
+            </HorizontalScrollView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- NEXT CLASS HERO CARD                                -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/heroNextClass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_hero_next_class"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <!-- Top row: "NEXT CLASS" badge + countdown -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="14dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvHeroBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_hero_badge"
+                            android:letterSpacing="0.15"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="5dp"
+                            android:text="NEXT CLASS"
+                            android:textColor="#FFFFFF"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <TextView
+                            android:id="@+id/tvHeroCountdown"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#CCFFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/ivHeroChevron"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="6dp"
+                            android:src="@drawable/ic_chevron_right"
+                            android:rotation="0"
+                            app:tint="#CCFFFFFF"
+                            android:importantForAccessibility="no" />
+
+                    </LinearLayout>
+
+                    <!-- Subject name -->
+                    <TextView
+                        android:id="@+id/tvHeroSubject"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="#FFFFFF"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- Time + Teacher row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginEnd="6dp"
+                            android:src="@drawable/ic_clock"
+                            app:tint="#AAFFFFFF"
+                            android:importantForAccessibility="no" />
+
+                        <TextView
+                            android:id="@+id/tvHeroTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#CCFFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginEnd="5dp"
+                                android:src="@drawable/ic_person"
+                                app:tint="#AAFFFFFF"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:id="@+id/tvHeroTeacher"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textColor="#CCFFFFFF"
+                                android:textSize="13sp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <!-- Progress Bar for Class Start Time -->
+                    <com.google.android.material.progressindicator.LinearProgressIndicator
+                        android:id="@+id/pbHeroTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:indicatorColor="#FFFFFF"
+                        app:trackColor="#40FFFFFF"
+                        app:trackCornerRadius="4dp"
+                        app:trackThickness="4dp"
+                        android:progress="0"
+                        android:visibility="gone" />
+
+                    <!-- Collapsible Details Container -->
+                    <LinearLayout
+                        android:id="@+id/heroDetailsContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <!-- Divider -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="16dp"
+                            android:layout_marginBottom="16dp"
+                            android:background="#26FFFFFF" />
+
+                        <!-- Quick Link to Class Notes button -->
+                        <LinearLayout
+                            android:id="@+id/btnHeroClassNotes"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_hero_action_pill"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="16dp"
+                            android:foreground="?attr/selectableItemBackground">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginEnd="6dp"
+                                android:src="@drawable/ic_library_outline"
+                                app:tint="#FFFFFF"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="View Class Notes"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- CALENDAR EXCEPTION BANNER                           -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/calendarExceptionBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_calendar_exception_banner"
+                android:gravity="center_vertical"
+                android:minHeight="128dp"
+                android:orientation="horizontal"
+                android:padding="18dp"
+                android:visibility="gone">
+
+                <FrameLayout
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/bg_calendar_outline_icon">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="☾"
+                        android:textColor="@color/cm_accent"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvExceptionTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        app:autoSizeMaxTextSize="20sp"
+                        app:autoSizeMinTextSize="15sp"
+                        app:autoSizeStepGranularity="1sp"
+                        app:autoSizeTextType="uniform" />
+
+                    <TextView
+                        android:id="@+id/tvExceptionDateRange"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvExceptionMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingExtra="2dp"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="72dp"
+                    android:gravity="center"
+                    android:text="☾"
+                    android:textColor="@color/cm_warning"
+                    android:textSize="58sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/calendarExceptionStatus"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/bg_calendar_status_strip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/tvTodayLabel"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_badge_blue"
+                    android:gravity="center"
+                    android:text="i"
+                    android:textColor="@color/cm_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvExceptionStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="Timetable preserved - Vacation override active"
+                    android:textColor="@color/cm_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- SCHEDULE SECTION HEADER                             -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/scheduleHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvScheduleLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/today_label"
-                    android:textColor="@color/cm_primary"
+                    android:text="TODAY'S SCHEDULE"
+                    android:fontFamily="sans-serif"
+                    android:textColor="@color/cm_text_disabled"
                     android:textSize="11sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.15"/>
+                    android:letterSpacing="0.12"
+                    android:layout_weight="1"/>
 
                 <TextView
-                    android:id="@+id/tvSelectedDay"
+                    android:id="@+id/tvPeriodCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="26sp"
+                    android:background="@drawable/bg_badge_blue"
+                    android:fontFamily="sans-serif"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="3dp"
+                    android:textColor="@color/cm_primary"
+                    android:textSize="11sp"
                     android:textStyle="bold"/>
 
             </LinearLayout>
 
-        </LinearLayout>
-
-        <!-- Day selector pills (Sat–Fri) -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="none"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="12dp">
-
-            <LinearLayout
-                android:id="@+id/daySelector"
-                android:layout_width="wrap_content"
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- SHIMMER LOADING PLACEHOLDER                         -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/shimmerView"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"/>
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_base_alpha="0.4"
+                app:shimmer_duration="1000"
+                app:shimmer_highlight_alpha="0.8"
+                app:shimmer_intensity="0.15">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <include layout="@layout/item_shimmer_period" />
+                    <include layout="@layout/item_shimmer_period" />
+                    <include layout="@layout/item_shimmer_period" />
+                </LinearLayout>
+            </com.facebook.shimmer.ShimmerFrameLayout>
 
-        </HorizontalScrollView>
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- PERIODS LIST                                         -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvPeriods"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:clipToPadding="false"
+                android:clipChildren="false"
+                android:paddingBottom="8dp"/>
 
-        <LinearLayout
-            android:id="@+id/calendarExceptionBanner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_calendar_exception_banner"
-            android:gravity="center_vertical"
-            android:minHeight="128dp"
-            android:orientation="horizontal"
-            android:padding="18dp"
-            android:visibility="gone">
-
-            <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="14dp"
-                android:background="@drawable/bg_calendar_outline_icon">
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- ASSIGNMENT COUNTDOWNS SECTION                       -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/countdownSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginTop="8dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="☾"
-                    android:textColor="@color/cm_accent"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
+                    android:text="📝 UPCOMING DEADLINES"
+                    android:textColor="@color/cm_text_disabled"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:paddingHorizontal="20dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="8dp"/>
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvExceptionTitle"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvCountdowns"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"/>
+
+            </LinearLayout>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- EMPTY STATE                                          -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/emptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="300dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/emoji_party"
+                    android:textSize="48sp"/>
+
+                <TextView
+                    android:id="@+id/tvNoClassesTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/no_classes_title"
                     android:textColor="@color/cm_text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold"
-                    app:autoSizeMaxTextSize="20sp"
-                    app:autoSizeMinTextSize="15sp"
-                    app:autoSizeStepGranularity="1sp"
-                    app:autoSizeTextType="uniform" />
+                    android:layout_marginTop="12dp"/>
 
                 <TextView
-                    android:id="@+id/tvExceptionDateRange"
-                    android:layout_width="match_parent"
+                    android:id="@+id/tvNoClassesSubtitle"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
+                    android:text="@string/enjoy_free_day"
+                    android:textColor="@color/cm_text_muted"
+                    android:textSize="14sp"
+                    android:layout_marginTop="4dp"/>
 
-                <TextView
-                    android:id="@+id/tvExceptionMessage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:lineSpacingExtra="2dp"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="13sp" />
             </LinearLayout>
 
-            <TextView
-                android:layout_width="52dp"
-                android:layout_height="72dp"
-                android:gravity="center"
-                android:text="☾"
-                android:textColor="@color/cm_warning"
-                android:textSize="58sp"
-                android:textStyle="bold" />
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/calendarExceptionStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginBottom="10dp"
-            android:background="@drawable/bg_calendar_status_strip"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:background="@drawable/bg_badge_blue"
-                android:gravity="center"
-                android:text="i"
-                android:textColor="@color/cm_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvExceptionStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:text="Timetable preserved - Vacation override active"
-                android:textColor="@color/cm_primary"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <!-- Period count badge -->
-        <TextView
-            android:id="@+id/tvPeriodCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"
-            android:background="@drawable/bg_badge_blue"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
-            android:textColor="@color/cm_primary"
-            android:textSize="12sp"/>
-
-        <!-- Periods list -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvPeriods"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false"
-            android:clipToPadding="false"
-            android:clipChildren="false"
-            android:paddingBottom="16dp"/>
-
-<!--
-        <LinearLayout
-            android:id="@+id/cardNoticeBoard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="8dp"
-            android:background="@drawable/bg_notice_home_panel"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="16dp">
-
-            <FrameLayout
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="14dp"
-                android:background="@drawable/bg_icon_container">
-
-                <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_notice"
-                    app:tint="@color/cm_primary" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Notice Board"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvNoticeBoardSubtitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Checking today's notices..."
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvTodayNoticeCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_blue"
-                android:gravity="center"
-                android:minWidth="42dp"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="7dp"
-                android:text="0"
-                android:textColor="@color/cm_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginStart="10dp"
-                android:src="@drawable/ic_chevron_right"
-                app:tint="@color/cm_text_secondary" />
-        </LinearLayout>
--->
-
-        <!-- Assignment countdowns section -->
-        <LinearLayout
-            android:id="@+id/countdownSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone"
-            android:layout_marginTop="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📝 UPCOMING DEADLINES"
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.15"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="8dp"/>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvCountdowns"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false"/>
-
-        </LinearLayout>
-
-        <!-- Empty state -->
-        <LinearLayout
-            android:id="@+id/emptyState"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="300dp"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/emoji_party"
-                android:textSize="48sp"/>
-
-            <TextView
-                android:id="@+id/tvNoClassesTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/no_classes_title"
-                android:textColor="@color/cm_text_primary"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginTop="12dp"/>
-
-            <TextView
-                android:id="@+id/tvNoClassesSubtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/enjoy_free_day"
-                android:textColor="@color/cm_text_muted"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp"/>
-
-        </LinearLayout>
-
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+    </androidx.core.widget.NestedScrollView>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

@@ -64,12 +64,12 @@
         <activity
             android:name=".activities.LoginActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".activities.RegisterActivity"
             android:exported="false"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".activities.ForgotPasswordActivity"
@@ -207,6 +207,12 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Widget Timetable List Service -->
+        <service
+            android:name=".widget.WidgetTimetableService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
 
         <!-- Chat Reply Receiver -->
         <receiver

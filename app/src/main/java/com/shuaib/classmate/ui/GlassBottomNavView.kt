@@ -15,7 +15,9 @@ import android.graphics.*
 import android.os.Build
 import android.util.AttributeSet
 import android.view.animation.AccelerateDecelerateInterpolator
+import androidx.core.content.ContextCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.shuaib.classmate.R
 
 class GlassBottomNavView @JvmOverloads constructor(
     context: Context,
@@ -53,7 +55,7 @@ class GlassBottomNavView @JvmOverloads constructor(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         startGlowPulse()
-        applyBlurIfSupported()
+        // Backdrop blur is disabled on the view directly to keep text and icons 100% sharp.
     }
 
     override fun onDetachedFromWindow() {
@@ -107,8 +109,9 @@ class GlassBottomNavView @JvmOverloads constructor(
         clipPath.addRoundRect(rect, radii, Path.Direction.CW)
         canvas.clipPath(clipPath)
 
-        // 1. Dark frosted glass base (stronger than the drawable version for layering)
-        glassPaint.color = Color.argb(185, 7, 17, 31)
+        // 1. Frosted glass base background (dynamically resolved nav capsule color)
+        val glassColor = ContextCompat.getColor(context, R.color.cm_bottom_nav_bg)
+        glassPaint.color = glassColor
         canvas.drawRoundRect(rect, topCorner, topCorner, glassPaint)
 
         // 2. Top gradient shimmer (frosted glass effect)
@@ -120,28 +123,38 @@ class GlassBottomNavView @JvmOverloads constructor(
         )
         canvas.drawRoundRect(rect, topCorner, topCorner, shimmerPaint)
 
-        // 3. Pulsing glow spot under active tab
+        // 3. Pulsing glow spot under active tab (matches the active theme primary color)
         if (activeTabCenterX > 0) {
+            val primaryColor = ContextCompat.getColor(context, R.color.cm_primary)
+            val r = Color.red(primaryColor)
+            val g = Color.green(primaryColor)
+            val b = Color.blue(primaryColor)
+            
             val glowRadius = dpToPx(36f)
-            val alpha = (glowAlpha * 55).toInt().coerceIn(0, 255)
+            val alpha = (glowAlpha * 48).toInt().coerceIn(0, 255)
             glowPaint.shader = RadialGradient(
                 activeTabCenterX, h * 0.3f,
                 glowRadius,
-                Color.argb(alpha, 59, 130, 246),
+                Color.argb(alpha, r, g, b),
                 Color.TRANSPARENT,
                 Shader.TileMode.CLAMP
             )
             canvas.drawCircle(activeTabCenterX, h * 0.3f, glowRadius, glowPaint)
         }
 
-        // 4. Top edge hairline border
+        // 4. Top edge hairline border (dynamically matches the active theme border color)
+        val strokeColor = ContextCompat.getColor(context, R.color.bottom_nav_stroke)
+        val strokeR = Color.red(strokeColor)
+        val strokeG = Color.green(strokeColor)
+        val strokeB = Color.blue(strokeColor)
+        
         borderPaint.shader = LinearGradient(
             0f, 0f, w, 0f,
-            Color.argb(0, 30, 51, 85),
-            Color.argb(80, 30, 51, 85),
+            Color.argb(0, strokeR, strokeG, strokeB),
+            Color.argb(120, strokeR, strokeG, strokeB),
             Shader.TileMode.CLAMP
         )
-        borderPaint.color = Color.argb(70, 30, 51, 85)
+        borderPaint.color = Color.argb(100, strokeR, strokeG, strokeB)
         canvas.drawLine(0f, 1f, w, 1f, borderPaint)
 
         // Let super draw the icons/text on top

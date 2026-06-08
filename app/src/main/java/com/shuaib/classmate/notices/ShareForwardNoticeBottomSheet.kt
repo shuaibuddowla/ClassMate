@@ -62,8 +62,8 @@ class ShareForwardNoticeBottomSheet : BottomSheetDialogFragment() {
             NoticeForwardManager.forwardToRoom(GROUP_ROOM_ID, notice)
             NoticeShareManager.recordShare(notice.id, "class_group")
             onShareRecorded?.invoke()
-            Toast.makeText(requireContext(), "Forwarded to Class Group", Toast.LENGTH_SHORT).show()
-            openChat(GROUP_ROOM_ID, "group", "Class Group", null)
+            Toast.makeText(requireContext(), "Forwarded to CODRIX-22", Toast.LENGTH_SHORT).show()
+            openChat(GROUP_ROOM_ID, "group", "CODRIX-22", null)
             dismiss()
         }
         binding.rowSendDm.setOnClickListener { showDmSelector(notice) }

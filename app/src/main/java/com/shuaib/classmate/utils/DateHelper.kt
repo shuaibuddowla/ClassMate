@@ -61,11 +61,7 @@ object DateHelper {
         return cancelDate == today()
     }
 
-    // Check if substitute is active today
-    fun isSubstituteActive(substituteDate: String): Boolean {
-        if (substituteDate.isEmpty()) return false
-        return substituteDate == today()
-    }
+
 
     // Format for display e.g "Today, Apr 11"
     fun formatForDisplay(dateStr: String): String {

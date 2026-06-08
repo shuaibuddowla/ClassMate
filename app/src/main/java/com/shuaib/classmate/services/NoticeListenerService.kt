@@ -71,6 +71,7 @@ class NoticeListenerService : Service() {
         listenerRegistration = noticesRef.addSnapshotListener { snapshots, e ->
             if (e != null || snapshots == null) return@addSnapshotListener
 
+            var hasChanges = false
             for (dc in snapshots.documentChanges) {
                 if (dc.type == DocumentChange.Type.ADDED) {
                     val timestamp = dc.document.getTimestamp("timestamp")
@@ -88,9 +89,15 @@ class NoticeListenerService : Service() {
                         if (timestamp != null && (lastNoticeTimestamp == null || timestamp > lastNoticeTimestamp!!)) {
                             NotificationHelper.showNotification(this, title, body, isCancel)
                             lastNoticeTimestamp = timestamp
+                            hasChanges = true
                         }
                     }
+                } else if (dc.type == DocumentChange.Type.MODIFIED || dc.type == DocumentChange.Type.REMOVED) {
+                    hasChanges = true
                 }
+            }
+            if (hasChanges || !isFirstLoad) {
+                com.shuaib.classmate.utils.WidgetUpdater.refresh(this)
             }
             isFirstLoad = false
         }

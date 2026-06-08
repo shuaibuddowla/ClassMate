@@ -1,5 +1,6 @@
 package com.shuaib.classmate.activities
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
@@ -7,6 +8,7 @@ import android.util.Patterns
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
 import com.shuaib.classmate.R
@@ -30,6 +32,7 @@ class ForgotPasswordActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.tvBackToSignIn.setOnClickListener { finish() }
         binding.btnSendReset.setOnClickListener { sendResetLink() }
+
         binding.etEmail.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 sendResetLink()
@@ -38,6 +41,9 @@ class ForgotPasswordActivity : AppCompatActivity() {
                 false
             }
         }
+
+        // Open Gmail app (falls back to Gmail web if app not installed)
+        binding.btnOpenGmail.setOnClickListener { openGmail() }
     }
 
     override fun onDestroy() {
@@ -64,7 +70,7 @@ class ForgotPasswordActivity : AppCompatActivity() {
                 Log.d("AuthTrace", "4. Success: Reset email sent")
                 AuthDebug.d("Forgot password reset email sent email=${AuthDebug.maskEmail(email)}")
                 setLoading(false)
-                Snackbar.make(binding.root, "Reset link sent! Check your email.", Snackbar.LENGTH_LONG).show()
+                showEmailSentSuccess(email)
                 startCooldown()
             }
             .addOnFailureListener {
@@ -74,6 +80,40 @@ class ForgotPasswordActivity : AppCompatActivity() {
                 setLoading(false)
                 Snackbar.make(binding.root, AuthErrorMapper.forgotPasswordMessage(it), Snackbar.LENGTH_LONG).show()
             }
+    }
+
+    /**
+     * Reveals the success/instruction panel with the sent-to email address
+     * and the spam tip + Open Gmail button.
+     */
+    private fun showEmailSentSuccess(email: String) {
+        binding.tvEmailSentTo.text =
+            "A password reset link was sent to\n$email\n\nPlease open it and follow the instructions to reset your password."
+        binding.cardEmailSent.isVisible = true
+        // Scroll to show the card
+        binding.cardEmailSent.post {
+            (binding.root as? android.widget.ScrollView)?.smoothScrollTo(0, binding.cardEmailSent.top)
+        }
+    }
+
+    private fun openGmail() {
+        // Try launching Gmail app directly; fall back to a chooser so the
+        // user can pick whichever email client they prefer.
+        val gmailPackage = "com.google.android.gm"
+        val gmailIntent = packageManager.getLaunchIntentForPackage(gmailPackage)
+        if (gmailIntent != null) {
+            startActivity(gmailIntent)
+        } else {
+            // Gmail not installed – open a generic email chooser
+            val chooser = Intent.createChooser(
+                Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_APP_EMAIL)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                "Open Email App"
+            )
+            runCatching { startActivity(chooser) }
+        }
     }
 
     private fun setLoading(loading: Boolean) {

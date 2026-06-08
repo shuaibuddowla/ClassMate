@@ -137,11 +137,16 @@
         android:layout_height="match_parent"
         android:layout_marginTop="78dp">
 
-        <androidx.core.widget.NestedScrollView
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="140dp">
+            android:layout_height="match_parent">
+
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/nestedScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="140dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -593,5 +598,57 @@
                     android:layout_height="180dp" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- Shimmer loading state -->
+        <com.facebook.shimmer.ShimmerFrameLayout
+            android:id="@+id/shimmerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:shimmer_auto_start="true"
+            app:shimmer_base_alpha="0.4"
+            app:shimmer_duration="1000"
+            app:shimmer_highlight_alpha="0.8"
+            app:shimmer_intensity="0.15">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="10dp">
+                <!-- Shimmer title 1 -->
+                <View
+                    android:layout_width="160dp"
+                    android:layout_height="18dp"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.2"/>
+                <!-- Horizontal items -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:layout_marginBottom="16dp">
+                    <include layout="@layout/item_shimmer_pdf" android:layout_width="280dp" android:layout_height="84dp" android:layout_marginEnd="12dp"/>
+                    <include layout="@layout/item_shimmer_pdf" android:layout_width="280dp" android:layout_height="84dp"/>
+                </LinearLayout>
+                <!-- Shimmer title 2 -->
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="18dp"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@color/cm_text_secondary"
+                    android:alpha="0.2"/>
+                <!-- List items -->
+                <include layout="@layout/item_shimmer_pdf"/>
+                <include layout="@layout/item_shimmer_pdf"/>
+                <include layout="@layout/item_shimmer_pdf"/>
+            </LinearLayout>
+        </com.facebook.shimmer.ShimmerFrameLayout>
+    </FrameLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </FrameLayout>

@@ -1,45 +1,47 @@
 # ClassMate
 
-ClassMate is an Android app for class communities. It brings notices, timetable reminders, PDF library management, polls, attendance tools, profile management, and real-time chat into one Firebase-backed student workflow.
+ClassMate is a Kotlin Android app for the MBSTU CSE-22 class community. It brings notices, AI summaries, timetable updates, library resources, chat, polls, attendance, widgets, and admin publishing tools into one Firebase-backed student workflow.
 
-## Features
+## Highlights
 
-- Firebase Authentication based sign in and registration.
-- Notice feed with comments, reactions, reminders, pins, sharing, and offline-first caching.
-- Timetable and academic calendar support with local persistence and scheduled reminders.
-- PDF library with upload, subject organization, search, recent files, and notification handling.
-- Real-time class chat and direct messaging flows.
-- AI-assisted notice summaries and drafts powered by Groq, with Gemini fallback support.
-- Polls, attendance, result uploads, seat plans, onboarding, profile editing, and admin tools.
-- Firebase Cloud Functions and Firestore rules included with the project.
+- Clean Facebook-style login and step-by-step account creation.
+- Modern notice feed with pins, reactions, comments, reminders, sharing, and offline-first caching.
+- AI notice summaries for students and AI-assisted notice drafting for admins.
+- Admin notice composer with markdown-style formatting, write/preview pills, attachment support, and deadline/cancellation workflows.
+- Timetable, class cancellation, substitute class, assignment deadline, and class-test deadline support.
+- PDF Library with subject organization, search, recent uploads, visible downloaded/offline files, and open/delete cache actions.
+- Real-time class chat and direct messages with smoother bottom-of-chat behavior.
+- Home/widget timetable surfaces for quick schedule checks.
+- Polls, attendance tools, seat plans, results, profile management, and admin utilities.
+- Firebase Cloud Functions and Firestore rules included.
 
 ## Tech Stack
 
-- Kotlin and Android Views
+- Kotlin, Android Views, Material Components
 - Gradle Kotlin DSL
-- Firebase Auth, Firestore, Storage, Messaging, and Cloud Functions
-- Room for local cache
-- WorkManager for background sync and reminders
-- Groq API for primary AI notice generation, with Gemini API fallback
-- Material Components, Navigation, Glide, Lottie, and Shimmer
+- Firebase Auth, Firestore, Messaging, Cloud Functions
+- Room for local/offline cache
+- WorkManager for reminders and background sync
+- Groq for primary AI generation with Gemini fallback
+- OneSignal and Telegram integrations for notification workflows
+- Glide, Lottie, Shimmer, AndroidX Navigation
 
 ## Project Structure
 
 ```text
-app/                 Android application source
-functions/           Firebase Cloud Functions source
-firestore.rules      Firestore security rules
-firestore.indexes.json
-firebase.json        Firebase project configuration
-gradle/              Gradle wrapper and version catalog
+app/                    Android app source
+functions/              Firebase Cloud Functions source
+firestore.rules         Firestore security rules
+firestore.indexes.json  Firestore index definitions
+firebase.json           Firebase project configuration
+gradle/                 Gradle wrapper and version catalog
 ```
 
 ## Local Setup
 
-1. Install Android Studio with JDK 17.
-2. Clone the repository and open the root folder in Android Studio.
-3. Create `local.properties` in the project root. Android Studio usually adds `sdk.dir` automatically.
-4. Add the app library release settings used by `app/build.gradle.kts`:
+1. Install Android Studio and open this repository.
+2. Let Android Studio create `local.properties` with `sdk.dir`.
+3. Add required local build values to `local.properties`:
 
 ```properties
 GITHUB_LIBRARY_TOKEN=your_token
@@ -54,9 +56,8 @@ GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-5. Confirm `app/google-services.json` matches the Firebase project used for the app.
-6. Keep Groq and Gemini keys in `local.properties`; they are injected through `BuildConfig` and should not be committed.
-7. Build the debug APK:
+4. Confirm `app/google-services.json` belongs to your Firebase project.
+5. Build:
 
 ```powershell
 .\gradlew.bat --no-daemon --console=plain :app:assembleDebug
@@ -64,20 +65,18 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## Firebase Functions
 
-Install dependencies and build the functions package:
-
 ```powershell
 cd functions
 npm install
 npm run build
 ```
 
-Deploy Firebase resources from the project root when ready:
+Deploy from the project root:
 
 ```powershell
 firebase deploy
 ```
 
-## Repository Notes
+## Security Notes
 
-Generated APKs, IDE state, crash logs, UI inspection dumps, and local staging folders are intentionally ignored. The repository is intended to contain the source code and configuration needed to build and maintain ClassMate, not local machine artifacts.
+Do not commit `local.properties`, APK files, keystores, API secrets, or release artifacts. Firebase Android API keys in `google-services.json` should be restricted in Google Cloud/Firebase.

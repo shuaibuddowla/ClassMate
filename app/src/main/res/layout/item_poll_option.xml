@@ -32,10 +32,10 @@
             android:id="@+id/ivCheck"
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:src="@drawable/ic_heart_filled"
+            android:src="@drawable/ic_check"
             android:layout_marginEnd="10dp"
             android:visibility="gone"
-            app:tint="@color/cm_primary_soft" />
+            app:tint="@color/cm_primary" />
 
         <TextView
             android:id="@+id/tvOptionText"

@@ -199,7 +199,8 @@ class LibrarySearchFragment : Fragment() {
     }
 
     private fun loadFiles() {
-        binding.progressSearch.isVisible = true
+        binding.shimmerView.isVisible = true
+        binding.shimmerView.startShimmer()
         db.collection("library_files")
             .whereEqualTo("isDeleted", false)
             .get()
@@ -208,12 +209,14 @@ class LibrarySearchFragment : Fragment() {
                 allFiles = snapshot.documents.map { doc -> doc.toPdfFile() }
                     .filterNot { it.isDeleted }
                     .sortedByDescending { it.timestamp ?: it.createdAt }
-                binding.progressSearch.isVisible = false
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
                 updateResults()
             }
             .addOnFailureListener { error ->
                 if (_binding == null) return@addOnFailureListener
-                binding.progressSearch.isVisible = false
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
                 Toast.makeText(context, "Failed to load search: ${error.message}", Toast.LENGTH_SHORT).show()
                 updateEmptyState(noResults = false)
             }

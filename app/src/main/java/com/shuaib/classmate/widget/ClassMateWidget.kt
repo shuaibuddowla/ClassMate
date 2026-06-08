@@ -63,13 +63,26 @@ class ClassMateWidget : AppWidgetProvider() {
                 createNoticesPendingIntent(context, widgetId)
             )
 
-            // Default values
-            views.setTextViewText(
-                R.id.tvWidgetNextSubject, "No classes today"
+            // Set up scrollable list view for today's periods
+            val adapterIntent = Intent(context, WidgetTimetableService::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                data = android.net.Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
+            }
+            views.setRemoteAdapter(R.id.lvWidgetPeriods, adapterIntent)
+            views.setEmptyView(R.id.lvWidgetPeriods, R.id.tvWidgetEmptySchedule)
+
+            val templateIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("OPEN_TAB", "timetable")
+            }
+            val templatePendingIntent = PendingIntent.getActivity(
+                context,
+                widgetId + 20000,
+                templateIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
-            views.setTextViewText(
-                R.id.tvWidgetNextTime, ""
-            )
+            views.setPendingIntentTemplate(R.id.lvWidgetPeriods, templatePendingIntent)
+
             views.setTextViewText(
                 R.id.tvWidgetAssignment, "No deadlines"
             )
@@ -85,62 +98,13 @@ class ClassMateWidget : AppWidgetProvider() {
 
             // Push initial update
             appWidgetManager.updateAppWidget(widgetId, views)
+            appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.lvWidgetPeriods)
 
             // Load data from Firestore
             val auth = FirebaseAuth.getInstance()
             if (auth.currentUser == null) return
 
             val db = FirebaseFirestore.getInstance()
-            val todayDay = DateHelper.todayDayString()
-
-            // Load today's next period
-            db.collection("timetable")
-                .document(todayDay)
-                .collection("periods")
-                .orderBy("startTime")
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val now = Calendar.getInstance()
-                    val currentTime = String.format(
-                        "%02d:%02d",
-                        now.get(Calendar.HOUR_OF_DAY),
-                        now.get(Calendar.MINUTE)
-                    )
-
-                    // Find next upcoming period
-                    val nextPeriod = snapshot.documents
-                        .map { doc ->
-                            Pair(
-                                doc.getString("subject") ?: "",
-                                doc.getString("startTime") ?: ""
-                            )
-                        }
-                        .filter { it.second > currentTime }
-                        .firstOrNull()
-
-                    if (nextPeriod != null) {
-                        views.setTextViewText(
-                            R.id.tvWidgetNextSubject,
-                            nextPeriod.first
-                        )
-                        views.setTextViewText(
-                            R.id.tvWidgetNextTime,
-                            nextPeriod.second
-                        )
-                    } else {
-                        views.setTextViewText(
-                            R.id.tvWidgetNextSubject,
-                            "No more classes today"
-                        )
-                        views.setTextViewText(
-                            R.id.tvWidgetNextTime, ""
-                        )
-                    }
-
-                    appWidgetManager.updateAppWidget(
-                        widgetId, views
-                    )
-                }
 
             // Load upcoming assignments
             // from user's countdown subcollection

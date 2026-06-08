@@ -99,8 +99,6 @@
                         android:layout_height="wrap_content"
                         android:minLines="5"
                         android:gravity="top"
-                        android:inputType="textMultiLine|textCapSentences"
-                        android:scrollbars="vertical"
                         android:textColor="@color/cm_text_primary"
                         android:textSize="14sp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -210,25 +208,25 @@
                     <RadioGroup
                         android:id="@+id/rgBodyMode"
                         android:layout_width="match_parent"
-                        android:layout_height="38dp"
-                        android:layout_marginBottom="8dp"
-                        android:background="@drawable/bg_settings_card"
+                        android:layout_height="44dp"
+                        android:layout_marginBottom="10dp"
+                        android:background="@drawable/bg_notice_mode_container"
                         android:gravity="center"
                         android:orientation="horizontal"
-                        android:padding="2dp">
+                        android:padding="4dp">
 
                         <RadioButton
                             android:id="@+id/rbWrite"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="1"
-                            android:background="@drawable/bg_library_icon_button"
+                            android:background="@drawable/sl_notice_mode_pill"
                             android:button="@null"
                             android:checked="true"
                             android:gravity="center"
                             android:text="Write"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="12sp"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <RadioButton
@@ -237,12 +235,12 @@
                             android:layout_height="match_parent"
                             android:layout_marginStart="4dp"
                             android:layout_weight="1"
-                            android:background="@drawable/bg_library_icon_button"
+                            android:background="@drawable/sl_notice_mode_pill"
                             android:button="@null"
                             android:gravity="center"
                             android:text="Preview"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="12sp"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
                     </RadioGroup>
 
@@ -253,13 +251,13 @@
                         android:layout_height="wrap_content"
                         android:scrollbars="none"
                         android:layout_marginBottom="6dp">
-
+                        
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:paddingVertical="4dp">
-
+                            
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnBold"
                                 style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -370,8 +368,6 @@
                             android:layout_height="wrap_content"
                             android:minLines="4"
                             android:gravity="top"
-                            android:inputType="textMultiLine|textCapSentences"
-                            android:scrollbars="vertical"
                             android:textColor="@color/cm_text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -386,7 +382,7 @@
                         android:padding="16dp"
                         android:layout_marginBottom="16dp"
                         android:minHeight="120dp">
-
+                        
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
