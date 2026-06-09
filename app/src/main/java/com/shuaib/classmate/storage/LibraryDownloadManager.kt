@@ -2,11 +2,11 @@ package com.shuaib.classmate.storage
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import androidx.core.content.FileProvider
 import com.google.firebase.Timestamp
+import com.shuaib.classmate.BuildConfig
+import com.shuaib.classmate.activities.OfflinePdfViewerActivity
 import com.shuaib.classmate.models.PdfFile
 import okhttp3.*
 import org.json.JSONObject
@@ -77,7 +77,7 @@ object LibraryDownloadManager {
 
         Log.d(TAG, "Starting download for ${pdfFile.title} from url: $url")
         val client = OkHttpClient.Builder().build()
-        val request = Request.Builder().url(url).build()
+        val request = buildDownloadRequest(pdfFile, url)
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -86,48 +86,69 @@ object LibraryDownloadManager {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) {
-                    onFailure(IOException("Unexpected response code: ${response.code}"))
-                    return
-                }
-
-                val body = response.body
-                if (body == null) {
-                    onFailure(IOException("Empty response body"))
-                    return
-                }
-
-                try {
-                    val dir = getDownloadsDir(context)
-                    if (!dir.exists()) dir.mkdirs()
-
-                    val file = File(dir, "${pdfFile.id}.pdf")
-                    val outputStream = FileOutputStream(file)
-                    val inputStream = body.byteStream()
-                    val totalBytes = body.contentLength()
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    var totalRead = 0L
-
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                        totalRead += bytesRead
-                        if (totalBytes > 0) {
-                            val progress = ((totalRead * 100) / totalBytes).toInt()
-                            onProgress(progress)
-                        }
+                response.use {
+                    if (!it.isSuccessful) {
+                        onFailure(IOException("Download failed with HTTP ${it.code}"))
+                        return
                     }
 
-                    outputStream.flush()
-                    outputStream.close()
-                    inputStream.close()
+                    val body = it.body
+                    if (body == null) {
+                        onFailure(IOException("Empty response body"))
+                        return
+                    }
 
-                    saveMetadata(context, pdfFile)
-                    Log.d(TAG, "Download and metadata save completed for ${pdfFile.id}")
-                    onSuccess()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error writing file to storage", e)
-                    onFailure(e)
+                    try {
+                        val dir = getDownloadsDir(context)
+                        if (!dir.exists() && !dir.mkdirs()) {
+                            onFailure(IOException("Unable to prepare offline cache"))
+                            return
+                        }
+
+                        val file = File(dir, "${pdfFile.id}.pdf")
+                        val tempFile = File(dir, "${pdfFile.id}.download")
+                        if (tempFile.exists()) tempFile.delete()
+
+                        body.byteStream().use { inputStream ->
+                            FileOutputStream(tempFile).use { outputStream ->
+                                val totalBytes = body.contentLength()
+                                val buffer = ByteArray(8192)
+                                var bytesRead: Int
+                                var totalRead = 0L
+
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                    outputStream.write(buffer, 0, bytesRead)
+                                    totalRead += bytesRead
+                                    if (totalBytes > 0) {
+                                        val progress = ((totalRead * 100) / totalBytes).toInt().coerceIn(0, 100)
+                                        onProgress(progress)
+                                    }
+                                }
+                                outputStream.flush()
+                            }
+                        }
+
+                        if (tempFile.length() == 0L) {
+                            tempFile.delete()
+                            onFailure(IOException("Downloaded file was empty"))
+                            return
+                        }
+
+                        if (file.exists()) file.delete()
+                        if (!tempFile.renameTo(file)) {
+                            tempFile.copyTo(file, overwrite = true)
+                            tempFile.delete()
+                        }
+
+                        saveMetadata(context, pdfFile, file.length())
+                        Log.d(TAG, "Download and metadata save completed for ${pdfFile.id}")
+                        onProgress(100)
+                        onSuccess()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error writing file to storage", e)
+                        File(getDownloadsDir(context), "${pdfFile.id}.download").delete()
+                        onFailure(e)
+                    }
                 }
             }
         })
@@ -151,21 +172,65 @@ object LibraryDownloadManager {
         }
 
         try {
-            val authority = "${context.packageName}.fileprovider"
-            val uri = FileProvider.getUriForFile(context, authority, file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/pdf")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val intent = Intent(context, OfflinePdfViewerActivity::class.java).apply {
+                putExtra(OfflinePdfViewerActivity.EXTRA_FILE_PATH, file.absolutePath)
+                putExtra(OfflinePdfViewerActivity.EXTRA_TITLE, pdfFile.title.ifBlank { "Offline PDF" })
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Error opening local PDF", e)
-            Toast.makeText(context, "No PDF viewer app found", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Unable to open offline PDF", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun saveMetadata(context: Context, pdf: PdfFile) {
+    private fun buildDownloadRequest(pdfFile: PdfFile, url: String): Request {
+        val useGitHubAssetApi = isGitHubReleaseAsset(pdfFile) &&
+            BuildConfig.GITHUB_OWNER.isNotBlank() &&
+            BuildConfig.GITHUB_REPO.isNotBlank()
+        val builder = Request.Builder()
+            .url(if (useGitHubAssetApi) githubAssetApiUrl(pdfFile) else directDownloadUrl(url, pdfFile.fileId))
+            .header("User-Agent", "ClassMate-Android")
+
+        if (useGitHubAssetApi) {
+            builder.header("Accept", "application/octet-stream")
+        }
+
+        if (useGitHubAssetApi && BuildConfig.GITHUB_LIBRARY_TOKEN.isNotBlank()) {
+            builder
+                .header("Authorization", "Bearer ${BuildConfig.GITHUB_LIBRARY_TOKEN}")
+                .header("X-GitHub-Api-Version", "2022-11-28")
+        }
+
+        return builder.build()
+    }
+
+    private fun directDownloadUrl(url: String, storedFileId: String): String {
+        val driveFileId = storedFileId.ifBlank { extractDriveFileId(url) }
+        return if (driveFileId.isNotBlank() && url.contains("drive.google.com", ignoreCase = true)) {
+            "https://drive.google.com/uc?export=download&id=$driveFileId"
+        } else {
+            url
+        }
+    }
+
+    private fun extractDriveFileId(url: String): String {
+        val filePathMatch = Regex("/file/d/([^/]+)").find(url)?.groupValues?.getOrNull(1)
+        if (!filePathMatch.isNullOrBlank()) return filePathMatch
+
+        val queryMatch = Regex("[?&]id=([^&]+)").find(url)?.groupValues?.getOrNull(1)
+        return queryMatch.orEmpty()
+    }
+
+    private fun isGitHubReleaseAsset(pdfFile: PdfFile): Boolean {
+        return pdfFile.provider == "github_releases" && pdfFile.githubAssetId > 0L
+    }
+
+    private fun githubAssetApiUrl(pdfFile: PdfFile): String {
+        return "https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/releases/assets/${pdfFile.githubAssetId}"
+    }
+
+    private fun saveMetadata(context: Context, pdf: PdfFile, cachedSizeBytes: Long) {
         val dir = getDownloadsDir(context)
         if (!dir.exists()) dir.mkdirs()
         val metaFile = File(dir, "${pdf.id}.json")
@@ -183,7 +248,7 @@ object LibraryDownloadManager {
             put("courseType", pdf.courseType)
             put("fileType", pdf.fileType)
             put("mimeType", pdf.mimeType)
-            put("sizeBytes", pdf.sizeBytes)
+            put("sizeBytes", cachedSizeBytes.takeIf { it > 0L } ?: pdf.sizeBytes)
             put("provider", pdf.provider)
             put("githubAssetId", pdf.githubAssetId)
             put("githubAssetName", pdf.githubAssetName)
