@@ -61,6 +61,12 @@ import com.shuaib.classmate.workers.TimetableResetWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import android.content.Context
+import com.shuaib.classmate.utils.ShakeDetector
+import com.shuaib.classmate.utils.TorchManager
+import com.shuaib.classmate.utils.AppPreferences
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -69,6 +75,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
     private lateinit var navController: NavController
+    private lateinit var appPrefs: AppPreferences
 
     private val mainTabs = listOf(
         R.id.nav_timetable,
@@ -114,6 +121,16 @@ class MainActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
+        appPrefs = AppPreferences(this)
+        if (appPrefs.isShakeToTorchEnabled()) {
+            val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (hasCameraPermission) {
+                com.shuaib.classmate.services.ShakeToTorchService.start(this)
+            }
+        }
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as? NavHostFragment

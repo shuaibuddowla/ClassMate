@@ -46,6 +46,15 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
+    fun isShakeToTorchEnabled(): Boolean =
+        prefs.getBoolean("shake_to_torch_enabled", false)
+
+    fun setShakeToTorchEnabled(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean("shake_to_torch_enabled", enabled)
+            .apply()
+    }
+
     fun getSavedRingerMode(): Int =
         prefs.getInt("saved_ringer_mode", 2) // AudioManager.RINGER_MODE_NORMAL is 2
 

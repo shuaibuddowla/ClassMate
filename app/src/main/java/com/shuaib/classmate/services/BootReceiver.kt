@@ -20,6 +20,11 @@ class BootReceiver : BroadcastReceiver() {
             } else {
                 Log.d(TAG, "Auto-mute is disabled. No alarms rescheduled after boot.")
             }
+
+            if (prefs.isShakeToTorchEnabled()) {
+                Log.d(TAG, "Shake to Torch is enabled. Starting service after boot.")
+                ShakeToTorchService.start(context)
+            }
         }
     }
 
