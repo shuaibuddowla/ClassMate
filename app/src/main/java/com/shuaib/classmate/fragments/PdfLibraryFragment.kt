@@ -33,6 +33,7 @@ import com.shuaib.classmate.adapters.RecentPdfAdapter
 import com.shuaib.classmate.adapters.OfflinePdfAdapter
 import com.shuaib.classmate.adapters.SubjectAdapter
 import com.shuaib.classmate.databinding.DialogLibraryUploadNotificationsBinding
+import com.shuaib.classmate.databinding.DialogOfflineDownloadsBinding
 import com.shuaib.classmate.databinding.DialogPdfOptionsBinding
 import com.shuaib.classmate.databinding.FragmentPdfLibraryBinding
 import com.shuaib.classmate.models.PdfFile
@@ -59,7 +60,6 @@ class PdfLibraryFragment : Fragment() {
     private lateinit var labAdapter: SubjectAdapter
     private lateinit var otherAdapter: SubjectAdapter
     private lateinit var recentAdapter: RecentPdfAdapter
-    private lateinit var offlineAdapter: OfflinePdfAdapter
     private var offlinePdfs = emptyList<PdfFile>()
     private var allSubjects = emptyList<Subject>()
     private var regularSubjects = emptyList<Subject>()
@@ -127,22 +127,19 @@ class PdfLibraryFragment : Fragment() {
         recentAdapter.onDeleteClick = { pdf -> showDeleteConfirmation(pdf) }
         recentAdapter.onFavoriteClick = { pdf -> togglePdfFavorite(pdf) }
 
-        offlineAdapter = OfflinePdfAdapter(
-            emptyList(),
-            onItemClick = { pdf -> handleResourceAction(pdf) },
-            onDeleteClick = { pdf -> showDeleteCacheConfirmation(pdf) }
-        )
-
         binding.rvRecent.apply {
             layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
             adapter = recentAdapter
             layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
             lockParentSwipeWhileTouching(this)
         }
-        binding.rvOffline.apply {
-            layoutManager = LinearLayoutManager(context)
-            adapter = offlineAdapter
-            layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
+
+        binding.btnOfflineDownloads.applyClickAnimation {
+            showOfflineDownloadsDialog()
+        }
+
+        binding.btnQuestionBank.applyClickAnimation {
+            (activity as? MainActivity)?.openChildDestination(R.id.nav_pdf, R.id.fragment_question_bank)
         }
 
         regularAdapter = SubjectAdapter(regularSubjects, pdfCounts) { subject -> navigateToPdfs(subject) }
@@ -356,13 +353,58 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun refreshOfflineSection() {
-        if (_binding == null || !::offlineAdapter.isInitialized) return
+        if (_binding == null) return
         offlinePdfs = LibraryDownloadManager.getDownloadedFiles(requireContext())
-        offlineAdapter.updateList(offlinePdfs)
-        val shouldShow = offlinePdfs.isNotEmpty()
-        binding.offlineHeader.isVisible = shouldShow
-        binding.rvOffline.isVisible = shouldShow
-        if (shouldShow) binding.rvOffline.scheduleLayoutAnimation()
+        binding.btnOfflineDownloads.isVisible = false
+    }
+
+    private fun showOfflineDownloadsDialog() {
+        val dialog = BottomSheetDialog(requireContext())
+        val dialogBinding = DialogOfflineDownloadsBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
+
+        var dialogAdapter: OfflinePdfAdapter? = null
+        dialogAdapter = OfflinePdfAdapter(
+            offlinePdfs,
+            onItemClick = { pdf ->
+                dialog.dismiss()
+                handleResourceAction(pdf)
+            },
+            onDeleteClick = { pdf ->
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Remove Offline Copy")
+                    .setMessage("Are you sure you want to remove \"${pdf.title}\" from your device? You will need internet connection to view it again.")
+                    .setPositiveButton("Remove") { _, _ ->
+                        LibraryDownloadManager.deleteDownload(requireContext(), pdf.id)
+                        Toast.makeText(requireContext(), "Offline copy removed", Toast.LENGTH_SHORT).show()
+                        
+                        refreshOfflineSection()
+                        
+                        dialogAdapter?.updateList(offlinePdfs)
+                        dialogBinding.tvOfflineDownloadsMetaDialog.text = "${offlinePdfs.size} ${if (offlinePdfs.size == 1) "file" else "files"} available without internet"
+                        dialogBinding.tvEmptyOfflineDownloads.isVisible = offlinePdfs.isEmpty()
+                        dialogBinding.rvOfflineDownloadsDialog.isVisible = offlinePdfs.isNotEmpty()
+                        
+                        if (offlinePdfs.isEmpty()) {
+                            dialog.dismiss()
+                        }
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        )
+
+        dialogBinding.rvOfflineDownloadsDialog.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = dialogAdapter
+            layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
+        }
+
+        dialogBinding.tvOfflineDownloadsMetaDialog.text = "${offlinePdfs.size} ${if (offlinePdfs.size == 1) "file" else "files"} available without internet"
+        dialogBinding.tvEmptyOfflineDownloads.isVisible = offlinePdfs.isEmpty()
+        dialogBinding.rvOfflineDownloadsDialog.isVisible = offlinePdfs.isNotEmpty()
+
+        dialog.show()
     }
 
     private fun handleResourceAction(pdf: PdfFile) {
@@ -642,19 +684,16 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun checkAdminAccess() {
-        val uid = auth.currentUser?.uid ?: run {
-            isAdmin = false
-            binding.btnUploadPdf.isVisible = false
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
             loadLibraryData()
             return
         }
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 if (_binding == null) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                val canUploadPdf = doc.getBoolean("permissions.canUploadPDF") ?: false
-                val canUploadLibrary = doc.getBoolean("permissions.canUploadLibrary") ?: false
-                isAdmin = role == "superadmin" || role == "admin" || canUploadPdf || canUploadLibrary
+                val user = doc.toObject(com.shuaib.classmate.models.User::class.java)
+                isAdmin = user?.let { it.canUploadPDF() || it.canUploadLibrary() } ?: false
                 binding.btnUploadPdf.isVisible = isAdmin
                 loadLibraryData()
             }

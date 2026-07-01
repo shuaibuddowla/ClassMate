@@ -293,9 +293,8 @@ class GroupChatFragment : Fragment() {
         FirebaseFirestore.getInstance().collection("users").document(currentUserId).get()
             .addOnSuccessListener { doc ->
                 if (_binding == null) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                val canPost = doc.getBoolean("permissions.canPostNotices") ?: false
-                isAdmin = role == "superadmin" || role == "admin" || canPost
+                val user = doc.toObject(com.shuaib.classmate.models.User::class.java)
+                isAdmin = user?.canPostNotices() ?: false
             }
     }
 

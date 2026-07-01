@@ -51,6 +51,8 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", v
 markwon-core = { group = "io.noties.markwon", name = "core", version.ref = "markwon" }
 markwon-strikethrough = { group = "io.noties.markwon", name = "ext-strikethrough", version.ref = "markwon" }
 markwon-html = { group = "io.noties.markwon", name = "html", version.ref = "markwon" }
+markwon-tables = { group = "io.noties.markwon", name = "ext-tables", version.ref = "markwon" }
+markwon-linkify = { group = "io.noties.markwon", name = "linkify", version.ref = "markwon" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

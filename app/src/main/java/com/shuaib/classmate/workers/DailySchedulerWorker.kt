@@ -20,6 +20,9 @@ import java.util.concurrent.TimeUnit
 class DailySchedulerWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+            return Result.success()
+        }
         val firestore = FirebaseFirestore.getInstance()
         val calendar = Calendar.getInstance()
         val dayName = when (calendar.get(Calendar.DAY_OF_WEEK)) {
@@ -52,10 +55,10 @@ class DailySchedulerWorker(context: Context, params: WorkerParameters) : Corouti
 
             for (period in periods) {
                 // Check if the class is cancelled for today
-                val isCancelledToday = period.isCancelled && period.cancelDate == todayDate
+                val isCancelledToday = period.isCancelled || period.cancelDate == todayDate
                 
                 if (!isCancelledToday) {
-                    scheduleNotification(period)
+                    scheduleNotification(period, dayName)
                 }
             }
 
@@ -65,7 +68,7 @@ class DailySchedulerWorker(context: Context, params: WorkerParameters) : Corouti
         }
     }
 
-    private fun scheduleNotification(period: Period) {
+    private fun scheduleNotification(period: Period, dayName: String) {
         val classTime = parseTime(period.startTime) ?: return
         val now = Calendar.getInstance()
         
@@ -78,6 +81,8 @@ class DailySchedulerWorker(context: Context, params: WorkerParameters) : Corouti
             val delay = targetTime.timeInMillis - now.timeInMillis
             
             val data = workDataOf(
+                "id" to period.id,
+                "day" to dayName,
                 "subject" to period.subject,
                 "teacher" to period.teacher
             )

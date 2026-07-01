@@ -50,7 +50,7 @@ class UserManagementActivity : AppCompatActivity() {
                 binding.progressBar.visibility = View.GONE
                 val user = doc.toObject(User::class.java)?.copy(uid = doc.id)
                 currentUser = user
-                if (user != null && (user.role == "superadmin" || user.permissions["canManageUsers"] == true)) {
+                if (user != null && user.canManageUsers()) {
                     fetchAllUsers()
                 } else {
                     Toast.makeText(this, "Access restricted to Super Admins only.", Toast.LENGTH_LONG).show()
@@ -102,7 +102,24 @@ class UserManagementActivity : AppCompatActivity() {
             return
         }
 
-        val options = arrayOf("Change Role", "Delete User")
+        val optionsList = mutableListOf<String>()
+        val isSuperadmin = currUser.role == "superadmin"
+
+        if (isSuperadmin || currUser.canManageAdmins()) {
+            optionsList.add("Change Role")
+        }
+
+        val canDelete = isSuperadmin || (currUser.canManageUsers() && targetUser.role != "admin" && targetUser.role != "superadmin")
+        if (canDelete) {
+            optionsList.add("Delete User")
+        }
+
+        if (optionsList.isEmpty()) {
+            Toast.makeText(this, "You do not have permission to manage this user.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val options = optionsList.toTypedArray()
 
         MaterialAlertDialogBuilder(this, R.style.Theme_ClassMate_Dialog)
             .setTitle("Manage ${targetUser.fullName.ifBlank { targetUser.name }}")
@@ -116,8 +133,25 @@ class UserManagementActivity : AppCompatActivity() {
     }
 
     private fun showChangeRoleDialog(targetUser: User) {
-        val roles = arrayOf("Student", "Admin", "Super Admin")
-        val roleValues = arrayOf("student", "admin", "superadmin")
+        val currUser = currentUser ?: return
+        val isSuperadmin = currUser.role == "superadmin"
+
+        if ((targetUser.role == "admin" || targetUser.role == "superadmin") && !isSuperadmin) {
+            Toast.makeText(this, "Only Super Admins can change roles for Admins and Super Admins.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val roles: Array<CharSequence>
+        val roleValues: Array<String>
+
+        if (isSuperadmin) {
+            roles = arrayOf("Student", "Admin", "Super Admin")
+            roleValues = arrayOf("student", "admin", "superadmin")
+        } else {
+            roles = arrayOf("Student", "Admin")
+            roleValues = arrayOf("student", "admin")
+        }
+
         val currentRoleIndex = roleValues.indexOf(targetUser.role.lowercase()).let { if (it == -1) 0 else it }
 
         MaterialAlertDialogBuilder(this, R.style.Theme_ClassMate_Dialog)

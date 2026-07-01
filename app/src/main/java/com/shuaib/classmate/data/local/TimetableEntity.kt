@@ -1,10 +1,16 @@
 package com.shuaib.classmate.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.shuaib.classmate.models.Period
 
-@Entity(tableName = "timetable_periods")
+@Entity(
+    tableName = "timetable_periods",
+    indices = [
+        Index(value = ["day", "startTime"])
+    ]
+)
 data class TimetableEntity(
     @PrimaryKey val cacheKey: String,
     val day: String,

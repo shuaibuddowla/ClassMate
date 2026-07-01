@@ -1,6 +1,7 @@
 // C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt
 package com.shuaib.classmate.fragments
 
+import com.shuaib.classmate.BuildConfig
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -34,13 +35,17 @@ import com.onesignal.OneSignal
 import com.shuaib.classmate.activities.LoginActivity
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.AdminPanelActivity
+import com.shuaib.classmate.activities.AiSettingsActivity
 import com.shuaib.classmate.activities.UserManagementActivity
 import com.shuaib.classmate.activities.MainActivity
+import com.shuaib.classmate.activities.PostNoticeActivity
 import com.shuaib.classmate.adapters.PdfAdapter
+
 import com.shuaib.classmate.adapters.SubjectAdapter
 import com.shuaib.classmate.databinding.DialogEditProfileBinding
 import com.shuaib.classmate.databinding.FragmentProfileBinding
 import com.shuaib.classmate.models.PdfFile
+
 import com.shuaib.classmate.models.User
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.ui.GlowHelper
@@ -54,6 +59,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import java.io.File
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
+import com.shuaib.classmate.utils.AppUpdateManager
+import com.shuaib.classmate.utils.AppUpdateInfo
+import com.shuaib.classmate.notices.NoticeTextFormatter
+import com.shuaib.classmate.databinding.DialogAppUpdateBinding
+import kotlinx.coroutines.Job
 
 class ProfileFragment : Fragment() {
 
@@ -96,6 +106,8 @@ class ProfileFragment : Fragment() {
 
         setupDarkModeToggle()
         setupNotificationsToggle()
+        setupAutoMuteToggle()
+        setupAiSettings()
         setupSavedResources()
         listenToFriendsConfig()
         fetchUserProfile()
@@ -158,6 +170,29 @@ class ProfileFragment : Fragment() {
             signOut()
         }
 
+        binding.layoutDeleteOfflineCache.setOnClickListener {
+            val context = requireContext()
+            val offlineFiles = com.shuaib.classmate.storage.LibraryDownloadManager.getDownloadedFiles(context)
+            if (offlineFiles.isEmpty()) {
+                Toast.makeText(context, "No offline cache found", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_ClassMate_Dialog)
+                .setTitle("Delete Offline Cache")
+                .setMessage("Are you sure you want to delete all offline PDF files? This will free up storage space.")
+                .setPositiveButton("Delete") { _, _ ->
+                    offlineFiles.forEach { pdf ->
+                        com.shuaib.classmate.storage.LibraryDownloadManager.deleteDownload(context, pdf.id)
+                    }
+                    Toast.makeText(context, "Offline cache cleared", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+
+
         binding.switchFriendsPublic.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked == isFriendsPublic) return@setOnCheckedChangeListener
             firestore.collection("config").document("friends")
@@ -170,11 +205,71 @@ class ProfileFragment : Fragment() {
                     binding.switchFriendsPublic.isChecked = isFriendsPublic
                 }
         }
+        
+        setupAppVersion()
+    }
+
+    private fun setupAppVersion() {
+        val currentVersion = "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+        binding.tvAppVersion.text = currentVersion
+        
+        binding.layoutCheckUpdates.setOnClickListener {
+            checkUpdatesManually()
+        }
+    }
+
+    private fun checkUpdatesManually() {
+        binding.pbCheckUpdates.visibility = View.VISIBLE
+        binding.ivCheckUpdatesChevron.visibility = View.GONE
+        binding.layoutCheckUpdates.isClickable = false
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val updateInfo = AppUpdateManager.checkLatestRelease()
+                val isAvailable = AppUpdateManager.isUpdateAvailable(updateInfo.latestVersionName)
+                
+                binding.pbCheckUpdates.visibility = View.GONE
+                binding.ivCheckUpdatesChevron.visibility = View.VISIBLE
+                binding.layoutCheckUpdates.isClickable = true
+
+                if (isAvailable) {
+                    AppUpdateManager.showUpdateDialog(requireContext(), updateInfo, viewLifecycleOwner.lifecycleScope)
+                } else {
+                    Toast.makeText(requireContext(), "ClassMate is up to date!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                binding.pbCheckUpdates.visibility = View.GONE
+                binding.ivCheckUpdatesChevron.visibility = View.VISIBLE
+                binding.layoutCheckUpdates.isClickable = true
+                Toast.makeText(requireContext(), "Failed to check for updates: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun signOut() {
         val context = requireContext()
-        OneSignal.logout()
+        val uid = auth.currentUser?.uid
+        if (uid != null) {
+            val updates = mapOf(
+                "oneSignalPlayerId" to com.google.firebase.firestore.FieldValue.delete(),
+                "onesignalPlayerId" to com.google.firebase.firestore.FieldValue.delete(),
+                "playerId" to com.google.firebase.firestore.FieldValue.delete()
+            )
+            FirebaseFirestore.getInstance().document("users/$uid")
+                .update(updates)
+                .addOnFailureListener { e ->
+                    android.util.Log.e("ProfileFragment", "Failed to clear push ID in Firestore: ${e.message}")
+                }
+        }
+        
+        try {
+            OneSignal.User.pushSubscription.optOut()
+            OneSignal.logout()
+        } catch (e: Exception) {
+            android.util.Log.e("ProfileFragment", "OneSignal signout failed: ${e.message}")
+        }
+        
+        com.shuaib.classmate.chat.ChatRepository.close()
         auth.signOut()
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -279,6 +374,53 @@ class ProfileFragment : Fragment() {
             prefs.setNotificationsEnabled(isChecked)
             if (isChecked) OneSignal.User.pushSubscription.optIn()
             else OneSignal.User.pushSubscription.optOut()
+        }
+    }
+
+    private fun setupAutoMuteToggle() {
+        val prefs = AppPreferences(requireContext())
+        binding.switchAutoMute.isChecked = prefs.isAutoMuteEnabled()
+
+        binding.switchAutoMute.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setAutoMuteEnabled(isChecked)
+            
+            if (isChecked) {
+                val notificationManager = requireContext().getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                val hasPolicyAccess = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    notificationManager?.isNotificationPolicyAccessGranted == true
+                } else {
+                    true
+                }
+
+                if (!hasPolicyAccess) {
+                    showDndPermissionDialog()
+                }
+            }
+
+            com.shuaib.classmate.services.AutoMuteScheduler.scheduleAlarms(requireContext())
+        }
+    }
+
+    private fun showDndPermissionDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Silent Mode Access Required")
+            .setMessage("To allow ClassMate to shift your phone into complete Silent mode during class, Do Not Disturb access is required. If not granted, the app will fall back to Vibrate mode.")
+            .setPositiveButton("Grant Access") { _, _ ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    val intent = Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                    startActivity(intent)
+                }
+            }
+            .setNegativeButton("Use Vibrate Mode Only") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun setupAiSettings() {
+        binding.cardAiSettings.applyClickAnimation {
+            startActivity(Intent(requireContext(), AiSettingsActivity::class.java))
+            requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
     }
 
@@ -473,16 +615,15 @@ class ProfileFragment : Fragment() {
             user.email
         }
 
-        val isAdmin = user.role == "superadmin" ||
-            user.role == "admin" ||
-            user.permissions.values.any { it }
+        val isAdmin = user.isAdmin()
         binding.adminSection.isVisible = isAdmin
 
-        val canManageUsers = user.role == "superadmin" || user.permissions["canManageUsers"] == true
+        val isSuperAdmin = user.role == "superadmin"
+
+        val canManageUsers = user.canManageUsers()
         binding.layoutUserManagement.isVisible = canManageUsers
         binding.dividerUserManagement.isVisible = canManageUsers
 
-        val isSuperAdmin = user.role == "superadmin"
         binding.dividerFriendsToggle.isVisible = isSuperAdmin
         binding.layoutFriendsToggle.isVisible = isSuperAdmin
 
@@ -593,6 +734,10 @@ class ProfileFragment : Fragment() {
         val showSeeFriends = user.role == "superadmin" || isFriendsPublic
         binding.cardSeeFriends.isVisible = showSeeFriends
         binding.dividerSeeFriends.isVisible = showSeeFriends
+    }
+
+    override fun onResume() {
+        super.onResume()
     }
 
     override fun onDestroyView() {

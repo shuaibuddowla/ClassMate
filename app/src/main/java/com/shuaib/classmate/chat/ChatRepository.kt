@@ -49,6 +49,7 @@ object ChatRepository {
     private var avatarUrl: String = ""
     private var reconnectScheduled = false
     private var manuallyClosed = false
+    private var configJob: kotlinx.coroutines.Job? = null
     private var pendingGetRooms = false
     private var pendingGetUsers = false
     private val pendingSetRooms: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap())
@@ -121,6 +122,21 @@ object ChatRepository {
         this.avatarUrl = avatarUrl.orEmpty()
         manuallyClosed = false
         connect()
+    }
+
+    fun close() {
+        manuallyClosed = true
+        reconnectScheduled = false
+        val socketToCancel = webSocket
+        webSocket = null
+        try {
+            socketToCancel?.close(1000, "User logged out")
+        } catch (_: Exception) {}
+        userId = ""
+        userName = "User"
+        avatarUrl = ""
+        activeRooms.clear()
+        _connectionState.value = ConnectionState.DISCONNECTED
     }
 
     fun connect() {
@@ -314,7 +330,8 @@ object ChatRepository {
     }
 
     private fun observeServerConfig() {
-        scope.launch {
+        if (configJob != null) return
+        configJob = scope.launch {
             callbackFlow {
                 val listener = FirebaseFirestore.getInstance()
                     .collection("config")

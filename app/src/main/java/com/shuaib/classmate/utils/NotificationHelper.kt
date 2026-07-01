@@ -17,6 +17,9 @@ object NotificationHelper {
     private const val CHANNEL_CANCELLATIONS_ID = "classmate_cancellations"
 
     fun showNotification(context: Context, title: String, body: String, isCancel: Boolean) {
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+            return
+        }
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val channelId = if (isCancel) CHANNEL_CANCELLATIONS_ID else CHANNEL_NOTICES_ID

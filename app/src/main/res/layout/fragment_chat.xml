@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_chat_list_background">
@@ -10,58 +11,400 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top App Bar -->
+        <!-- Header Toolbar -->
         <LinearLayout
-            android:id="@+id/mainChatToolbar"
+            android:id="@+id/aiChatHeader"
             android:layout_width="match_parent"
             android:layout_height="72dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="20dp"
+            android:paddingStart="8dp"
             android:paddingEnd="12dp">
 
-            <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginEnd="12dp"
-                android:contentDescription="@string/app_name"
-                android:src="@drawable/ic_classmate_logo_mark" />
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Go Back"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/cm_text_primary"
+                android:padding="10dp"
+                android:scaleType="fitCenter" />
 
-            <TextView
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="12dp"
+                android:contentDescription="AI Icon"
+                android:src="@drawable/ic_ai_logo" />
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="ClassMate"
-                android:textColor="@color/cm_text_primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ClassMate AI"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Personal Academic Assistant"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <ImageButton
-                android:id="@+id/btnSearch"
+                android:id="@+id/btnClearChat"
                 android:layout_width="44dp"
                 android:layout_height="44dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Search"
-                android:src="@drawable/ic_search_modern"
-                android:tint="@color/cm_text_primary" />
-
-            <ImageButton
-                android:id="@+id/btnCompose"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Compose"
-                android:src="@drawable/ic_edit"
-                android:tint="@color/cm_text_primary" />
+                android:contentDescription="Clear Chat History"
+                android:src="@drawable/ic_delete"
+                app:tint="@color/cm_text_primary"
+                android:padding="10dp"
+                android:scaleType="fitCenter" />
         </LinearLayout>
 
-        <!-- Filter Chips -->
+        <!-- Header Divider Line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/cm_divider" />
+
+
+        <!-- Message List Container -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- Chat Messages list -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvAiChat"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp"
+                android:scrollbars="vertical" />
+
+            <!-- Redesigned Empty state dashboard when no message -->
+            <LinearLayout
+                android:id="@+id/layoutEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp"
+                android:visibility="gone">
+
+                <!-- Welcome Header -->
+                <ImageView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:layout_marginBottom="16dp"
+                    android:src="@drawable/ic_ai_logo" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Welcome to ClassMate AI"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="Your elite academic representative and assistant. How can I help you today?"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="24dp" />
+
+                <!-- Rich suggestion cards -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Card 1: Today's Classes -->
+                    <LinearLayout
+                        android:id="@+id/cardClasses"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_card_primary"
+                        android:orientation="horizontal"
+                        android:padding="14dp"
+                        android:layout_marginBottom="12dp"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="14dp"
+                            android:background="@drawable/bg_icon_container"
+                            android:padding="8dp">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/ic_timetable"
+                                app:tint="@color/cm_on_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="📅 Today's Classes"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="View your scheduled periods, timings, and teachers."
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Card 2: Summarize Notices -->
+                    <LinearLayout
+                        android:id="@+id/cardNotices"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_card_primary"
+                        android:orientation="horizontal"
+                        android:padding="14dp"
+                        android:layout_marginBottom="12dp"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="14dp"
+                            android:background="@drawable/bg_icon_container"
+                            android:padding="8dp">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/ic_notice"
+                                app:tint="@color/cm_on_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="📢 Summarize Notices"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Get a quick summary of recent announcements and alerts."
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Card 3: PDF Study Files -->
+                    <LinearLayout
+                        android:id="@+id/cardResources"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_card_primary"
+                        android:orientation="horizontal"
+                        android:padding="14dp"
+                        android:layout_marginBottom="12dp"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="14dp"
+                            android:background="@drawable/bg_icon_container"
+                            android:padding="8dp">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/ic_library_outline"
+                                app:tint="@color/cm_on_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="📖 PDF Study Files"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Browse and download syllabus, notes, and resource PDFs."
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Card 4: Class Cancellations -->
+                    <LinearLayout
+                        android:id="@+id/cardCancellations"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_card_primary"
+                        android:orientation="horizontal"
+                        android:padding="14dp"
+                        android:layout_marginBottom="12dp"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="14dp"
+                            android:background="@drawable/bg_icon_container"
+                            android:padding="8dp">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/ic_close"
+                                app:tint="@color/cm_on_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🚫 Class Cancellations"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Check if any classes are cancelled or rescheduled today."
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Typing Indicator (glowing thinking dots) -->
+        <LinearLayout
+            android:id="@+id/layoutTypingIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="64dp"
+            android:paddingVertical="6dp"
+            android:gravity="start"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- AI Avatar -->
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/ic_ai_logo" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chat_bubble_received_modern"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:gravity="center_vertical">
+
+                <com.facebook.shimmer.ShimmerFrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:shimmer_auto_start="true"
+                    app:shimmer_duration="1200">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ClassMate AI is thinking"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="italic" />
+
+                        <TextView
+                            android:id="@+id/tvThinkingDots"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="..."
+                            android:textColor="@color/cm_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="2dp" />
+                    </LinearLayout>
+                </com.facebook.shimmer.ShimmerFrameLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Prompts / Suggestions Chips (relocated to bottom) -->
         <HorizontalScrollView
+            android:id="@+id/scrollSuggestions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipToPadding="false"
             android:paddingHorizontal="16dp"
-            android:paddingBottom="12dp"
+            android:paddingBottom="8dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -70,203 +413,107 @@
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/chipAll"
+                    android:id="@+id/chipClasses"
                     android:layout_width="wrap_content"
                     android:layout_height="34dp"
-                    android:background="@drawable/bg_chat_chip_selected_blue"
+                    android:background="@drawable/bg_chat_chip_unselected"
                     android:gravity="center"
-                    android:paddingHorizontal="20dp"
-                    android:text="All"
-                    android:textColor="@color/cm_on_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:paddingHorizontal="16dp"
+                    android:text="📅 Today's Classes"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="13sp" />
 
                 <TextView
-                    android:id="@+id/chipGroups"
+                    android:id="@+id/chipNotices"
                     android:layout_width="wrap_content"
                     android:layout_height="34dp"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_chat_chip_unselected"
                     android:gravity="center"
-                    android:paddingHorizontal="20dp"
-                    android:text="Groups"
+                    android:paddingHorizontal="16dp"
+                    android:text="📢 Summarize Notices"
                     android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
-                    android:id="@+id/chipDMs"
+                    android:id="@+id/chipResources"
                     android:layout_width="wrap_content"
                     android:layout_height="34dp"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_chat_chip_unselected"
                     android:gravity="center"
-                    android:paddingHorizontal="20dp"
-                    android:text="DMs"
+                    android:paddingHorizontal="16dp"
+                    android:text="📖 PDF Study Files"
                     android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
-                    android:id="@+id/chipUnread"
+                    android:id="@+id/chipCancellations"
                     android:layout_width="wrap_content"
                     android:layout_height="34dp"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_chat_chip_unselected"
                     android:gravity="center"
-                    android:paddingHorizontal="20dp"
-                    android:text="Unread"
+                    android:paddingHorizontal="16dp"
+                    android:text="🚫 Any Cancellations?"
                     android:textColor="@color/cm_text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!-- Bottom Input bar -->
         <LinearLayout
-            android:id="@+id/chatSearchBar"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:gravity="center_vertical"
+            android:layout_height="wrap_content"
+            android:background="@color/cm_card"
+            android:elevation="8dp"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:visibility="gone">
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="10dp"
+            android:gravity="center_vertical">
 
+            <!-- Mic voice input Button -->
+            <ImageButton
+                android:id="@+id/btnVoiceInput"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Voice Input"
+                android:src="@drawable/ic_mic"
+                app:tint="@color/cm_text_secondary"
+                android:padding="8dp"
+                android:scaleType="fitCenter" />
+
+            <!-- Input edit text -->
             <EditText
-                android:id="@+id/etSearchChats"
+                android:id="@+id/etMessage"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:layout_marginHorizontal="8dp"
                 android:background="@drawable/bg_chat_input_modern"
-                android:drawableStart="@drawable/ic_search_modern"
-                android:drawablePadding="10dp"
-                android:hint="Search chats..."
-                android:inputType="text"
-                android:paddingHorizontal="14dp"
+                android:hint="Ask me anything about study..."
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLines="4"
+                android:minHeight="40dp"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="10dp"
                 android:textColor="@color/cm_text_primary"
                 android:textColorHint="@color/cm_text_secondary"
                 android:textSize="15sp" />
 
-            <TextView
-                android:id="@+id/btnCloseChatSearch"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:gravity="center"
-                android:text="X"
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="18sp" />
+            <!-- Send button -->
+            <ImageButton
+                android:id="@+id/btnSend"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_chat_fab_gradient"
+                android:contentDescription="Send Message"
+                android:src="@drawable/ic_send"
+                app:tint="@color/cm_on_primary"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="2dp" />
         </LinearLayout>
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                android:id="@+id/swipeRefresh"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvChats"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="88dp" />
-            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-            <TextView
-                android:id="@+id/tvEmptyChats"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:padding="32dp"
-                android:text="No chats found"
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="15sp"
-                android:visibility="gone" />
-
-            <!-- Under Development / Server Offline Card -->
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardServerOffline"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_margin="24dp"
-                android:visibility="gone"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="6dp"
-                app:cardBackgroundColor="@color/cm_surface"
-                app:cardPreventCornerOverlap="true">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="24dp"
-                    android:paddingVertical="32dp">
-
-                    <FrameLayout
-                        android:layout_width="80dp"
-                        android:layout_height="80dp"
-                        android:background="@drawable/bg_notice_icon_circle">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            android:src="@drawable/ic_classmate_logo_mark" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="20dp"
-                        android:text="Chat Under Development"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="19sp"
-                        android:textStyle="bold"
-                        android:gravity="center" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="This feature is currently under active development. The local real-time server is offline or unavailable right now."
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="14sp"
-                        android:lineSpacingExtra="2dp"
-                        android:gravity="center" />
-
-                    <TextView
-                        android:id="@+id/btnRetryOffline"
-                        android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="20dp"
-                        android:background="@drawable/bg_notice_action_pill"
-                        android:gravity="center"
-                        android:minWidth="120dp"
-                        android:paddingHorizontal="24dp"
-                        android:text="Retry Connection"
-                        android:textColor="@color/cm_on_primary"
-                        android:textSize="13.5sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </FrameLayout>
     </LinearLayout>
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabNewMessage"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="20dp"
-        android:contentDescription="New Message"
-        android:src="@drawable/ic_edit"
-        app:backgroundTint="@color/cm_primary"
-        app:borderWidth="0dp"
-        app:elevation="6dp"
-        app:fabSize="normal"
-        app:srcCompat="@drawable/ic_edit"
-        app:tint="@color/cm_on_primary" />
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -19,7 +19,7 @@
     <color name="cm_border_strong">#475569</color>
     <color name="cm_divider">#CBD5E1</color>
 
-    <color name="cm_primary">#2563EB</color>
+    <color name="cm_primary">#1D4ED8</color>
     <color name="cm_primary_light">#3B82F6</color>
     <color name="cm_primary_dark">#1E40AF</color>
     <color name="cm_primary_container">#DBEAFE</color>
@@ -72,6 +72,13 @@
     <color name="cm_bottom_nav_icon_inactive">#475569</color>
     <color name="cm_bottom_nav_text_active">#1D4ED8</color>
     <color name="cm_bottom_nav_text_inactive">#475569</color>
+
+    <!-- Premium palette colors -->
+    <color name="cm_premium_bg">#0A0E23</color>
+    <color name="cm_premium_accent">#00BFA5</color>
+    <color name="cm_glass_surface">#1AFFFFFF</color>
+    <color name="cm_text_primary_premium">#E0E0E0</color>
+    <color name="cm_text_secondary_premium">#A0A0A0</color>
 
     <!-- Backward-compatible aliases for existing layouts and drawables. -->
     <color name="cm_background">@color/cm_bg</color>

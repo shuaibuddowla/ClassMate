@@ -8,7 +8,6 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.data.local.ClassMateDatabase
 import com.shuaib.classmate.data.local.TimetableEntity
 import com.shuaib.classmate.utils.DateHelper
-import com.shuaib.classmate.utils.SubjectVisuals
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -65,7 +64,7 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
         
         val metaText = when {
             isCancelled -> "Class has been cancelled"
-            isSubstitute -> "Substitute: ${entity.substituteTeacher}"
+            isSubstitute -> "Substitute: ${entity.substituteTeacher.ifBlank { "Assigned" }}"
             else -> "Teacher: ${entity.teacher}"
         }
         views.setTextViewText(R.id.tvWidgetPeriodMeta, metaText)
@@ -73,16 +72,14 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
         // Bind status indicator and badges
         when {
             isCancelled -> {
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_badge_pill)
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundTint", context.getColor(R.color.cm_error))
+                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_widget_indicator_cancel)
                 
                 views.setTextViewText(R.id.tvWidgetPeriodBadge, "CANCELLED")
                 views.setInt(R.id.tvWidgetPeriodBadge, "setBackgroundResource", R.drawable.bg_badge_red)
                 views.setTextColor(R.id.tvWidgetPeriodBadge, context.getColor(R.color.cm_error))
             }
             isSubstitute -> {
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_badge_pill)
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundTint", context.getColor(R.color.cm_warning))
+                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_widget_indicator_substitute)
                 
                 views.setTextViewText(R.id.tvWidgetPeriodBadge, "SUBSTITUTE")
                 views.setInt(R.id.tvWidgetPeriodBadge, "setBackgroundResource", R.drawable.bg_badge_purple)
@@ -90,9 +87,7 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
             }
             else -> {
                 // Normal class or lab
-                val accentColor = getSubjectAccentColor(entity.subject)
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_badge_pill)
-                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundTint", accentColor)
+                views.setInt(R.id.vWidgetPeriodIndicator, "setBackgroundResource", R.drawable.bg_widget_indicator_default)
                 
                 if (isLabSession) {
                     views.setTextViewText(R.id.tvWidgetPeriodBadge, "LAB")
@@ -124,7 +119,7 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
     }
 
     override fun getItemId(position: Int): Long {
-        return position.toLong()
+        return periodsList.getOrNull(position)?.cacheKey?.hashCode()?.toLong() ?: position.toLong()
     }
 
     override fun hasStableIds(): Boolean {
@@ -138,14 +133,6 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
             time.format(formatter)
         } catch (e: Exception) {
             time24
-        }
-    }
-
-    private fun getSubjectAccentColor(subject: String): Int {
-        return try {
-            SubjectVisuals.forSubject(subject).startColor
-        } catch (e: Exception) {
-            context.getColor(R.color.cm_primary)
         }
     }
 }

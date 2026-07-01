@@ -79,8 +79,7 @@ class UserDetailActivity : AppCompatActivity() {
             .addOnSuccessListener { currentDoc ->
                 currentUser = currentDoc.toObject(User::class.java)?.copy(uid = currentDoc.id) ?: User(uid = currentUid)
 
-                val user = currentUser
-                if (user.role != "superadmin" && user.permissions["canManageUsers"] != true) {
+                if (!currentUser.canManageUsers()) {
                     binding.progressBar.visibility = View.GONE
                     Toast.makeText(this, "Access restricted to Super Admins only.", Toast.LENGTH_LONG).show()
                     finish()
@@ -128,35 +127,38 @@ class UserDetailActivity : AppCompatActivity() {
         }
 
         val isSuperadmin = currentUser.role == "superadmin"
-        binding.tvRoleLabel.visibility = if (isSuperadmin) View.VISIBLE else View.GONE
-        binding.radioGroupRole.visibility = if (isSuperadmin) View.VISIBLE else View.GONE
+        val canEditRole = isSuperadmin || currentUser.canManageAdmins()
+        binding.tvRoleLabel.visibility = if (canEditRole) View.VISIBLE else View.GONE
+        binding.radioGroupRole.visibility = if (canEditRole) View.VISIBLE else View.GONE
+        binding.radioSuperadmin.visibility = if (isSuperadmin) View.VISIBLE else View.GONE
 
-        bindPermissionControls(isSuperadmin)
+        bindPermissionControls()
     }
 
-    private fun bindPermissionControls(isSuperadmin: Boolean) {
+    private fun bindPermissionControls() {
         var visibleCount = 0
         switchMap.forEach { (key, view) ->
-            val canControl = isSuperadmin || currentUser.permissions[key] == true
+            val canControl = currentUser.hasPermission(key)
             view.visibility = if (canControl) View.VISIBLE else View.GONE
             view.text = permissionLabels[key].orEmpty()
             view.isChecked = targetUser.permissions[key] == true
             if (canControl) visibleCount++
         }
         binding.tvPermissionHint.visibility = if (visibleCount == 0) View.VISIBLE else View.GONE
-        binding.btnSave.isEnabled = isSuperadmin || visibleCount > 0
+        binding.btnSave.isEnabled = currentUser.role == "superadmin" || visibleCount > 0
     }
 
     private fun saveChanges() {
         val isSuperadmin = currentUser.role == "superadmin"
-        val allowedKeys = permissionLabels.keys.filter { isSuperadmin || currentUser.permissions[it] == true }
+        val canEditRole = isSuperadmin || currentUser.canManageAdmins()
+        val allowedKeys = permissionLabels.keys.filter { currentUser.hasPermission(it) }
         val newPermissions = targetUser.permissions.toMutableMap()
         allowedKeys.forEach { key ->
             newPermissions[key] = switchMap.getValue(key).isChecked
         }
 
         val updates = mutableMapOf<String, Any>("permissions" to newPermissions)
-        if (isSuperadmin) {
+        if (canEditRole) {
             val role = selectedRole()
             updates["role"] = role
             // Align permissions automatically with the role to prevent security issues

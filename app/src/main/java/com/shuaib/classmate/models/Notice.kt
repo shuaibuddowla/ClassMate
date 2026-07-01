@@ -42,7 +42,9 @@ data class Notice(
     val deadlineType: String = "assignment",
     
     // Resource specific
-    val pdfId: String = ""
+    val pdfId: String = "",
+    
+    val readCount: Int = 0
 ) {
     val displayType: String
         get() = when {

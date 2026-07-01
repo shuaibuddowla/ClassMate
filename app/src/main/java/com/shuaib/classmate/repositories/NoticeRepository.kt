@@ -66,7 +66,7 @@ class NoticeRepository private constructor(context: Context) {
                             }
                         }
                     }
-                    WidgetUpdater.refresh(appContext)
+                    WidgetUpdater.refresh(appContext, syncTodayTimetable = false)
                 }
             }
     }
@@ -115,7 +115,7 @@ class NoticeRepository private constructor(context: Context) {
                 .map { it.id }
                 .filter { it.isNotBlank() }
                 .forEach { noticeDao.markDeleted(it) }
-            WidgetUpdater.refresh(appContext)
+            WidgetUpdater.refresh(appContext, syncTodayTimetable = false)
         } catch (e: Exception) {
             android.util.Log.e("NoticeRepository", "Sync failed: ${e.message}")
         }

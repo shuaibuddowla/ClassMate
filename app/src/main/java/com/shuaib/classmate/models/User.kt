@@ -32,6 +32,26 @@ data class User(
         return studentId.isNotBlank() && department.isNotBlank()
     }
 
+    fun hasPermission(permissionKey: String): Boolean {
+        if (role == "superadmin") return true
+        return permissions[permissionKey] == true
+    }
+
+    fun canPostNotices(): Boolean = hasPermission("canPostNotices")
+    fun canEditTimetable(): Boolean = hasPermission("canEditTimetable")
+    fun canCreatePolls(): Boolean = hasPermission("canCreatePolls")
+    fun canSendClassCancel(): Boolean = hasPermission("canSendClassCancel")
+    fun canUploadPDF(): Boolean = hasPermission("canUploadPDF")
+    fun canUploadLibrary(): Boolean = hasPermission("canUploadLibrary")
+    fun canUploadResult(): Boolean = hasPermission("canUploadResult")
+    fun canUploadSeatPlan(): Boolean = hasPermission("canUploadSeatPlan")
+    fun canManageUsers(): Boolean = hasPermission("canManageUsers")
+    fun canManageAdmins(): Boolean = hasPermission("canManageAdmins")
+
+    fun isAdmin(): Boolean {
+        return role == "superadmin" || role == "admin" || permissions.values.any { it }
+    }
+
     companion object {
         val DEFAULT_PERMISSIONS = mapOf(
             "canPostNotices" to false,

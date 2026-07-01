@@ -57,11 +57,8 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners(user: User) {
-        val p = user.permissions
-        val isRoleAdmin = user.role == "superadmin" || user.role == "admin"
-
         // Post Notice
-        if (isRoleAdmin || p["canPostNotices"] == true) {
+        if (user.canPostNotices()) {
             binding.cardPostNotice.visibility = View.VISIBLE
             binding.cardPostNotice.applyClickAnimation {
                 startActivity(Intent(this, PostNoticeActivity::class.java))
@@ -70,7 +67,7 @@ class AdminPanelActivity : AppCompatActivity() {
         }
 
         // Timetable
-        if (isRoleAdmin || p["canEditTimetable"] == true) {
+        if (user.canEditTimetable()) {
             binding.cardEditTimetable.visibility = View.VISIBLE
             binding.cardEditTimetable.applyClickAnimation {
                 startActivity(Intent(this, TimetableManagementActivity::class.java))
@@ -82,10 +79,16 @@ class AdminPanelActivity : AppCompatActivity() {
                 startActivity(Intent(this, AcademicCalendarActivity::class.java))
                 overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
             }
+
+            binding.cardManageBusSchedule.visibility = View.VISIBLE
+            binding.cardManageBusSchedule.applyClickAnimation {
+                startActivity(Intent(this, BusScheduleManagementActivity::class.java))
+                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            }
         }
 
         // PDF
-        if (isRoleAdmin || p["canUploadPDF"] == true || p["canUploadLibrary"] == true) {
+        if (user.canUploadPDF() || user.canUploadLibrary()) {
             binding.cardUploadPDF.visibility = View.VISIBLE
             binding.cardUploadPDF.applyClickAnimation {
                 startActivity(Intent(this, PdfUploadActivity::class.java))
@@ -94,7 +97,7 @@ class AdminPanelActivity : AppCompatActivity() {
         }
 
         // Seat Plan
-        if (isRoleAdmin || p["canUploadSeatPlan"] == true) {
+        if (user.canUploadSeatPlan()) {
             binding.cardUploadSeatPlan.visibility = View.VISIBLE
             binding.cardUploadSeatPlan.applyClickAnimation {
                 startActivity(Intent(this, SeatPlanUploadActivity::class.java))
@@ -103,7 +106,7 @@ class AdminPanelActivity : AppCompatActivity() {
         }
 
         // Result
-        if (isRoleAdmin || p["canUploadResult"] == true) {
+        if (user.canUploadResult()) {
             binding.cardUploadResult.visibility = View.VISIBLE
             binding.cardUploadResult.applyClickAnimation {
                 startActivity(Intent(this, ResultUploadActivity::class.java))
@@ -111,21 +114,7 @@ class AdminPanelActivity : AppCompatActivity() {
             }
         }
 
-        if (isRoleAdmin) {
-            binding.cardStartAttendance.visibility = View.VISIBLE
-            binding.cardStartAttendance.applyClickAnimation {
-                startActivity(Intent(this, StartAttendanceActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-            }
-
-            binding.cardAttendanceReports.visibility = View.VISIBLE
-            binding.cardAttendanceReports.applyClickAnimation {
-                startActivity(Intent(this, AttendanceHubActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-            }
-        }
-
-        if (isRoleAdmin || p["canManageUsers"] == true) {
+        if (user.canManageUsers()) {
             binding.cardManageUsers.visibility = View.VISIBLE
             binding.cardManageUsers.applyClickAnimation {
                 startActivity(Intent(this, UserManagementActivity::class.java))
@@ -208,11 +197,10 @@ class AdminPanelActivity : AppCompatActivity() {
         if (binding.cardPostNotice.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardPostNotice)
         if (binding.cardEditTimetable.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardEditTimetable)
         if (binding.cardAcademicCalendar.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardAcademicCalendar)
+        if (binding.cardManageBusSchedule.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardManageBusSchedule)
         if (binding.cardUploadPDF.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardUploadPDF)
         if (binding.cardUploadSeatPlan.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardUploadSeatPlan)
         if (binding.cardUploadResult.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardUploadResult)
-        if (binding.cardStartAttendance.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardStartAttendance)
-        if (binding.cardAttendanceReports.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardAttendanceReports)
         if (binding.cardManageUsers.visibility == View.VISIBLE) viewsToAnimate.add(binding.cardManageUsers)
         if (binding.btnTestTelegram.visibility == View.VISIBLE) viewsToAnimate.add(binding.btnTestTelegram)
 

@@ -375,6 +375,9 @@ class LoginActivity : AppCompatActivity() {
         OneSignal.login(uid)
         OneSignal.User.addTag("role", role)
         OneSignal.User.addTag("uid", uid)
+        try {
+            OneSignal.User.pushSubscription.optIn()
+        } catch (_: Exception) {}
         navigateToMain()
     }
 

@@ -45,6 +45,7 @@
         </com.google.android.material.tabs.TabLayout>
 
         <ScrollView
+            android:id="@+id/scrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:fillViewport="true">
@@ -64,32 +65,60 @@
                 android:visibility="gone"
                 android:layout_marginBottom="16dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="✨ CLASSMATE AI COMPOSER"
-                    android:textColor="@color/cm_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.15"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
+                <!-- Header card describing the AI Composer -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Paste messy draft details, dates, cancelled slots, or rough admin scribble. ClassMate AI will automatically structure, format, and prepare the notice fields for you."
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="12.5sp"
                     android:layout_marginBottom="16dp"
-                    android:lineSpacingMultiplier="1.15" />
+                    app:cardBackgroundColor="@color/cm_primary_soft"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/cm_primary_light">
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="✨ CLASSMATE AI COMPOSER"
+                            android:textColor="@color/cm_primary"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.15"
+                            android:layout_marginBottom="8dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Paste messy draft details, dates, cancelled slots, or rough admin scribble. ClassMate AI will automatically structure, format, and prepare the notice fields for you."
+                            android:textColor="@color/cm_text_muted"
+                            android:textSize="12.5sp"
+                            android:lineSpacingMultiplier="1.2" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Input area with Outline style and custom start icon -->
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Paste messy draft details..."
-                    android:textColorHint="@color/cm_text_secondary"
-                    app:boxStrokeColor="@color/cm_primary"
+                    android:textColorHint="@color/cm_text_disabled"
+                    app:startIconDrawable="@drawable/ic_edit"
+                    app:startIconTint="@color/cm_primary"
+                    app:boxBackgroundColor="@color/cm_surface"
+                    app:boxStrokeColor="@color/sl_input_stroke"
+                    app:boxStrokeWidth="1.5dp"
+                    app:boxStrokeWidthFocused="2dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
                     app:hintTextColor="@color/cm_primary"
                     android:layout_marginBottom="16dp">
 
@@ -103,45 +132,57 @@
                         android:textSize="14sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- Draft button styled premium -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnAiAnalyze"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:text="Draft with AI"
+                    android:text="Draft with ClassMate AI"
+                    app:icon="@drawable/ic_classmate_logo_mark"
+                    app:iconTint="@android:color/white"
                     android:textAllCaps="false"
-                    android:textColor="@color/cm_on_primary"
-                    app:backgroundTint="@null"
-                    android:background="@drawable/bg_circle_accent"
+                    android:textColor="@android:color/white"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:backgroundTint="@color/cm_primary"
                     android:layout_marginBottom="16dp" />
 
                 <!-- AI Detection Status Card -->
-                <LinearLayout
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="@drawable/bg_card_primary"
-                    android:padding="16dp"
+                    app:cardBackgroundColor="@color/cm_surface"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="2dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/cm_border"
                     android:layout_marginBottom="8dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="💡 AI DETECTION METRICS"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.1"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tvAiDetected"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="No draft analyzed yet."
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="13.5sp"
-                        android:lineSpacingMultiplier="1.2" />
-                </LinearLayout>
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="💡 AI DETECTION METRICS"
+                            android:textColor="@color/cm_primary"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.1"
+                            android:layout_marginBottom="12dp" />
+
+                        <TextView
+                            android:id="@+id/tvAiDetected"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="No draft analyzed yet."
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="13.5sp"
+                            android:lineSpacingMultiplier="1.2" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
 
@@ -164,20 +205,14 @@
                     <RadioButton android:id="@+id/rbCancel" android:layout_width="wrap_content"
                         android:layout_height="wrap_content" android:text="Cancellation"
                         android:textColor="@color/cm_text_primary" />
+                    <RadioButton android:id="@+id/rbPoll" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Create Poll"
+                        android:textColor="@color/cm_text_primary" />
                     <RadioButton android:id="@+id/rbSub" android:layout_width="wrap_content"
                         android:layout_height="wrap_content" android:text="Substitute"
                         android:textColor="@color/cm_text_primary" />
-                    <RadioButton
-                        android:id="@+id/rbAssignment"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Set Assignment Deadline"
-                        android:textColor="@color/cm_text_primary" />
-                    <RadioButton
-                        android:id="@+id/rbClassTest"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Set Class Test Deadline"
+                    <RadioButton android:id="@+id/rbVacation" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Vacation / Holiday"
                         android:textColor="@color/cm_text_primary" />
                 </RadioGroup>
 
@@ -203,155 +238,6 @@
                             android:layout_height="wrap_content"
                             android:textColor="@color/cm_text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- Write / Preview Selector -->
-                    <RadioGroup
-                        android:id="@+id/rgBodyMode"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginBottom="10dp"
-                        android:background="@drawable/bg_notice_mode_container"
-                        android:gravity="center"
-                        android:orientation="horizontal"
-                        android:padding="4dp">
-
-                        <RadioButton
-                            android:id="@+id/rbWrite"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="@drawable/sl_notice_mode_pill"
-                            android:button="@null"
-                            android:checked="true"
-                            android:gravity="center"
-                            android:text="Write"
-                            android:textColor="@color/sl_notice_mode_text"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-
-                        <RadioButton
-                            android:id="@+id/rbPreview"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/sl_notice_mode_pill"
-                            android:button="@null"
-                            android:gravity="center"
-                            android:text="Preview"
-                            android:textColor="@color/sl_notice_mode_text"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </RadioGroup>
-
-                    <!-- Markdown Helper Toolbar -->
-                    <HorizontalScrollView
-                        android:id="@+id/toolbarMarkdown"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:scrollbars="none"
-                        android:layout_marginBottom="6dp">
-                        
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:paddingVertical="4dp">
-                            
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnBold"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="B"
-                                android:textStyle="bold"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnItalic"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="I"
-                                android:textStyle="italic"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnHeading"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="H#"
-                                android:textStyle="bold"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnBulletList"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="• List"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnNumberedList"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="1. List"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnQuote"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="Quote"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnInlineCode"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="`Code`"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnLink"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="36dp"
-                                android:minWidth="0dp"
-                                android:paddingHorizontal="12dp"
-                                android:text="🔗 Link"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
-                        </LinearLayout>
-                    </HorizontalScrollView>
-
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/layoutBodyInput"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -370,37 +256,6 @@
                             android:gravity="top"
                             android:textColor="@color/cm_text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- Live Preview Container -->
-                    <LinearLayout
-                        android:id="@+id/layoutPreview"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:visibility="gone"
-                        android:background="@drawable/bg_card_primary"
-                        android:padding="16dp"
-                        android:layout_marginBottom="16dp"
-                        android:minHeight="120dp">
-                        
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="📝 LIVE PREVIEW"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.1"
-                            android:layout_marginBottom="12dp" />
-
-                        <TextView
-                            android:id="@+id/tvBodyPreview"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="14.5sp"
-                            android:lineSpacingMultiplier="1.2" />
-                    </LinearLayout>
 
                     <!-- Attachment section (only for normal notices) -->
                     <LinearLayout
@@ -570,6 +425,115 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- Vacation/Holiday section -->
+                <LinearLayout
+                    android:id="@+id/sectionVacationDetails"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Vacation / Exception Type"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/dropdownVacationType"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Title (Reason/Announcement) -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Vacation / Holiday Title (e.g. Eid Vacation)"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etVacationTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Description / Reason"
+                        android:textColorHint="@color/cm_text_secondary"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:hintTextColor="@color/cm_primary"
+                        android:layout_marginBottom="16dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etVacationReason"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minLines="3"
+                            android:gravity="top"
+                            android:textColor="@color/cm_text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Date range pickers -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="16dp">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="Start Date"
+                            android:textColorHint="@color/cm_text_secondary"
+                            app:boxStrokeColor="@color/cm_primary"
+                            app:hintTextColor="@color/cm_primary"
+                            android:layout_marginEnd="8dp">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etVacationStart"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:focusable="false"
+                                android:clickable="true"
+                                android:textColor="@color/cm_text_primary" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="End Date"
+                            android:textColorHint="@color/cm_text_secondary"
+                            app:boxStrokeColor="@color/cm_primary"
+                            app:hintTextColor="@color/cm_primary"
+                            android:layout_marginStart="8dp">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etVacationEnd"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:focusable="false"
+                                android:clickable="true"
+                                android:textColor="@color/cm_text_primary" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
                 <!-- Cancel/Sub shared section -->
                 <LinearLayout
                     android:id="@+id/sectionSubjectPicker"
@@ -628,76 +592,7 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- Assignment section -->
-                <LinearLayout
-                    android:id="@+id/sectionAssignment"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:visibility="gone">
 
-                    <!-- Subject dropdown -->
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutAssignmentSubject"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Select Subject"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                        android:textColorHint="@color/cm_text_secondary"
-                        app:boxStrokeColor="@color/cm_primary"
-                        app:hintTextColor="@color/cm_primary"
-                        android:layout_marginBottom="12dp">
-                        <AutoCompleteTextView
-                            android:id="@+id/dropdownAssignmentSubject"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="none"
-                            android:textColor="@color/cm_text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- Assignment topic -->
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutTopic"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Assignment Topic"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                        android:textColorHint="@color/cm_text_secondary"
-                        app:boxStrokeColor="@color/cm_primary"
-                        app:hintTextColor="@color/cm_primary"
-                        android:layout_marginBottom="12dp">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etAssignmentTopic"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:textColor="@color/cm_text_primary"
-                            android:inputType="textMultiLine"
-                            android:minLines="2" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- Submission date picker button -->
-                    <Button
-                        android:id="@+id/btnPickDate"
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="@drawable/bg_settings_card"
-                        android:text="📅 Pick Submission Date"
-                        android:textColor="@color/cm_primary"
-                        android:layout_marginBottom="8dp"
-                        style="@style/Widget.MaterialComponents.Button.TextButton" />
-
-                    <!-- Selected date display -->
-                    <TextView
-                        android:id="@+id/tvSelectedDate"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="No date selected"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="13sp"
-                        android:gravity="center"
-                        android:layout_marginBottom="12dp" />
-
-                </LinearLayout>
 
                 <!-- End of Manual Mode Container -->
                 </LinearLayout>

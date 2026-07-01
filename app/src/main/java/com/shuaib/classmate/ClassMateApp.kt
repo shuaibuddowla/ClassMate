@@ -53,6 +53,7 @@ class ClassMateApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         NoticeTextFormatter.init(this)
         FirestoreManager.enableOfflinePersistence()
 
@@ -88,6 +89,13 @@ class ClassMateApp : Application() {
                     if (!playerId.isNullOrBlank()) {
                         saveOneSignalPlayerId(playerId)
                     }
+                } catch (_: Exception) {}
+            } else {
+                // User is logged out: disconnect chat and opt out from OneSignal
+                ChatRepository.close()
+                try {
+                    OneSignal.User.pushSubscription.optOut()
+                    OneSignal.logout()
                 } catch (_: Exception) {}
             }
         }
@@ -132,11 +140,9 @@ class ClassMateApp : Application() {
                 NotificationRouter.pendingNoticeId = noticeId
                 NotificationRouter.pendingTab = when (type) {
                     "chat_message" -> "chat"
-                    "cancellation", "substitute" -> "timetable"
                     "resource" -> "pdf_library"
-                    "assignment" -> "timetable"
                     "poll" -> "notices"
-                    else -> "notices"
+                    else -> "notices"   // cancellation, substitute, assignment, deadline, exam → notices
                 }
 
                 if (type == "chat_message" && !roomId.isNullOrBlank()) {
@@ -242,19 +248,16 @@ class ClassMateApp : Application() {
     }
 
     private fun applyThemePreference(prefs: AppPreferences) {
-        val isDarkMode = prefs.isDarkMode()
-        if (isDarkMode) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        }
+        prefs.setDarkMode(false)
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
     }
 
     private fun syncNotificationPreference(prefs: AppPreferences) {
         val isNotificationsEnabled = prefs.isNotificationsEnabled()
+        val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
 
         // Ensure OneSignal state matches user preference on app start
-        if (isNotificationsEnabled) {
+        if (isNotificationsEnabled && isLoggedIn) {
             OneSignal.User.pushSubscription.optIn()
         } else {
             OneSignal.User.pushSubscription.optOut()
@@ -262,45 +265,47 @@ class ClassMateApp : Application() {
     }
 
     private fun scheduleBackgroundWorks() {
-        val workManager = WorkManager.getInstance(this)
+        CoroutineScope(Dispatchers.Default).launch {
+            val workManager = WorkManager.getInstance(this@ClassMateApp)
 
-        // Daily Timetable Sync
-        val syncWorkRequest = PeriodicWorkRequestBuilder<DailySchedulerWorker>(
-            24, TimeUnit.HOURS
-        ).build()
+            // Daily Timetable Sync
+            val syncWorkRequest = PeriodicWorkRequestBuilder<DailySchedulerWorker>(
+                24, TimeUnit.HOURS
+            ).build()
 
-        workManager.enqueueUniquePeriodicWork(
-            "DailyTimetableSync",
-            ExistingPeriodicWorkPolicy.KEEP,
-            syncWorkRequest
-        )
-
-        // Morning Briefing at 8:00 AM
-        val morningBriefRequest = PeriodicWorkRequestBuilder<MorningBriefWorker>(
-            24, TimeUnit.HOURS
-        ).setInitialDelay(calculateDelayUntil8AM(), TimeUnit.MILLISECONDS)
-        .build()
-
-        workManager.enqueueUniquePeriodicWork(
-            "MorningBriefing",
-            ExistingPeriodicWorkPolicy.KEEP,
-            morningBriefRequest
-        )
-
-        val offlineSyncRequest = OneTimeWorkRequestBuilder<OfflineSyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
+            workManager.enqueueUniquePeriodicWork(
+                "DailyTimetableSync",
+                ExistingPeriodicWorkPolicy.KEEP,
+                syncWorkRequest
             )
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+
+            // Morning Briefing at 8:00 AM
+            val morningBriefRequest = PeriodicWorkRequestBuilder<MorningBriefWorker>(
+                24, TimeUnit.HOURS
+            ).setInitialDelay(calculateDelayUntil8AM(), TimeUnit.MILLISECONDS)
             .build()
 
-        workManager.enqueueUniqueWork(
-            OfflineSyncWorker.UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            offlineSyncRequest
-        )
+            workManager.enqueueUniquePeriodicWork(
+                "MorningBriefing",
+                ExistingPeriodicWorkPolicy.KEEP,
+                morningBriefRequest
+            )
+
+            val offlineSyncRequest = OneTimeWorkRequestBuilder<OfflineSyncWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                )
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .build()
+
+            workManager.enqueueUniqueWork(
+                OfflineSyncWorker.UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                offlineSyncRequest
+            )
+        }
     }
 
     private fun calculateDelayUntil8AM(): Long {
@@ -323,5 +328,8 @@ class ClassMateApp : Application() {
         private const val APP_STARTUP_DEFER_MS = 2500L
         private const val ONESIGNAL_SYNC_PREFS = "onesignal_sync"
         private const val KEY_LAST_ONESIGNAL_PLAYER_ID = "last_player_id"
+
+        lateinit var instance: ClassMateApp
+            private set
     }
 }

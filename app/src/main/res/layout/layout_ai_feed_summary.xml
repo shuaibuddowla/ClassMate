@@ -27,8 +27,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:contentDescription="AI Icon"
-            android:src="@drawable/ic_classmate_logo_monochrome"
-            app:tint="@color/cm_notice_resource" />
+            android:src="@drawable/ic_ai_logo" />
 
         <TextView
             android:id="@+id/tvAiTitle"
@@ -95,6 +94,8 @@
             android:lineSpacingExtra="3dp"
             android:textColor="@color/cm_text_secondary"
             android:textSize="13sp"
+            android:autoLink="web"
+            android:linksClickable="true"
             tools:text="- Structured programming class has been postponed to 11:30 AM today.\n- Physics Lab report submission deadline is next Tuesday.\n- ⚠️ ACTION REQUIRED: Register for the programming contest by 8:00 PM." />
 
         <!-- Loading State -->

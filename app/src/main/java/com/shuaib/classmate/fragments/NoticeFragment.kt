@@ -11,9 +11,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.util.Log
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -21,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.SimpleItemAnimator
+import android.view.animation.AnimationUtils
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
@@ -36,7 +42,6 @@ import com.shuaib.classmate.activities.PostNoticeActivity
 import com.shuaib.classmate.adapters.NoticeAdapter
 import com.shuaib.classmate.adapters.NoticeGroupHeader
 import com.shuaib.classmate.databinding.FragmentNoticeBinding
-import com.shuaib.classmate.databinding.ItemNoticeFilterChipBinding
 import com.shuaib.classmate.models.Notice
 import com.shuaib.classmate.models.Poll
 import com.shuaib.classmate.notices.NoticeEngagement
@@ -64,35 +69,45 @@ class NoticeFragment : Fragment() {
 
     private var isAdmin = false
     private var currentUserId = ""
+    private var currentUserName = ""
+    private var currentUserStudentId = ""
+    private val readNoticeCache = mutableSetOf<String>()
     private var selectedFilter = NoticeFilter.ALL
+    private var lastFilter: NoticeFilter? = null
     private var searchQuery = ""
     private var allNotices: List<Notice> = emptyList()
     private var allPolls: List<Poll> = emptyList()
-    private val engagementListeners = mutableListOf<ListenerRegistration>()
-    private var engagementNoticeIds: Set<String> = emptySet()
+    private val fetchedEngagementNoticeIds = mutableSetOf<String>()
     private val likeCountByNotice = mutableMapOf<String, Int>()
-    private val commentCountByNotice = mutableMapOf<String, Int>()
     private val shareCountByNotice = mutableMapOf<String, Int>()
     private var likedNoticeIds: Set<String> = emptySet()
     private val pendingPinnedState = mutableMapOf<String, Boolean>()
     private var currentRenderedItems: List<Any> = emptyList()
+    private var todayReminderShown = false
 
     private var isSummaryCollapsed = true
+    private var isAiSummaryHiddenByScroll = false
     private var todayNoticesToSummarize: List<Notice> = emptyList()
+    private var lastProcessedHash: String? = null
+    private var statusBarHeight = 0
+    private var totalScrollY = 0
 
     private enum class NoticeFilter(val label: String, val icon: String) {
-        ALL("All", "A"),
-        NOTICES("Notices", "N"),
-        DEADLINES("Deadlines", "!"),
-        POLLS("Polls", "%"),
-        RESOURCES("Resources", "R"),
-        EXAMS("Exams", "EX")
+        ALL("All", "✨"),
+        NOTICES("Notices", "📢"),
+        DEADLINES("Deadlines", "⏰"),
+        POLLS("Polls", "📊"),
+        RESOURCES("Resources", "📚"),
+        EXAMS("Exams", "📝")
     }
 
     private val homeFilters = listOf(
         NoticeFilter.ALL,
         NoticeFilter.NOTICES,
-        NoticeFilter.DEADLINES
+        NoticeFilter.DEADLINES,
+        NoticeFilter.POLLS,
+        NoticeFilter.RESOURCES,
+        NoticeFilter.EXAMS
     )
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -105,6 +120,15 @@ class NoticeFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
         currentUserId = auth.currentUser?.uid.orEmpty()
+        if (currentUserId.isNotBlank()) {
+            db.collection("users").document(currentUserId).get()
+                .addOnSuccessListener { doc ->
+                    if (doc.exists()) {
+                        currentUserName = doc.getString("name") ?: ""
+                        currentUserStudentId = doc.getString("studentId") ?: ""
+                    }
+                }
+        }
 
         val noticeIdArg = arguments?.getString("noticeId")
         if (!noticeIdArg.isNullOrBlank()) {
@@ -115,7 +139,15 @@ class NoticeFragment : Fragment() {
         setupTopBar()
         setupSearch()
         setupAiSummaryCard()
-        renderFilterChips()
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.noticeHeaderPanel) { _, insets ->
+            val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            this.statusBarHeight = statusBarHeight
+            adjustHeaderOnScroll(totalScrollY)
+            updateAiSummaryUiState()
+            insets
+        }
+
         observeCachedNotices()
         checkAdminAccess()
         fetchData()
@@ -132,10 +164,6 @@ class NoticeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // Force a refresh when returning to this fragment to ensure data is up-to-date
-        if (allNotices.isNotEmpty()) {
-            noticeViewModel.refresh()
-        }
     }
 
     private fun setupRecyclerView() {
@@ -149,15 +177,37 @@ class NoticeFragment : Fragment() {
             onPinClick = { notice -> togglePin(notice) },
             onForwardClick = { notice -> openForwardSheet(notice.id) },
             onReminderClick = { notice -> NoticeReminderManager.showReminderOptions(requireContext(), notice) },
-            onNoticeLongClick = { notice -> if (isAdmin) showNoticeActionsDialog(notice) },
+            onNoticeLongClick = { notice -> showNoticeActionsDialog(notice) },
+            onCopyClick = { notice -> copyNoticeToClipboard(notice) },
             onPollVote = { pollId, option -> castVote(pollId, option) },
             onPollMultiVote = { poll, option -> toggleMultiVote(poll, option) },
-            onPollDelete = { pollId -> deletePoll(pollId) }
+            onPollDelete = { pollId -> deletePoll(pollId) },
+            onNoticeViewed = { notice -> markNoticeAsRead(notice) },
+            onReadReceiptsClick = { notice -> showReadReceipts(notice) }
         )
         binding.rvNotices.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = noticeAdapter
             itemAnimator?.changeDuration = 0
+            
+            addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    totalScrollY += dy
+                    if (!recyclerView.canScrollVertically(-1)) {
+                        totalScrollY = 0
+                    }
+                    adjustHeaderOnScroll(totalScrollY)
+
+                    if (!recyclerView.canScrollVertically(-1)) {
+                        setAiSummaryHiddenByScroll(false)
+                    } else if (dy > 12) {
+                        setAiSummaryHiddenByScroll(true)
+                    } else if (dy < -12) {
+                        setAiSummaryHiddenByScroll(false)
+                    }
+                }
+            })
         }
     }
 
@@ -173,7 +223,6 @@ class NoticeFragment : Fragment() {
         binding.etNoticeSearch.text?.clear()
         noticeAdapter.setSearchQuery("")
         setSearchMode(false)
-        renderFilterChips()
         renderFeed()
     }
 
@@ -207,7 +256,8 @@ class NoticeFragment : Fragment() {
 
     private fun fetchData() {
         if (_binding == null) return
-        if (!binding.swipeRefresh.isRefreshing) {
+        fetchedEngagementNoticeIds.clear()
+        if (!binding.swipeRefresh.isRefreshing && allNotices.isEmpty()) {
             binding.shimmerView.isVisible = true
             binding.shimmerView.startShimmer()
             binding.rvNotices.isVisible = false
@@ -228,7 +278,6 @@ class NoticeFragment : Fragment() {
             binding.shimmerView.stopShimmer()
             binding.shimmerView.isVisible = false
             binding.rvNotices.isVisible = true
-            renderFilterChips()
             renderFeed()
         }
     }
@@ -246,10 +295,26 @@ class NoticeFragment : Fragment() {
                         binding.shimmerView.isVisible = false
                         binding.rvNotices.isVisible = true
 
-                        restartEngagementListeners(notices.map { it.id }.filter { it.isNotBlank() }.toSet())
-                        renderFilterChips()
+                        fetchEngagementState(notices.map { it.id }.filter { it.isNotBlank() }.toSet())
                         renderFeed()
                         processAiSummary(notices)
+
+                        // Show today's notices reminder banner (once per session)
+                        if (!todayReminderShown) {
+                            val todayStart = java.util.Calendar.getInstance().apply {
+                                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                set(java.util.Calendar.MINUTE, 0)
+                                set(java.util.Calendar.SECOND, 0)
+                                set(java.util.Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+                            val todayCount = notices.count { notice ->
+                                val ts = notice.timestamp?.toDate()?.time ?: 0L
+                                ts >= todayStart
+                            }
+                            if (todayCount > 0) {
+                                showTodayReminderBanner(todayCount)
+                            }
+                        }
                     }
                 }
                 launch {
@@ -301,7 +366,6 @@ class NoticeFragment : Fragment() {
         binding.shimmerView.isVisible = false
         binding.rvNotices.isVisible = true
         binding.swipeRefresh.isRefreshing = false
-        renderFilterChips()
         renderFeed()
     }
 
@@ -315,7 +379,6 @@ class NoticeFragment : Fragment() {
         if (allPolls.isEmpty()) {
             showFetchedPolls(emptyList())
         } else {
-            renderFilterChips()
             renderFeed()
         }
         if (NetworkMonitor.isOnline(requireContext()) || allNotices.isEmpty()) {
@@ -372,6 +435,10 @@ class NoticeFragment : Fragment() {
             }
 
             if (_binding == null) return@launch
+            val wasEmpty = currentRenderedItems.isEmpty()
+            val filterChanged = lastFilter != selectedFilter
+            lastFilter = selectedFilter
+
             if (rendered != currentRenderedItems || noticeAdapter.currentList != rendered) {
                 currentRenderedItems = rendered
                 noticeAdapter.submitList(rendered) {
@@ -398,12 +465,51 @@ class NoticeFragment : Fragment() {
                         binding.rvNotices.scrollToPosition(firstNoticePosition)
                     }
                     noticeAdapter.setEngagementState(buildEngagementState())
+
+                    if (wasEmpty || filterChanged) {
+                        binding.rvNotices.scheduleLayoutAnimation()
+                    }
                 }
             } else {
                 noticeAdapter.setEngagementState(buildEngagementState())
             }
             updateEmptyState(filteredItems.isEmpty())
         }
+    }
+
+    private fun showTodayReminderBanner(count: Int) {
+        if (_binding == null || todayReminderShown) return
+        todayReminderShown = true
+        val banner = binding.layoutReminderBanner
+        val label = if (count == 1) "notice" else "notices"
+        binding.tvReminderText.text = "You have $count $label today"
+
+        banner.visibility = android.view.View.VISIBLE
+        val slideDown = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_down_in)
+        banner.startAnimation(slideDown)
+
+        val dismissAction = Runnable { dismissReminderBanner() }
+        banner.tag = dismissAction
+        banner.postDelayed(dismissAction, 4000L)
+
+        binding.btnDismissReminder.setOnClickListener {
+            banner.removeCallbacks(dismissAction)
+            dismissReminderBanner()
+        }
+    }
+
+    private fun dismissReminderBanner() {
+        val banner = binding.layoutReminderBanner
+        if (banner.visibility != android.view.View.VISIBLE) return
+        val slideUp = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_up_out)
+        slideUp.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
+            override fun onAnimationStart(a: android.view.animation.Animation?) = Unit
+            override fun onAnimationRepeat(a: android.view.animation.Animation?) = Unit
+            override fun onAnimationEnd(a: android.view.animation.Animation?) {
+                if (_binding != null) banner.visibility = android.view.View.GONE
+            }
+        })
+        banner.startAnimation(slideUp)
     }
 
     private fun buildPoll(doc: com.google.firebase.firestore.DocumentSnapshot, voteSnapshot: com.google.firebase.firestore.QuerySnapshot?): Poll {
@@ -438,46 +544,7 @@ class NoticeFragment : Fragment() {
         }
     }
 
-    private fun renderFilterChips() {
-        val context = context ?: return
-        if (_binding == null) return
-        if (selectedFilter !in homeFilters) selectedFilter = NoticeFilter.ALL
-        val counts = mapOf(
-            NoticeFilter.ALL to allNotices.size + allPolls.size,
-            NoticeFilter.NOTICES to allNotices.count { it.displayType == "notice" || it.displayType == "cancellation" },
-            NoticeFilter.DEADLINES to allNotices.count { it.displayType == "deadline" },
-            NoticeFilter.POLLS to allPolls.size,
-            NoticeFilter.RESOURCES to allNotices.count { it.displayType == "resource" },
-            NoticeFilter.EXAMS to allNotices.count { it.displayType == "exam" }
-        )
-        binding.filterChipContainer.removeAllViews()
-        homeFilters.forEach { filter ->
-            val chip = ItemNoticeFilterChipBinding.inflate(layoutInflater, binding.filterChipContainer, false)
-            val selected = filter == selectedFilter
-            chip.chipRoot.background = context.getDrawable(
-                if (selected) R.drawable.bg_notice_chip_selected else R.drawable.bg_notice_chip
-            )
-            chip.tvChipIcon.text = filter.icon
-            chip.tvChipIcon.isVisible = false
-            chip.tvChipLabel.text = filter.label
-            chip.tvChipCount.text = "${counts[filter] ?: 0}"
-            chip.tvChipLabel.setTextColor(
-                if (selected) ThemeColors.onPrimary(context) else ThemeColors.textSecondary(context)
-            )
-            chip.tvChipCount.setTextColor(
-                if (selected) ThemeColors.onPrimary(context) else ThemeColors.textSecondary(context)
-            )
-            chip.chipRoot.setOnClickListener {
-                selectedFilter = filter
-                it.animate().scaleX(0.98f).scaleY(0.98f).setDuration(55).withEndAction {
-                    it.animate().scaleX(1f).scaleY(1f).setDuration(90).start()
-                }.start()
-                renderFilterChips()
-                renderFeed()
-            }
-            binding.filterChipContainer.addView(chip.root)
-        }
-    }
+
 
     private fun updateEmptyState(isEmpty: Boolean) {
         binding.emptyNoticeState.isVisible = isEmpty
@@ -673,21 +740,31 @@ class NoticeFragment : Fragment() {
     }
 
     private fun showNoticeActionsDialog(notice: Notice) {
-        AlertDialog.Builder(requireContext(), R.style.Theme_ClassMate_Dialog)
-            .setTitle("Notice Actions")
-            .setItems(arrayOf("Edit", "Delete")) { _, which ->
-                if (which == 0) {
-                    startActivity(
-                        Intent(requireContext(), PostNoticeActivity::class.java)
-                            .putExtra("NOTICE_ID", notice.id)
-                            .putExtra("NOTICE_TITLE", notice.title)
-                            .putExtra("NOTICE_BODY", notice.content)
-                    )
-                } else {
-                    confirmDeleteNotice(notice)
+        if (isAdmin) {
+            AlertDialog.Builder(requireContext(), R.style.Theme_ClassMate_Dialog)
+                .setTitle("Notice Actions")
+                .setItems(arrayOf("Edit", "Delete")) { _, which ->
+                    if (which == 0) {
+                        startActivity(
+                            Intent(requireContext(), PostNoticeActivity::class.java)
+                                .putExtra("NOTICE_ID", notice.id)
+                                .putExtra("NOTICE_TITLE", notice.title)
+                                .putExtra("NOTICE_BODY", notice.content)
+                        )
+                    } else {
+                        confirmDeleteNotice(notice)
+                    }
                 }
-            }
-            .show()
+                .show()
+        }
+    }
+
+    private fun copyNoticeToClipboard(notice: Notice) {
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val textToCopy = "Title: ${notice.title}\n\n${notice.content}"
+        val clip = android.content.ClipData.newPlainText("Notice", textToCopy)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(requireContext(), "Notice copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
     private fun confirmDeleteNotice(notice: Notice) {
@@ -716,66 +793,70 @@ class NoticeFragment : Fragment() {
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 if (_binding == null) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                val canPost = doc.getBoolean("permissions.canPostNotices") ?: false
-                isAdmin = role == "superadmin" || role == "admin" || canPost
+                val user = doc.toObject(com.shuaib.classmate.models.User::class.java)
+                isAdmin = user?.canPostNotices() ?: false
                 binding.btnPostNotice.isVisible = isAdmin
                 binding.btnEmptyPost.isVisible = isAdmin && allNotices.isEmpty() && allPolls.isEmpty()
             }
     }
 
     override fun onDestroyView() {
-        engagementListeners.forEach { it.remove() }
-        engagementListeners.clear()
-        engagementNoticeIds = emptySet() // Crucial: allow listeners to restart when view is recreated
+        fetchedEngagementNoticeIds.clear()
         binding.rvNotices.adapter = null
         currentRenderedItems = emptyList()
         _binding = null
         super.onDestroyView()
     }
 
-    private fun restartEngagementListeners(noticeIds: Set<String>) {
-        if (engagementNoticeIds == noticeIds) {
+    private fun fetchEngagementState(noticeIds: Set<String>) {
+        if (_binding == null) return
+        val toFetch = noticeIds - fetchedEngagementNoticeIds
+        if (toFetch.isEmpty()) {
             noticeAdapter.setEngagementState(buildEngagementState())
             return
         }
-        engagementNoticeIds = noticeIds
-        engagementListeners.forEach { it.remove() }
-        engagementListeners.clear()
-        likeCountByNotice.keys.retainAll(noticeIds)
-        commentCountByNotice.keys.retainAll(noticeIds)
-        shareCountByNotice.keys.retainAll(noticeIds)
-        likedNoticeIds = likedNoticeIds.filterTo(mutableSetOf()) { it in noticeIds }
-        if (noticeIds.isEmpty()) return
-        noticeIds.chunked(30).forEach { chunk ->
-            engagementListeners += db.collection("notice_likes")
-                .whereIn("noticeId", chunk)
-                .addSnapshotListener { snapshot, _ ->
-                    val docs = snapshot?.documents.orEmpty()
-                    replaceCounts(likeCountByNotice, chunk, docs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount())
-                    likedNoticeIds = (likedNoticeIds - chunk.toSet()) +
-                            docs.filter { it.getString("userId") == currentUserId }.mapNotNull { it.getString("noticeId") }
-                    noticeAdapter.setEngagementState(buildEngagementState())
-                }
-            engagementListeners += db.collection("notice_comments")
-                .whereIn("noticeId", chunk)
-                .addSnapshotListener { snapshot, _ ->
-                    val docs = snapshot?.documents.orEmpty().filter { it.getBoolean("isDeleted") != true }
-                    replaceCounts(commentCountByNotice, chunk, docs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount())
-                    noticeAdapter.setEngagementState(buildEngagementState())
-                }
-            engagementListeners += db.collection("notice_shares")
-                .whereIn("noticeId", chunk)
-                .addSnapshotListener { snapshot, _ ->
-                    val docs = snapshot?.documents.orEmpty()
-                    replaceCounts(shareCountByNotice, chunk, docs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount())
-                    noticeAdapter.setEngagementState(buildEngagementState())
-                }
-        }
-    }
 
-    private fun replaceCounts(target: MutableMap<String, Int>, chunk: List<String>, replacement: Map<String, Int>) {
-        chunk.forEach { id -> target[id] = replacement[id] ?: 0 }
+        fetchedEngagementNoticeIds.addAll(toFetch)
+
+        viewLifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            toFetch.chunked(30).forEach { chunk ->
+                try {
+                    val likesTask = db.collection("notice_likes")
+                        .whereIn("noticeId", chunk)
+                        .get()
+                    val sharesTask = db.collection("notice_shares")
+                        .whereIn("noticeId", chunk)
+                        .get()
+
+                    val likesSnapshot = Tasks.await(likesTask)
+                    val sharesSnapshot = Tasks.await(sharesTask)
+
+                    if (_binding == null) return@forEach
+
+                    val likeDocs = likesSnapshot.documents
+                    val likeCounts = likeDocs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount()
+                    val userLikedIds = likeDocs.filter { it.getString("userId") == currentUserId }.mapNotNull { it.getString("noticeId") }.toSet()
+
+                    val shareDocs = sharesSnapshot.documents
+                    val shareCounts = shareDocs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount()
+
+                    launch(kotlinx.coroutines.Dispatchers.Main) {
+                        if (_binding == null) return@launch
+                        chunk.forEach { id ->
+                            likeCountByNotice[id] = likeCounts[id] ?: 0
+                            shareCountByNotice[id] = shareCounts[id] ?: 0
+                        }
+                        likedNoticeIds = likedNoticeIds + userLikedIds
+                        noticeAdapter.setEngagementState(buildEngagementState())
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("NoticeFragment", "Failed to fetch engagement for chunk", e)
+                    launch(kotlinx.coroutines.Dispatchers.Main) {
+                        fetchedEngagementNoticeIds.removeAll(chunk.toSet())
+                    }
+                }
+            }
+        }
     }
 
     private fun buildEngagementState(): Map<String, NoticeEngagement> {
@@ -783,7 +864,7 @@ class NoticeFragment : Fragment() {
             notice.id to NoticeEngagement(
                 noticeId = notice.id,
                 likeCount = likeCountByNotice[notice.id] ?: 0,
-                commentCount = commentCountByNotice[notice.id] ?: 0,
+                commentCount = notice.discussionCount,
                 shareCount = shareCountByNotice[notice.id] ?: 0,
                 isLiked = notice.id in likedNoticeIds,
                 isPinned = pendingPinnedState[notice.id] ?: notice.isPinned
@@ -826,6 +907,11 @@ class NoticeFragment : Fragment() {
     private fun setupAiSummaryCard() {
         if (_binding == null) return
         val card = binding.aiSummaryCard
+        
+        // Make the entire card background clickable for a premium "one-click" experience
+        card.cardAiSummary.setOnClickListener {
+            toggleAiSummaryExpansion()
+        }
         card.layoutAiHeader.setOnClickListener {
             toggleAiSummaryExpansion()
         }
@@ -839,16 +925,23 @@ class NoticeFragment : Fragment() {
     }
 
     private fun toggleAiSummaryExpansion() {
+        if (_binding == null) return
         isSummaryCollapsed = !isSummaryCollapsed
+        
+        // Premium layout transitions for card height expansion/collapse
+        val card = binding.aiSummaryCard.cardAiSummary
+        val parent = card.parent as? ViewGroup
+        if (parent != null) {
+            androidx.transition.TransitionManager.beginDelayedTransition(parent)
+        }
+        
         updateAiSummaryUiState()
         if (!isSummaryCollapsed) {
             val hash = getTodayNoticesHash()
-            if (hash.isNotEmpty()) {
-                val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-                val cached = prefs.getString("summary_$hash", null)
-                if (cached.isNullOrEmpty()) {
-                    generateAiSummary()
-                }
+            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+            val cached = prefs.getString("summary_$hash", null)
+            if (cached.isNullOrBlank()) {
+                generateAiSummary()
             }
         }
     }
@@ -891,12 +984,15 @@ class NoticeFragment : Fragment() {
                     subject = "Notice Feed Summary"
                 )
                 if (_binding == null) return@launch
-                if (result != null && result.isNotBlank()) {
+                if (result.isSuccess) {
+                    val summary = result.getOrThrow()
                     val prefs = context.getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-                    prefs.edit().putString("summary_$hash", result).apply()
+                    prefs.edit().putString("summary_$hash", summary).apply()
                     updateAiSummaryUiState()
                 } else {
-                    showAiSummaryError("Failed to generate summary.")
+                    val exception = result.exceptionOrNull()
+                    val errorMsg = exception?.message ?: "Failed to generate summary."
+                    showAiSummaryError(errorMsg)
                 }
             } catch (e: Exception) {
                 if (_binding == null) return@launch
@@ -923,18 +1019,80 @@ class NoticeFragment : Fragment() {
     private fun updateAiSummaryUiState() {
         if (_binding == null) return
         val card = binding.aiSummaryCard
-        if (todayNoticesToSummarize.isEmpty()) {
-            card.cardAiSummary.visibility = View.GONE
-            return
-        }
         val hash = getTodayNoticesHash()
-        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-        val isDismissed = prefs.getBoolean("dismissed_$hash", false)
-        if (isDismissed) {
+        
+        // Reset error/loading state if hash changes so we don't get stuck in a stale error state
+        if (hash.isNotEmpty() && hash != lastProcessedHash) {
+            lastProcessedHash = hash
+            card.layoutAiLoading.visibility = View.GONE
+            card.layoutAiError.visibility = View.GONE
+            card.tvAiSummaryText.visibility = View.VISIBLE
+        }
+
+        val isCardVisible = todayNoticesToSummarize.isNotEmpty() && run {
+            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+            !prefs.getBoolean("dismissed_$hash", false)
+        }
+
+        // Dynamically adjust RecyclerView top padding to avoid empty space when card is hidden/dismissed
+        val density = resources.displayMetrics.density
+        val topPadding = if (isCardVisible) (128 * density).toInt() else (72 * density).toInt()
+        binding.rvNotices.setPadding(
+            binding.rvNotices.paddingLeft,
+            topPadding + statusBarHeight,
+            binding.rvNotices.paddingRight,
+            binding.rvNotices.paddingBottom
+        )
+
+        // Dynamically adjust reminder banner topMargin to float below the transparent status bar + header
+        val bannerParams = binding.layoutReminderBanner.layoutParams as? ViewGroup.MarginLayoutParams
+        if (bannerParams != null) {
+            bannerParams.topMargin = (72 * density).toInt() + statusBarHeight
+            binding.layoutReminderBanner.layoutParams = bannerParams
+        }
+
+        // Dynamically adjust shimmer and empty state top padding
+        binding.shimmerView.setPadding(
+            binding.shimmerView.paddingLeft,
+            (72 * density).toInt() + statusBarHeight,
+            binding.shimmerView.paddingRight,
+            binding.shimmerView.paddingBottom
+        )
+        binding.emptyNoticeState.setPadding(
+            binding.emptyNoticeState.paddingLeft,
+            (72 * density).toInt() + statusBarHeight,
+            binding.emptyNoticeState.paddingRight,
+            binding.emptyNoticeState.paddingBottom
+        )
+
+        if (!isCardVisible) {
             card.cardAiSummary.visibility = View.GONE
             return
         }
+
         card.cardAiSummary.visibility = View.VISIBLE
+        
+        // Dynamically adjust AI summary card topMargin to float below the transparent status bar + header
+        val params = card.cardAiSummary.layoutParams as? ViewGroup.MarginLayoutParams
+        if (params != null) {
+            params.topMargin = (72 * density).toInt() + statusBarHeight
+            card.cardAiSummary.layoutParams = params
+        }
+        
+        // Restore correct translation and alpha based on scroll state
+        if (isAiSummaryHiddenByScroll) {
+            card.cardAiSummary.alpha = 0f
+            card.cardAiSummary.post {
+                val topMargin = (card.cardAiSummary.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0
+                card.cardAiSummary.translationY = -(card.cardAiSummary.height + topMargin).toFloat()
+            }
+        } else {
+            card.cardAiSummary.alpha = 1f
+            card.cardAiSummary.translationY = 0f
+        }
+
+        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+
         if (isSummaryCollapsed) {
             card.layoutAiContent.visibility = View.GONE
             card.ivAiChevron.rotation = 0f
@@ -952,9 +1110,16 @@ class NoticeFragment : Fragment() {
                 card.tvAiSummaryText.visibility = View.VISIBLE
                 val context = context
                 if (context != null) {
-                    card.tvAiSummaryText.text = com.shuaib.classmate.notices.NoticeTextFormatter.format(context, cachedSummary)
+                    val formatted = com.shuaib.classmate.notices.NoticeTextFormatter.format(context, cachedSummary)
+                    val spannable = android.text.SpannableStringBuilder(formatted)
+                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                    card.tvAiSummaryText.text = spannable
+                    card.tvAiSummaryText.movementMethod = android.text.method.LinkMovementMethod.getInstance()
                 } else {
-                    card.tvAiSummaryText.text = cachedSummary
+                    val spannable = android.text.SpannableStringBuilder(cachedSummary)
+                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                    card.tvAiSummaryText.text = spannable
+                    card.tvAiSummaryText.movementMethod = android.text.method.LinkMovementMethod.getInstance()
                 }
             } else {
                 if (card.layoutAiLoading.visibility != View.VISIBLE && card.layoutAiError.visibility != View.VISIBLE) {
@@ -966,4 +1131,194 @@ class NoticeFragment : Fragment() {
             }
         }
     }
+
+    private fun setAiSummaryHiddenByScroll(hidden: Boolean) {
+        if (_binding == null || isAiSummaryHiddenByScroll == hidden) return
+        
+        val card = binding.aiSummaryCard.cardAiSummary
+        if (todayNoticesToSummarize.isEmpty()) return
+        val hash = getTodayNoticesHash()
+        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
+        val isDismissed = prefs.getBoolean("dismissed_$hash", false)
+        if (isDismissed) return
+
+        isAiSummaryHiddenByScroll = hidden
+
+        val topMargin = (card.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0
+        val offset = if (hidden) -(card.height + topMargin).toFloat() else 0f
+        
+        card.animate()
+            .translationY(offset)
+            .alpha(if (hidden) 0f else 1f)
+            .setDuration(220)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+    }
+
+    private fun adjustHeaderOnScroll(scrollOffset: Int) {
+        if (_binding == null) return
+        val density = resources.displayMetrics.density
+        val scrollLimit = 80 * density
+        val fraction = (scrollOffset.toFloat() / scrollLimit).coerceIn(0f, 1f)
+
+        // Title scaling
+        val scale = 1.0f - (0.2f * fraction)
+        binding.tvNoticeTitle.pivotX = 0f
+        if (binding.tvNoticeTitle.height > 0) {
+            binding.tvNoticeTitle.pivotY = binding.tvNoticeTitle.height.toFloat() / 2f
+        }
+        binding.tvNoticeTitle.scaleX = scale
+        binding.tvNoticeTitle.scaleY = scale
+        binding.tvNoticeTitle.translationY = (6 * density) * fraction
+
+        // Subtitle collapsing & fade
+        val subtitleAlpha = 1.0f - fraction
+        binding.tvNoticeSubtitle.pivotY = 0f
+        binding.tvNoticeSubtitle.alpha = subtitleAlpha
+        binding.tvNoticeSubtitle.scaleY = subtitleAlpha
+        binding.tvNoticeSubtitle.translationY = -(6 * density) * fraction
+
+        // Buttons and search container scaling
+        val buttonScale = 1.0f - (0.15f * fraction)
+        if (binding.btnSearch.width > 0) {
+            binding.btnSearch.pivotX = binding.btnSearch.width.toFloat() / 2f
+            binding.btnSearch.pivotY = binding.btnSearch.height.toFloat() / 2f
+        }
+        binding.btnSearch.scaleX = buttonScale
+        binding.btnSearch.scaleY = buttonScale
+
+        if (binding.btnPostNotice.width > 0) {
+            binding.btnPostNotice.pivotX = binding.btnPostNotice.width.toFloat()
+            binding.btnPostNotice.pivotY = binding.btnPostNotice.height.toFloat() / 2f
+        }
+        binding.btnPostNotice.scaleX = buttonScale
+        binding.btnPostNotice.scaleY = buttonScale
+
+        if (binding.searchContainer.width > 0) {
+            binding.searchContainer.pivotX = binding.searchContainer.width.toFloat()
+            binding.searchContainer.pivotY = binding.searchContainer.height.toFloat() / 2f
+        }
+        binding.searchContainer.scaleX = buttonScale
+        binding.searchContainer.scaleY = buttonScale
+
+        // Dynamic padding adjustment
+        val baseTopPadding = (12 * density).toInt()
+        val targetTopPadding = (4 * density).toInt()
+        val currentTopPadding = baseTopPadding - ((baseTopPadding - targetTopPadding) * fraction).toInt()
+
+        val baseBottomPadding = (6 * density).toInt()
+        val targetBottomPadding = (2 * density).toInt()
+        val currentBottomPadding = baseBottomPadding - ((baseBottomPadding - targetBottomPadding) * fraction).toInt()
+
+        binding.noticeHeaderPanel.setPadding(
+            binding.noticeHeaderPanel.paddingLeft,
+            statusBarHeight + currentTopPadding,
+            binding.noticeHeaderPanel.paddingRight,
+            currentBottomPadding
+        )
+    }
+
+    private fun markNoticeAsRead(notice: Notice) {
+        if (notice.id.isBlank() || currentUserId.isBlank()) return
+        if (readNoticeCache.contains(notice.id)) return
+
+        val context = context ?: return
+        val prefs = context.getSharedPreferences("classmate_reads", Context.MODE_PRIVATE)
+        val readSet = prefs.getStringSet("read_notices", emptySet()) ?: emptySet()
+        if (readSet.contains(notice.id)) {
+            readNoticeCache.add(notice.id)
+            return
+        }
+
+        readNoticeCache.add(notice.id)
+        val newReadSet = readSet.toMutableSet()
+        newReadSet.add(notice.id)
+        prefs.edit().putStringSet("read_notices", newReadSet).apply()
+
+        val receiptRef = db.collection("notices").document(notice.id)
+            .collection("read_receipts").document(currentUserId)
+
+        val receiptData = hashMapOf(
+            "userId" to currentUserId,
+            "userName" to currentUserName.ifBlank { "Student" },
+            "studentId" to currentUserStudentId.ifBlank { "N/A" },
+            "readAt" to com.google.firebase.Timestamp.now()
+        )
+
+        val noticeRef = db.collection("notices").document(notice.id)
+
+        db.runBatch { batch ->
+            batch.set(receiptRef, receiptData)
+            batch.update(noticeRef, "readCount", FieldValue.increment(1))
+        }.addOnFailureListener { e ->
+            Log.e("NoticeFragment", "Failed to log read receipt", e)
+        }
+    }
+
+    private fun showReadReceipts(notice: Notice) {
+        val context = context ?: return
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(context)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_read_receipts, null)
+        dialog.setContentView(dialogView)
+
+        val tvTitle = dialogView.findViewById<TextView>(R.id.tvTitle)
+        val pbLoading = dialogView.findViewById<ProgressBar>(R.id.pbLoading)
+        val tvEmpty = dialogView.findViewById<TextView>(R.id.tvEmpty)
+        val rvReaders = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvReaders)
+
+        tvTitle.text = "Read Receipts (${notice.readCount})"
+        rvReaders.layoutManager = LinearLayoutManager(context)
+
+        db.collection("notices").document(notice.id)
+            .collection("read_receipts")
+            .orderBy("readAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                pbLoading.visibility = View.GONE
+                val documents = snapshot.documents
+                if (documents.isEmpty()) {
+                    tvEmpty.visibility = View.VISIBLE
+                } else {
+                    rvReaders.visibility = View.VISIBLE
+                    rvReaders.adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<ReaderViewHolder>() {
+                        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReaderViewHolder {
+                            val v = layoutInflater.inflate(R.layout.item_read_receipt, parent, false)
+                            return ReaderViewHolder(v)
+                        }
+
+                        override fun onBindViewHolder(holder: ReaderViewHolder, position: Int) {
+                            val doc = documents[position]
+                            val name = doc.getString("userName").orEmpty()
+                            val studentId = doc.getString("studentId").orEmpty()
+                            val readAt = doc.getTimestamp("readAt")
+
+                            holder.tvName.text = name
+                            holder.tvInfo.text = if (studentId.isNotBlank() && studentId != "N/A") "ID: $studentId" else "Student"
+                            
+                            if (readAt != null) {
+                                val sdf = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
+                                holder.tvTime.text = sdf.format(readAt.toDate())
+                            } else {
+                                holder.tvTime.text = "Just now"
+                            }
+                        }
+
+                        override fun getItemCount(): Int = documents.size
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                pbLoading.visibility = View.GONE
+                tvEmpty.text = "Failed to load read receipts."
+                tvEmpty.visibility = View.VISIBLE
+                Log.e("NoticeFragment", "Failed to fetch read receipts", e)
+            }
+
+        dialog.show()
+    }
+}
+
+class ReaderViewHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+    val tvName: TextView = view.findViewById(R.id.tvReaderName)
+    val tvInfo: TextView = view.findViewById(R.id.tvReaderInfo)
+    val tvTime: TextView = view.findViewById(R.id.tvReadTime)
 }

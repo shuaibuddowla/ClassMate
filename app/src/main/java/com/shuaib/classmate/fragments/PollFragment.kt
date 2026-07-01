@@ -22,18 +22,20 @@ import com.shuaib.classmate.models.Poll
 
 class PollFragment : Fragment() {
 
-    private lateinit var binding: FragmentPollBinding
+    private var _binding: FragmentPollBinding? = null
+    private val binding get() = _binding!!
     private lateinit var db: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private var currentUserId = ""
     private var isAdmin = false
+    private var pollListener: com.google.firebase.firestore.ListenerRegistration? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentPollBinding.inflate(
+        _binding = FragmentPollBinding.inflate(
             inflater, container, false
         )
         return binding.root
@@ -56,6 +58,7 @@ class PollFragment : Fragment() {
             .document(currentUserId)
             .get()
             .addOnSuccessListener { doc ->
+                if (_binding == null) return@addOnSuccessListener
                 val role = doc.getString("role") ?: "student"
                 isAdmin = role == "superadmin" || role == "admin"
                 loadPolls()
@@ -63,9 +66,11 @@ class PollFragment : Fragment() {
     }
 
     private fun loadPolls() {
-        db.collection("polls")
+        pollListener?.remove()
+        pollListener = db.collection("polls")
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
+                if (_binding == null) return@addSnapshotListener
                 if (error != null || snapshot == null) return@addSnapshotListener
 
                 val pollDocs = snapshot.documents
@@ -83,6 +88,7 @@ class PollFragment : Fragment() {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
+                if (_binding == null) return@addOnSuccessListener
                 if (!isAdded) return@addOnSuccessListener
                 val pollDocs = snapshot.documents
                 if (pollDocs.isEmpty()) {
@@ -100,6 +106,7 @@ class PollFragment : Fragment() {
         }
         Tasks.whenAllSuccess<QuerySnapshot>(voteTasks)
             .addOnSuccessListener { voteSnapshots ->
+                if (_binding == null) return@addOnSuccessListener
                 if (!isAdded) return@addOnSuccessListener
                 val polls = pollDocs.mapIndexed { index, doc ->
                     buildPoll(doc, voteSnapshots[index])
@@ -218,5 +225,12 @@ class PollFragment : Fragment() {
 
     private fun deletePoll(pollId: String) {
         db.collection("polls").document(pollId).delete()
+    }
+
+    override fun onDestroyView() {
+        pollListener?.remove()
+        pollListener = null
+        _binding = null
+        super.onDestroyView()
     }
 }

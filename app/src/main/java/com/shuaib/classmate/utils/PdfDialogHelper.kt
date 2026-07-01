@@ -2,17 +2,16 @@ package com.shuaib.classmate.utils
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.DialogPdfOptionsBinding
 import com.shuaib.classmate.models.PdfFile
 import com.shuaib.classmate.storage.LibraryDownloadManager
 import com.shuaib.classmate.storage.LibraryUrlOpener
-import java.util.Locale
 
 object PdfDialogHelper {
     fun showPdfOptions(
@@ -21,18 +20,40 @@ object PdfDialogHelper {
         pdf: PdfFile,
         onOfflineStatusChanged: (() -> Unit)? = null
     ) {
+        val isDownloaded = LibraryDownloadManager.isDownloaded(context, pdf.id)
+        if (isDownloaded) {
+            // Directly open local offline PDF inside the app without showing the bottom sheet
+            LibraryDownloadManager.openLocalFile(context, pdf)
+            return
+        }
+
+        // Show the bottom sheet options dialog
         val dialog = BottomSheetDialog(context)
         val layoutInflater = LayoutInflater.from(context)
         val sheet = DialogPdfOptionsBinding.inflate(layoutInflater)
-        val isDownloaded = LibraryDownloadManager.isDownloaded(context, pdf.id)
         
         sheet.tvTitle.text = pdf.title.ifBlank { "Library material" }
-        sheet.tvMeta.text = listOf(pdf.subject.ifBlank { "ClassMate Library" }, formatBytes(pdf.sizeBytes))
-            .filter { it.isNotBlank() }
-            .joinToString(" - ")
+        sheet.tvMeta.text = pdf.subject.ifBlank { "ClassMate Library" }
+
+        val url = pdf.downloadUrl.ifBlank { pdf.driveUrl.ifBlank { pdf.telegramUrl } }
         
-        sheet.tvDownloadLabel.text = if (isDownloaded) "Open Offline" else "Download Offline"
-        sheet.btnDeleteCache.isVisible = isDownloaded
+        // Dynamically update the text of the online viewing option depending on the provider/URL
+        val openOnlineText = when {
+            pdf.provider == "telegram" || url.contains("t.me", ignoreCase = true) || pdf.telegramUrl.contains("t.me", ignoreCase = true) -> "Open in Telegram"
+            pdf.provider == "google_drive" || pdf.provider == "drive" || url.contains("drive.google.com", ignoreCase = true) -> "Open in Drive"
+            pdf.provider == "github_releases" || pdf.provider == "github" || url.contains("github.com", ignoreCase = true) -> "Open in GitHub"
+            else -> "Open Online"
+        }
+        sheet.tvOpenOnlineLabel.text = openOnlineText
+
+        // Only allow Google Drive files to be made available offline (excluding folder links)
+        val isDrive = pdf.provider == "google_drive" || pdf.provider == "drive" || url.contains("drive.google.com", ignoreCase = true)
+        val isFolder = url.contains("/folders/") || url.contains("drive/folders")
+        val showDownload = isDrive && !isFolder
+
+        sheet.btnDownload.isVisible = showDownload
+        sheet.tvDownloadLabel.text = "Make Available Offline"
+        sheet.btnDeleteCache.isVisible = false // Bypassed for offline copies anyway
 
         val visuals = FileVisuals.getVisuals(pdf)
         sheet.iconContainer.background = ContextCompat.getDrawable(context, visuals.backgroundRes)
@@ -45,11 +66,6 @@ object PdfDialogHelper {
         }
         
         sheet.btnDownload.setOnClickListener {
-            if (LibraryDownloadManager.isDownloaded(context, pdf.id)) {
-                dialog.dismiss()
-                LibraryDownloadManager.openLocalFile(context, pdf)
-                return@setOnClickListener
-            }
             sheet.tvDownloadLabel.text = "Downloading..."
             sheet.btnDownload.isEnabled = false
             LibraryDownloadManager.downloadFile(
@@ -62,41 +78,24 @@ object PdfDialogHelper {
                 },
                 onSuccess = {
                     activity.runOnUiThread {
-                        Toast.makeText(context, "Saved for offline study", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Saved offline", Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
                         onOfflineStatusChanged?.invoke()
+                        // Directly open the downloaded PDF inside the app
+                        LibraryDownloadManager.openLocalFile(context, pdf)
                     }
                 },
                 onFailure = { error ->
                     activity.runOnUiThread {
                         sheet.btnDownload.isEnabled = true
-                        sheet.tvDownloadLabel.text = "Download Offline"
+                        sheet.tvDownloadLabel.text = "Make Available Offline"
                         Toast.makeText(context, "Download failed: ${error.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             )
         }
-        
-        sheet.btnDeleteCache.setOnClickListener {
-            LibraryDownloadManager.deleteDownload(context, pdf.id)
-            Toast.makeText(context, "Offline copy removed", Toast.LENGTH_SHORT).show()
-            dialog.dismiss()
-            onOfflineStatusChanged?.invoke()
-        }
-        
+
         dialog.setContentView(sheet.root)
         dialog.show()
-    }
-
-    private fun formatBytes(bytes: Long): String {
-        if (bytes <= 0L) return ""
-        val units = arrayOf("B", "KB", "MB", "GB")
-        var value = bytes.toDouble()
-        var unit = 0
-        while (value >= 1024 && unit < units.lastIndex) {
-            value /= 1024
-            unit += 1
-        }
-        return if (unit == 0) "${bytes}B" else String.format(Locale.US, "%.1f %s", value, units[unit])
     }
 }

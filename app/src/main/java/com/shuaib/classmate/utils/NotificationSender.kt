@@ -15,6 +15,15 @@ object NotificationSender {
 
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    private fun getChannelIdForType(type: String): String {
+        return when (type) {
+            "chat_message" -> "chat_messages"
+            "notice" -> "classmate_notices"
+            "cancellation", "substitute" -> "classmate_cancellations"
+            else -> "classmate_notifications"
+        }
+    }
+
     fun sendToAll(
         title: String,
         message: String,
@@ -59,6 +68,8 @@ object NotificationSender {
                     put("data", dataObj)
                     put("android_accent_color", "FF4D9FFF")
                     put("priority", 10)
+                    put("existing_android_channel_id", getChannelIdForType(type))
+                    put("android_visibility", 1)
                 }.toString()
 
                 connection.outputStream.write(body.toByteArray(Charsets.UTF_8))
@@ -209,6 +220,8 @@ object NotificationSender {
                     put("data", dataObj)
                     put("android_accent_color", "FF4D9FFF")
                     put("priority", 10)
+                    put("existing_android_channel_id", getChannelIdForType(type))
+                    put("android_visibility", 1)
                 }.toString()
                 connection.outputStream.write(body.toByteArray(Charsets.UTF_8))
                 connection.outputStream.flush()

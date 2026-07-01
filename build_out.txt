@@ -1,0 +1,120 @@
+﻿Reusing configuration cache.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateSafeArgsDebug UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsDebug UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesDebug UP-TO-DATE
+> Task :app:processDebugMainManifest FROM-CACHE
+> Task :app:processDebugManifest FROM-CACHE
+> Task :app:processDebugManifestForPackage FROM-CACHE
+> Task :app:processDebugResources FROM-CACHE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:65:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:74:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:80:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:86:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:95:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:104:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:113:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:121:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:220:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:221:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt:222:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt:21:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt:57:20 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt:101:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt:419:34 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt:513:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/OnboardingActivity.kt:67:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/RegisterActivity.kt:16:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/RegisterActivity.kt:50:20 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/RegisterActivity.kt:95:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/RegisterActivity.kt:281:34 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt:49:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt:133:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt:142:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt:143:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt:144:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultViewerActivity.kt:32:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultViewerActivity.kt:112:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultViewerActivity.kt:113:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultViewerActivity.kt:114:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt:49:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt:132:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt:141:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt:142:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt:143:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanViewerActivity.kt:32:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanViewerActivity.kt:118:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanViewerActivity.kt:119:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanViewerActivity.kt:120:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SplashActivity.kt:103:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt:61:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt:182:17 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt:235:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt:236:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt:237:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt:37:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt:75:13 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt:299:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt:300:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt:301:9 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/data/FirestoreManager.kt:20:18 'fun setPersistenceEnabled(p0: Boolean): FirebaseFirestoreSettings.Builder' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/data/FirestoreManager.kt:21:18 'fun setCacheSizeBytes(p0: Long): FirebaseFirestoreSettings.Builder' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/PdfLibraryFragment.kt:637:61 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/PollFragment.kt:191:42 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt:131:31 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt:136:31 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt:423:31 'fun overridePendingTransition(p0: Int, p1: Int): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt:684:65 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt:685:64 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/SubjectPdfListFragment.kt:112:61 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/SubjectPdfListFragment.kt:116:61 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.List<kotlin.String>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/TimetableFragment.kt:733:30 Condition is always 'false'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/notices/NoticeCommentsBottomSheetFragment.kt:64:68 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/notices/NoticeUi.kt:36:31 Unchecked cast of 'kotlin.Any?' to 'kotlin.collections.Map<kotlin.String, kotlin.Any>'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/storage/LibraryDownloadManager.kt:157:25 Condition is always 'false'.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/storage/LibraryUrlOpener.kt:30:18 'fun setToolbarColor(p0: Int): CustomTabsIntent.Builder' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AuthErrorMapper.kt:3:8 'class GoogleSignInStatusCodes : CommonStatusCodes' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AuthErrorMapper.kt:50:13 'class GoogleSignInStatusCodes : CommonStatusCodes' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AuthErrorMapper.kt:51:13 'class GoogleSignInStatusCodes : CommonStatusCodes' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AuthErrorMapper.kt:52:13 'class GoogleSignInStatusCodes : CommonStatusCodes' is deprecated. Deprecated in Java.
+w: file:///D:/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AuthErrorMapper.kt:65:23 'class GoogleSignInStatusCodes : CommonStatusCodes' is deprecated. Deprecated in Java.
+
+BUILD SUCCESSFUL in 3m 37s
+20 actionable tasks: 2 executed, 4 from cache, 14 up-to-date
+Configuration cache entry reused.

@@ -19,6 +19,7 @@ import com.shuaib.classmate.databinding.ActivityPdfUploadBinding
 import com.shuaib.classmate.storage.GitHubReleaseStorageClient
 import com.shuaib.classmate.utils.NotificationSender
 import com.shuaib.classmate.utils.SubjectList
+import com.shuaib.classmate.utils.TelegramUploader
 
 class PdfUploadActivity : AppCompatActivity() {
 
@@ -28,7 +29,10 @@ class PdfUploadActivity : AppCompatActivity() {
     private var selectedFileUri: Uri? = null
     private var selectedFileInfo: SelectedFileInfo? = null
     private var currentUserName = ""
-    private var isLinkMode = false
+    private enum class UploadMode {
+        GITHUB, TELEGRAM, LINK
+    }
+    private var currentMode = UploadMode.GITHUB
 
     private val filePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
@@ -43,6 +47,11 @@ class PdfUploadActivity : AppCompatActivity() {
                 val titleSuggestion = info.displayName.substringBeforeLast(".")
                     .replace("_", " ")
                     .replace("-", " ")
+                    .split(" ")
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ") { word ->
+                        word.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase(java.util.Locale.getDefault()) else c.toString() }
+                    }
                 binding.etTitle.setText(titleSuggestion)
             }
         }
@@ -57,7 +66,7 @@ class PdfUploadActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         binding.btnBack.setOnClickListener { finish() }
-        updateMode(false)
+        updateMode()
 
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).get()
@@ -74,7 +83,14 @@ class PdfUploadActivity : AppCompatActivity() {
         }
 
         binding.toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) updateMode(checkedId == R.id.btnModeDrive)
+            if (isChecked) {
+                currentMode = when (checkedId) {
+                    R.id.btnModeGithub -> UploadMode.GITHUB
+                    R.id.btnModeTelegram -> UploadMode.TELEGRAM
+                    else -> UploadMode.LINK
+                }
+                updateMode()
+            }
         }
 
         binding.btnPickFile.setOnClickListener {
@@ -82,20 +98,26 @@ class PdfUploadActivity : AppCompatActivity() {
         }
 
         binding.btnSave.setOnClickListener {
-            if (isLinkMode) {
-                handleLinkUpload()
-            } else {
-                handleGitHubUpload()
+            when (currentMode) {
+                UploadMode.LINK -> handleLinkUpload()
+                UploadMode.GITHUB -> handleGitHubUpload()
+                UploadMode.TELEGRAM -> handleTelegramUpload()
             }
         }
     }
 
-    private fun updateMode(linkMode: Boolean) {
-        isLinkMode = linkMode
+    private fun updateMode() {
+        val linkMode = currentMode == UploadMode.LINK
         binding.layoutTelegram.isVisible = !linkMode
         binding.layoutDrive.isVisible = linkMode
         binding.btnSave.isEnabled = linkMode || selectedFileUri != null
-        binding.btnSave.text = if (linkMode) "Add Link to Library" else "Upload to Library"
+        binding.btnSave.text = if (linkMode) {
+            "Add Link to Library"
+        } else if (currentMode == UploadMode.TELEGRAM) {
+            "Post to Telegram & Save"
+        } else {
+            "Upload to Library"
+        }
     }
 
     private fun handleLinkUpload() {
@@ -203,6 +225,94 @@ class PdfUploadActivity : AppCompatActivity() {
             }
     }
 
+    private fun handleTelegramUpload() {
+        val input = validateCommonInputs() ?: return
+        val uri = selectedFileUri ?: run {
+            Toast.makeText(this, "Pick a file first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val info = selectedFileInfo ?: getSelectedFileInfo(uri)
+
+        if (!isSupportedMimeType(info.mimeType)) {
+            Toast.makeText(this, "Unsupported file type: ${info.mimeType}", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (info.sizeBytes > MAX_UPLOAD_BYTES) {
+            Toast.makeText(this, "File too large. Keep library uploads under 100 MB.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        setUploading(true, "Uploading to Telegram...")
+        
+        TelegramUploader.uploadPdf(
+            context = applicationContext,
+            fileUri = uri,
+            title = input.title,
+            subject = input.subject,
+            uploadedBy = currentUserName,
+            onProgress = { progress ->
+                runOnUiThread { binding.tvProgress.text = progress }
+            },
+            onSuccess = { telegramUrl, fileId ->
+                saveTelegramMetadata(input, info, telegramUrl, fileId)
+            },
+            onFailure = { errorMsg ->
+                runOnUiThread {
+                    handleUploadError(errorMsg)
+                }
+            }
+        )
+    }
+
+    private fun saveTelegramMetadata(
+        input: UploadInput,
+        info: SelectedFileInfo,
+        telegramUrl: String,
+        fileId: String
+    ) {
+        binding.tvProgress.text = "Saving to library..."
+        val uid = auth.currentUser?.uid.orEmpty()
+        val courseType = courseTypeFor(input.subject)
+        val data = hashMapOf(
+            "title" to input.title,
+            "subject" to input.subject,
+            "courseCode" to input.courseCode,
+            "courseType" to courseType,
+            "description" to input.description,
+            "fileType" to info.fileType,
+            "mimeType" to info.mimeType,
+            "sizeBytes" to info.sizeBytes,
+            "provider" to "telegram",
+            "downloadUrl" to telegramUrl,
+            "driveUrl" to telegramUrl,
+            "telegramUrl" to telegramUrl,
+            "fileId" to fileId,
+            "githubAssetId" to 0L,
+            "githubAssetName" to "",
+            "uploadedByUid" to uid,
+            "uploadedByName" to currentUserName,
+            "uploadedBy" to currentUserName,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "timestamp" to FieldValue.serverTimestamp(),
+            "downloadCount" to 0L,
+            "isDeleted" to false
+        )
+
+        db.collection("library_files")
+            .add(data)
+            .addOnSuccessListener { doc ->
+                postResourceNotice(input.title, input.subject, doc.id, input.description)
+                setUploading(false)
+                Toast.makeText(this, "Successfully posted to Telegram and saved!", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Firestore error: ${e.message}")
+                handleUploadError("Firestore error: ${e.message}")
+            }
+    }
+
     private fun saveExternalLink(input: UploadInput, link: String) {
         setUploading(true, "Saving to library...")
         val uid = auth.currentUser?.uid.orEmpty()
@@ -243,20 +353,38 @@ class PdfUploadActivity : AppCompatActivity() {
     }
 
     private fun postResourceNotice(title: String, subject: String, resourceId: String, description: String = "") {
-        val noticeBody = if (description.isNotBlank()) {
-            description
-        } else {
-            "New study material has been posted for $subject."
+        val noticeBody = buildString {
+            if (description.isNotBlank()) {
+                append(description)
+                append("\n\n")
+            } else {
+                append("A new learning resource has been shared for **$subject**.")
+                append("\n\n")
+            }
+            append("🔗 **Quick Access:** Open the attachment container below to view or download the file.")
         }
 
+        val uid = auth.currentUser?.uid.orEmpty()
         val noticeData = hashMapOf(
-            "title" to "New Material: $title",
+            "title" to "📚 Resource: $title",
             "body" to noticeBody,
+            "content" to noticeBody,
+            "type" to "resource",
             "postedBy" to currentUserName,
+            "createdBy" to uid,
+            "createdByName" to currentUserName,
             "timestamp" to FieldValue.serverTimestamp(),
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
             "isResource" to true,
+            "isCancel" to false,
+            "isSub" to false,
+            "isAssignment" to false,
+            "isClassTest" to false,
             "subject" to subject,
-            "pdfId" to resourceId
+            "pdfId" to resourceId,
+            "isPinned" to false,
+            "isDeleted" to false
         )
         db.collection("notices").add(noticeData)
         NotificationSender.sendResourceAlert(

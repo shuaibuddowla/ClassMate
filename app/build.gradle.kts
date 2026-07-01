@@ -28,8 +28,8 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.1.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "GITHUB_LIBRARY_TOKEN", "\"${getLocalProperty("GITHUB_LIBRARY_TOKEN")}\"")
@@ -42,7 +42,7 @@ android {
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"${getLocalProperty("GEMINI_API_KEY")}\"")
         buildConfigField("String", "GROQ_API_KEY", "\"${getLocalProperty("GROQ_API_KEY")}\"")
-        buildConfigField("String", "GEMINI_MODEL", "\"gemini-1.5-flash\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"gemini-2.5-flash\"")
         buildConfigField("String", "GROQ_MODEL", "\"llama-3.3-70b-versatile\"")
     }
 
@@ -150,6 +150,8 @@ dependencies {
     implementation(libs.markwon.core)
     implementation(libs.markwon.strikethrough)
     implementation(libs.markwon.html)
+    implementation(libs.markwon.tables)
+    implementation(libs.markwon.linkify)
 
     // Testing
     testImplementation(libs.junit)

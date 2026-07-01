@@ -16,11 +16,11 @@
         <item name="android:textColorSecondary">@color/cm_text_secondary</item>
 
         <!-- Status Bar -->
-        <item name="android:statusBarColor">@color/cm_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
 
         <!-- Navigation Bar -->
-        <item name="android:navigationBarColor">@color/cm_bg</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
 
@@ -36,8 +36,8 @@
         <item name="android:windowBackground">@drawable/bg_splash_screen</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:statusBarColor">@color/cm_bg</item>
-        <item name="android:navigationBarColor">@color/cm_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 

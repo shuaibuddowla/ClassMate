@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="52dp"
     android:layout_marginBottom="10dp"
-    android:background="@drawable/bg_notice_badge"
+    android:background="@drawable/bg_poll_option"
     android:clickable="true"
     android:focusable="true">
 

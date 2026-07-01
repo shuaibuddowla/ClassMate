@@ -16,4 +16,7 @@ object AppConstants {
     val GROQ_API_KEY: String = BuildConfig.GROQ_API_KEY
     val GEMINI_MODEL: String = BuildConfig.GEMINI_MODEL
     val GROQ_MODEL: String = BuildConfig.GROQ_MODEL
+
+    // Links
+    const val WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/ENVSddeEDrwGrNntcAOzzr"
 }

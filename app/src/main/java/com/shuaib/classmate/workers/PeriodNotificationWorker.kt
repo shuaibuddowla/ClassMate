@@ -18,13 +18,33 @@ import java.time.LocalDate
 class PeriodNotificationWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+            return Result.success()
+        }
         val exception = AcademicCalendarRepository().getActiveExceptionForDate(LocalDate.now())
         if (exception != null && exception.isActive && exception.scope == "ALL_CLASSES") {
             return Result.success()
         }
 
-        val subject = inputData.getString("subject") ?: "Class"
-        val teacher = inputData.getString("teacher") ?: "Unknown"
+        var subject = inputData.getString("subject") ?: "Class"
+        var teacher = inputData.getString("teacher") ?: "Unknown"
+        val id = inputData.getString("id")
+        val day = inputData.getString("day")
+
+        if (id != null && day != null) {
+            val database = com.shuaib.classmate.data.local.ClassMateDatabase.getInstance(applicationContext)
+            val periods = database.timetableDao().getPeriodsSync(day)
+            val entity = periods.find { it.id == id }
+            if (entity != null) {
+                val todayDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                if (entity.cancelDate == todayDate) {
+                    return Result.success()
+                }
+                if (entity.substituteDate == todayDate && entity.substituteTeacher.isNotBlank()) {
+                    teacher = entity.substituteTeacher
+                }
+            }
+        }
 
         showNotification(subject, teacher)
         return Result.success()

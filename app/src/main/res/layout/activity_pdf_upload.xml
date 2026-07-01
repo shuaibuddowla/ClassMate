@@ -122,8 +122,17 @@
             android:layout_height="wrap_content"
             app:singleSelection="true"
             app:selectionRequired="true"
-            app:checkedButton="@+id/btnModeTelegram"
+            app:checkedButton="@+id/btnModeGithub"
             android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnModeGithub"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="GitHub"
+                android:textColor="@color/cm_text_primary"/>
 
             <Button
                 android:id="@+id/btnModeTelegram"
@@ -131,7 +140,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="GitHub Upload"
+                android:text="Telegram"
                 android:textColor="@color/cm_text_primary"/>
 
             <Button
@@ -140,7 +149,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Paste Link"
+                android:text="LINK"
                 android:textColor="@color/cm_text_primary"/>
 
         </com.google.android.material.button.MaterialButtonToggleGroup>

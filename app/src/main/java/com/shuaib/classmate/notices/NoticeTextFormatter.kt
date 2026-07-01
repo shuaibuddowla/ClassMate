@@ -13,6 +13,9 @@ import io.noties.markwon.Markwon
 import io.noties.markwon.MarkwonConfiguration
 import io.noties.markwon.core.MarkwonTheme
 
+import io.noties.markwon.ext.tables.TablePlugin
+import io.noties.markwon.linkify.LinkifyPlugin
+
 object NoticeTextFormatter {
     private var markwon: Markwon? = null
     private var cachedIsDark: Boolean? = null
@@ -22,7 +25,7 @@ object NoticeTextFormatter {
         if (markwon == null || cachedIsDark != isDark) {
             cachedIsDark = isDark
 
-            val linkColor = ThemeColors.primarySoft(context)
+            val linkColor = if (isDark) ThemeColors.primaryLight(context) else ThemeColors.primary(context)
             // Premium background chips for code snippets
             val codeBgColor = if (isDark) "#27272A".toColorInt() else "#F4F4F5".toColorInt()
             val codeTextColor = if (isDark) "#E4E4E7".toColorInt() else "#27272A".toColorInt()
@@ -30,6 +33,8 @@ object NoticeTextFormatter {
             val quoteBarColor = if (isDark) "#52525B".toColorInt() else "#D4D4D8".toColorInt()
 
             markwon = Markwon.builder(context.applicationContext)
+                .usePlugin(TablePlugin.create(context))
+                .usePlugin(LinkifyPlugin.create())
                 .usePlugin(object : AbstractMarkwonPlugin() {
                     override fun configureTheme(builder: MarkwonTheme.Builder) {
                         builder

@@ -297,7 +297,7 @@ service cloud.firestore {
     }
 
     function validLibraryProvider() {
-      return request.resource.data.provider in ["github_releases", "external_link"];
+      return request.resource.data.provider in ["github_releases", "external_link", "telegram"];
     }
 
     function validLibraryMimeType() {
@@ -330,6 +330,8 @@ service cloud.firestore {
         "provider",
         "downloadUrl",
         "driveUrl",
+        "telegramUrl",
+        "fileId",
         "githubAssetId",
         "githubAssetName",
         "uploadedByUid",
@@ -390,10 +392,23 @@ service cloud.firestore {
         && request.resource.data.githubAssetName == "";
     }
 
+    function validLibraryTelegramCreate() {
+      return request.resource.data.provider == "telegram"
+        && request.resource.data.telegramUrl is string
+        && request.resource.data.telegramUrl.size() > 0
+        && request.resource.data.fileId is string
+        && request.resource.data.githubAssetId == 0
+        && request.resource.data.githubAssetName == "";
+    }
+
     function validLibraryCreate() {
       return canUploadPdf()
         && validLibraryBaseFields()
-        && (validLibraryGitHubCreate() || validLibraryExternalLinkCreate())
+        && (
+          validLibraryGitHubCreate() ||
+          validLibraryExternalLinkCreate() ||
+          validLibraryTelegramCreate()
+        )
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.timestamp == request.time;
@@ -407,6 +422,107 @@ service cloud.firestore {
     }
 
     function validLibrarySoftDeleteUpdate() {
+      return canUploadPdf()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isDeleted", "updatedAt"])
+        && request.resource.data.isDeleted == true
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // ── Question Bank helpers ─────────────────────────────────────────────────
+
+    function validQbExamType() {
+      return request.resource.data.examType in [
+        "Final", "CT1", "CT2", "CT3", "CT4", "Mid", "Other"
+      ];
+    }
+
+    function validQbProvider() {
+      return !("provider" in request.resource.data) ||
+        request.resource.data.provider in [
+          "github_releases", "external_link", "telegram", ""
+        ];
+    }
+
+    function validQbUrl() {
+      // At least one of downloadUrl / driveUrl / telegramUrl must be non-empty
+      return (
+        ("downloadUrl" in request.resource.data && request.resource.data.downloadUrl.size() > 0) ||
+        ("driveUrl"    in request.resource.data && request.resource.data.driveUrl.size()    > 0) ||
+        ("telegramUrl" in request.resource.data && request.resource.data.telegramUrl.size() > 0)
+      );
+    }
+
+    function validQbBaseFields() {
+      return request.resource.data.keys().hasOnly([
+        "title",
+        "courseCode",
+        "subject",
+        "examType",
+        "semester",
+        "year",
+        "uploadedByUid",
+        "uploadedByName",
+        "uploadedBy",
+        "telegramUrl",
+        "driveUrl",
+        "downloadUrl",
+        "provider",
+        "sizeBytes",
+        "downloadCount",
+        "timestamp",
+        "createdAt",
+        "updatedAt",
+        "isDeleted"
+      ])
+      && request.resource.data.title is string
+      && request.resource.data.title.size() > 0
+      && request.resource.data.title.size() <= 200
+      && request.resource.data.courseCode is string
+      && request.resource.data.courseCode.size() <= 40
+      && request.resource.data.subject is string
+      && request.resource.data.subject.size() <= 120
+      && validQbExamType()
+      && request.resource.data.semester is string
+      && request.resource.data.semester.size() <= 30
+      && request.resource.data.year is string
+      && request.resource.data.year.size() <= 10
+      && request.resource.data.year.matches("^[0-9]{4}$")
+      && request.resource.data.uploadedByUid == request.auth.uid
+      && request.resource.data.uploadedByName is string
+      && request.resource.data.uploadedByName.size() <= 80
+      && request.resource.data.uploadedBy is string
+      && request.resource.data.uploadedBy.size() <= 80
+      && request.resource.data.telegramUrl is string
+      && request.resource.data.telegramUrl.size() <= 2000
+      && request.resource.data.driveUrl is string
+      && request.resource.data.driveUrl.size() <= 2000
+      && request.resource.data.downloadUrl is string
+      && request.resource.data.downloadUrl.size() <= 2000
+      && validQbUrl()
+      && validQbProvider()
+      && request.resource.data.sizeBytes is int
+      && request.resource.data.sizeBytes >= 0
+      && request.resource.data.sizeBytes <= 104857600
+      && request.resource.data.downloadCount == 0
+      && request.resource.data.isDeleted == false;
+    }
+
+    function validQbCreate() {
+      return canUploadPdf()
+        && validQbBaseFields()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.timestamp == request.time;
+    }
+
+    function validQbDownloadCountUpdate() {
+      return isLoggedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["downloadCount"])
+        && request.resource.data.downloadCount is int
+        && request.resource.data.downloadCount == resource.data.downloadCount + 1;
+    }
+
+    function validQbSoftDelete() {
       return canUploadPdf()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isDeleted", "updatedAt"])
         && request.resource.data.isDeleted == true
@@ -547,7 +663,7 @@ service cloud.firestore {
 
     match /config/{doc} {
       allow read: if request.auth != null;
-      allow write: if isLoggedIn() && isSuperAdmin();
+      allow read, write: if isLoggedIn() && isSuperAdmin();
     }
 
     match /users/{userId} {
@@ -559,6 +675,10 @@ service cloud.firestore {
       allow update: if validManagerUserUpdate() || validOwnUserUpdate(userId);
 
       allow delete: if isLoggedIn() && (isSuperAdmin() || canManageUsers());
+
+      match /ai_chat_history/{messageId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
 
       match /countdowns/{countdownId} {
         allow read: if isLoggedIn() && request.auth.uid == userId;
@@ -602,6 +722,11 @@ service cloud.firestore {
       allow read: if isLoggedIn();
       allow create, delete: if canEditTimetable();
       allow update: if canEditTimetable() || validClassCancelPeriodUpdate();
+    }
+
+    match /bus_schedules/{scheduleId} {
+      allow read: if isLoggedIn();
+      allow create, update, delete: if canEditTimetable();
     }
 
     match /academic_calendar_exceptions/{exceptionId} {
@@ -835,6 +960,10 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    match /pending_notices/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     match /notification_queue/{docId} {
       allow read: if isAdmin() ||
         (isLoggedIn() && resource.data.studentUid == request.auth.uid);
@@ -845,6 +974,23 @@ service cloud.firestore {
          request.resource.data.diff(resource.data)
            .affectedKeys().hasOnly(["sent"]));
       allow delete: if isAdmin();
+    }
+
+    match /question_bank/{paperId} {
+      // Any logged-in student can list/read non-deleted papers
+      allow read: if isLoggedIn() && resource.data.isDeleted != true;
+
+      // Only users with upload permission can create a new question paper
+      allow create: if validQbCreate();
+
+      // Admins can do anything; uploaders can soft-delete their own doc;
+      // any logged-in user can increment the download counter
+      allow update: if isAdmin()
+        || validQbSoftDelete()
+        || validQbDownloadCountUpdate();
+
+      // Hard delete restricted to superadmins only
+      allow delete: if isSuperAdmin();
     }
 
     match /{document=**} {

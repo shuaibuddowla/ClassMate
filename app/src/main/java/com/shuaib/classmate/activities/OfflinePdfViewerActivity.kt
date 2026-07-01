@@ -49,24 +49,16 @@ class OfflinePdfViewerActivity : AppCompatActivity() {
                 val pdfRenderer = PdfRenderer(descriptor!!)
                 renderer = pdfRenderer
                 val pageCount = pdfRenderer.pageCount
-                val pages = mutableListOf<Bitmap>()
-
-                for (index in 0 until pageCount) {
-                    pdfRenderer.openPage(index).use { page ->
-                        val width = resources.displayMetrics.widthPixels
-                        val scale = width.toFloat() / page.width.toFloat()
-                        val height = (page.height * scale).toInt().coerceAtLeast(1)
-                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        bitmap.eraseColor(Color.WHITE)
-                        page.render(bitmap, Rect(0, 0, width, height), null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        pages.add(bitmap)
-                    }
-                }
 
                 runOnUiThread {
                     binding.progress.isVisible = false
                     binding.tvPageCount.text = "$pageCount ${if (pageCount == 1) "page" else "pages"}"
-                    pages.forEach { addPageView(it) }
+                    
+                    val displayWidth = resources.displayMetrics.widthPixels
+                    val density = resources.displayMetrics.density
+                    
+                    val adapter = PdfPagesAdapter(pdfRenderer, displayWidth, density)
+                    binding.rvPages.adapter = adapter
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Unable to render offline PDF", e)
@@ -75,21 +67,65 @@ class OfflinePdfViewerActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun addPageView(bitmap: Bitmap) {
-        val margin = (12 * resources.displayMetrics.density).toInt()
-        val imageView = ImageView(this).apply {
-            setImageBitmap(bitmap)
-            adjustViewBounds = true
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(Color.WHITE)
-            layoutParams = ViewGroup.MarginLayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = margin
+    private class PdfPagesAdapter(
+        private val renderer: PdfRenderer,
+        private val displayWidth: Int,
+        private val density: Float
+    ) : androidx.recyclerview.widget.RecyclerView.Adapter<PdfPagesAdapter.PageViewHolder>() {
+
+        private val margin = (12 * density).toInt()
+
+        class PageViewHolder(val imageView: ImageView) : androidx.recyclerview.widget.RecyclerView.ViewHolder(imageView)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageViewHolder {
+            val imageView = ImageView(parent.context).apply {
+                adjustViewBounds = true
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setBackgroundColor(Color.WHITE)
+                layoutParams = ViewGroup.MarginLayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = margin
+                }
+            }
+            return PageViewHolder(imageView)
+        }
+
+        override fun onBindViewHolder(holder: PageViewHolder, position: Int) {
+            val imageView = holder.imageView
+            imageView.setImageBitmap(null)
+            imageView.tag = position
+
+            val pageIndex = position
+            Thread {
+                try {
+                    val bitmap = renderPage(pageIndex)
+                    imageView.post {
+                        if (imageView.tag == pageIndex) {
+                            imageView.setImageBitmap(bitmap)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("PdfPagesAdapter", "Error rendering page $pageIndex", e)
+                }
+            }.start()
+        }
+
+        override fun getItemCount(): Int = renderer.pageCount
+
+        private fun renderPage(index: Int): Bitmap {
+            synchronized(renderer) {
+                renderer.openPage(index).use { page ->
+                    val scale = displayWidth.toFloat() / page.width.toFloat()
+                    val height = (page.height * scale).toInt().coerceAtLeast(1)
+                    val bitmap = Bitmap.createBitmap(displayWidth, height, Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    return bitmap
+                }
             }
         }
-        binding.pageContainer.addView(imageView)
     }
 
     private fun showError(message: String) {

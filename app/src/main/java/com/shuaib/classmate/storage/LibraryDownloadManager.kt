@@ -77,8 +77,69 @@ object LibraryDownloadManager {
 
         Log.d(TAG, "Starting download for ${pdfFile.title} from url: $url")
         val client = OkHttpClient.Builder().build()
-        val request = buildDownloadRequest(pdfFile, url)
 
+        val isTelegram = pdfFile.provider == "telegram" ||
+                (pdfFile.fileId.isNotBlank() && (url.contains("t.me", ignoreCase = true) || pdfFile.telegramUrl.contains("t.me", ignoreCase = true)))
+
+        if (isTelegram && pdfFile.fileId.isNotBlank() && com.shuaib.classmate.utils.AppConstants.TELEGRAM_BOT_TOKEN.isNotBlank()) {
+            val botToken = com.shuaib.classmate.utils.AppConstants.TELEGRAM_BOT_TOKEN
+            val getFileUrl = "https://api.telegram.org/bot$botToken/getFile?file_id=${pdfFile.fileId}"
+            val getFileRequest = Request.Builder()
+                .url(getFileUrl)
+                .build()
+
+            client.newCall(getFileRequest).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.w(TAG, "Failed to resolve Telegram file path, attempting direct URL: $url", e)
+                    performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use { resp ->
+                        var resolvedUrl: String? = null
+                        if (resp.isSuccessful) {
+                            val bodyStr = resp.body?.string()
+                            if (!bodyStr.isNullOrBlank()) {
+                                try {
+                                    val json = JSONObject(bodyStr)
+                                    if (json.optBoolean("ok", false)) {
+                                        val result = json.optJSONObject("result")
+                                        val filePath = result?.optString("file_path", "") ?: ""
+                                        if (filePath.isNotBlank()) {
+                                            resolvedUrl = "https://api.telegram.org/file/bot$botToken/$filePath"
+                                            Log.d(TAG, "Resolved Telegram download URL: $resolvedUrl")
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error parsing Telegram getFile response", e)
+                                }
+                            }
+                        }
+
+                        if (resolvedUrl != null) {
+                            performDownload(client, context, pdfFile, resolvedUrl!!, onProgress, onSuccess, onFailure)
+                        } else {
+                            Log.w(TAG, "Telegram getFile response unsuccessful or invalid. Attempting direct URL: $url")
+                            performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+                        }
+                    }
+                }
+            })
+        } else {
+            performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+        }
+    }
+
+    private fun performDownload(
+        client: OkHttpClient,
+        context: Context,
+        pdfFile: PdfFile,
+        url: String,
+        onProgress: (Int) -> Unit,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        val request = buildDownloadRequest(pdfFile, url)
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Download failed", e)

@@ -4,6 +4,8 @@ import android.util.Log
 import com.google.gson.Gson
 import com.shuaib.classmate.models.AiNoticeDraft
 import com.shuaib.classmate.utils.AppConstants
+import com.shuaib.classmate.utils.AppPreferences
+import com.shuaib.classmate.ClassMateApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -15,40 +17,76 @@ import java.io.IOException
 class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson) : AiProvider {
 
     override suspend fun summarizeNotice(input: NoticeSummaryInput): Result<String> = withContext(Dispatchers.IO) {
-        val prompt = """
-            You are ClassMate AI, an expert academic assistant for MBSTU CSE-22 (Computer Science & Engineering, 2022 batch) students.
-            Your task is to transform academic notices (which can be unstructured, verbose, or in Bangla/Benglish) into highly polished, structured, and scannable summaries in English.
+        val isMultiNotice = input.subject == "Notice Feed Summary" || input.title == "Today's Updates"
+        val prompt = if (isMultiNotice) {
+            """
+                You are ClassMate AI, an expert academic assistant for MBSTU CSE-22 (Computer Science & Engineering, 2022 batch) students.
+                Your task is to transform TODAY'S ACADEMIC UPDATES (which is a concatenated list of multiple notices, potentially in Bangla, English, or Benglish) into a single, cohesive, highly polished, and easily scannable daily briefing in English.
 
-            Guidelines:
-            1. **Language & Translation**: Always output ONLY in English. Translate any Bangla or colloquial "Benglish" text (e.g., "class hobena", "somoy ektu change", "ct postpone") into formal, precise academic English.
-            2. **Structure & Formatting**:
-               - Start directly with the key details. Do NOT include any "TL;DR" lines, titles, introductory text, or greetings.
-               - **Key Details**: Use clear, high-density, bulleted points (using - ) as appropriate. Bold crucial facts (dates, times, venues, faculty names).
-               - **Action Required**: If students need to act, prefix the relevant bullet with "⚠️ **ACTION REQUIRED:**".
-               - **Deadline**: If a deadline is mentioned, append a single line: "**📅 Deadline:** [Date/Time] (verbatim)" at the very end.
-            3. **High-Density Extraction**:
-               - **What**: Exact details of the event (assignment, exam, syllabus, cancellation).
-               - **When & Where**: Exact time, date, and venue (e.g. "**11:30 AM**", "**Room 403**", "**CSE Lab 2**"). Preserve these verbatim.
-               - **Who**: Faculty/coordinator name and instructions.
-            4. **Tone & Constraints**:
-               - Professional, concise, and academic. No greetings, introductions, or sign-offs.
-               - Do NOT assume or invent any information. If details are missing, omit them.
-            5. **Scannable Emojis**:
-               - Use emojis as bullets to visually group information:
-                 - 📌 for general announcements
-                 - 🧪 for exams, class tests, or quizzes
-                 - 📝 for assignments or submissions
-                 - 🚫 for class cancellations or suspensions
-                 - 📍 for location/room numbers
-                 - 👤 for teacher/faculty information
+                Guidelines:
+                1. **Language & Translation**: Always output ONLY in English. Translate any Bangla or colloquial "Benglish" notices (e.g., "class hobena" -> Class Cancelled, "ct postpone" -> Class Test Postponed) into formal, precise academic English.
+                2. **Structure & Formatting**:
+                   - Start directly with the summary. Do NOT include any "TL;DR" lines, titles, introductory text, greetings, or meta-commentary.
+                   - For each distinct notice in the updates:
+                     - Use a separate bullet point starting with a relevant, descriptive emoji.
+                     - Bold crucial facts like dates, times, venues, and faculty names.
+                     - If a notice requires action or has a deadline, clearly highlight it (e.g., "⚠️ **ACTION REQUIRED:** [task] by **[Deadline]**").
+                3. **Bullet Point Categories**:
+                   - 🚫 for class cancellations or suspensions
+                   - 🧪 for exams, class tests (CTs), or quizzes
+                   - 📝 for assignments or homework submissions
+                   - 📌 for general announcements, registration, or fees
+                   - 📍 for locations, rooms, or lab venues
+                   - 👤 for faculty or teacher announcements
+                4. **High Density & Conciseness**:
+                   - Keep the briefing extremely concise, dense, and focused on actionable info. Do NOT write long paragraphs; write short, punchy bullet points.
+                   - Do not invent or assume details. If a notice is vague, summarize only what is explicitly written.
 
-            Notice Title: ${input.title}
-            Notice Type: ${input.type ?: "General"}
-            Subject/Course: ${input.subject ?: "N/A"}
-            Target Date: ${input.date ?: "N/A"}
-            Notice Body:
-            ${input.body}
-        """.trimIndent()
+                Here is the list of today's updates:
+                ${input.body}
+            """.trimIndent()
+        } else {
+            """
+                You are ClassMate AI, an expert academic assistant for MBSTU CSE-22 (Computer Science & Engineering, 2022 batch) students.
+                Your task is to transform academic notices (which can be unstructured, verbose, or in Bangla/Benglish) into highly polished, structured, and scannable summaries in English.
+
+                Guidelines:
+                1. **Language & Translation**: Always output ONLY in English. Translate any Bangla or colloquial "Benglish" text (e.g., "class hobena" -> Class Cancelled, "somoy ektu change" -> Time rescheduled, "ct postpone" -> Class Test Postponed) into formal, precise academic English.
+                2. **Common Abbreviation Mapping**:
+                   - Translate "CT" or "ct" or "quiz" to "Class Test".
+                   - Translate "mid" or "sem" to "Semester Examination".
+                   - Translate "cr" or "CR" to "Class Representative".
+                   - Translate "hw" or "task" to "Assignment".
+                   - Translate common Bengali day names (e.g., "Sombar" to "Monday", "Mongolbar" to "Tuesday") to English.
+                3. **Structure & Formatting**:
+                   - Start directly with the key details. Do NOT include any "TL;DR" lines, titles, introductory text, or greetings.
+                   - **Key Details**: Use clear, high-density, bulleted points (using - ) as appropriate. Bold crucial facts (dates, times, venues, faculty names).
+                   - **Action Required**: If students need to act, prefix the relevant bullet with "⚠️ **ACTION REQUIRED:**".
+                   - **Deadline**: If a deadline is mentioned, append a single line: "**📅 Deadline:** [Date/Time] (verbatim)" at the very end.
+                4. **High-Density Extraction**:
+                   - **What**: Exact details of the event (assignment, exam, syllabus, cancellation).
+                   - **When & Where**: Exact time, date, and venue (e.g. "**11:30 AM**", "**Room 403**", "**CSE Lab 2**"). Preserve these verbatim.
+                   - **Who**: Faculty/coordinator name and instructions.
+                5. **Tone & Constraints**:
+                   - Professional, concise, and academic. No greetings, introductions, or sign-offs.
+                   - Do NOT assume or invent any information. If details are missing, omit them.
+                6. **Scannable Emojis**:
+                   - Use emojis as bullets to visually group information:
+                     - 📌 for general announcements
+                     - 🧪 for exams, class tests, or quizzes
+                     - 📝 for assignments or submissions
+                     - 🚫 for class cancellations or suspensions
+                     - 📍 for location/room numbers
+                     - 👤 for teacher/faculty information
+
+                Notice Title: ${input.title}
+                Notice Type: ${input.type ?: "General"}
+                Subject/Course: ${input.subject ?: "N/A"}
+                Target Date: ${input.date ?: "N/A"}
+                Notice Body:
+                ${input.body}
+            """.trimIndent()
+        }
 
         val requestBody = mapOf(
             "contents" to listOf(
@@ -65,11 +103,16 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
         )
 
         executeRequest(requestBody) { responseText ->
-            val parsedText = parseTextResponse(responseText)
-            if (parsedText.isBlank()) {
-                Result.failure(AiProviderError.InvalidResponse("Empty response from Gemini"))
-            } else {
-                Result.success(parsedText)
+            try {
+                val parsedText = parseTextResponse(responseText)
+                val cleanedText = cleanMarkdownResponse(parsedText)
+                if (cleanedText.isBlank()) {
+                    Result.failure(AiProviderError.InvalidResponse("Empty response from Gemini"))
+                } else {
+                    Result.success(cleanedText)
+                }
+            } catch (e: Exception) {
+                Result.failure(AiProviderError.InvalidResponse(e.message ?: "Failed to parse response"))
             }
         }
     }
@@ -90,14 +133,19 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
             Supported types: ${input.supportedTypes.joinToString()}
             Teacher context: ${input.teacherContext ?: "N/A"}
 
-            Rules:
-            - Translate any Bangla/mixed input to formal English.
-            - Polish grammar, spelling, and academic tone.
-            - Use bullet points where listing multiple items.
-            - Never invent dates, subject names, teacher names, or room numbers.
-            - Use missingFields array for fields you cannot determine.
-            - Resolve relative dates (e.g., "tomorrow", "next Monday") to yyyy-MM-dd using the currentDate above.
-            - Output JSON only. No markdown code blocks.
+            Rules & Abbreviation Mappings:
+            - Translate all Bangla/colloquial "Benglish" (e.g., "class hobena", "quiz postpone", "somoy change") into formal academic English.
+            - Map local abbreviations:
+              - "CT" or "ct" or "quiz" -> "Class Test"
+              - "mid" or "sem" -> "Semester Examination"
+              - "cr" or "CR" -> "Class Representative"
+              - "hw" or "task" -> "Assignment"
+              - "sombar" -> "Monday", "mangalbar" -> "Tuesday", "budhbar" -> "Wednesday", "brihoshpotibar" -> "Thursday", "shukrobar" -> "Friday", "shonibar" -> "Saturday", "robibar" -> "Sunday".
+            - Resolve relative dates (e.g., "tomorrow", "next Monday", "sombar") to yyyy-MM-dd using the currentDate: ${input.currentDate}.
+            - Format the "body" text beautifully using Markdown. Use bold (e.g., **10:30 AM**, **Room 403**, **Dr. X**) for key parameters, and clean bullet points.
+            - Keep the notice "body" extremely concise, high-density, and focused purely on the main context and key details (cancellations, timings, deadlines, tasks). Avoid verbose fluff or excessive elaboration so students can grasp the core message immediately. Do not write long paragraphs; use concise bullet points instead.
+            - Never invent dates, subjects, teacher names, or room numbers. Leave fields as null or use the missingFields array.
+            - Output JSON only. No markdown wrapping.
 
             JSON schema:
             {
@@ -157,13 +205,94 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
         }
     }
 
+    override suspend fun chatWithAi(input: AiChatInput): Result<String> = withContext(Dispatchers.IO) {
+        val contents = input.messages.map { msg ->
+            val apiRole = if (msg.role == "user") "user" else "model"
+            mapOf(
+                "role" to apiRole,
+                "parts" to listOf(mapOf("text" to msg.content))
+            )
+        }
+
+        val requestBody = mapOf(
+            "systemInstruction" to mapOf(
+                "parts" to listOf(
+                    mapOf("text" to input.systemPrompt)
+                )
+            ),
+            "contents" to contents,
+            "generationConfig" to mapOf(
+                "temperature" to 0.4,
+                "maxOutputTokens" to 2048
+            )
+        )
+
+        executeRequest(requestBody) { responseText ->
+            try {
+                val parsedText = parseTextResponse(responseText)
+                val cleanedText = cleanMarkdownResponse(parsedText)
+                if (cleanedText.isBlank()) {
+                    Result.failure(AiProviderError.InvalidResponse("Empty response from Gemini"))
+                } else {
+                    Result.success(cleanedText)
+                }
+            } catch (e: Exception) {
+                Result.failure(AiProviderError.InvalidResponse(e.message ?: "Failed to parse response"))
+            }
+        }
+    }
+
+
+    private fun cleanMarkdownResponse(text: String): String {
+        var cleaned = text.trim()
+        if (cleaned.startsWith("```")) {
+            val lines = cleaned.split("\n")
+            val startIdx = if (lines.isNotEmpty() && lines.first().startsWith("```")) 1 else 0
+            val endIdx = if (lines.size > startIdx && lines.last().startsWith("```")) lines.size - 1 else lines.size
+            cleaned = lines.subList(startIdx, endIdx).joinToString("\n").trim()
+        }
+        return cleaned
+    }
+
+    private fun parseTextResponse(jsonResponse: String): String {
+        val map = gson.fromJson(jsonResponse, Map::class.java) ?: throw Exception("Invalid JSON response")
+        
+        // Check for prompt feedback block
+        val promptFeedback = map["promptFeedback"] as? Map<*, *>
+        val blockReason = promptFeedback?.get("blockReason") as? String
+        if (!blockReason.isNullOrBlank()) {
+            throw Exception("Prompt was blocked: $blockReason")
+        }
+
+        val candidates = map["candidates"] as? List<*>
+        if (candidates.isNullOrEmpty()) {
+            throw Exception("No candidates returned from AI")
+        }
+        val firstCandidate = candidates[0] as? Map<*, *>
+        val finishReason = firstCandidate?.get("finishReason") as? String
+        if (finishReason != null && finishReason != "STOP" && finishReason != "MAX_TOKENS") {
+            throw Exception("AI generation blocked: $finishReason")
+        }
+
+        val content = firstCandidate?.get("content") as? Map<*, *>
+        val parts = content?.get("parts") as? List<*>
+        val firstPart = parts?.get(0) as? Map<*, *>
+        return (firstPart?.get("text") as? String) ?: throw Exception("Empty text content from AI")
+    }
+
     private fun <T> executeRequest(bodyMap: Any, parser: (String) -> Result<T>): Result<T> {
         val apiKey = AppConstants.GEMINI_API_KEY
         if (apiKey.isBlank() || apiKey.startsWith("TODO")) {
             return Result.failure(AiProviderError.InvalidApiKey("Gemini API key is missing"))
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/${AppConstants.GEMINI_MODEL}:generateContent"
+        val selectedModel = try {
+            AppPreferences(ClassMateApp.instance).getGeminiModel()
+        } catch (_: Throwable) {
+            AppConstants.GEMINI_MODEL
+        }
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$selectedModel:generateContent"
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val requestJson = gson.toJson(bodyMap)
         val requestBody = requestJson.toRequestBody(mediaType)
@@ -192,19 +321,7 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
         }
     }
 
-    private fun parseTextResponse(jsonResponse: String): String {
-        return try {
-            val map = gson.fromJson(jsonResponse, Map::class.java)
-            val candidates = map["candidates"] as? List<*>
-            val firstCandidate = candidates?.get(0) as? Map<*, *>
-            val content = firstCandidate?.get("content") as? Map<*, *>
-            val parts = content?.get("parts") as? List<*>
-            val firstPart = parts?.get(0) as? Map<*, *>
-            (firstPart?.get("text") as? String) ?: ""
-        } catch (e: Exception) {
-            ""
-        }
-    }
+
 
     private fun mapError(code: Int, body: String?): AiProviderError {
         val message = body ?: "Error code $code"

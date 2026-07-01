@@ -71,7 +71,7 @@
         android:background="@drawable/bg_notice_reminder_option_selected"
         android:paddingHorizontal="14dp"
         android:paddingVertical="12dp"
-        android:textColor="#DCEBFF"
+        android:textColor="@color/cm_text_primary"
         android:textSize="13sp"
         android:visibility="gone" />
 

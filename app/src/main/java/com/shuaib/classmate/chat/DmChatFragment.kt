@@ -354,8 +354,8 @@ class DmChatFragment : Fragment() {
         FirebaseFirestore.getInstance().collection("users").document(currentUserId).get()
             .addOnSuccessListener { doc ->
                 if (_binding == null) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                isAdmin = role == "superadmin" || role == "admin"
+                val user = doc.toObject(com.shuaib.classmate.models.User::class.java)
+                isAdmin = user?.isAdmin() ?: false
             }
     }
 

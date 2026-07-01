@@ -35,15 +35,18 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.CreatePollActivity
+import com.shuaib.classmate.activities.ImageViewerActivity
 import com.shuaib.classmate.databinding.ItemNoticeGroupHeaderBinding
 import com.shuaib.classmate.databinding.ItemNoticeModernBinding
 import com.shuaib.classmate.databinding.ItemPollBinding
 import com.shuaib.classmate.databinding.ItemPollOptionBinding
 import com.shuaib.classmate.models.Notice
+import com.shuaib.classmate.models.PdfFile
 import com.shuaib.classmate.models.Poll
 import com.shuaib.classmate.notices.NoticeEngagement
 import com.shuaib.classmate.notices.NoticeTextFormatter
 import com.shuaib.classmate.notices.NoticeUi
+import com.shuaib.classmate.chat.AvatarUtils
 import com.shuaib.classmate.services.AIService
 import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.utils.ThemeColors
@@ -72,10 +75,13 @@ class NoticeAdapter(
     private val onForwardClick: (Notice) -> Unit = {},
     private val onReminderClick: (Notice) -> Unit = {},
     private val onNoticeLongClick: (Notice) -> Unit = {},
+    private val onCopyClick: (Notice) -> Unit = {},
     private val onPollVote: (pollId: String, option: String) -> Unit = { _, _ -> },
     private val onPollMultiVote: (poll: Poll, option: String) -> Unit = { _, _ -> },
     private val onPollDelete: (pollId: String) -> Unit = { _ -> },
-    private val onGroupToggle: (NoticeGroupHeader) -> Unit = {}
+    private val onGroupToggle: (NoticeGroupHeader) -> Unit = {},
+    private val onNoticeViewed: (Notice) -> Unit = {},
+    private val onReadReceiptsClick: (Notice) -> Unit = {}
 ) : ListAdapter<Any, RecyclerView.ViewHolder>(DiffCallback) {
 
     private var engagementByNoticeId: Map<String, NoticeEngagement> = emptyMap()
@@ -86,6 +92,9 @@ class NoticeAdapter(
     private val aiSummaryCache = mutableMapOf<String, String>()
     private val aiSummaryVisibleIds = mutableSetOf<String>()
     private val aiSummaryLoadingIds = mutableSetOf<String>()
+    private val authorAvatarCache = mutableMapOf<String, String?>()
+    private val authorNameCache = mutableMapOf<String, String?>()
+    private val libraryPdfCache = mutableMapOf<String, PdfFile?>()
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     init {
@@ -197,6 +206,12 @@ class NoticeAdapter(
                 holder.bind(notice, payloads)
                 return
             }
+            if (payloads.contains(PAYLOAD_PIN)) {
+                val accent = NoticeUi.accent(holder.itemView.context, notice.displayType)
+                val cardFill = themedNoticeCardFill(holder.itemView.context, accent)
+                holder.bindPinState(notice, cardFill)
+                return
+            }
             holder.bind(notice, payloads)
             return
         }
@@ -231,11 +246,62 @@ class NoticeAdapter(
             }
             binding.tvTypeLabel.text = NoticeUi.typeLabel(type)
             binding.tvTypeLabel.setTextColor(accent)
+
+            // Dynamic User Profile Fetching and Binding for Notice Card Author
+            val authorId = notice.createdBy.ifBlank { notice.postedBy }
+            if (authorId.isNotBlank()) {
+                val cachedAvatar = authorAvatarCache[authorId]
+                val cachedName = authorNameCache[authorId]
+                if (cachedAvatar != null || authorAvatarCache.containsKey(authorId)) {
+                    AvatarUtils.bind(binding.ivAuthorAvatar, binding.tvAuthorAvatarLetter, authorId, cachedName ?: notice.displayAuthor, cachedAvatar)
+                    binding.tvAuthorName.text = cachedName ?: notice.displayAuthor
+                } else {
+                    binding.tvAuthorName.text = notice.displayAuthor
+                    AvatarUtils.bind(binding.ivAuthorAvatar, binding.tvAuthorAvatarLetter, authorId, notice.displayAuthor, null)
+                    
+                    authorAvatarCache[authorId] = null
+                    authorNameCache[authorId] = notice.displayAuthor
+                    
+                    FirebaseFirestore.getInstance().collection("users").document(authorId).get()
+                        .addOnSuccessListener { doc ->
+                            if (doc.exists()) {
+                                val photoUrl = doc.getString("photoUrl")
+                                val fullName = doc.getString("fullName")?.takeIf { it.isNotBlank() } 
+                                    ?: doc.getString("name")?.takeIf { it.isNotBlank() }
+                                if (!photoUrl.isNullOrBlank()) {
+                                    authorAvatarCache[authorId] = photoUrl
+                                }
+                                if (!fullName.isNullOrBlank()) {
+                                    authorNameCache[authorId] = fullName
+                                }
+                                val pos = currentList.indexOfFirst { it is Notice && (it.createdBy == authorId || it.postedBy == authorId) }
+                                if (pos != -1) {
+                                    notifyItemChanged(pos)
+                                }
+                            }
+                        }
+                }
+            } else {
+                binding.tvAuthorName.text = notice.displayAuthor
+                AvatarUtils.bind(binding.ivAuthorAvatar, binding.tvAuthorAvatarLetter, "", notice.displayAuthor, null)
+            }
+
+            val isGeneralNotice = NoticeUi.typeLabel(notice.displayType) == "GENERAL NOTICE"
             val shouldShowSubject = NoticeUi.shouldShowHeaderSubject(notice)
-            binding.tvSubject.text = NoticeUi.headerSubject(notice)
-            binding.tvSubject.isVisible = shouldShowSubject
-            binding.tvBullet.isVisible = shouldShowSubject
-            binding.tvBullet.setTextColor(ColorUtils.setAlphaComponent(accent, 140))
+            binding.tvBullet.isVisible = false
+            if (shouldShowSubject) {
+                binding.tvSubject.text = NoticeUi.headerSubject(notice)
+                binding.tvSubject.isVisible = true
+                binding.tvSubject.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 24))
+                binding.tvSubject.setTextColor(accent)
+            } else if (isGeneralNotice) {
+                binding.tvSubject.text = "Announcement"
+                binding.tvSubject.isVisible = true
+                binding.tvSubject.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 24))
+                binding.tvSubject.setTextColor(accent)
+            } else {
+                binding.tvSubject.isVisible = false
+            }
 
             // Title with Search Highlighting
             val title = notice.title.ifBlank { "Untitled notice" }
@@ -249,20 +315,138 @@ class NoticeAdapter(
             val imageUrl = notice.attachments.firstOrNull { it["type"] == "image" }?.get("url")?.toString()
                 ?: notice.attachmentUrl.takeIf { notice.attachmentType == "image" }
 
-            binding.ivPreview.isVisible = !imageUrl.isNullOrBlank()
-            if (!imageUrl.isNullOrBlank()) {
+            val hasImage = !imageUrl.isNullOrBlank()
+            binding.imagePreviewContainer.isVisible = hasImage
+            if (hasImage) {
                 Glide.with(itemView.context)
                     .load(imageUrl)
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .placeholder(R.drawable.bg_notice_modern_card)
                     .centerCrop()
                     .into(binding.ivPreview)
+
+                // Launch full-screen image viewer on tap
+                binding.imagePreviewContainer.setOnClickListener {
+                    val intent = Intent(itemView.context, ImageViewerActivity::class.java)
+                        .putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, imageUrl)
+                    itemView.context.startActivity(intent)
+                }
+            } else {
+                binding.imagePreviewContainer.setOnClickListener(null)
+            }
+
+            // Document / File Attachments Binding (PDF/Doc/PPT)
+            val fileAttachment = notice.attachments.firstOrNull { it["type"] != "image" }
+                ?: if (notice.attachmentType != "none" && notice.attachmentType != "image") {
+                    mapOf("name" to notice.attachmentName, "url" to notice.attachmentUrl, "type" to notice.attachmentType)
+                } else null
+
+            if (fileAttachment != null) {
+                binding.fileAttachmentContainer.visibility = View.VISIBLE
+                val fileName = fileAttachment["name"]?.toString() ?: "Attachment"
+                val fileUrl = fileAttachment["url"]?.toString().orEmpty()
+                val fileType = (fileAttachment["type"]?.toString() ?: "pdf").lowercase()
+
+                binding.tvFileName.text = fileName
+                binding.tvFileExtension.text = fileType.uppercase()
+                
+                val (iconBg, iconColor) = when (fileType) {
+                    "pdf" -> Pair(R.drawable.bg_library_file_icon_red, R.color.cm_file_pdf_text)
+                    "doc", "docx" -> Pair(R.drawable.bg_library_file_icon_blue, R.color.cm_file_doc_text)
+                    "ppt", "pptx" -> Pair(R.drawable.bg_library_file_icon_yellow, R.color.cm_file_ppt_text)
+                    else -> Pair(R.drawable.bg_library_file_icon_purple, R.color.cm_file_other)
+                }
+                binding.fileIconContainer.setBackgroundResource(iconBg)
+                binding.tvFileExtension.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, iconColor))
+                binding.tvFileSize.text = "Tap to open ${fileType.uppercase()} file"
+
+                val openAction = View.OnClickListener {
+                    if (fileUrl.isNotBlank()) {
+                        try {
+                            HapticHelper.lightPop(it)
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fileUrl))
+                            itemView.context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(itemView.context, "No app available to open this link.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                binding.fileAttachmentContainer.setOnClickListener(openAction)
+                binding.btnOpenFile.setOnClickListener(openAction)
+            } else if (notice.isResource && notice.pdfId.isNotBlank()) {
+                val pdfId = notice.pdfId
+                if (libraryPdfCache.containsKey(pdfId)) {
+                    val pdfFile = libraryPdfCache[pdfId]
+                    if (pdfFile != null) {
+                        binding.fileAttachmentContainer.visibility = View.VISIBLE
+                        binding.tvFileName.text = pdfFile.title
+                        val fileType = pdfFile.fileType.lowercase()
+                        binding.tvFileExtension.text = fileType.uppercase()
+                        
+                        val (iconBg, iconColor) = when (fileType) {
+                            "pdf" -> Pair(R.drawable.bg_library_file_icon_red, R.color.cm_file_pdf_text)
+                            "doc", "docx" -> Pair(R.drawable.bg_library_file_icon_blue, R.color.cm_file_doc_text)
+                            "ppt", "pptx" -> Pair(R.drawable.bg_library_file_icon_yellow, R.color.cm_file_ppt_text)
+                            else -> Pair(R.drawable.bg_library_file_icon_purple, R.color.cm_file_other)
+                        }
+                        binding.fileIconContainer.setBackgroundResource(iconBg)
+                        binding.tvFileExtension.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, iconColor))
+                        
+                        val sizeStr = formatBytes(pdfFile.sizeBytes)
+                        binding.tvFileSize.text = if (sizeStr.isNotBlank()) "Tap to open · $sizeStr" else "Tap to open attachment"
+                        
+                        val openAction = View.OnClickListener {
+                            val activity = itemView.context as? android.app.Activity
+                            if (activity != null) {
+                                com.shuaib.classmate.utils.PdfDialogHelper.showPdfOptions(activity, itemView.context, pdfFile)
+                            } else {
+                                val fileUrl = pdfFile.downloadUrl.ifBlank { pdfFile.driveUrl }
+                                if (fileUrl.isNotBlank()) {
+                                    try {
+                                        HapticHelper.lightPop(it)
+                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fileUrl))
+                                        itemView.context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(itemView.context, "No app available to open this link.", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }
+                        binding.fileAttachmentContainer.setOnClickListener(openAction)
+                        binding.btnOpenFile.setOnClickListener(openAction)
+                    } else {
+                        binding.fileAttachmentContainer.visibility = View.GONE
+                    }
+                } else {
+                    binding.fileAttachmentContainer.visibility = View.GONE
+                    // Trigger Firestore fetch
+                    libraryPdfCache[pdfId] = null
+                    FirebaseFirestore.getInstance().collection("library_files").document(pdfId).get()
+                        .addOnSuccessListener { doc ->
+                            if (doc.exists() && doc.getBoolean("isDeleted") != true) {
+                                val pdfFile = doc.toPdfFile()
+                                libraryPdfCache[pdfId] = pdfFile
+                                currentList.forEachIndexed { index, item ->
+                                    if (item is Notice && item.pdfId == pdfId) {
+                                        notifyItemChanged(index)
+                                    }
+                                }
+                            } else {
+                                libraryPdfCache[pdfId] = null
+                            }
+                        }
+                        .addOnFailureListener {
+                            libraryPdfCache[pdfId] = null
+                        }
+                }
+            } else {
+                binding.fileAttachmentContainer.visibility = View.GONE
             }
 
             val noticeText = normalizedNoticeText(notice)
             bindPreview(binding.tvPreview, notice, noticeText, accent)
             bindCardAiSummary(notice, noticeText)
-            binding.tvMeta.text = "${NoticeUi.formatDate(notice.createdAt)} - ${NoticeUi.formatTime(notice.createdAt)}"
+            binding.tvMeta.text = "${NoticeUi.formatDate(notice.createdAt)} · ${NoticeUi.formatTime(notice.createdAt)}"
 
             val priorityLabel = NoticeUi.priorityLabel(notice)
             binding.tvCountdown.isVisible = notice.deadlineAt != null
@@ -275,19 +459,47 @@ class NoticeAdapter(
             bindEngagement(notice, actionMuted)
 
             bindPinState(notice, cardFill)
+            val isAdmin = isAdminProvider()
+            binding.btnOptions.isVisible = isAdmin
+            binding.btnReadReceipts.isVisible = isAdmin
+            if (isAdmin) {
+                binding.tvReadCount.text = notice.readCount.toString()
+                binding.btnReadReceipts.setOnClickListener {
+                    HapticHelper.lightPop(it)
+                    it.animateSpringScale(1.1f)
+                    onReadReceiptsClick(notice)
+                }
+            }
+
+            if (isAdmin) {
+                binding.btnOptions.setOnClickListener {
+                    HapticHelper.mediumThud(it)
+                    it.animateSpringScale(1.15f)
+                    onNoticeLongClick(notice)
+                }
+            }
 
             binding.cardRoot.setOnClickListener {
                 HapticHelper.mediumThud(it)
                 it.animateSpringScale(0.97f)
                 toggleExpansion(notice)
             }
-            binding.cardRoot.setOnLongClickListener {
-                if (isAdminProvider()) {
-                    HapticHelper.heavyClick(it)
-                    onNoticeLongClick(notice)
-                }
+            binding.cardRoot.setOnLongClickListener(null)
+
+            binding.tvTitle.setOnClickListener(null)
+            binding.tvTitle.setOnLongClickListener {
+                HapticHelper.heavyClick(it)
+                onCopyClick(notice)
                 true
             }
+
+            binding.tvPreview.setOnClickListener(null)
+            binding.tvPreview.setOnLongClickListener {
+                HapticHelper.heavyClick(it)
+                onCopyClick(notice)
+                true
+            }
+
             binding.btnLike.setOnClickListener {
                 HapticHelper.lightPop(it)
                 it.animateSpringScale(1.15f)
@@ -314,6 +526,8 @@ class NoticeAdapter(
                 it.animateSpringScale(1.2f)
                 onPinClick(notice)
             }
+
+            onNoticeViewed(notice)
 
             binding.cardRoot.animate().cancel()
             val isPartialUpdate = payloads.isNotEmpty()
@@ -351,22 +565,43 @@ class NoticeAdapter(
 
         private fun bindEngagement(notice: Notice, actionMuted: Int) {
             val engagement = engagementByNoticeId[notice.id] ?: NoticeEngagement(noticeId = notice.id, isPinned = notice.isPinned)
-            val likeColor = if (engagement.isLiked) ThemeColors.error(itemView.context) else actionMuted
-            binding.ivLikeIcon.setImageResource(if (engagement.isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
-            binding.ivLikeIcon.setColorFilter(likeColor)
+            val ctx = itemView.context
+            
+            // Like Pill
+            if (engagement.isLiked) {
+                val likeActiveColor = ThemeColors.error(ctx)
+                binding.btnLike.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(likeActiveColor, 32))
+                binding.ivLikeIcon.setImageResource(R.drawable.ic_heart_filled)
+                binding.ivLikeIcon.setColorFilter(likeActiveColor)
+                binding.tvLikeCount.setTextColor(likeActiveColor)
+            } else {
+                binding.btnLike.backgroundTintList = null
+                binding.ivLikeIcon.setImageResource(R.drawable.ic_heart_outline)
+                binding.ivLikeIcon.setColorFilter(actionMuted)
+                binding.tvLikeCount.setTextColor(actionMuted)
+            }
             binding.tvLikeCount.text = compactCount(engagement.likeCount)
-            binding.tvLikeCount.setTextColor(likeColor)
+
+            // Comment Pill (Disabled)
+            binding.btnComment.visibility = View.GONE
+            binding.btnComment.backgroundTintList = null
             binding.ivCommentIcon.setColorFilter(actionMuted)
-            binding.tvCommentCount.text = compactCount(engagement.commentCount)
+            binding.tvCommentCount.text = "0"
             binding.tvCommentCount.setTextColor(actionMuted)
+
+            // Reminder Pill
+            binding.btnReminder.backgroundTintList = null
             binding.ivReminderIcon.setColorFilter(actionMuted)
+
+            // Share Pill
+            binding.btnForward.backgroundTintList = null
             binding.ivShareIcon.setColorFilter(actionMuted)
             binding.tvShareCount.text = compactCount(engagement.shareCount)
             binding.tvShareCount.setTextColor(actionMuted)
             binding.tvShareCount.isVisible = engagement.shareCount > 0
         }
 
-        private fun bindPinState(notice: Notice, cardFill: Int) {
+        fun bindPinState(notice: Notice, cardFill: Int) {
             val engagement = engagementByNoticeId[notice.id] ?: NoticeEngagement(noticeId = notice.id, isPinned = notice.isPinned)
             val pinned = engagement.isPinned || notice.isPinned
             binding.btnPin.isVisible = true
@@ -446,113 +681,107 @@ class NoticeAdapter(
             }
         }
 
+        private fun isLongNotice(text: String): Boolean {
+            return text.length > 240 || hasPreviewLineOverflow(text)
+        }
+
         private fun bindPreview(target: TextView, notice: Notice, fullText: String, linkColor: Int) {
             val isExpanded = notice.id in expandedNoticeIds
             target.tag = notice.id
             target.highlightColor = Color.TRANSPARENT
             target.setTextIsSelectable(false)
             target.isVerticalScrollBarEnabled = false
-            target.setOnClickListener(null)
 
             if (fullText.isBlank()) {
                 target.movementMethod = null
                 target.maxLines = Int.MAX_VALUE
                 target.ellipsize = null
                 target.text = "No description provided."
+                target.setOnClickListener(null)
                 return
             }
 
             val context = itemView.context
+            val isLong = isLongNotice(fullText)
+
+            // Forward text clicks to card root for unified haptic feedback and spring animations
+            target.setOnClickListener {
+                binding.cardRoot.performClick()
+            }
+
             if (isExpanded) {
                 target.maxLines = Int.MAX_VALUE
                 target.ellipsize = null
-                val formattedText = highlightedPreviewText(context, fullText)
-                val spannableContent = SpannableStringBuilder(formattedText)
-                val suffix = "\n\nSee less"
-                spannableContent.append(suffix)
-                val start = spannableContent.length - suffix.length
-                styleInlineAction(spannableContent, start, spannableContent.length, linkColor)
-                target.text = spannableContent
-                target.movementMethod = android.text.method.LinkMovementMethod.getInstance()
-                target.setOnClickListener { toggleExpansion(notice) }
+                
+                val formattedText = NoticeTextFormatter.format(context, fullText)
+                val highlightedText = highlightedPreviewText(context, formattedText)
+                val suffix = "  see less"
+                val spannable = SpannableStringBuilder(highlightedText)
+                android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                spannable.append(suffix)
+                
+                val start = spannable.length - suffix.length
+                spannable.setSpan(
+                    ClickableActionSpan(linkColor) { binding.cardRoot.performClick() },
+                    start,
+                    spannable.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                
+                target.text = spannable
+                target.movementMethod = LinkMovementMethodWithBubble.getInstance()
             } else {
-                target.movementMethod = null
-                target.maxLines = NOTICE_CARD_PREVIEW_MAX_LINES
-                target.ellipsize = android.text.TextUtils.TruncateAt.END
-                val formattedFullText = highlightedPreviewText(context, fullText)
-                target.text = formattedFullText
-
-                target.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
-                    override fun onPreDraw(): Boolean {
-                        target.viewTreeObserver.removeOnPreDrawListener(this)
-                        if (target.tag == notice.id) {
-                            val layout = target.layout
-                            if (layout != null) {
-                                val displayedText = target.text
-                                val displayedLength = displayedText.length
-                                val lastVisibleLine = (NOTICE_CARD_PREVIEW_MAX_LINES - 1).coerceAtMost(layout.lineCount - 1)
-                                val lineEnd = if (lastVisibleLine >= 0) layout.getLineEnd(lastVisibleLine) else displayedLength
-                                val isLayoutTruncated = lastVisibleLine >= 0 &&
-                                    layout.lineCount >= NOTICE_CARD_PREVIEW_MAX_LINES &&
-                                    (layout.getEllipsisCount(lastVisibleLine) > 0 || lineEnd < displayedLength)
-                                val hasExplicitLineOverflow = hasPreviewLineOverflow(fullText)
-                                val visibleEnd = if (isLayoutTruncated) {
-                                    lineEnd
-                                } else {
-                                    previewEndForExplicitLines(displayedText.toString())
-                                }
-
-                                if (isLayoutTruncated || hasExplicitLineOverflow) {
-                                    bindTruncatedPreview(target, notice, displayedText, linkColor, visibleEnd)
-                                } else {
-                                    // Not truncated, clear click listener so it falls through to cardRoot
-                                    target.setOnClickListener(null)
-                                }
-                            }
-                        }
-                        return true
+                if (isLong) {
+                    target.maxLines = Int.MAX_VALUE
+                    target.ellipsize = null
+                    
+                    val hasLineOverflow = hasPreviewLineOverflow(fullText)
+                    val visibleEnd = if (hasLineOverflow) {
+                        previewEndForExplicitLines(fullText).coerceAtMost(240)
+                    } else {
+                        cleanPreviewEnd(fullText, 240)
                     }
-                })
+                    
+                    val truncatedText = fullText.substring(0, visibleEnd).trimEnd()
+                    val formattedText = NoticeTextFormatter.format(context, truncatedText)
+                    val highlightedText = highlightedPreviewText(context, formattedText)
+                    
+                    val suffix = "... see more"
+                    val spannable = SpannableStringBuilder(highlightedText)
+                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                    spannable.append(suffix)
+                    
+                    val start = spannable.length - suffix.length
+                    spannable.setSpan(
+                        ClickableActionSpan(linkColor) { binding.cardRoot.performClick() },
+                        start,
+                        spannable.length,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    
+                    target.text = spannable
+                    target.movementMethod = LinkMovementMethodWithBubble.getInstance()
+                } else {
+                    target.maxLines = Int.MAX_VALUE
+                    target.ellipsize = null
+                    
+                    val formattedText = NoticeTextFormatter.format(context, fullText)
+                    val highlightedText = highlightedPreviewText(context, formattedText)
+                    val spannable = SpannableStringBuilder(highlightedText)
+                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                    
+                    target.text = spannable
+                    target.movementMethod = LinkMovementMethodWithBubble.getInstance()
+                }
             }
         }
 
-        private fun bindTruncatedPreview(
-            target: TextView,
-            notice: Notice,
-            displayedText: CharSequence,
-            linkColor: Int,
-            visibleEnd: Int
-        ) {
-            val suffix = "... see more"
-            val renderedText = displayedText.toString()
-            val previewLimit = (visibleEnd - suffix.length)
-                .coerceAtLeast(0)
-                .coerceAtMost(renderedText.length)
-            val previewEnd = cleanPreviewEnd(renderedText, previewLimit)
-            val preview = displayedText.subSequence(0, previewEnd)
-
-            target.maxLines = NOTICE_CARD_PREVIEW_MAX_LINES
-            target.ellipsize = null
-            val spannable = SpannableStringBuilder(preview)
-            spannable.append(suffix)
-
-            val start = spannable.length - suffix.length
-            styleInlineAction(spannable, start, spannable.length, linkColor)
-            target.text = spannable
-            target.setOnClickListener { toggleExpansion(notice) }
-        }
-
-        private fun highlightedPreviewText(context: Context, text: String): CharSequence {
-            return if (searchQuery.isNotBlank() && text.contains(searchQuery, ignoreCase = true)) {
+        private fun highlightedPreviewText(context: Context, text: CharSequence): CharSequence {
+            return if (searchQuery.isNotBlank() && text.toString().contains(searchQuery, ignoreCase = true)) {
                 highlightSearchText(text, searchQuery, ThemeColors.primarySoft(context))
             } else {
                 text
             }
-        }
-
-        private fun styleInlineAction(text: SpannableStringBuilder, start: Int, end: Int, color: Int) {
-            text.setSpan(ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            text.setSpan(StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         private fun bindCardAiSummary(notice: Notice, fullText: String) {
@@ -564,10 +793,19 @@ class NoticeAdapter(
 
             binding.aiSummaryContainer.isVisible = isVisible
             binding.tvCardAiSummary.isVisible = isVisible
-            binding.tvCardAiSummary.text = summary
+
+            val formatted = summary
                 ?.takeIf { it.isNotBlank() }
                 ?.let { NoticeTextFormatter.format(itemView.context, it) }
-                ?: ""
+            if (formatted != null) {
+                val spannable = SpannableStringBuilder(formatted)
+                android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
+                binding.tvCardAiSummary.text = spannable
+                binding.tvCardAiSummary.movementMethod = LinkMovementMethodWithBubble.getInstance()
+            } else {
+                binding.tvCardAiSummary.text = ""
+                binding.tvCardAiSummary.movementMethod = null
+            }
 
             binding.pbCardAiSummary.isVisible = isLoading
             binding.btnCardAiSummary.isEnabled = !isLoading
@@ -578,11 +816,30 @@ class NoticeAdapter(
                 binding.pbCardAiSummary.indeterminateTintList = ColorStateList.valueOf(accent)
             }
 
-            binding.tvCardAiSummaryAction.text = when {
-                isLoading -> "Summarizing..."
-                isVisible -> "✨ Hide Summary"
-                else -> "✨ Show AI Summary"
+            val rawText = when {
+                isLoading -> "✨ ..."
+                isVisible -> "✨ Hide"
+                else -> "✨ AI"
             }
+            val ssb = SpannableStringBuilder(rawText)
+            val spaceIndex = rawText.indexOf(' ')
+            if (spaceIndex != -1) {
+                ssb.setSpan(
+                    ForegroundColorSpan(accent),
+                    spaceIndex + 1,
+                    rawText.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            } else {
+                ssb.setSpan(
+                    ForegroundColorSpan(accent),
+                    0,
+                    rawText.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            binding.tvCardAiSummaryAction.text = ssb
+            binding.tvCardAiSummaryAction.setTextColor(ThemeColors.textMuted(itemView.context))
 
             val badgeBg = NoticeUi.badgeBackground(itemView.context, type)
             if (isVisible) {
@@ -598,7 +855,6 @@ class NoticeAdapter(
                     13
                 )
             }
-            binding.tvCardAiSummaryAction.setTextColor(accent)
 
             binding.btnCardAiSummary.setOnClickListener {
                 HapticHelper.lightPop(it)
@@ -623,9 +879,10 @@ class NoticeAdapter(
             aiSummaryVisibleIds.add(notice.id)
             notifyCurrentNotice(notice.id)
             adapterScope.launch {
-                val summary = AIService.summarizeNotice(
+                val result = AIService.summarizeNotice(
                     notice.title, notice.content, notice.displayType, notice.subject.ifBlank { null }
                 )
+                val summary = result.getOrNull()
                 aiSummaryLoadingIds.remove(notice.id)
                 if (summary.isNullOrBlank()) {
                     aiSummaryVisibleIds.remove(notice.id)
@@ -638,18 +895,21 @@ class NoticeAdapter(
             }
         }
 
-        private fun isLongNoticeForCard(text: String): Boolean {
-            val words = text.split(Regex("\\s+")).count { it.isNotBlank() }
-            val explicitLines = text.count { it == '\n' } + 1
-            return words > 45 || text.length > 260 || explicitLines > NOTICE_CARD_PREVIEW_MAX_LINES
-        }
-
         private fun toggleExpansion(notice: Notice) {
+            val text = normalizedNoticeText(notice)
+            if (!isLongNotice(text)) return
+
             HapticHelper.lightPop(itemView)
             if (notice.id in expandedNoticeIds) {
                 expandedNoticeIds.remove(notice.id)
             } else {
                 expandedNoticeIds.add(notice.id)
+            }
+            val recyclerView = itemView.parent as? RecyclerView
+            if (recyclerView != null) {
+                TransitionManager.beginDelayedTransition(recyclerView)
+            } else {
+                TransitionManager.beginDelayedTransition(binding.cardRoot)
             }
             notifyItemChanged(bindingAdapterPosition)
         }
@@ -693,9 +953,19 @@ class NoticeAdapter(
                 showVotersDialog(itemView.context, poll)
             }
 
-            binding.optionsContainer.removeAllViews()
-            poll.options.forEach { option ->
-                val optionBinding = ItemPollOptionBinding.inflate(LayoutInflater.from(itemView.context), binding.optionsContainer, false)
+            val childCount = binding.optionsContainer.childCount
+            val requiredCount = poll.options.size
+            if (childCount > requiredCount) {
+                binding.optionsContainer.removeViews(requiredCount, childCount - requiredCount)
+            }
+            poll.options.forEachIndexed { idx, option ->
+                val optionBinding = if (idx < childCount) {
+                    ItemPollOptionBinding.bind(binding.optionsContainer.getChildAt(idx))
+                } else {
+                    val ob = ItemPollOptionBinding.inflate(LayoutInflater.from(itemView.context), binding.optionsContainer, false)
+                    binding.optionsContainer.addView(ob.root)
+                    ob
+                }
                 val percentage = poll.percentageFor(option)
                 val voteCount = poll.votesFor(option)
                 val selected = selectedOptions.contains(option)
@@ -711,15 +981,7 @@ class NoticeAdapter(
                 optionBinding.ivCheck.isVisible = selected
 
                 if (showResults) {
-                    // Animated Progress Bar
-                    android.animation.ValueAnimator.ofInt(0, percentage).apply {
-                        duration = 750
-                        interpolator = android.view.animation.DecelerateInterpolator()
-                        addUpdateListener { animator ->
-                            optionBinding.optionProgress.progress = animator.animatedValue as Int
-                        }
-                        start()
-                    }
+                    optionBinding.optionProgress.progress = percentage
                 } else {
                     optionBinding.optionProgress.progress = 0
                 }
@@ -728,8 +990,12 @@ class NoticeAdapter(
                     if (selected) ThemeColors.primary(itemView.context)
                     else ThemeColors.textPrimary(itemView.context)
                 )
+                
+                optionBinding.optionRoot.setBackgroundResource(
+                    if (selected) R.drawable.bg_poll_option_selected else R.drawable.bg_poll_option
+                )
 
-                optionBinding.optionRoot.alpha = if (showResults && !selected) 0.85f else 1f
+                optionBinding.optionRoot.alpha = if (showResults && !selected) 0.82f else 1f
                 optionBinding.optionRoot.isEnabled = !expired
 
                 if (!expired) {
@@ -738,8 +1004,9 @@ class NoticeAdapter(
                         it.animateSpringScale(0.98f)
                         if (poll.allowMultipleAnswers) onPollMultiVote(poll, option) else onPollVote(poll.id, option)
                     }
+                } else {
+                    optionBinding.optionRoot.setOnClickListener(null)
                 }
-                binding.optionsContainer.addView(optionBinding.root)
             }
 
             binding.btnDelete.isVisible = isAdminProvider()
@@ -893,6 +1160,45 @@ class NoticeAdapter(
         return key.hashCode().toLong()
     }
 
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0L) return ""
+        val units = arrayOf("B", "KB", "MB", "GB")
+        var value = bytes.toDouble()
+        var unit = 0
+        while (value >= 1024 && unit < units.lastIndex) {
+            value /= 1024
+            unit += 1
+        }
+        return if (unit == 0) "${bytes}B" else String.format(java.util.Locale.US, "%.1f %s", value, units[unit])
+    }
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.toPdfFile(): PdfFile {
+        return PdfFile(
+            id = id,
+            title = getString("title") ?: "No Title",
+            subject = getString("subject") ?: "",
+            description = getString("description") ?: "",
+            uploadedBy = getString("uploadedByName") ?: getString("uploadedBy") ?: "",
+            telegramUrl = getString("telegramUrl") ?: "",
+            driveUrl = getString("driveUrl") ?: "",
+            fileId = getString("fileId") ?: "",
+            timestamp = getTimestamp("timestamp") ?: getTimestamp("createdAt"),
+            courseCode = getString("courseCode") ?: "",
+            courseType = getString("courseType") ?: "",
+            fileType = getString("fileType") ?: "other",
+            mimeType = getString("mimeType") ?: "application/octet-stream",
+            sizeBytes = getLong("sizeBytes") ?: 0L,
+            provider = getString("provider") ?: "",
+            downloadUrl = getString("downloadUrl") ?: "",
+            githubAssetId = getLong("githubAssetId") ?: 0L,
+            githubAssetName = getString("githubAssetName") ?: getString("title") ?: "",
+            createdAt = getTimestamp("createdAt"),
+            updatedAt = getTimestamp("updatedAt"),
+            downloadCount = getLong("downloadCount") ?: 0L,
+            isDeleted = getBoolean("isDeleted") ?: false
+        )
+    }
+
     companion object {
         private const val TYPE_NOTICE = 0
         private const val TYPE_POLL = 1
@@ -900,6 +1206,7 @@ class NoticeAdapter(
         private const val PAYLOAD_LIKE = "payload_like"
         private const val PAYLOAD_SEARCH = "payload_search"
         private const val PAYLOAD_HIGHLIGHT = "payload_highlight"
+        private const val PAYLOAD_PIN = "payload_pin"
         private const val NOTICE_CARD_PREVIEW_MAX_LINES = 6
 
         private val DiffCallback = object : DiffUtil.ItemCallback<Any>() {
@@ -920,6 +1227,22 @@ class NoticeAdapter(
                     else -> false
                 }
             }
+
+            override fun getChangePayload(oldItem: Any, newItem: Any): Any? {
+                if (oldItem is Notice && newItem is Notice) {
+                    if (oldItem.isPinned != newItem.isPinned &&
+                        oldItem.attachments == newItem.attachments &&
+                        oldItem.title == newItem.title &&
+                        oldItem.body == newItem.body &&
+                        oldItem.subject == newItem.subject &&
+                        oldItem.type == newItem.type &&
+                        oldItem.priority == newItem.priority
+                    ) {
+                        return PAYLOAD_PIN
+                    }
+                }
+                return super.getChangePayload(oldItem, newItem)
+            }
         }
     }
 }
@@ -932,7 +1255,13 @@ private fun highlightSearchText(text: CharSequence, query: String, color: Int): 
     while (start >= 0) {
         val end = start + query.length
         spannable.setSpan(
-            ForegroundColorSpan(color),
+            android.text.style.BackgroundColorSpan(Color.parseColor("#FFEB3B")),
+            start,
+            end,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+        spannable.setSpan(
+            ForegroundColorSpan(Color.BLACK),
             start,
             end,
             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -962,4 +1291,88 @@ private fun View.animateSpringScale(targetScale: Float) {
     this.scaleY = targetScale
     springX.start()
     springY.start()
+}
+
+private class ClickableActionSpan(
+    private val color: Int,
+    private val onClickAction: () -> Unit
+) : android.text.style.ClickableSpan() {
+    override fun onClick(widget: View) {
+        onClickAction()
+    }
+
+    override fun updateDrawState(ds: android.text.TextPaint) {
+        super.updateDrawState(ds)
+        ds.color = color
+        ds.isUnderlineText = false
+        ds.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+}
+
+private class LinkMovementMethodWithBubble private constructor() : android.text.method.LinkMovementMethod() {
+    override fun onTouchEvent(widget: TextView, buffer: android.text.Spannable, event: android.view.MotionEvent): Boolean {
+        val action = event.action
+        if (action == android.view.MotionEvent.ACTION_UP || action == android.view.MotionEvent.ACTION_DOWN) {
+            var x = event.x.toInt()
+            var y = event.y.toInt()
+
+            x -= widget.totalPaddingLeft
+            y -= widget.totalPaddingTop
+
+            x += widget.scrollX
+            y += widget.scrollY
+
+            val layout = widget.layout
+            if (layout != null) {
+                val line = layout.getLineForVertical(y)
+                val off = layout.getOffsetForHorizontal(line, x.toFloat())
+
+                val links = buffer.getSpans(off, off, android.text.style.ClickableSpan::class.java)
+
+                if (links.isNotEmpty()) {
+                    val link = links[0]
+                    val linkStart = buffer.getSpanStart(link)
+                    val linkEnd = buffer.getSpanEnd(link)
+                    
+                    // Precise boundary check: verify if the offset off falls inside the link boundaries
+                    if (off >= linkStart && off <= linkEnd) {
+                        val lineStart = layout.getLineStart(line)
+                        val lineEnd = layout.getLineEnd(line)
+                        
+                        // Clamp link bounds to the current line boundaries
+                        val clampStart = Math.max(linkStart, lineStart)
+                        val clampEnd = Math.min(linkEnd, lineEnd)
+                        
+                        val xStart = layout.getPrimaryHorizontal(clampStart)
+                        val xEnd = layout.getPrimaryHorizontal(clampEnd)
+                        
+                        val minX = Math.min(xStart, xEnd)
+                        val maxX = Math.max(xStart, xEnd)
+                        
+                        // Verify that the horizontal touch coordinate is actually within character boundaries
+                        if (x.toFloat() >= minX && x.toFloat() <= maxX) {
+                            if (action == android.view.MotionEvent.ACTION_UP) {
+                                link.onClick(widget)
+                            } else if (action == android.view.MotionEvent.ACTION_DOWN) {
+                                android.text.Selection.setSelection(buffer, linkStart, linkEnd)
+                            }
+                            return true
+                        }
+                    }
+                }
+                android.text.Selection.removeSelection(buffer)
+            }
+        }
+        return false
+    }
+
+    companion object {
+        private var instance: LinkMovementMethodWithBubble? = null
+        fun getInstance(): LinkMovementMethodWithBubble {
+            if (instance == null) {
+                instance = LinkMovementMethodWithBubble()
+            }
+            return instance!!
+        }
+    }
 }

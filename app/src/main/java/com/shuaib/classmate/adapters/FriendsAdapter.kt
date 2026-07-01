@@ -30,7 +30,13 @@ class FriendsAdapter(
         val friend = friends[position]
         holder.binding.apply {
             tvFriendName.text = friend.name
-            tvFriendId.text = friend.studentId
+            
+            val details = listOfNotNull(
+                friend.studentId.takeIf { it.isNotBlank() },
+                friend.bloodGroup.takeIf { it.isNotBlank() },
+                friend.homeDistrict.takeIf { it.isNotBlank() }
+            ).joinToString(" • ")
+            tvFriendId.text = details
 
             Glide.with(ivFriendProfile.context)
                 .load(friend.photoUrl.ifEmpty { null })

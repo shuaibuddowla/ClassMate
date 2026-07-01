@@ -39,3 +39,13 @@ sealed class AiProviderError(
     class InvalidResponse(message: String, statusCode: Int? = null, responseBody: String? = null) : AiProviderError(statusCode, responseBody, message)
     class Unknown(message: String, statusCode: Int? = null, responseBody: String? = null) : AiProviderError(statusCode, responseBody, message)
 }
+
+data class AiChatMessageInput(
+    val role: String, // "user" or "assistant" / "model"
+    val content: String
+)
+
+data class AiChatInput(
+    val messages: List<AiChatMessageInput>,
+    val systemPrompt: String
+)

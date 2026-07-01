@@ -648,6 +648,9 @@ class RegisterActivity : AppCompatActivity() {
         OneSignal.login(uid)
         OneSignal.User.addTag("role", "student")
         OneSignal.User.addTag("uid", uid)
+        try {
+            OneSignal.User.pushSubscription.optIn()
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {

@@ -4,14 +4,14 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/cardDayRoot"
-    android:layout_width="50dp"
-    android:layout_height="60dp"
+    android:layout_width="46dp"
+    android:layout_height="54dp"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:paddingTop="12dp"
-    android:paddingBottom="8dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="6dp"
     android:background="@drawable/bg_day_card_unselected"
-    android:elevation="3dp"
+    android:elevation="2.5dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackgroundBorderless">
@@ -21,7 +21,7 @@
         android:id="@+id/tvDayShort"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="10.5sp"
+        android:textSize="9.5sp"
         android:textStyle="bold"
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/cm_text_disabled"
@@ -32,19 +32,19 @@
         android:id="@+id/tvDayDate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="17sp"
+        android:textSize="15sp"
         android:textStyle="bold"
         android:fontFamily="sans-serif"
         android:textColor="@color/cm_text_primary"
-        android:layout_marginTop="5dp"/>
+        android:layout_marginTop="2dp"/>
 
     <!-- Selected indicator pill -->
     <View
         android:id="@+id/vDayIndicator"
-        android:layout_width="16dp"
-        android:layout_height="3dp"
+        android:layout_width="14dp"
+        android:layout_height="2.5dp"
         android:background="@drawable/bg_day_card_indicator"
-        android:layout_marginTop="7dp"
+        android:layout_marginTop="4dp"
         android:visibility="invisible"/>
 
 </LinearLayout>

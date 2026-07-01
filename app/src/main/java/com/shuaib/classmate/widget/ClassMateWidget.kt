@@ -9,10 +9,13 @@ import android.content.Intent
 import android.widget.RemoteViews
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.R
-import com.shuaib.classmate.utils.DateHelper
+import com.shuaib.classmate.data.local.ClassMateDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -32,6 +35,7 @@ class ClassMateWidget : AppWidgetProvider() {
     }
 
     companion object {
+        private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun updateWidget(
             context: Context,
@@ -99,6 +103,7 @@ class ClassMateWidget : AppWidgetProvider() {
             // Push initial update
             appWidgetManager.updateAppWidget(widgetId, views)
             appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.lvWidgetPeriods)
+            loadLatestCachedNotice(context.applicationContext, appWidgetManager, widgetId)
 
             // Load data from Firestore
             val auth = FirebaseAuth.getInstance()
@@ -143,55 +148,50 @@ class ClassMateWidget : AppWidgetProvider() {
                         else -> "$daysLeft days left"
                     }
 
-                    views.setTextViewText(
+                    val assignmentViews = RemoteViews(context.packageName, R.layout.widget_classmate)
+                    assignmentViews.setTextViewText(
                         R.id.tvWidgetAssignment,
                         "$subject: $topic"
                     )
-                    views.setTextViewText(
+                    assignmentViews.setTextViewText(
                         R.id.tvWidgetDaysLeft,
                         daysText
                     )
 
-                    appWidgetManager.updateAppWidget(
-                        widgetId, views
-                    )
+                    appWidgetManager.partiallyUpdateAppWidget(widgetId, assignmentViews)
                 }
 
-            // Load latest notice
-            db.collection("notices")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .limit(5)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val latestNotice = snapshot.documents
-                        .firstOrNull { it.getBoolean("isDeleted") != true }
-                        ?: return@addOnSuccessListener
+        }
 
-                    val title = latestNotice.getString("title")
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "Latest notice"
-                    val time = relativeTime(
-                        latestNotice.getTimestamp("timestamp")?.toDate()?.time
-                            ?: latestNotice.getTimestamp("createdAt")?.toDate()?.time
-                    )
+        private fun loadLatestCachedNotice(
+            context: Context,
+            appWidgetManager: AppWidgetManager,
+            widgetId: Int
+        ) {
+            widgetScope.launch {
+                val views = RemoteViews(context.packageName, R.layout.widget_classmate)
+                if (!bindLatestCachedNotice(context, views, widgetId)) return@launch
+                appWidgetManager.partiallyUpdateAppWidget(widgetId, views)
+            }
+        }
 
-                    views.setTextViewText(
-                        R.id.tvWidgetNoticeTitle,
-                        title
-                    )
-                    views.setTextViewText(
-                        R.id.tvWidgetNoticeTime,
-                        time
-                    )
-                    views.setOnClickPendingIntent(
-                        R.id.widgetNoticeRow,
-                        createNoticePendingIntent(context, widgetId, latestNotice.id)
-                    )
+        private fun bindLatestCachedNotice(context: Context, views: RemoteViews, widgetId: Int): Boolean {
+            val latestNotice = runCatching {
+                ClassMateDatabase.getInstance(context).noticeDao().getLatestNoticeSync()
+            }.getOrNull() ?: return false
 
-                    appWidgetManager.updateAppWidget(
-                        widgetId, views
-                    )
-                }
+            val title = latestNotice.title
+                .takeIf { it.isNotBlank() }
+                ?: latestNotice.body.take(60).takeIf { it.isNotBlank() }
+                ?: "Latest notice"
+
+            views.setTextViewText(R.id.tvWidgetNoticeTitle, title)
+            views.setTextViewText(R.id.tvWidgetNoticeTime, relativeTime(latestNotice.timestampMillis))
+            views.setOnClickPendingIntent(
+                R.id.widgetNoticeRow,
+                createNoticePendingIntent(context, widgetId, latestNotice.id)
+            )
+            return true
         }
 
         private fun createMainPendingIntent(context: Context, widgetId: Int): PendingIntent {

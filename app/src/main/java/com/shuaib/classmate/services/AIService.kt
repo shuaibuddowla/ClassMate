@@ -7,6 +7,7 @@ import com.shuaib.classmate.ai.GeminiAiProvider
 import com.shuaib.classmate.ai.GroqAiProvider
 import com.shuaib.classmate.ai.NoticeDraftInput
 import com.shuaib.classmate.ai.NoticeSummaryInput
+import com.shuaib.classmate.ai.AiProviderError
 import com.shuaib.classmate.models.AiNoticeDraft
 import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.utils.AppConstants
@@ -87,10 +88,13 @@ object AIService {
         type: String? = null,
         subject: String? = null,
         date: String? = null
-    ): String? {
+    ): Result<String> {
         if (isKeyMissing()) {
-            Log.e("AIService", "AI API Keys are missing or invalid.")
-            return null
+            return Result.failure(
+                AiProviderError.InvalidApiKey(
+                    "AI API Keys are missing. Please configure GEMINI_API_KEY or GROQ_API_KEY in your local.properties file."
+                )
+            )
         }
 
         val input = NoticeSummaryInput(
@@ -103,16 +107,14 @@ object AIService {
 
         return try {
             val result = coordinator.summarizeNotice(input)
-            val aiResult = result.getOrNull()
-            if (aiResult == null) {
-                Log.w("AIService", "AI generated an empty response or failed.")
-                null
+            if (result.isSuccess) {
+                Result.success(result.getOrThrow().data)
             } else {
-                aiResult.data
+                val exception = result.exceptionOrNull() ?: Exception("AI failed to generate a summary.")
+                Result.failure(exception)
             }
         } catch (e: Exception) {
-            Log.e("AIService", "Notice summary failed: ${e.message}", e)
-            null
+            Result.failure(e)
         }
     }
 
@@ -143,6 +145,33 @@ object AIService {
             null
         }
     }
+
+    suspend fun chatWithAi(
+        messages: List<com.shuaib.classmate.ai.AiChatMessageInput>,
+        systemPrompt: String
+    ): String? {
+        if (isKeyMissing()) {
+            Log.e("AIService", "AI API Keys are missing or invalid.")
+            return null
+        }
+
+        val input = com.shuaib.classmate.ai.AiChatInput(messages, systemPrompt)
+
+        return try {
+            val result = coordinator.chatWithAi(input)
+            val aiResult = result.getOrNull()
+            if (aiResult == null) {
+                Log.w("AIService", "AI chat generated an empty response or failed.")
+                null
+            } else {
+                aiResult.data
+            }
+        } catch (e: Exception) {
+            Log.e("AIService", "AI chat failed: ${e.message}", e)
+            null
+        }
+    }
+
 
     private fun buildTeacherContext(): String {
         // Known teacher-subject mappings, locations, and schedules for MBSTU CSE-22

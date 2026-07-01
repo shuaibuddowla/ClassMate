@@ -38,7 +38,7 @@
     <fragment
         android:id="@+id/nav_chat"
         android:name="com.shuaib.classmate.chat.ChatFragment"
-        android:label="Chat"
+        android:label="Ask AI"
         tools:layout="@layout/fragment_chat">
         <action
             android:id="@+id/action_chat_to_group"
@@ -122,19 +122,32 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_pdf_to_question_bank"
+            app:destination="@id/fragment_question_bank"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
     <fragment
         android:id="@+id/fragment_library_all_files"
         android:name="com.shuaib.classmate.fragments.LibraryAllFilesFragment"
         android:label="All Uploads"
-        tools:layout="@layout/fragment_library_all_files" />
+        tools:layout="@layout/fragment_library_home" />
 
     <fragment
         android:id="@+id/fragment_library_search"
         android:name="com.shuaib.classmate.fragments.LibrarySearchFragment"
         android:label="Library Search"
         tools:layout="@layout/fragment_library_search" />
+
+    <fragment
+        android:id="@+id/fragment_question_bank"
+        android:name="com.shuaib.classmate.fragments.QuestionBankFragment"
+        android:label="Question Bank"
+        tools:layout="@layout/fragment_question_bank" />
 
     <fragment
         android:id="@+id/fragment_subject_pdf_list"

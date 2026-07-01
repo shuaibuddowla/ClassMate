@@ -23,6 +23,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         Log.d("FCM", "From: ${remoteMessage.from}")
 
+        // Check if user is logged in
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+            Log.d("FCM", "User is logged out, ignoring notification.")
+            return
+        }
+
         // If the message is from OneSignal, let OneSignal SDK handle it
         if (remoteMessage.data.containsKey("custom")) {
             Log.d("FCM", "Message is from OneSignal, skipping manual notification.")

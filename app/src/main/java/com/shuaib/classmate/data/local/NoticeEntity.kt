@@ -1,6 +1,7 @@
 package com.shuaib.classmate.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.google.firebase.Timestamp
 import com.shuaib.classmate.models.Notice
@@ -8,7 +9,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
 
-@Entity(tableName = "notices")
+@Entity(
+    tableName = "notices",
+    indices = [
+        Index(value = ["isDeleted", "isPinned", "timestampMillis"]),
+        Index(value = ["isDeleted", "timestampMillis"])
+    ]
+)
 data class NoticeEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -41,7 +48,8 @@ data class NoticeEntity(
     val submissionDate: String,
     val deadlineType: String,
     val pdfId: String,
-    val cachedAtMillis: Long = System.currentTimeMillis()
+    val cachedAtMillis: Long = System.currentTimeMillis(),
+    val readCount: Int = 0
 ) {
     fun toNotice(): Notice = Notice(
         id = id,
@@ -74,7 +82,8 @@ data class NoticeEntity(
         topic = topic,
         submissionDate = submissionDate,
         deadlineType = deadlineType,
-        pdfId = pdfId
+        pdfId = pdfId,
+        readCount = readCount
     )
 
     companion object {
@@ -109,7 +118,8 @@ data class NoticeEntity(
             topic = notice.topic,
             submissionDate = notice.submissionDate,
             deadlineType = notice.deadlineType,
-            pdfId = notice.pdfId
+            pdfId = notice.pdfId,
+            readCount = notice.readCount
         )
 
         private fun encodeAttachments(attachments: List<Map<String, Any>>): String {

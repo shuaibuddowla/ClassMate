@@ -40,7 +40,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
-import com.shuaib.classmate.attendance.AttendanceScanManager
 import com.shuaib.classmate.chat.ChatNotificationHelper
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.databinding.ActivityMainBinding
@@ -49,6 +48,7 @@ import com.shuaib.classmate.fragments.NoticeFragment
 import com.shuaib.classmate.fragments.PdfLibraryFragment
 import com.shuaib.classmate.fragments.ProfileFragment
 import com.shuaib.classmate.fragments.TimetableFragment
+import com.shuaib.classmate.models.User
 import com.shuaib.classmate.notices.NoticeReminderManager
 import com.shuaib.classmate.ui.BottomNavAnimator
 import com.shuaib.classmate.utils.HapticHelper
@@ -56,6 +56,7 @@ import com.shuaib.classmate.utils.NoticeReadTracker
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.WidgetUpdater
+import com.shuaib.classmate.utils.AppUpdateManager
 import com.shuaib.classmate.workers.TimetableResetWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -76,13 +77,14 @@ class MainActivity : AppCompatActivity() {
         R.id.nav_pdf,
         R.id.nav_profile
     )
-
     private var isAdmin = false
+    var isViewingRoutineInTimetable = true
     private var noticeBadgeListener: ListenerRegistration? = null
     private val startupHandler = Handler(Looper.getMainLooper())
     private var firstResumeHandled = false
     private var updatingBottomSelection = false
     private var bottomSystemInset = 0
+    private var statusBarHeight = 0
     private var bottomChromeAllowed = true
     private var bottomChromeHiddenByScroll = false
     private var activeScrollRoot: View? = null
@@ -95,26 +97,6 @@ class MainActivity : AppCompatActivity() {
     ) { isGranted: Boolean ->
         if (!isGranted) {
             showPermissionRationaleDialog()
-        }
-    }
-
-    private val bluetoothScanPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            checkBluetoothScanPermissionAndStartAttendanceScan()
-        } else {
-            AttendanceScanManager.stopScanning(this)
-        }
-    }
-
-    private val fineLocationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            AttendanceScanManager.checkActiveSessionAndStart(this)
-        } else {
-            AttendanceScanManager.stopScanning(this)
         }
     }
 
@@ -156,7 +138,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (currentTabId == R.id.nav_timetable) {
-                startActivity(Intent(this, TimetableManagementActivity::class.java))
+                if (isViewingRoutineInTimetable) {
+                    startActivity(Intent(this, TimetableManagementActivity::class.java))
+                } else {
+                    startActivity(Intent(this, BusScheduleManagementActivity::class.java))
+                }
             }
         }
 
@@ -217,6 +203,7 @@ class MainActivity : AppCompatActivity() {
 
                 updateBottomNavItemStates(tabId)
                 updateBottomChromeVisibility(tabId)
+                setMainPageSwipeEnabled(true)
 
                 if (tabId == R.id.nav_notices) {
                     NoticeReadTracker.markReadNow(this@MainActivity)
@@ -224,6 +211,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     refreshUnreadNoticeBadge()
                 }
+                applySystemBars()
             }
         })
     }
@@ -246,6 +234,7 @@ class MainActivity : AppCompatActivity() {
             val tabId = TAB_DESTINATION_MAP[destinationId] ?: childParentTabId
             updateBottomNavSelection(tabId ?: destinationId)
             updateBottomChromeVisibility(destinationId)
+            applySystemBars()
         }
     }
 
@@ -302,24 +291,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getCurrentDestinationId(): Int {
+        return if (binding.mainViewPager.isVisible) {
+            mainTabs.getOrNull(binding.mainViewPager.currentItem) ?: -1
+        } else {
+            navController.currentDestination?.id ?: -1
+        }
+    }
+
     private fun checkAdminStatus() {
         val uid = auth.currentUser?.uid ?: return
         firestore.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                val canEdit = doc.getBoolean("permissions.canEditTimetable") ?: false
-                val canPost = doc.getBoolean("permissions.canPostNotices") ?: false
-                val canUpload = doc.getBoolean("permissions.canUploadPDF") ?: false
-
-                isAdmin = role == "superadmin" || role == "admin" || canEdit || canPost || canUpload
-
-                updateFabVisibility(navController.currentDestination?.id ?: -1)
+                val user = doc.toObject(User::class.java)
+                isAdmin = user?.isAdmin() ?: false
+                updateFabVisibility(getCurrentDestinationId())
             }
             .addOnFailureListener {
                 // If offline or error, we default to student role which is safe
                 isAdmin = false
-                updateFabVisibility(navController.currentDestination?.id ?: -1)
+                updateFabVisibility(getCurrentDestinationId())
             }
     }
 
@@ -329,7 +321,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBottomChromeVisibility(destinationId: Int) {
-        bottomChromeAllowed = destinationId in MAIN_TAB_DESTINATIONS
+        bottomChromeAllowed = destinationId in MAIN_TAB_DESTINATIONS && destinationId != R.id.nav_chat
         bottomChromeHiddenByScroll = false
         clearBottomChromeScrollBehavior()
         binding.bottomNav.animate().cancel()
@@ -526,7 +518,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyRootInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            view.setPadding(0, 0, 0, 0)
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            statusBarHeight = systemBars.top
+            bottomSystemInset = systemBars.bottom
+            applySystemBars()
             insets
         }
     }
@@ -569,7 +564,6 @@ class MainActivity : AppCompatActivity() {
         popup.menu.add(0, 2, 1, "Timetable Editor")
         popup.menu.add(0, 3, 2, "Create Poll")
         popup.menu.add(0, 4, 3, "Upload a PDF")
-        popup.menu.add(0, 5, 4, "Start Attendance")
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -577,7 +571,6 @@ class MainActivity : AppCompatActivity() {
                 2 -> startActivity(Intent(this, TimetableManagementActivity::class.java))
                 3 -> startActivity(Intent(this, CreatePollActivity::class.java))
                 4 -> startActivity(Intent(this, PdfUploadActivity::class.java))
-                5 -> startActivity(Intent(this, StartAttendanceActivity::class.java))
             }
             true
         }
@@ -594,14 +587,27 @@ class MainActivity : AppCompatActivity() {
         WidgetUpdater.refresh(this)
         refreshUnreadNoticeBadge()
         handleNotificationRouting()
-        startupHandler.postDelayed({ checkBluetoothScanPermissionAndStartAttendanceScan() }, ATTENDANCE_SCAN_DELAY_MS)
     }
 
     private fun applySystemBars() {
         val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
-        window.statusBarColor = ThemeColors.bg(this)
-        window.navigationBarColor = ThemeColors.bg(this)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
+        val isNoticesTab = if (::binding.isInitialized) {
+            binding.mainViewPager.isVisible && mainTabs.getOrNull(binding.mainViewPager.currentItem) == R.id.nav_notices
+        } else {
+            false
+        }
+
+        if (::binding.isInitialized) {
+            val topPadding = if (isNoticesTab) 0 else statusBarHeight
+            binding.mainViewPager.setPadding(0, topPadding, 0, 0)
+            binding.navHostFragment.setPadding(0, statusBarHeight, 0, bottomSystemInset)
+        }
 
         try {
             WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -633,34 +639,54 @@ class MainActivity : AppCompatActivity() {
             WidgetUpdater.refresh(this)
             scheduleMidnightReset()
             NoticeReminderManager.syncRemindersWithLocal(this)
+            com.shuaib.classmate.services.AutoMuteScheduler.scheduleAlarms(this)
         }, BACKGROUND_WORK_DELAY_MS)
 
         startupHandler.postDelayed({
             if (isFinishing || isDestroyed) return@postDelayed
-            checkBluetoothScanPermissionAndStartAttendanceScan()
-        }, ATTENDANCE_SCAN_DELAY_MS)
+            checkAppUpdateSilently()
+        }, BACKGROUND_WORK_DELAY_MS + 1500L)
+    }
+
+    private fun checkAppUpdateSilently() {
+        val prefs = getSharedPreferences("app_update_prefs", MODE_PRIVATE)
+        val lastCheck = prefs.getLong("last_check_time", 0L)
+        val currentTime = System.currentTimeMillis()
+
+        // Debounce update check to once every 24 hours (86,400,000 ms), unless mock mode is enabled
+        if (currentTime - lastCheck >= 86400000L || AppUpdateManager.isMockEnabled) {
+            prefs.edit().putLong("last_check_time", currentTime).apply()
+
+            lifecycleScope.launch {
+                try {
+                    val updateInfo = AppUpdateManager.checkLatestRelease()
+                    if (AppUpdateManager.isUpdateAvailable(updateInfo.latestVersionName)) {
+                        AppUpdateManager.showUpdateDialog(this@MainActivity, updateInfo, lifecycleScope)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Silent update check failed: ${e.message}")
+                }
+            }
+        }
     }
 
     private fun listenForUnreadNotices() {
         noticeBadgeListener?.remove()
+        val lastReadTime = com.google.firebase.Timestamp(java.util.Date(NoticeReadTracker.lastReadMillis(this)))
         noticeBadgeListener = firestore.collection("notices")
-            .addSnapshotListener { snapshot, _ ->
-                val unreadCount = snapshot?.documents?.count {
-                    NoticeReadTracker.isUnread(this, it.getTimestamp("timestamp"))
-                } ?: 0
+            .whereGreaterThan("timestamp", lastReadTime)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("MainActivity", "Error listening for unread notices", error)
+                    return@addSnapshotListener
+                }
+                val unreadCount = snapshot?.size() ?: 0
                 updateNoticeBadge(unreadCount)
             }
     }
 
     private fun refreshUnreadNoticeBadge() {
-        firestore.collection("notices")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val unreadCount = snapshot.documents.count {
-                    NoticeReadTracker.isUnread(this, it.getTimestamp("timestamp"))
-                }
-                updateNoticeBadge(unreadCount)
-            }
+        listenForUnreadNotices()
     }
 
     private fun updateNoticeBadge(count: Int) {
@@ -677,21 +703,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observeChatUnreadBadge() {
-        lifecycleScope.launch {
-            ChatRepository.rooms.collect { rooms ->
-                val unreadCount = rooms.sumOf { it.unreadCount }
-                if (unreadCount > 0) {
-                    val badge = binding.bottomNav.getOrCreateBadge(R.id.nav_chat)
-                    badge.isVisible = true
-                    badge.number = unreadCount
-                    badge.maxCharacterCount = 3
-                    badge.backgroundColor = ThemeColors.primary(this@MainActivity)
-                    badge.badgeTextColor = ThemeColors.onPrimary(this@MainActivity)
-                } else {
-                    binding.bottomNav.removeBadge(R.id.nav_chat)
-                }
-            }
-        }
+        // AI Chat tab does not require unread badges from old WebSocket rooms
     }
 
     private fun handleNotificationRouting() {
@@ -701,21 +713,6 @@ class MainActivity : AppCompatActivity() {
         when (tab) {
             "chat" -> {
                 showMainTab(R.id.nav_chat)
-                NotificationRouter.pendingChatRoomId?.let { roomId ->
-                    if (NotificationRouter.pendingChatRoomType == "group" || roomId == "group_main") {
-                        openChildDestination(R.id.nav_chat, R.id.fragment_group_chat)
-                    } else {
-                        openChildDestination(
-                            R.id.nav_chat,
-                            R.id.fragment_dm_chat,
-                            bundleOf(
-                                "roomId" to roomId,
-                                "otherUserName" to (NotificationRouter.pendingChatSenderName ?: "Chat"),
-                                "otherUserId" to NotificationRouter.pendingChatSenderId
-                            )
-                        )
-                    }
-                }
             }
             "notices" -> showMainTab(R.id.nav_notices)
             "timetable" -> showMainTab(R.id.nav_timetable)
@@ -762,7 +759,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val FIRST_DRAW_WORK_DELAY_MS = 1200L
         private const val BACKGROUND_WORK_DELAY_MS = 3000L
-        private const val ATTENDANCE_SCAN_DELAY_MS = 4500L
         private const val BOTTOM_CHROME_SCROLL_THRESHOLD = 8
         private const val BOTTOM_CHROME_ANIMATION_MS = 220L
 
@@ -797,29 +793,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    private fun checkBluetoothScanPermissionAndStartAttendanceScan() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.BLUETOOTH_SCAN
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            bluetoothScanPermissionLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
-            return
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            fineLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            return
-        }
-
-        AttendanceScanManager.checkActiveSessionAndStart(this)
     }
 
     private fun showPermissionRationaleDialog() {
@@ -861,14 +834,7 @@ class MainActivity : AppCompatActivity() {
             val senderName = intent.getStringExtra(ChatNotificationHelper.KEY_SENDER_NAME)
                 ?: intent.getStringExtra("senderName")
 
-            if (roomType == "group") {
-                openChildDestination(R.id.nav_chat, R.id.fragment_group_chat)
-            } else {
-                openChildDestination(R.id.nav_chat, R.id.fragment_dm_chat, bundleOf(
-                    "roomId" to roomId,
-                    "otherUserName" to (senderName ?: "Chat")
-                ))
-            }
+            showMainTab(R.id.nav_chat)
             return
         }
 

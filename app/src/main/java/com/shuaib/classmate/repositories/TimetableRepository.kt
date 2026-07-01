@@ -12,6 +12,8 @@ import com.shuaib.classmate.data.local.TimetableEntity
 import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.workers.OfflineSyncWorker
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
@@ -55,8 +57,12 @@ class TimetableRepository private constructor(private val context: Context) {
         timetableDao.replaceDay(normalizedDay, entities)
     }
 
-    suspend fun syncAllFromFirestore(source: Source = Source.DEFAULT) {
-        DAYS.forEach { day -> syncDayFromFirestore(day, source) }
+    suspend fun syncAllFromFirestore(source: Source = Source.DEFAULT) = coroutineScope {
+        DAYS.map { day ->
+            async {
+                runCatching { syncDayFromFirestore(day, source) }
+            }
+        }.forEach { it.await() }
     }
 
     fun enqueueNetworkSync() {

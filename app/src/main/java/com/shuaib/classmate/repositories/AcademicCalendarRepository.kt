@@ -1,6 +1,7 @@
 package com.shuaib.classmate.repositories
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -79,7 +80,7 @@ class AcademicCalendarRepository(
         if (validationError != null) return Result.failure(IllegalArgumentException(validationError))
 
         return try {
-            val now = Timestamp.now()
+            val now = FieldValue.serverTimestamp()
             val collection = firestore.collection(AcademicCalendarException.COLLECTION)
             val payload = mutableMapOf<String, Any>(
                 "title" to exception.title.trim(),
@@ -113,7 +114,7 @@ class AcademicCalendarRepository(
                 .update(
                     mapOf(
                         "isActive" to isActive,
-                        "updatedAt" to Timestamp.now()
+                        "updatedAt" to FieldValue.serverTimestamp()
                     )
                 )
                 .await()

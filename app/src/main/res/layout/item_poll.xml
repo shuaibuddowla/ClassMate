@@ -5,16 +5,16 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
+    android:layout_marginBottom="12dp"
     android:clickable="true"
     android:focusable="true"
     app:cardBackgroundColor="@color/cm_surface_glass"
     app:cardCornerRadius="24dp"
-    app:cardElevation="1dp"
-    app:cardMaxElevation="3dp"
+    app:cardElevation="2dp"
+    app:cardMaxElevation="4dp"
     app:cardPreventCornerOverlap="false"
     app:strokeColor="@color/bottom_nav_stroke"
-    app:strokeWidth="1dp">
+    app:strokeWidth="1.2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -22,22 +22,38 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- Top metadata panel -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="14dp">
 
+            <!-- Poll Category Badge -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:background="@drawable/bg_notice_badge"
+                android:gravity="center"
+                android:letterSpacing="0.04"
+                android:paddingHorizontal="10dp"
+                android:text="POLL"
+                android:textColor="@color/cm_success"
+                android:textSize="9.5sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="8dp" />
+
+            <!-- Active/Expired Status Pill -->
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="25dp"
+                android:layout_height="22dp"
                 android:gravity="center"
                 android:letterSpacing="0.03"
                 android:paddingHorizontal="10dp"
                 android:text="Active"
-                android:textSize="10.5sp"
+                android:textSize="9.5sp"
                 android:textStyle="bold"
                 android:textAllCaps="true"
                 tools:text="Active" />
@@ -47,40 +63,46 @@
                 android:layout_height="0dp"
                 android:layout_weight="1"/>
 
+            <!-- Admin Actions Block -->
             <ImageButton
                 android:id="@+id/btnEdit"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@drawable/ic_edit"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="@color/cm_text_secondary"
                 android:visibility="gone"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="6dp"
+                android:padding="6dp"
                 android:contentDescription="Edit Poll"/>
 
             <ImageButton
                 android:id="@+id/btnDelete"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@drawable/ic_delete"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 app:tint="@color/cm_cancel_red"
                 android:visibility="gone"
+                android:padding="6dp"
                 android:contentDescription="Delete Poll"/>
 
         </LinearLayout>
 
+        <!-- Question Title -->
         <TextView
             android:id="@+id/tvQuestion"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/cm_text_primary"
-            android:textSize="17.5sp"
+            android:textSize="16.5sp"
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium"
-            android:lineSpacingExtra="2dp"
-            android:layout_marginBottom="16dp"/>
+            android:lineSpacingExtra="2.5dp"
+            android:layout_marginBottom="16dp"
+            tools:text="Which programming language should we choose for our upcoming project?" />
 
+        <!-- Options Container -->
         <LinearLayout
             android:id="@+id/optionsContainer"
             android:layout_width="match_parent"
@@ -91,11 +113,12 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:layout_marginBottom="12dp"
             android:background="@color/cm_border"
             android:alpha="0.25" />
 
+        <!-- Footer block -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -114,9 +137,11 @@
                     android:layout_height="wrap_content"
                     android:text="Winner: Waiting..."
                     android:textColor="@color/cm_success"
-                    android:textSize="13sp"
+                    android:textSize="12.5sp"
                     android:textStyle="bold"
-                    android:visibility="gone"/>
+                    android:visibility="gone"
+                    tools:visibility="visible"
+                    tools:text="Winner: Kotlin" />
 
                 <TextView
                     android:id="@+id/tvTotalVotes"
@@ -125,28 +150,32 @@
                     android:text="0 votes"
                     android:textColor="@color/cm_text_secondary"
                     android:textSize="12sp"
-                    android:layout_marginTop="2dp"/>
+                    android:layout_marginTop="2dp"
+                    tools:text="28 voters" />
 
                 <TextView
                     android:id="@+id/tvPollMode"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="2.5dp"
                     android:textColor="@color/cm_text_muted"
-                    android:textSize="11sp" />
+                    android:textSize="10.5sp"
+                    tools:text="Select one option" />
             </LinearLayout>
 
+            <!-- Voter Statistics Action button -->
             <TextView
                 android:id="@+id/btnViewVoters"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Who Voted?"
+                android:text="📊 Who Voted?"
                 android:textColor="@color/cm_primary"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:padding="8dp"
                 android:background="?attr/selectableItemBackground"
-                android:visibility="gone"/>
+                android:visibility="gone"
+                tools:visibility="visible" />
 
         </LinearLayout>
 

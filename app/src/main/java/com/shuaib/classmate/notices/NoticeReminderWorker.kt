@@ -20,6 +20,9 @@ class NoticeReminderWorker(
 ) : Worker(context, params) {
 
     override fun doWork(): Result {
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+            return Result.success()
+        }
         val noticeId = inputData.getString("noticeId").orEmpty()
         val title = inputData.getString("title").orEmpty().ifBlank { "Notice reminder" }
         val body = inputData.getString("body").orEmpty()

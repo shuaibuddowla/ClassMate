@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Sparkle 1 (Large Center) -->
+    <path
+        android:pathData="M12,2 Q12,12 22,12 Q12,12 12,22 Q12,12 2,12 Q12,12 12,2 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="2"
+                android:startY="2"
+                android:endX="22"
+                android:endY="22"
+                android:startColor="#8B5CF6"
+                android:centerColor="#3B82F6"
+                android:endColor="#06B6D4" />
+        </aapt:attr>
+    </path>
+
+    <!-- Sparkle 2 (Small Top-Right) -->
+    <path
+        android:pathData="M19.5,3.5 Q19.5,5.5 21.5,5.5 Q19.5,5.5 19.5,7.5 Q19.5,5.5 17.5,5.5 Q19.5,5.5 19.5,3.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="17.5"
+                android:startY="3.5"
+                android:endX="21.5"
+                android:endY="7.5"
+                android:startColor="#EC4899"
+                android:endColor="#8B5CF6" />
+        </aapt:attr>
+    </path>
+
+    <!-- Sparkle 3 (Smaller Bottom-Left) -->
+    <path
+        android:pathData="M5,16 Q5,18 7,18 Q5,18 5,20 Q5,18 3,18 Q5,18 5,16 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="3"
+                android:startY="16"
+                android:endX="7"
+                android:endY="20"
+                android:startColor="#3B82F6"
+                android:endColor="#06B6D4" />
+        </aapt:attr>
+    </path>
+</vector>

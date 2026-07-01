@@ -68,9 +68,9 @@ object CountdownManager {
 
     fun getUserCountdowns(
         onResult: (List<Assignment>) -> Unit
-    ) {
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("users")
+    ): com.google.firebase.firestore.ListenerRegistration? {
+        val uid = auth.currentUser?.uid ?: return null
+        return db.collection("users")
             .document(uid)
             .collection("countdowns")
             .orderBy("submissionDate")

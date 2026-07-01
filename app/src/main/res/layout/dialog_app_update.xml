@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/dialog_app_update.xml -->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="@color/cm_surface"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/cm_border">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
+
+        <!-- Glowing Badge Header -->
+        <FrameLayout
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp">
+
+            <!-- Outer Glowing Ring -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_update_circle_glow"/>
+
+            <!-- Inner Gradient Circle -->
+            <FrameLayout
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_update_circle_gradient">
+
+                <ImageView
+                    android:id="@+id/ivUpdateIcon"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_classmate_logo"
+                    android:importantForAccessibility="no"/>
+            </FrameLayout>
+        </FrameLayout>
+
+        <!-- Title & Subtitle -->
+        <TextView
+            android:id="@+id/tvUpdateTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New Update Available"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="A new version of ClassMate is ready. Update now to enjoy the latest features and stability fixes."
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:layout_marginTop="6dp"
+            android:layout_marginHorizontal="8dp"/>
+
+        <!-- Version Transition Pills -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="20dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:background="@drawable/bg_settings_card">
+
+            <TextView
+                android:id="@+id/tvLocalVersionPill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge_pill"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:text="v1.0.0"/>
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginHorizontal="12dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/cm_primary"
+                android:importantForAccessibility="no"/>
+
+            <TextView
+                android:id="@+id/tvUpdateVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge_purple"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:text="v1.1.0"/>
+        </LinearLayout>
+
+        <!-- Changelog Container (Card-in-card style) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_shimmer_rect"
+            android:backgroundTint="@color/cm_background"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WHAT'S NEW"
+                android:textColor="@color/cm_primary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp"/>
+
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/nsvChangelog"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:fadeScrollbars="false"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/tvUpdateChangelog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="13sp"
+                    android:lineSpacingMultiplier="1.25"
+                    tools:text="• Added interactive bus schedules\n• UI design updates\n• Bug fixes"/>
+            </androidx.core.widget.NestedScrollView>
+        </LinearLayout>
+
+        <!-- Progress Indicator Section -->
+        <LinearLayout
+            android:id="@+id/layoutDownloadProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="20dp"
+            tools:visibility="visible">
+
+            <ProgressBar
+                android:id="@+id/pbDownloadProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:progressDrawable="@drawable/bg_poll_progress"
+                android:max="100"
+                android:progress="0"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tvDownloadProgressText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Downloading: 0% (0.0 MB / 0.0 MB)"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="11sp"
+                android:gravity="end"/>
+        </LinearLayout>
+
+        <!-- Action Buttons Section (Equal split layout) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btnUpdateLater"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_update_btn_outline"
+                android:text="Later"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                android:layout_marginEnd="12dp"/>
+
+            <Button
+                android:id="@+id/btnUpdateNow"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_gradient_button"
+                android:text="Update Now"
+                android:textColor="@color/cm_on_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

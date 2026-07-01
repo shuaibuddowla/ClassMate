@@ -10,18 +10,24 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import com.shuaib.classmate.R
 import com.shuaib.classmate.adapters.PeriodAdapter
 import com.shuaib.classmate.databinding.ActivityTimetableManagementBinding
 import com.shuaib.classmate.databinding.DialogAddPeriodBinding
 import com.shuaib.classmate.models.Period
+import com.shuaib.classmate.repositories.TimetableRepository
+import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.ThemeColors
+import com.shuaib.classmate.utils.WidgetUpdater
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.util.Calendar
@@ -311,6 +317,7 @@ class TimetableManagementActivity : AppCompatActivity() {
         task.addOnSuccessListener {
             Toast.makeText(this, if (isEdit) "Period updated" else "Period added", Toast.LENGTH_SHORT).show()
             fetchTimetable(currentDay)
+            refreshWidgetAfterTimetableChange(currentDay)
         }
         .addOnFailureListener { e ->
             Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -324,9 +331,22 @@ class TimetableManagementActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 Toast.makeText(this, "Period deleted", Toast.LENGTH_SHORT).show()
                 fetchTimetable(currentDay)
+                refreshWidgetAfterTimetableChange(currentDay)
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun refreshWidgetAfterTimetableChange(day: String) {
+        lifecycleScope.launch {
+            runCatching {
+                TimetableRepository.getInstance(this@TimetableManagementActivity)
+                    .syncDayFromFirestore(day, Source.DEFAULT)
+            }
+            if (day == DateHelper.todayDayString()) {
+                WidgetUpdater.refresh(this@TimetableManagementActivity, syncTodayTimetable = false)
+            }
+        }
     }
 }

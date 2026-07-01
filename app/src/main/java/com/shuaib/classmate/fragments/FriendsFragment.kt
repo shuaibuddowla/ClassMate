@@ -36,6 +36,8 @@ class FriendsFragment : Fragment() {
     private var isFriendsPublic = false
     private var currentUserRole = "student"
     private var accessChecked = false   // becomes true once both config + role are fetched
+    private var selectedBloodGroup: String? = null
+    private var selectedDistrict: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -51,6 +53,7 @@ class FriendsFragment : Fragment() {
 
         setupRecyclerView()
         setupSearch()
+        setupFilters()
 
         // First, fetch the current user's role, then kick off access checks
         fetchCurrentUserRole()
@@ -216,11 +219,7 @@ class FriendsFragment : Fragment() {
                     }.sortedBy { it.name }
 
                     val query = binding.etSearch.text.toString()
-                    if (query.isEmpty()) {
-                        updateListWithEmptyCheck(allUsersList)
-                    } else {
-                        filterList(query)
-                    }
+                    filterList(query)
                 }
             }
     }
@@ -235,21 +234,105 @@ class FriendsFragment : Fragment() {
         })
     }
 
-    private fun filterList(query: String) {
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isEmpty()) {
-            updateListWithEmptyCheck(allUsersList)
+    private fun setupFilters() {
+        binding.chipGroupFilters.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.contains(R.id.chipAll)) {
+                resetFilters()
+            }
+        }
+
+        binding.chipBlood.setOnClickListener {
+            showBloodGroupSelector()
+        }
+
+        binding.chipDistrict.setOnClickListener {
+            showDistrictSelector()
+        }
+    }
+
+    private fun resetFilters() {
+        selectedBloodGroup = null
+        selectedDistrict = null
+        binding.chipBlood.text = "Blood Group"
+        binding.chipDistrict.text = "Home District"
+        binding.chipAll.isChecked = true
+        filterList(binding.etSearch.text.toString())
+    }
+
+    private fun showBloodGroupSelector() {
+        val bloodGroups = listOf("A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-")
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Select Blood Group")
+            .setItems(bloodGroups.toTypedArray()) { _, which ->
+                val selected = bloodGroups[which]
+                selectedBloodGroup = selected
+                selectedDistrict = null
+                binding.chipBlood.text = "Blood: $selected"
+                binding.chipDistrict.text = "Home District"
+                binding.chipBlood.isChecked = true
+                filterList(binding.etSearch.text.toString())
+            }
+            .setNeutralButton("Clear Filter") { _, _ ->
+                resetFilters()
+            }
+            .show()
+    }
+
+    private fun showDistrictSelector() {
+        val districts = allUsersList.map { it.homeDistrict.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sortedWith(String.CASE_INSENSITIVE_ORDER)
+
+        if (districts.isEmpty()) {
+            Toast.makeText(context, "No districts available to filter", Toast.LENGTH_SHORT).show()
+            binding.chipAll.isChecked = true
             return
         }
 
-        val filtered = allUsersList.filter { user ->
-            user.name.contains(trimmedQuery, ignoreCase = true) ||
-            user.studentId.contains(trimmedQuery, ignoreCase = true) ||
-            user.bloodGroup.contains(trimmedQuery, ignoreCase = true) ||
-            user.homeDistrict.contains(trimmedQuery, ignoreCase = true) ||
-            user.address.contains(trimmedQuery, ignoreCase = true) ||
-            user.phone.contains(trimmedQuery)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Select Home District")
+            .setItems(districts.toTypedArray()) { _, which ->
+                val selected = districts[which]
+                selectedDistrict = selected
+                selectedBloodGroup = null
+                binding.chipDistrict.text = "District: $selected"
+                binding.chipBlood.text = "Blood Group"
+                binding.chipDistrict.isChecked = true
+                filterList(binding.etSearch.text.toString())
+            }
+            .setNeutralButton("Clear Filter") { _, _ ->
+                resetFilters()
+            }
+            .show()
+    }
+
+    private fun filterList(query: String) {
+        var filtered = allUsersList
+
+        // Apply Blood Group Filter
+        selectedBloodGroup?.let { blood ->
+            filtered = filtered.filter { it.bloodGroup.equals(blood, ignoreCase = true) }
         }
+
+        // Apply District Filter
+        selectedDistrict?.let { district ->
+            filtered = filtered.filter { it.homeDistrict.equals(district, ignoreCase = true) }
+        }
+
+        // Apply Text Query Filter
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isNotEmpty()) {
+            filtered = filtered.filter { user ->
+                user.name.contains(trimmedQuery, ignoreCase = true) ||
+                user.studentId.contains(trimmedQuery, ignoreCase = true) ||
+                user.bloodGroup.contains(trimmedQuery, ignoreCase = true) ||
+                user.homeDistrict.contains(trimmedQuery, ignoreCase = true) ||
+                user.address.contains(trimmedQuery, ignoreCase = true) ||
+                user.phone.contains(trimmedQuery)
+            }
+        }
+
         updateListWithEmptyCheck(filtered)
     }
 

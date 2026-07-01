@@ -41,13 +41,24 @@ object AvatarUtils {
                 .circleCrop()
                 .into(imageView)
         } else {
-            imageView.setImageDrawable(null)
-            imageView.background = circle(userId.ifBlank { name })
-            imageView.visibility = View.VISIBLE
-            letterView?.apply {
-                visibility = View.VISIBLE
-                background = circle(userId.ifBlank { name })
-                text = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            if (letterView != null) {
+                imageView.visibility = View.GONE
+                letterView.visibility = View.VISIBLE
+                val cleanName = name.trim().ifBlank { "ClassMate" }
+                val letter = cleanName.firstOrNull()?.uppercaseChar()?.toString() ?: "C"
+                letterView.text = letter
+                letterView.background = circle(userId)
+            } else {
+                imageView.visibility = View.VISIBLE
+                letterView?.visibility = View.GONE
+                val cleanName = name.trim().ifBlank { "ClassMate" }
+                val encodedName = android.net.Uri.encode(cleanName)
+                val fallbackUrl = "https://api.dicebear.com/7.x/initials/png?seed=$encodedName&radius=50"
+                Glide.with(imageView)
+                    .load(fallbackUrl)
+                    .placeholder(placeholder)
+                    .circleCrop()
+                    .into(imageView)
             }
         }
     }

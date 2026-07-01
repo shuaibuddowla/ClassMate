@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_library_row"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="12dp">
+
+    <!-- Icon -->
+    <FrameLayout
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginEnd="13dp"
+        android:background="@drawable/bg_library_file_icon_red">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_result"
+            app:tint="@color/cm_on_primary" />
+    </FrameLayout>
+
+    <!-- Info -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvQpTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:text="Final Exam 2023 — CSE-201" />
+
+        <!-- Badges row: exam type + year -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvQpExamType"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_library_badge_red"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="2dp"
+                android:textColor="@color/cm_on_primary"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                tools:text="FINAL" />
+
+            <TextView
+                android:id="@+id/tvQpYear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_library_badge_blue"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="2dp"
+                android:textColor="@color/cm_primary"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                tools:text="2023" />
+
+            <TextView
+                android:id="@+id/tvQpSemester"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_library_badge_purple"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="2dp"
+                android:textColor="@color/cm_file_other_text"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                tools:text="2nd SEM" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvQpMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/cm_text_muted"
+            android:textSize="10.5sp"
+            tools:text="By Admin · 3 days ago" />
+    </LinearLayout>
+
+    <!-- Open button -->
+    <TextView
+        android:id="@+id/btnOpen"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_marginStart="10dp"
+        android:background="@drawable/bg_library_chip_selected"
+        android:gravity="center"
+        android:minWidth="52dp"
+        android:paddingHorizontal="10dp"
+        android:text="Open"
+        android:textColor="@color/cm_on_primary"
+        android:textSize="10.5sp"
+        android:textStyle="bold" />
+
+    <!-- Delete (admin) -->
+    <ImageView
+        android:id="@+id/btnDelete"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_library_icon_button_small"
+        android:padding="6dp"
+        android:src="@drawable/ic_delete"
+        android:visibility="gone"
+        app:tint="@color/cm_cancel_red" />
+
+</LinearLayout>

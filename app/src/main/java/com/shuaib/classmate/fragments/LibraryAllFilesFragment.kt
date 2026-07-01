@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.shuaib.classmate.adapters.PdfAdapter
-import com.shuaib.classmate.databinding.FragmentLibraryAllFilesBinding
+import com.shuaib.classmate.databinding.FragmentLibraryHomeBinding
 import com.shuaib.classmate.models.PdfFile
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.utils.PdfDialogHelper
@@ -21,7 +21,7 @@ import com.shuaib.classmate.utils.applyClickAnimation
 
 class LibraryAllFilesFragment : Fragment() {
 
-    private var _binding: FragmentLibraryAllFilesBinding? = null
+    private var _binding: FragmentLibraryHomeBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var db: FirebaseFirestore
@@ -34,7 +34,7 @@ class LibraryAllFilesFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentLibraryAllFilesBinding.inflate(inflater, container, false)
+        _binding = FragmentLibraryHomeBinding.inflate(inflater, container, false)
         return binding.root
     }
 

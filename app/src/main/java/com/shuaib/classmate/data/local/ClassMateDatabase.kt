@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [NoticeEntity::class, TimetableEntity::class],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class ClassMateDatabase : RoomDatabase() {
@@ -23,7 +23,9 @@ abstract class ClassMateDatabase : RoomDatabase() {
                     context.applicationContext,
                     ClassMateDatabase::class.java,
                     "classmate-offline.db"
-                ).build().also { instance = it }
+                )
+                .fallbackToDestructiveMigration(true)
+                .build().also { instance = it }
             }
         }
     }

@@ -1,6 +1,6 @@
 # ClassMate
 
-**ClassMate** is a comprehensive academic companion app built for the MBSTU CSE-22 batch. It unifies notices, timetable management, library resources, real-time chat, polls, attendance tools, and administrative workflows into a single Firebase-backed platform — designed with a mobile-first experience for both students and administrators.
+**ClassMate** is a comprehensive academic companion app built for the MBSTU CSE-22 batch. It unifies notices, timetable management, library resources, polls, and administrative workflows into a single Firebase-backed platform — designed with a mobile-first experience for both students and administrators.
 
 ---
 
@@ -43,7 +43,6 @@
 - GitHub-powered resource distribution workflow
 
 ### Communication
-- Real-time batch chat and direct messaging
 - Polls and voting system
 - Profile management
 - Administrative moderation tools
