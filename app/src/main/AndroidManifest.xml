@@ -81,13 +81,6 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".activities.SmartDigestActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize"
-            tools:ignore="LockedOrientationActivity" />
-
-        <activity
             android:name=".activities.UserManagementActivity"
             android:exported="false" />
 

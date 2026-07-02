@@ -478,12 +478,6 @@ class TimetableFragment : Fragment() {
     }
 
     private fun setupHeroClassClickListeners() {
-        binding.cardSmartDigest.applyClickAnimation {
-            val intent = Intent(requireContext(), com.shuaib.classmate.activities.SmartDigestActivity::class.java)
-            startActivity(intent)
-            requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
-        }
-
         binding.heroNextClass.setOnClickListener { card ->
             val context = card.context
             val reduceMotion = AnimUtils.isReduceMotionEnabled(context)
