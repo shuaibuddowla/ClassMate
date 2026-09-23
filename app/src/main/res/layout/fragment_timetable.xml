@@ -30,17 +30,18 @@
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingHorizontal="20dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="10dp">
+                android:paddingHorizontal="18dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp">
 
                 <LinearLayout
                     android:id="@+id/layoutGreeting"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="10dp"
                     android:orientation="vertical"
                     app:layout_constraintBottom_toBottomOf="parent"
-                    app:layout_constraintEnd_toStartOf="@+id/btnWhatsApp"
+                    app:layout_constraintEnd_toStartOf="@+id/btnAddPeriod"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent">
 
@@ -52,7 +53,7 @@
                         android:letterSpacing="0.01"
                         android:text="Hello,"
                         android:textColor="@color/cm_text_disabled"
-                        android:textSize="17sp" />
+                        android:textSize="14sp" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -71,7 +72,7 @@
                             android:maxLines="1"
                             android:text="Student"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="28sp"
+                            android:textSize="22sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -79,30 +80,44 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="2dp"
                             android:text=" 👋"
-                            android:textSize="24sp" />
+                            android:textSize="18sp" />
 
                     </LinearLayout>
                 </LinearLayout>
 
-                <FrameLayout
-                    android:id="@+id/btnWhatsApp"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                <LinearLayout
+                    android:id="@+id/btnAddPeriod"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_btn_add_period"
                     android:clickable="true"
                     android:focusable="true"
-                    android:foreground="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Open WhatsApp Group"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:visibility="gone"
+                    tools:visibility="visible"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent">
 
                     <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_whatsapp" />
+                        android:layout_width="13dp"
+                        android:layout_height="13dp"
+                        android:layout_marginEnd="5dp"
+                        android:src="@drawable/ic_add"
+                        app:tint="@color/cm_primary" />
 
-                </FrameLayout>
+                    <TextView
+                        android:id="@+id/tvAddPeriod"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Add Period"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -113,8 +128,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:clipToPadding="false"
-                android:paddingHorizontal="14dp"
-                android:paddingBottom="10dp"
+                android:paddingHorizontal="12dp"
+                android:paddingBottom="4dp"
                 android:scrollbars="none">
 
                 <LinearLayout
@@ -132,12 +147,13 @@
             <LinearLayout
                 android:id="@+id/layoutScheduleToggle"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="38dp"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginBottom="14dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
                 android:background="@drawable/bg_toggle_container"
                 android:orientation="horizontal"
-                android:padding="4dp">
+                android:padding="3dp">
 
                 <TextView
                     android:id="@+id/btnToggleRoutine"
@@ -148,7 +164,7 @@
                     android:gravity="center"
                     android:text="Class Routine"
                     android:textColor="#FFFFFF"
-                    android:textSize="13sp"
+                    android:textSize="12.5sp"
                     android:textStyle="bold"
                     android:clickable="true"
                     android:focusable="true"/>
@@ -162,7 +178,7 @@
                     android:gravity="center"
                     android:text="Bus Schedule"
                     android:textColor="@color/cm_text_secondary"
-                    android:textSize="13sp"
+                    android:textSize="12.5sp"
                     android:textStyle="bold"
                     android:clickable="true"
                     android:focusable="true"/>

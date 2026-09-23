@@ -32,16 +32,9 @@ android {
         versionName = "1.1.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GITHUB_LIBRARY_TOKEN", "\"${getLocalProperty("GITHUB_LIBRARY_TOKEN")}\"")
-        buildConfigField("String", "GITHUB_OWNER", "\"${getLocalProperty("GITHUB_OWNER")}\"")
-        buildConfigField("String", "GITHUB_REPO", "\"${getLocalProperty("GITHUB_REPO")}\"")
-        buildConfigField("String", "GITHUB_RELEASE_TAG", "\"${getLocalProperty("GITHUB_RELEASE_TAG")}\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"${getLocalProperty("BACKEND_BASE_URL")}\"")
         buildConfigField("String", "ONESIGNAL_APP_ID", "\"${getLocalProperty("ONESIGNAL_APP_ID")}\"")
-        buildConfigField("String", "ONESIGNAL_REST_API_KEY", "\"${getLocalProperty("ONESIGNAL_REST_API_KEY")}\"")
-        buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"${getLocalProperty("TELEGRAM_BOT_TOKEN")}\"")
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
-        buildConfigField("String", "GEMINI_API_KEY", "\"${getLocalProperty("GEMINI_API_KEY")}\"")
-        buildConfigField("String", "GROQ_API_KEY", "\"${getLocalProperty("GROQ_API_KEY")}\"")
         buildConfigField("String", "GEMINI_MODEL", "\"gemini-2.5-flash\"")
         buildConfigField("String", "GROQ_MODEL", "\"llama-3.3-70b-versatile\"")
     }

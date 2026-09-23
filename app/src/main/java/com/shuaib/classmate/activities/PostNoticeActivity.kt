@@ -21,6 +21,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityPostNoticeBinding
 import com.shuaib.classmate.notices.NoticeTextFormatter
@@ -31,6 +32,7 @@ import com.shuaib.classmate.utils.CountdownManager
 import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.utils.NotificationSender
 import com.shuaib.classmate.utils.SubjectList
+import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.TelegramUploader
 import com.shuaib.classmate.utils.WidgetUpdater
 import com.shuaib.classmate.models.AcademicCalendarException
@@ -51,6 +53,7 @@ class PostNoticeActivity : AppCompatActivity() {
     private var selectedSubmissionDate = ""
     private var selectedDeadlineType = "assignment"
     private var editNoticeId: String? = null
+    private var courseListener: ListenerRegistration? = null
 
     private var isAiPostingMode = false
     private var aiPolishedNotice: com.shuaib.classmate.models.AiNoticeDraft? = null
@@ -139,6 +142,8 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun setupToolbar() {
+        val managedBatch = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        binding.toolbar.subtitle = "Batch: ${com.shuaib.classmate.models.Batch.formatName(managedBatch)}"
         binding.toolbar.setNavigationOnClickListener { finish() }
     }
 
@@ -181,7 +186,10 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
-        db.collection("notices")
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("notices")
             .document(noticeId)
             .update(
                 mapOf(
@@ -317,9 +325,13 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun setupSubjectPicker() {
-        val subjectNames = SubjectList.subjects.map { it.name }
-        val subjectAdapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, subjectNames)
-        binding.dropdownSubject.setAdapter(subjectAdapter)
+        courseListener?.remove()
+        courseListener = CoursePicker.bind(this, binding.dropdownSubject)
+    }
+
+    override fun onDestroy() {
+        courseListener?.remove()
+        super.onDestroy()
     }
 
     private fun setupAttachmentButtons() {
@@ -400,7 +412,11 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val noticeData = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to (result.title ?: "Class Cancelled"),
             "body" to (result.body ?: ""),
             "content" to (result.body ?: ""),
@@ -422,10 +438,13 @@ class PostNoticeActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "isPinned" to false,
             "isDeleted" to false,
-            "timestamp" to FieldValue.serverTimestamp()
+            "timestamp" to FieldValue.serverTimestamp(),
+            "semester" to targetSemester
         )
 
-        db.collection("notices")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("notices")
             .add(noticeData)
             .addOnSuccessListener { docRef ->
                 markPeriodAsCancelled(subject, targetDay, targetDate, whenText, docRef.id)
@@ -445,11 +464,6 @@ class PostNoticeActivity : AppCompatActivity() {
             binding.etTitle.error = "Title required"
             return
         }
-        if (bodyText.length > 5000) {
-            Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         if (bodyText.length > 5000) {
             Toast.makeText(this, "Body text exceeds 5000 characters limit", Toast.LENGTH_SHORT).show()
             return
@@ -514,7 +528,11 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun saveNoticeToFirestore(title: String, body: String) {
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val noticeData = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to title,
             "body" to body,
             "content" to body,
@@ -537,10 +555,13 @@ class PostNoticeActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "isPinned" to false,
             "isDeleted" to false,
-            "timestamp" to FieldValue.serverTimestamp()
+            "timestamp" to FieldValue.serverTimestamp(),
+            "semester" to targetSemester
         )
 
-        db.collection("notices")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("notices")
             .add(noticeData)
             .addOnSuccessListener { docRef ->
                 WidgetUpdater.refresh(this)
@@ -548,6 +569,7 @@ class PostNoticeActivity : AppCompatActivity() {
                     title = title,
                     body = body,
                     noticeId = docRef.id,
+                    batchId = targetBatchId,
                     onSuccess = {
                         binding.progressBar.isVisible = false
                         Toast.makeText(this, "✅ Notice posted!", Toast.LENGTH_SHORT).show()
@@ -582,7 +604,11 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val noticeData = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to "Class Cancelled",
             "body" to "$selectedSubject class has been cancelled for $whenText",
             "content" to "$selectedSubject class has been cancelled for $whenText",
@@ -604,10 +630,13 @@ class PostNoticeActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "isPinned" to false,
             "isDeleted" to false,
-            "timestamp" to FieldValue.serverTimestamp()
+            "timestamp" to FieldValue.serverTimestamp(),
+            "semester" to targetSemester
         )
 
-        db.collection("notices")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("notices")
             .add(noticeData)
             .addOnSuccessListener { docRef ->
                 markPeriodAsCancelled(
@@ -626,9 +655,9 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun markPeriodAsCancelled(subject: String, day: String, cancelDate: String, whenText: String, noticeId: String? = null) {
-        db.collection("timetable")
-            .document(day)
-            .collection("periods")
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        com.shuaib.classmate.repositories.TimetableRepository.getInstance(this).getPeriodsCollection(day, targetSemester, targetBatchId)
             .whereEqualTo("subject", subject)
             .get()
             .addOnSuccessListener { snapshot ->
@@ -662,11 +691,13 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun sendCancellationNotification(subject: String, whenText: String, day: String, noticeId: String? = null) {
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
         NotificationSender.sendCancellationAlert(
             subject = subject,
             whenText = whenText,
             day = day,
             noticeId = noticeId,
+            batchId = targetBatchId,
             onSuccess = {
                 binding.progressBar.isVisible = false
                 Toast.makeText(this, "Cancellation published!", Toast.LENGTH_SHORT).show()
@@ -697,7 +728,11 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val noticeData = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to "Substitute Class",
             "body" to "$selectedSubject will be taken by $subTeacher $whenText",
             "content" to "$selectedSubject will be taken by $subTeacher $whenText",
@@ -720,15 +755,17 @@ class PostNoticeActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "isPinned" to false,
             "isDeleted" to false,
-            "timestamp" to FieldValue.serverTimestamp()
+            "timestamp" to FieldValue.serverTimestamp(),
+            "semester" to targetSemester
         )
 
-        db.collection("notices")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("notices")
             .add(noticeData)
             .addOnSuccessListener {
-                db.collection("timetable")
-                    .document(targetDayString)
-                    .collection("periods")
+                com.shuaib.classmate.repositories.TimetableRepository.getInstance(this)
+                    .getPeriodsCollection(targetDayString, targetSemester, targetBatchId)
                     .whereEqualTo("subject", selectedSubject)
                     .get()
                     .addOnSuccessListener { snapshot ->
@@ -748,6 +785,7 @@ class PostNoticeActivity : AppCompatActivity() {
                                     substituteTeacher = subTeacher,
                                     whenText = whenText,
                                     day = targetDayString,
+                                    batchId = targetBatchId,
                                     onSuccess = {
                                         binding.progressBar.isVisible = false
                                         Toast.makeText(this, "🔄 Substitute published!", Toast.LENGTH_SHORT).show()
@@ -937,7 +975,11 @@ class PostNoticeActivity : AppCompatActivity() {
                     ClassReminderWorkCoordinator.cancelTodayClassReminders(this@PostNoticeActivity)
                 }
 
+                val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+                val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
                 val noticeData = hashMapOf(
+                    "batchId" to targetBatchId,
                     "title" to noticeTitle,
                     "body" to noticeBody,
                     "content" to noticeBody,
@@ -956,10 +998,13 @@ class PostNoticeActivity : AppCompatActivity() {
                     "updatedAt" to FieldValue.serverTimestamp(),
                     "isPinned" to true,
                     "isDeleted" to false,
-                    "timestamp" to FieldValue.serverTimestamp()
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "semester" to targetSemester
                 )
 
-                db.collection("notices")
+                db.collection("batches")
+                    .document(targetBatchId)
+                    .collection("notices")
                     .add(noticeData)
                     .addOnSuccessListener { docRef ->
                         WidgetUpdater.refresh(this@PostNoticeActivity)
@@ -967,6 +1012,7 @@ class PostNoticeActivity : AppCompatActivity() {
                             title = noticeTitle,
                             body = noticeBody,
                             noticeId = docRef.id,
+                            batchId = targetBatchId,
                             onSuccess = {
                                 binding.progressBar.isVisible = false
                                 Toast.makeText(this@PostNoticeActivity, "✅ Vacation notice and exception published!", Toast.LENGTH_SHORT).show()

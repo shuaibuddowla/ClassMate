@@ -1,6 +1,3 @@
-/*
- * C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/NotificationSender.kt
- */
 package com.shuaib.classmate.utils
 
 import kotlinx.coroutines.CoroutineScope
@@ -8,12 +5,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.shuaib.classmate.chat.ChatRepository
+import com.shuaib.classmate.network.BackendApiClient
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import com.shuaib.classmate.notices.NoticeTextFormatter
 
 object NotificationSender {
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    private val client = OkHttpClient()
 
     private fun getChannelIdForType(type: String): String {
         return when (type) {
@@ -24,7 +28,8 @@ object NotificationSender {
         }
     }
 
-    fun sendToAll(
+    fun sendToBatch(
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         title: String,
         message: String,
         type: String,
@@ -34,37 +39,28 @@ object NotificationSender {
     ) {
         scope.launch {
             try {
-                val connection = java.net.URL(
-                    "https://api.onesignal.com/notifications"
-                ).openConnection() as java.net.HttpURLConnection
-
-                connection.requestMethod = "POST"
-                connection.setRequestProperty(
-                    "Content-Type", "application/json; charset=utf-8"
-                )
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Key ${AppConstants.ONESIGNAL_REST_API_KEY}"
-                )
-                connection.doOutput = true
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-
-                // Build data payload
                 val dataObj = JSONObject().apply {
                     put("type", type)
+                    put("batchId", batchId)
+                    put("semester", SemesterManager.getActiveSemester())
                     extraData.forEach { (k, v) -> put(k, v) }
+                }
+
+                val filters = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("field", "tag")
+                        put("key", "batchId")
+                        put("relation", "=")
+                        put("value", batchId)
+                    })
                 }
 
                 val body = JSONObject().apply {
                     put("app_id", AppConstants.ONESIGNAL_APP_ID)
                     put("target_channel", "push")
-                    put("included_segments",
-                        org.json.JSONArray().put("All"))
-                    put("headings",
-                        JSONObject().put("en", NoticeTextFormatter.stripMarkdown(title)))
-                    put("contents",
-                        JSONObject().put("en", NoticeTextFormatter.stripMarkdown(message)))
+                    put("filters", filters)
+                    put("headings", JSONObject().put("en", NoticeTextFormatter.stripMarkdown(title)))
+                    put("contents", JSONObject().put("en", NoticeTextFormatter.stripMarkdown(message)))
                     put("data", dataObj)
                     put("android_accent_color", "FF4D9FFF")
                     put("priority", 10)
@@ -72,12 +68,8 @@ object NotificationSender {
                     put("android_visibility", 1)
                 }.toString()
 
-                connection.outputStream.write(body.toByteArray(Charsets.UTF_8))
-                connection.outputStream.flush()
-
-                val responseCode = connection.responseCode
-                android.util.Log.d("ONESIGNAL",
-                    "Response: $responseCode")
+                val responseCode = postNotification(body)
+                android.util.Log.d("ONESIGNAL", "Response: $responseCode")
 
                 withContext(Dispatchers.Main) {
                     if (responseCode == 200 || responseCode == 201 || responseCode == 204) onSuccess()
@@ -91,6 +83,26 @@ object NotificationSender {
                 }
             }
         }
+    }
+
+    fun sendToAll(
+        title: String,
+        message: String,
+        type: String,
+        extraData: Map<String, String> = emptyMap(),
+        onSuccess: () -> Unit = {},
+        onFailure: (String) -> Unit = {}
+    ) {
+        // Default to current batch
+        sendToBatch(
+            batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
+            title = title,
+            message = message,
+            type = type,
+            extraData = extraData,
+            onSuccess = onSuccess,
+            onFailure = onFailure
+        )
     }
 
     fun sendToPlayers(
@@ -126,7 +138,8 @@ object NotificationSender {
         val bodyText = messageText.ifBlank { "Photo" }.take(100)
         val data = mapOf("roomId" to roomId, "senderId" to senderId)
         if (roomId == "group_main") {
-            sendToAll(
+            sendToBatch(
+                batchId = AppContextManager.getBatchId(),
                 title = "CODRIX-22",
                 message = "$senderName: $bodyText",
                 type = "chat_message",
@@ -199,16 +212,10 @@ object NotificationSender {
     ) {
         scope.launch {
             try {
-                val connection = java.net.URL("https://api.onesignal.com/notifications").openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.setRequestProperty("Authorization", "Key ${AppConstants.ONESIGNAL_REST_API_KEY}")
-                connection.doOutput = true
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-
                 val dataObj = JSONObject().apply {
                     put("type", type)
+                    put("batchId", AppContextManager.getBatchId())
+                    put("semester", SemesterManager.getActiveSemester())
                     extraData.forEach { (k, v) -> put(k, v) }
                 }
                 val body = JSONObject().apply {
@@ -223,9 +230,7 @@ object NotificationSender {
                     put("existing_android_channel_id", getChannelIdForType(type))
                     put("android_visibility", 1)
                 }.toString()
-                connection.outputStream.write(body.toByteArray(Charsets.UTF_8))
-                connection.outputStream.flush()
-                val responseCode = connection.responseCode
+                val responseCode = postNotification(body)
                 withContext(Dispatchers.Main) {
                     if (responseCode == 200 || responseCode == 201 || responseCode == 204) onSuccess()
                     else onFailure("HTTP $responseCode")
@@ -236,14 +241,25 @@ object NotificationSender {
         }
     }
 
+    private fun postNotification(body: String): Int {
+        val request = BackendApiClient.authenticated(
+            Request.Builder()
+                .url(BackendApiClient.url("/v1/notifications"))
+                .post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+        )
+        return client.newCall(request).execute().use { response -> response.code }
+    }
+
     // New Assignment Alert
     fun sendAssignmentAlert(
         subject: String,
         topic: String,
         dueDate: String,
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = "📝 New Assignment Posted",
         message = "Subject: $subject\nTopic: $topic\nDeadline: $dueDate\n\nClick to add a live countdown to your home screen!",
         type = "assignment",
@@ -255,9 +271,11 @@ object NotificationSender {
     // New Poll Alert
     fun sendPollAlert(
         question: String,
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = "📊 New Poll Added",
         message = "Question: $question\n\nClick to view and vote in the Notices tab!",
         type = "poll",
@@ -269,9 +287,11 @@ object NotificationSender {
     fun sendResourceAlert(
         title: String,
         subject: String,
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = title,
         message = "New study material has been posted for $subject.",
         type = "resource",
@@ -285,9 +305,11 @@ object NotificationSender {
         title: String,
         body: String,
         noticeId: String? = null,
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = "📢 $title",
         message = body,
         type = "notice",
@@ -302,9 +324,11 @@ object NotificationSender {
         whenText: String,
         noticeId: String? = null,
         day: String = "",
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = "Class Cancelled",
         message = "$subject class cancelled for $whenText",
         type = "cancellation",
@@ -322,9 +346,11 @@ object NotificationSender {
         whenText: String,
         noticeId: String? = null,
         day: String = "",
+        batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         onSuccess: () -> Unit = {},
         onFailure: (String) -> Unit = {}
-    ) = sendToAll(
+    ) = sendToBatch(
+        batchId = batchId,
         title = "🔄 Substitute Class",
         message = "$subject will be taken by $substituteTeacher $whenText",
         type = "substitute",

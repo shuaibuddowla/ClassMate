@@ -44,7 +44,9 @@ data class Notice(
     // Resource specific
     val pdfId: String = "",
     
-    val readCount: Int = 0
+    val readCount: Int = 0,
+    val semester: String = "2nd",
+    val batchId: String = ""
 ) {
     val displayType: String
         get() = when {

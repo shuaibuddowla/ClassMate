@@ -8,11 +8,13 @@ import com.shuaib.classmate.models.Period
 @Entity(
     tableName = "timetable_periods",
     indices = [
-        Index(value = ["day", "startTime"])
+        Index(value = ["batchId", "semesterId", "day", "startTime"])
     ]
 )
 data class TimetableEntity(
     @PrimaryKey val cacheKey: String,
+    val batchId: String = "",
+    val semesterId: String = "",
     val day: String,
     val id: String,
     val subject: String,
@@ -42,9 +44,16 @@ data class TimetableEntity(
     }
 
     companion object {
-        fun fromPeriod(day: String, period: Period): TimetableEntity = TimetableEntity(
-            cacheKey = cacheKey(day, period.id),
-            day = day,
+        fun fromPeriod(
+            batchId: String,
+            semesterId: String,
+            day: String,
+            period: Period
+        ): TimetableEntity = TimetableEntity(
+            cacheKey = cacheKey(batchId, semesterId, day, period.id),
+            batchId = batchId.lowercase(),
+            semesterId = semesterId.lowercase(),
+            day = day.lowercase(),
             id = period.id,
             subject = period.subject,
             teacher = period.teacher,
@@ -55,6 +64,7 @@ data class TimetableEntity(
             substituteDate = period.substituteDate
         )
 
-        fun cacheKey(day: String, id: String): String = "${day.lowercase()}:$id"
+        fun cacheKey(batchId: String, semesterId: String, day: String, id: String): String =
+            "${batchId.lowercase()}:${semesterId.lowercase()}:${day.lowercase()}:$id"
     }
 }

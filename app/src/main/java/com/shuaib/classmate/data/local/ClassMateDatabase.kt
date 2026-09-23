@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [NoticeEntity::class, TimetableEntity::class],
-    version = 3,
+    version = 6,
     exportSchema = false
 )
 abstract class ClassMateDatabase : RoomDatabase() {

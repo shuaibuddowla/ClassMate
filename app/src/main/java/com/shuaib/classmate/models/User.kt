@@ -24,16 +24,27 @@ data class User(
     val oneSignalPlayerId: String = "",
     val favoriteSubjects: List<String> = emptyList(),
     val favoritePdfIds: List<String> = emptyList(),
+    val batchId: String = "",
+    val adminBatchIds: List<String> = emptyList(),
     val permissions: Map<String, Boolean> = DEFAULT_PERMISSIONS
 ) {
     fun isProfileComplete(): Boolean {
-        // Only check mandatory fields: studentId and department.
-        // Phone and bloodGroup are optional (Step 2 can be skipped).
-        return studentId.isNotBlank() && department.isNotBlank()
+        // Only check mandatory fields: studentId, department, and batchId.
+        return studentId.isNotBlank() && department.isNotBlank() && batchId.isNotBlank()
+    }
+
+    fun isGlobalSuperAdmin(): Boolean = role == "global_super_admin" || role == "global_superadmin"
+
+    fun isBatchAdmin(batch: String): Boolean {
+        if (isGlobalSuperAdmin()) return true
+        if (role == "superadmin" || role == "super_admin" || role == "admin") {
+            return adminBatchIds.map { it.lowercase() }.contains(batch.lowercase())
+        }
+        return false
     }
 
     fun hasPermission(permissionKey: String): Boolean {
-        if (role == "superadmin") return true
+        if (isGlobalSuperAdmin() || role == "superadmin" || role == "super_admin") return true
         return permissions[permissionKey] == true
     }
 
@@ -49,7 +60,7 @@ data class User(
     fun canManageAdmins(): Boolean = hasPermission("canManageAdmins")
 
     fun isAdmin(): Boolean {
-        return role == "superadmin" || role == "admin" || permissions.values.any { it }
+        return isGlobalSuperAdmin() || role == "superadmin" || role == "super_admin" || role == "admin" || permissions.values.any { it }
     }
 
     companion object {

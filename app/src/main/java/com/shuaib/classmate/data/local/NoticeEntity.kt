@@ -49,7 +49,9 @@ data class NoticeEntity(
     val deadlineType: String,
     val pdfId: String,
     val cachedAtMillis: Long = System.currentTimeMillis(),
-    val readCount: Int = 0
+    val readCount: Int = 0,
+    val semester: String = "2nd",
+    val batchId: String = ""
 ) {
     fun toNotice(): Notice = Notice(
         id = id,
@@ -83,7 +85,9 @@ data class NoticeEntity(
         submissionDate = submissionDate,
         deadlineType = deadlineType,
         pdfId = pdfId,
-        readCount = readCount
+        readCount = readCount,
+        semester = semester,
+        batchId = batchId
     )
 
     companion object {
@@ -119,7 +123,9 @@ data class NoticeEntity(
             submissionDate = notice.submissionDate,
             deadlineType = notice.deadlineType,
             pdfId = notice.pdfId,
-            readCount = notice.readCount
+            readCount = notice.readCount,
+            semester = notice.semester.ifBlank { "2nd" },
+            batchId = notice.batchId
         )
 
         private fun encodeAttachments(attachments: List<Map<String, Any>>): String {

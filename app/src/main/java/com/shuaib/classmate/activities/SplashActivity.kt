@@ -11,7 +11,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
-import com.shuaib.classmate.models.User
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.AppPreferences
 
 @AndroidEntryPoint
@@ -28,6 +28,7 @@ class SplashActivity : AppCompatActivity() {
         // Keep system splash screen visible until routing is determined
         splashScreen.setKeepOnScreenCondition { !isReady }
 
+        AppContextManager.init(this)
         checkUserStatus()
     }
 
@@ -50,6 +51,7 @@ class SplashActivity : AppCompatActivity() {
 
         val timeoutRunnable = Runnable {
             if (!hasNavigated) {
+                AppContextManager.attachUser(uid)
                 navigate(MainActivity::class.java)
             }
         }
@@ -59,38 +61,50 @@ class SplashActivity : AppCompatActivity() {
             .addOnSuccessListener { cached ->
                 if (cached.exists()) {
                     handler.removeCallbacks(timeoutRunnable)
-                    routeFromProfile(cached)
+                    routeFromProfile(cached, uid)
                 } else {
-                    fetchFromServer(userRef, timeoutRunnable)
+                    fetchFromServer(userRef, uid, timeoutRunnable)
                 }
             }
             .addOnFailureListener {
-                fetchFromServer(userRef, timeoutRunnable)
+                fetchFromServer(userRef, uid, timeoutRunnable)
             }
     }
 
-    private fun fetchFromServer(userRef: com.google.firebase.firestore.DocumentReference, timeoutRunnable: Runnable) {
+    private fun fetchFromServer(
+        userRef: com.google.firebase.firestore.DocumentReference,
+        uid: String,
+        timeoutRunnable: Runnable
+    ) {
         userRef.get(Source.SERVER)
             .addOnSuccessListener { doc ->
                 handler.removeCallbacks(timeoutRunnable)
                 if (doc.exists()) {
-                    routeFromProfile(doc)
+                    routeFromProfile(doc, uid)
                 } else {
-                    navigate(MainActivity::class.java)
+                    navigate(BatchSelectionActivity::class.java)
                 }
             }
             .addOnFailureListener {
                 handler.removeCallbacks(timeoutRunnable)
+                AppContextManager.attachUser(uid)
                 navigate(MainActivity::class.java)
             }
     }
 
-    private fun routeFromProfile(document: DocumentSnapshot) {
+    private fun routeFromProfile(document: DocumentSnapshot, uid: String) {
         try {
-            navigate(MainActivity::class.java)
+            val batchId = document.getString("batchId")?.trim() ?: ""
+            if (batchId.isBlank()) {
+                navigate(BatchSelectionActivity::class.java)
+            } else {
+                AppContextManager.resolveAndInitialize(uid, batchId) { _, _ ->
+                    navigate(MainActivity::class.java)
+                }
+            }
         } catch (e: Exception) {
             android.util.Log.e("SplashActivity", "Error parsing profile: ${e.message}")
-            navigate(MainActivity::class.java)
+            navigate(BatchSelectionActivity::class.java)
         }
     }
 

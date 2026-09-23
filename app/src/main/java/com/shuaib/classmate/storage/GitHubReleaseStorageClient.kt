@@ -3,7 +3,7 @@ package com.shuaib.classmate.storage
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.shuaib.classmate.BuildConfig
+import com.shuaib.classmate.network.BackendApiClient
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,11 +25,7 @@ data class GitHubUploadResult(
 class GitHubStorageException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 class GitHubReleaseStorageClient(
-    private val context: Context,
-    private val token: String = BuildConfig.GITHUB_LIBRARY_TOKEN,
-    private val owner: String = BuildConfig.GITHUB_OWNER,
-    private val repo: String = BuildConfig.GITHUB_REPO,
-    private val releaseTag: String = BuildConfig.GITHUB_RELEASE_TAG
+    private val context: Context
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(45, TimeUnit.SECONDS)
@@ -43,49 +39,15 @@ class GitHubReleaseStorageClient(
         mimeType: String,
         onProgress: (Int) -> Unit = {}
     ): GitHubUploadResult {
-        validateConfig()
-        val release = getReleaseByTag()
-        return uploadReleaseAsset(release, fileUri, assetName, mimeType, onProgress)
-    }
-
-    private fun validateConfig() {
-        if (token.isBlank() || owner.isBlank() || repo.isBlank() || releaseTag.isBlank()) {
-            throw GitHubStorageException(
-                "GitHub storage is not configured. Check GITHUB_LIBRARY_TOKEN, GITHUB_OWNER, GITHUB_REPO, and GITHUB_RELEASE_TAG in local.properties."
-            )
-        }
-    }
-
-    private fun getReleaseByTag(): ReleaseInfo {
-        val url = "https://api.github.com/repos/$owner/$repo/releases/tags/$releaseTag"
-        val request = baseRequest(url).get().build()
-        client.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                throw mapGitHubError(response.code, body)
-            }
-            val json = JSONObject(body)
-            return ReleaseInfo(
-                id = json.getLong("id"),
-                uploadUrl = json.getString("upload_url").substringBefore("{")
-            )
-        }
-    }
-
-    private fun uploadReleaseAsset(
-        release: ReleaseInfo,
-        fileUri: Uri,
-        assetName: String,
-        mimeType: String,
-        onProgress: (Int) -> Unit
-    ): GitHubUploadResult {
         val encodedName = URLEncoder.encode(assetName, Charsets.UTF_8.name()).replace("+", "%20")
-        val url = "${release.uploadUrl}?name=$encodedName"
+        val url = BackendApiClient.url("/v1/github/upload?name=$encodedName")
         val requestBody = ContentUriRequestBody(context, fileUri, mimeType, onProgress)
-        val request = baseRequest(url)
-            .post(requestBody)
-            .header("Content-Type", mimeType)
-            .build()
+        val request = BackendApiClient.authenticated(
+            Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .header("Content-Type", mimeType)
+        )
 
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -104,15 +66,6 @@ class GitHubReleaseStorageClient(
         }
     }
 
-    private fun baseRequest(url: String): Request.Builder {
-        return Request.Builder()
-            .url(url)
-            .header("Authorization", "Bearer $token")
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "ClassMate-Android")
-    }
-
     private fun mapGitHubError(code: Int, body: String): GitHubStorageException {
         val githubMessage = runCatching {
             JSONObject(body).optString("message")
@@ -122,7 +75,7 @@ class GitHubReleaseStorageClient(
             401 -> "GitHub token invalid or expired"
             403 -> when {
                 githubMessage.contains("Resource not accessible", ignoreCase = true) ->
-                    "GitHub token cannot upload to this repository. Regenerate or approve a fine-grained token for $owner/$repo with Contents: Read and write."
+                    "GitHub token cannot upload to this repository. Check the Worker secret and repository permissions."
                 githubMessage.contains("rate limit", ignoreCase = true) ->
                     "GitHub API rate limit reached. Try again later."
                 else ->
@@ -135,8 +88,6 @@ class GitHubReleaseStorageClient(
         Log.e(TAG, "$message. Response size=${body.length}")
         return GitHubStorageException(message)
     }
-
-    private data class ReleaseInfo(val id: Long, val uploadUrl: String)
 
     private class ContentUriRequestBody(
         private val context: Context,

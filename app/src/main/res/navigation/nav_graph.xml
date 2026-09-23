@@ -34,35 +34,6 @@
         <deepLink app:uri="classmate://notice/{noticeId}" />
     </fragment>
 
-    <!-- Chat Flow -->
-    <fragment
-        android:id="@+id/nav_chat"
-        android:name="com.shuaib.classmate.chat.ChatFragment"
-        android:label="Ask AI"
-        tools:layout="@layout/fragment_chat">
-        <action
-            android:id="@+id/action_chat_to_group"
-            app:destination="@id/fragment_group_chat"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-        <action
-            android:id="@+id/action_chat_to_dm_list"
-            app:destination="@id/fragment_dm_list"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-        <action
-            android:id="@+id/action_chat_to_dm_chat"
-            app:destination="@id/fragment_dm_chat"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-    </fragment>
-
     <fragment
         android:id="@+id/fragment_group_chat"
         android:name="com.shuaib.classmate.chat.GroupChatFragment"

@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
+import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
 import com.shuaib.classmate.adapters.PeriodAdapter
 import com.shuaib.classmate.databinding.ActivityTimetableManagementBinding
@@ -24,7 +25,8 @@ import com.shuaib.classmate.databinding.DialogAddPeriodBinding
 import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.repositories.TimetableRepository
 import com.shuaib.classmate.utils.DateHelper
-import com.shuaib.classmate.utils.SubjectList
+import com.shuaib.classmate.utils.SemesterManager
+import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.WidgetUpdater
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ class TimetableManagementActivity : AppCompatActivity() {
     private lateinit var periodAdapter: PeriodAdapter
     private val periodList = mutableListOf<Period>()
     private var currentDay = "saturday"
+    private var courseListener: ListenerRegistration? = null
 
     private val days = listOf("saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday")
     private val dayShort = listOf("SAT", "SUN", "MON", "TUE", "WED", "THU", "FRI")
@@ -54,6 +57,7 @@ class TimetableManagementActivity : AppCompatActivity() {
         setupDaySelector()
         setupSwipeToDelete()
 
+        binding.toolbar.subtitle = "Managing ${SemesterManager.getActiveSemesterDisplay()}"
         binding.toolbar.setNavigationOnClickListener { 
             finish()
         }
@@ -206,8 +210,7 @@ class TimetableManagementActivity : AppCompatActivity() {
         binding.progressBar.visibility = View.VISIBLE
         binding.tvEmptyState.visibility = View.GONE
 
-        firestore.collection("timetable").document(day)
-            .collection("periods")
+        TimetableRepository.getInstance(this).getPeriodsCollection(day)
             .get()
             .addOnSuccessListener { documents ->
                 binding.progressBar.visibility = View.GONE
@@ -251,9 +254,8 @@ class TimetableManagementActivity : AppCompatActivity() {
         val dialogBinding = DialogAddPeriodBinding.inflate(LayoutInflater.from(this))
         val isEdit = period != null
 
-        val subjectNames = SubjectList.subjects.map { it.name }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, subjectNames)
-        dialogBinding.dropdownSubject.setAdapter(adapter)
+        courseListener?.remove()
+        courseListener = CoursePicker.bind(this, dialogBinding.dropdownSubject)
 
         if (isEdit) {
             dialogBinding.dropdownSubject.setText("${period?.subject}", false)
@@ -307,7 +309,7 @@ class TimetableManagementActivity : AppCompatActivity() {
     }
 
     private fun savePeriod(period: Period, isEdit: Boolean) {
-        val collection = firestore.collection("timetable").document(currentDay).collection("periods")
+        val collection = TimetableRepository.getInstance(this).getPeriodsCollection(currentDay)
         val task = if (isEdit) {
             collection.document(period.id).set(period)
         } else {
@@ -324,9 +326,14 @@ class TimetableManagementActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        courseListener?.remove()
+        super.onDestroy()
+    }
+
     private fun deletePeriod(period: Period) {
-        firestore.collection("timetable").document(currentDay)
-            .collection("periods").document(period.id)
+        TimetableRepository.getInstance(this).getPeriodsCollection(currentDay)
+            .document(period.id)
             .delete()
             .addOnSuccessListener {
                 Toast.makeText(this, "Period deleted", Toast.LENGTH_SHORT).show()
@@ -342,7 +349,7 @@ class TimetableManagementActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching {
                 TimetableRepository.getInstance(this@TimetableManagementActivity)
-                    .syncDayFromFirestore(day, Source.DEFAULT)
+                    .syncDayFromFirestore(day = day, source = Source.DEFAULT)
             }
             if (day == DateHelper.todayDayString()) {
                 WidgetUpdater.refresh(this@TimetableManagementActivity, syncTodayTimetable = false)

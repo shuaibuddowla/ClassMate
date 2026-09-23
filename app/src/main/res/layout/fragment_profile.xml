@@ -370,21 +370,20 @@
             android:layout_height="wrap_content"
             android:text="PREFERENCES"
             android:textColor="@color/cm_primary"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:letterSpacing="0.08"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="10dp"/>
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
             app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="2dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
+            app:cardCornerRadius="24dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -395,23 +394,38 @@
                 <!-- Dark Mode -->
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="68dp"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_dark_mode"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Dark Mode"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dark mode"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Use a comfortable dark appearance"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <androidx.appcompat.widget.SwitchCompat
                         android:id="@+id/switchDarkMode"
                         android:layout_width="wrap_content"
@@ -427,23 +441,38 @@
                 <!-- Push Notifications -->
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="68dp"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_notifications"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Push Notifications"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Push notifications"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Notices and important class updates"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <androidx.appcompat.widget.SwitchCompat
                         android:id="@+id/switchNotifications"
                         android:layout_width="wrap_content"
@@ -459,23 +488,38 @@
                 <!-- Auto Mute -->
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="68dp"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_clock"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Auto-Mute during class"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Auto-mute during class"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Silence your phone during scheduled periods"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <androidx.appcompat.widget.SwitchCompat
                         android:id="@+id/switchAutoMute"
                         android:layout_width="wrap_content"
@@ -491,23 +535,38 @@
                 <!-- Shake to Torch -->
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="68dp"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_flash"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Shake to toggle Flashlight"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Shake for flashlight"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Quickly toggle the torch with a gesture"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <androidx.appcompat.widget.SwitchCompat
                         android:id="@+id/switchShakeToTorch"
                         android:layout_width="wrap_content"
@@ -521,23 +580,22 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="FEATURES &amp; UTILITIES"
+            android:text="TOOLS &amp; STORAGE"
             android:textColor="@color/cm_primary"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:letterSpacing="0.08"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="10dp"/>
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
             app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="2dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
+            app:cardCornerRadius="24dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -549,7 +607,7 @@
                 <LinearLayout
                     android:id="@+id/cardAiSettings"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="72dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp"
@@ -557,20 +615,34 @@
                     android:clickable="true"
                     android:focusable="true">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_ai_logo"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="AI Assistant Settings"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"
-                        android:textStyle="bold"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="AI assistant"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Choose providers and preferred models"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
@@ -591,7 +663,7 @@
                 <LinearLayout
                     android:id="@+id/layoutAddWidget"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="72dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp"
@@ -599,19 +671,34 @@
                     android:clickable="true"
                     android:focusable="true">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_search_modern"
                         app:tint="@color/cm_primary"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Add Home Screen Widget"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Home screen widget"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="See your next class at a glance"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <ImageButton
                         android:id="@+id/btnAddWidget"
                         android:layout_width="20dp"
@@ -634,7 +721,7 @@
                 <LinearLayout
                     android:id="@+id/layoutDeleteOfflineCache"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="72dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:paddingHorizontal="16dp"
@@ -642,19 +729,34 @@
                     android:clickable="true"
                     android:focusable="true">
                     <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
                         android:src="@drawable/ic_delete"
                         app:tint="@color/cm_cancel_red"
                         android:importantForAccessibility="no"/>
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Delete Offline Cache"
-                        android:textColor="@color/cm_cancel_red"
-                        android:textSize="14sp"
-                        android:layout_marginStart="14dp"/>
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Clear offline cache"
+                            android:textColor="@color/cm_cancel_red"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Remove downloaded app data from this device"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
                     <ImageButton
                         android:layout_width="20dp"
                         android:layout_height="20dp"
@@ -689,6 +791,162 @@
                 android:letterSpacing="0.08"
                 android:layout_marginStart="8dp"
                 android:layout_marginBottom="8dp"/>
+
+            <!-- Active Semester Switcher Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardSemesterManagement"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_calendar"
+                            app:tint="@color/cm_primary"
+                            android:importantForAccessibility="no"/>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Active Semester"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:fontFamily="sans-serif-medium"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/tvActiveSemesterSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Your batch is currently on this semester"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvActiveSemesterBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="3RD SEMESTER"
+                            android:textColor="@color/cm_text_inverse"
+                            android:background="@drawable/bg_role_badge"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
+                            android:textSize="11sp"
+                            android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:scrollbars="none"
+                        android:overScrollMode="never">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/chipGroupSemesters"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:singleSelection="true"
+                            app:selectionRequired="true">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem1"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="1st Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem2"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="2nd Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem3"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="3rd Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem4"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="4th Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem5"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="5th Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem6"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="6th Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem7"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="7th Sem" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipSem8"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="8th Sem" />
+                        </com.google.android.material.chip.ChipGroup>
+                    </HorizontalScrollView>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPublishSemester"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="10dp"
+                        android:text="Publish Semester Switch"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        app:cornerRadius="12dp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

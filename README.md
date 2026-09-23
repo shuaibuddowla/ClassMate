@@ -90,25 +90,17 @@ gradle/                 Gradle wrapper and version catalog
 
 Install Android Studio and open this repository. Android Studio will generate `local.properties` with your SDK path automatically.
 
-### 2. Configure Build Credentials
+### 2. Configure Public Client Settings
 
 Add the following to `local.properties`:
 
 ```properties
-GITHUB_LIBRARY_TOKEN=your_token
-GITHUB_OWNER=your_github_owner
-GITHUB_REPO=your_library_repo
-GITHUB_RELEASE_TAG=your_release_tag
-
+BACKEND_BASE_URL=https://classmate-secure-api.your-subdomain.workers.dev
 ONESIGNAL_APP_ID=your_onesignal_app_id
-ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key
-
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHANNEL_ID=your_telegram_channel_id
-
-GROQ_API_KEY=your_groq_api_key
-GEMINI_API_KEY=your_gemini_api_key
 ```
+
+API keys and service tokens must not be added here. Configure them as encrypted Cloudflare Worker secrets by following [`cloudflare-worker/README.md`](cloudflare-worker/README.md).
 
 ### 3. Add Firebase Configuration
 
@@ -160,7 +152,7 @@ firebase deploy
 
 1. Fork or download this repository
 2. Create your own Firebase project and configure all required services
-3. Add your API credentials to `local.properties`
+3. Deploy the Cloudflare Worker and add only its public URL/client identifiers to `local.properties`
 4. Generate a signed release APK
 5. Distribute the APK to your students
 
@@ -208,18 +200,19 @@ keytool -list -v -alias androiddebugkey -keystore %USERPROFILE%\.android\debug.k
 firebase deploy --only firestore:rules
 ```
 
-#### Step 6 — Deploy Cloud Functions
+#### Step 6 — Deploy the Secure API
 
 ```powershell
-cd functions
+cd cloudflare-worker
 npm install
-npm run build
-firebase deploy --only functions
+node .\node_modules\wrangler\bin\wrangler.js login
+# Set the secrets listed in cloudflare-worker/README.md
+node .\node_modules\wrangler\bin\wrangler.js deploy
 ```
 
 #### Step 7 — Configure Third-Party Services
 
-Set up and add credentials for the following to `local.properties`:
+Set up the following services and save their credentials as encrypted Cloudflare Worker secrets:
 
 - Groq API
 - Gemini API

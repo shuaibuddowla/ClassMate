@@ -34,9 +34,9 @@ class SubjectAdapter(
 
             val count = pdfCounts[subject.name] ?: 0
             val fileText = when (count) {
-                0 -> "No resources"
-                1 -> "1 resource"
-                else -> "$count resources"
+                0 -> "No files"
+                1 -> "1 file"
+                else -> "$count files"
             }
             tvPdfCount.text = fileText
 

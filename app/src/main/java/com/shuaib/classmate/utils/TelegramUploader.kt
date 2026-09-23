@@ -8,6 +8,7 @@ import android.os.Looper
 import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
+import com.shuaib.classmate.network.BackendApiClient
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -18,8 +19,6 @@ import java.util.concurrent.TimeUnit
 object TelegramUploader {
 
     private const val TAG = "TELEGRAM_UPLOAD"
-    private val BOT_TOKEN: String
-        get() = AppConstants.TELEGRAM_BOT_TOKEN
     private val CHANNEL_ID: String
         get() = AppConstants.TELEGRAM_CHANNEL_ID
 
@@ -84,10 +83,11 @@ object TelegramUploader {
                     )
                     .build()
 
-                val request = Request.Builder()
-                    .url("https://api.telegram.org/bot$BOT_TOKEN/sendDocument")
-                    .post(requestBody)
-                    .build()
+                val request = BackendApiClient.authenticated(
+                    Request.Builder()
+                        .url(BackendApiClient.url("/v1/telegram/upload"))
+                        .post(requestBody)
+                )
 
                 client.newCall(request).execute().use { response ->
                     val responseBody = response.body?.string() ?: ""

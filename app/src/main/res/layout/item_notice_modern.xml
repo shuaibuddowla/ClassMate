@@ -538,38 +538,6 @@
                                 android:importantForAccessibility="no" />
                         </LinearLayout>
 
-                        <!-- Share Pill -->
-                        <LinearLayout
-                            android:id="@+id/btnForward"
-                            android:layout_width="wrap_content"
-                            android:layout_height="28dp"
-                            android:background="@drawable/bg_notice_action_pill"
-                            android:foreground="?attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="8dp">
-
-                            <ImageView
-                                android:id="@+id/ivShareIcon"
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_share_outline"
-                                app:tint="@color/cm_text_muted"
-                                android:importantForAccessibility="no" />
-
-                            <TextView
-                                android:id="@+id/tvShareCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="3dp"
-                                android:textColor="@color/cm_text_muted"
-                                android:textSize="10.5sp"
-                                android:textStyle="bold"
-                                tools:text="1" />
-                        </LinearLayout>
-
                         <!-- Read Receipts Pill (Admin Only) -->
                         <LinearLayout
                             android:id="@+id/btnReadReceipts"

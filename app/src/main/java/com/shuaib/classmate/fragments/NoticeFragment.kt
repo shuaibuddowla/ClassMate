@@ -49,7 +49,6 @@ import com.shuaib.classmate.notices.NoticeCommentsBottomSheetFragment
 import com.shuaib.classmate.notices.NoticeLikeManager
 import com.shuaib.classmate.notices.NoticeReminderManager
 import com.shuaib.classmate.notices.NoticeUi
-import com.shuaib.classmate.notices.ShareForwardNoticeBottomSheet
 import com.shuaib.classmate.utils.NetworkMonitor
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.applyClickAnimation
@@ -79,7 +78,6 @@ class NoticeFragment : Fragment() {
     private var allPolls: List<Poll> = emptyList()
     private val fetchedEngagementNoticeIds = mutableSetOf<String>()
     private val likeCountByNotice = mutableMapOf<String, Int>()
-    private val shareCountByNotice = mutableMapOf<String, Int>()
     private var likedNoticeIds: Set<String> = emptySet()
     private val pendingPinnedState = mutableMapOf<String, Boolean>()
     private var currentRenderedItems: List<Any> = emptyList()
@@ -175,7 +173,6 @@ class NoticeFragment : Fragment() {
             onLikeClick = { notice -> toggleNoticeLike(notice) },
             onCommentClick = { notice -> showCommentsBottomSheet(notice.id) },
             onPinClick = { notice -> togglePin(notice) },
-            onForwardClick = { notice -> openForwardSheet(notice.id) },
             onReminderClick = { notice -> NoticeReminderManager.showReminderOptions(requireContext(), notice) },
             onNoticeLongClick = { notice -> showNoticeActionsDialog(notice) },
             onCopyClick = { notice -> copyNoticeToClipboard(notice) },
@@ -609,12 +606,6 @@ class NoticeFragment : Fragment() {
             .show(childFragmentManager, NoticeCommentsBottomSheetFragment.TAG)
     }
 
-    private fun openForwardSheet(noticeId: String) {
-        ShareForwardNoticeBottomSheet.newInstance(noticeId).apply {
-            onShareRecorded = { incrementShareCount(noticeId) }
-        }.show(childFragmentManager, ShareForwardNoticeBottomSheet.TAG)
-    }
-
     private fun toggleNoticeLike(notice: Notice) {
         val uid = signedInUidOrPrompt() ?: return
         currentUserId = uid
@@ -651,12 +642,6 @@ class NoticeFragment : Fragment() {
                 renderFeed()
                 Toast.makeText(requireContext(), "Pin update failed", Toast.LENGTH_SHORT).show()
             }
-    }
-
-    private fun incrementShareCount(noticeId: String) {
-        if (_binding == null) return
-        shareCountByNotice[noticeId] = (shareCountByNotice[noticeId] ?: 0) + 1
-        noticeAdapter.setEngagementState(buildEngagementState())
     }
 
     private fun reconcilePendingPinState(notices: List<Notice>) {
@@ -824,12 +809,7 @@ class NoticeFragment : Fragment() {
                     val likesTask = db.collection("notice_likes")
                         .whereIn("noticeId", chunk)
                         .get()
-                    val sharesTask = db.collection("notice_shares")
-                        .whereIn("noticeId", chunk)
-                        .get()
-
                     val likesSnapshot = Tasks.await(likesTask)
-                    val sharesSnapshot = Tasks.await(sharesTask)
 
                     if (_binding == null) return@forEach
 
@@ -837,14 +817,10 @@ class NoticeFragment : Fragment() {
                     val likeCounts = likeDocs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount()
                     val userLikedIds = likeDocs.filter { it.getString("userId") == currentUserId }.mapNotNull { it.getString("noticeId") }.toSet()
 
-                    val shareDocs = sharesSnapshot.documents
-                    val shareCounts = shareDocs.groupingBy { it.getString("noticeId").orEmpty() }.eachCount()
-
                     launch(kotlinx.coroutines.Dispatchers.Main) {
                         if (_binding == null) return@launch
                         chunk.forEach { id ->
                             likeCountByNotice[id] = likeCounts[id] ?: 0
-                            shareCountByNotice[id] = shareCounts[id] ?: 0
                         }
                         likedNoticeIds = likedNoticeIds + userLikedIds
                         noticeAdapter.setEngagementState(buildEngagementState())
@@ -865,7 +841,7 @@ class NoticeFragment : Fragment() {
                 noticeId = notice.id,
                 likeCount = likeCountByNotice[notice.id] ?: 0,
                 commentCount = notice.discussionCount,
-                shareCount = shareCountByNotice[notice.id] ?: 0,
+                shareCount = 0,
                 isLiked = notice.id in likedNoticeIds,
                 isPinned = pendingPinnedState[notice.id] ?: notice.isPinned
             )

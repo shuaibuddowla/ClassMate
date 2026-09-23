@@ -54,17 +54,20 @@ class RegisterActivity : AppCompatActivity() {
             Log.d("AuthTrace", "4. idToken present: ${!idToken.isNullOrBlank()}")
             AuthDebug.d("Google signup credential result type=${account.javaClass.name} idTokenPresent=${!idToken.isNullOrBlank()}")
             if (idToken.isNullOrBlank()) {
+                Log.e("AuthTrace", "NULL_ID_TOKEN: Google account returned but idToken is null. " +
+                    "resultCode=${result.resultCode} email=${account.email?.take(3)}***")
                 AuthDebug.e("Google signup token null. status=${result.resultCode}")
                 setLoading(false)
-                showError("This sign-up option is temporarily unavailable.")
+                showError("Google Sign-In returned no token. Check OAuth configuration. [NULL_TOKEN]")
                 shakeForm()
                 return@registerForActivityResult
             }
             AuthDebug.d("Google signup account selected email=${AuthDebug.maskEmail(account.email.orEmpty())}")
             signInWithGoogleToken(idToken)
         } catch (e: ApiException) {
-            Log.d("AuthTrace", "4. idToken present: false (error: ${e.statusCode})")
-            AuthDebug.e("Google signup account picker failed status=${e.statusCode}", e)
+            val statusName = com.google.android.gms.common.api.CommonStatusCodes.getStatusCodeString(e.statusCode)
+            Log.e("AuthTrace", "GoogleSignIn ApiException: statusCode=${e.statusCode} statusName=$statusName message=${e.message}")
+            AuthDebug.e("Google signup account picker failed status=${e.statusCode} ($statusName)", e)
             setLoading(false)
             if (AuthErrorMapper.isGoogleSignInCancelled(e.statusCode)) {
                 return@registerForActivityResult

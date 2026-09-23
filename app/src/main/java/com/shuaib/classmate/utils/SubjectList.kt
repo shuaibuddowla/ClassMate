@@ -1,29 +1,38 @@
 package com.shuaib.classmate.utils
 
-object SubjectList {
-    val subjects = listOf(
-        Subject("Electronic Devices and Circuits", "CSE1201"),
-        Subject("Electronic Devices and Circuits Lab", "CSE1202"),
-        Subject("Structured Programming", "CSE1203"),
-        Subject("Structured Programming Lab", "CSE1204"),
-        Subject("Digital Electronics", "CSE1205"),
-        Subject("Digital Electronics Lab", "CSE1206"),
-        Subject("Physics", "CSE1207"),
-        Subject("Physics Lab", "CSE1208"),
-        Subject("Statistics", "CSE1209"),
-        Subject("Integral Calculus", "CSE1211"),
-        Subject("Engineering Drawing", "CSE1214"),
-        Subject("Viva-Voce", "CSE1215"),
-        Subject("Bhashani Studies", "BHS1201"),
-        Subject("Other Document", "LIB0000"),
-    ).distinctBy { it.name }
+import java.util.concurrent.ConcurrentHashMap
 
-    fun codeFor(subjectName: String): String {
-        return subjects.firstOrNull { it.name.equals(subjectName, ignoreCase = true) }?.code.orEmpty()
+/** Firestore-backed compatibility cache. No course names are bundled in the APK. */
+object SubjectList {
+    private val subjectsByContext = ConcurrentHashMap<String, List<Subject>>()
+
+    val subjects: List<Subject>
+        get() = getSubjectsForSemester(AppContextManager.getSemesterId())
+
+    fun replaceForContext(batchId: String, semesterId: String, subjects: List<Subject>) {
+        subjectsByContext[key(batchId, semesterId)] = subjects
+            .filter { it.name.isNotBlank() }
+            .distinctBy { it.name.lowercase() }
+            .sortedBy { it.name.lowercase() }
     }
+
+    fun getSubjectsForSemester(semester: String): List<Subject> =
+        subjectsByContext[key(AppContextManager.getBatchId(), semester)].orEmpty()
+
+    fun getAllKnownSubjects(): List<Subject> = subjectsByContext.values.flatten()
+        .distinctBy { it.name.lowercase() }
+
+    fun codeFor(subjectName: String, semester: String = AppContextManager.getSemesterId()): String =
+        getSubjectsForSemester(semester)
+            .firstOrNull { it.name.equals(subjectName, ignoreCase = true) }
+            ?.code.orEmpty()
+
+    private fun key(batchId: String, semesterId: String): String =
+        "${batchId.lowercase()}:${SemesterManager.normalizeSemester(semesterId).lowercase()}"
 }
 
 data class Subject(
     val name: String,
-    val code: String = ""
+    val code: String = "",
+    val type: String = "regular"
 )

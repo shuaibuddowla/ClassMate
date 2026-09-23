@@ -80,7 +80,6 @@ class MainActivity : AppCompatActivity() {
     private val mainTabs = listOf(
         R.id.nav_timetable,
         R.id.nav_notices,
-        R.id.nav_chat,
         R.id.nav_pdf,
         R.id.nav_profile
     )
@@ -147,22 +146,6 @@ class MainActivity : AppCompatActivity() {
         applyRootInsets()
         applyBottomNavInsets()
 
-        binding.fabGlobalAdd.setOnClickListener {
-            val currentTabId = if (binding.mainViewPager.isVisible) {
-                mainTabs.getOrNull(binding.mainViewPager.currentItem)
-            } else {
-                navController.currentDestination?.id
-            }
-
-            if (currentTabId == R.id.nav_timetable) {
-                if (isViewingRoutineInTimetable) {
-                    startActivity(Intent(this, TimetableManagementActivity::class.java))
-                } else {
-                    startActivity(Intent(this, BusScheduleManagementActivity::class.java))
-                }
-            }
-        }
-
         binding.bottomNav.setOnItemSelectedListener { item ->
             if (updatingBottomSelection) return@setOnItemSelectedListener true
             val index = mainTabs.indexOf(item.itemId)
@@ -173,7 +156,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         handleNotificationIntent(intent)
-        observeChatUnreadBadge()
         deferStartupWork()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -300,7 +282,6 @@ class MainActivity : AppCompatActivity() {
             return when (mainTabs[position]) {
                 R.id.nav_timetable -> TimetableFragment()
                 R.id.nav_notices -> NoticeFragment()
-                R.id.nav_chat -> com.shuaib.classmate.chat.ChatFragment()
                 R.id.nav_pdf -> PdfLibraryFragment()
                 R.id.nav_profile -> ProfileFragment()
                 else -> TimetableFragment()
@@ -323,36 +304,23 @@ class MainActivity : AppCompatActivity() {
                 if (!doc.exists()) return@addOnSuccessListener
                 val user = doc.toObject(User::class.java)
                 isAdmin = user?.isAdmin() ?: false
-                updateFabVisibility(getCurrentDestinationId())
             }
             .addOnFailureListener {
                 // If offline or error, we default to student role which is safe
                 isAdmin = false
-                updateFabVisibility(getCurrentDestinationId())
             }
     }
 
-    private fun updateFabVisibility(destinationId: Int) {
-        // Show ONLY in timetable page and ONLY for admins, hide for notice, library, profile, and chat
-        binding.fabGlobalAdd.isVisible = isAdmin && destinationId == R.id.nav_timetable
-    }
-
     private fun updateBottomChromeVisibility(destinationId: Int) {
-        bottomChromeAllowed = destinationId in MAIN_TAB_DESTINATIONS && destinationId != R.id.nav_chat
+        bottomChromeAllowed = destinationId in MAIN_TAB_DESTINATIONS
         bottomChromeHiddenByScroll = false
         clearBottomChromeScrollBehavior()
         binding.bottomNav.animate().cancel()
-        binding.fabGlobalAdd.animate().cancel()
         binding.bottomNav.translationY = 0f
-        binding.fabGlobalAdd.translationY = 0f
         binding.bottomNav.alpha = 1f
-        binding.fabGlobalAdd.alpha = 1f
         binding.bottomNav.isVisible = bottomChromeAllowed
         if (bottomChromeAllowed) {
-            updateFabVisibility(destinationId)
             attachBottomChromeScrollBehavior(destinationId)
-        } else {
-            binding.fabGlobalAdd.isVisible = false
         }
     }
 
@@ -470,15 +438,6 @@ class MainActivity : AppCompatActivity() {
                 if (!hidden && bottomChromeAllowed) binding.bottomNav.isVisible = true
             }
             .start()
-
-        if (binding.fabGlobalAdd.isVisible || hidden) {
-            binding.fabGlobalAdd.animate()
-                .translationY(fabOffset)
-                .alpha(if (hidden) 0f else 1f)
-                .setDuration(BOTTOM_CHROME_ANIMATION_MS)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .start()
-        }
     }
 
     private fun updateBottomNavSelection(destinationId: Int) {
@@ -689,8 +648,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun listenForUnreadNotices() {
         noticeBadgeListener?.remove()
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
         val lastReadTime = com.google.firebase.Timestamp(java.util.Date(NoticeReadTracker.lastReadMillis(this)))
-        noticeBadgeListener = firestore.collection("notices")
+        noticeBadgeListener = firestore.collection("batches").document(batchId).collection("notices")
             .whereGreaterThan("timestamp", lastReadTime)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -719,18 +679,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun observeChatUnreadBadge() {
-        // AI Chat tab does not require unread badges from old WebSocket rooms
-    }
-
     private fun handleNotificationRouting() {
         val tab = NotificationRouter.pendingTab ?: return
         val subject = NotificationRouter.pendingSubject
 
         when (tab) {
-            "chat" -> {
-                showMainTab(R.id.nav_chat)
-            }
             "notices" -> showMainTab(R.id.nav_notices)
             "timetable" -> showMainTab(R.id.nav_timetable)
             "pdf_library" -> {
@@ -782,7 +735,6 @@ class MainActivity : AppCompatActivity() {
         private val MAIN_TAB_DESTINATIONS = setOf(
             R.id.nav_timetable,
             R.id.nav_notices,
-            R.id.nav_chat,
             R.id.nav_pdf,
             R.id.nav_profile
         )
@@ -790,10 +742,6 @@ class MainActivity : AppCompatActivity() {
         private val TAB_DESTINATION_MAP = mapOf(
             R.id.nav_timetable to R.id.nav_timetable,
             R.id.nav_notices to R.id.nav_notices,
-            R.id.nav_chat to R.id.nav_chat,
-            R.id.fragment_group_chat to R.id.nav_chat,
-            R.id.fragment_dm_list to R.id.nav_chat,
-            R.id.fragment_dm_chat to R.id.nav_chat,
             R.id.nav_pdf to R.id.nav_pdf,
             R.id.fragment_library_all_files to R.id.nav_pdf,
             R.id.fragment_library_search to R.id.nav_pdf,
@@ -842,24 +790,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Handle Local Chat Notifications
-        val chatRoomId = intent.getStringExtra(ChatNotificationHelper.KEY_ROOM_ID)
-            ?: intent.getStringExtra("roomId")
-        chatRoomId?.let { roomId ->
-            val roomType = intent.getStringExtra(ChatNotificationHelper.KEY_ROOM_TYPE)
-                ?: intent.getStringExtra("roomType")
-            val senderName = intent.getStringExtra(ChatNotificationHelper.KEY_SENDER_NAME)
-                ?: intent.getStringExtra("senderName")
-
-            showMainTab(R.id.nav_chat)
-            return
-        }
-
         // Handle OneSignal / Other Notifications
         intent.getStringExtra("OPEN_TAB")?.let { tab ->
             when (tab) {
                 "notices" -> showMainTab(R.id.nav_notices)
                 "polls" -> showMainTab(R.id.nav_notices)
+                "timetable" -> showMainTab(R.id.nav_timetable)
+                "pdf_library" -> showMainTab(R.id.nav_pdf)
             }
         }
     }

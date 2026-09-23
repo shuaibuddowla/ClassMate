@@ -61,20 +61,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:menu="@menu/bottom_nav_menu" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabGlobalAdd"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="20dp"
-        android:layout_marginBottom="20dp"
-        android:src="@drawable/ic_add"
-        app:backgroundTint="@color/cm_primary"
-        app:elevation="6dp"
-        app:hoveredFocusedTranslationZ="2dp"
-        app:pressedTranslationZ="4dp"
-        app:tint="@color/cm_on_primary"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottom_nav"
-        app:layout_constraintEnd_toEndOf="parent" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>

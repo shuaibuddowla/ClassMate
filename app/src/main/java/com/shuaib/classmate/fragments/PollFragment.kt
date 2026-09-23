@@ -7,7 +7,11 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -51,29 +55,44 @@ class PollFragment : Fragment() {
         currentUserId = auth.currentUser?.uid ?: ""
 
         checkAdminAndLoadPolls()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.AppContextManager.activeBatchFlow.collect {
+                    loadPolls()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.AppContextManager.activeSemesterFlow.collect {
+                    loadPolls()
+                }
+            }
+        }
     }
 
     private fun checkAdminAndLoadPolls() {
-        db.collection("users")
-            .document(currentUserId)
-            .get()
-            .addOnSuccessListener { doc ->
-                if (_binding == null) return@addOnSuccessListener
-                val role = doc.getString("role") ?: "student"
-                isAdmin = role == "superadmin" || role == "admin"
-                loadPolls()
-            }
+        val role = com.shuaib.classmate.utils.AppContextManager.getRole()
+        isAdmin = role == "superadmin" || role == "admin" || role == "global_superadmin"
+        loadPolls()
     }
 
     private fun loadPolls() {
         pollListener?.remove()
-        pollListener = db.collection("polls")
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
+        pollListener = db.collection("batches")
+            .document(batchId)
+            .collection("polls")
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (_binding == null) return@addSnapshotListener
                 if (error != null || snapshot == null) return@addSnapshotListener
 
-                val pollDocs = snapshot.documents
+                val pollDocs = snapshot.documents.filter { (it.getString("semester") ?: activeSem) == activeSem }
                 if (pollDocs.isEmpty()) {
                     binding.emptyState.isVisible = true
                     binding.rvPolls.isVisible = false
@@ -84,13 +103,18 @@ class PollFragment : Fragment() {
     }
 
     private fun refreshPollsOnce() {
-        db.collection("polls")
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
+        db.collection("batches")
+            .document(batchId)
+            .collection("polls")
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
                 if (_binding == null) return@addOnSuccessListener
                 if (!isAdded) return@addOnSuccessListener
-                val pollDocs = snapshot.documents
+                val pollDocs = snapshot.documents.filter { (it.getString("semester") ?: activeSem) == activeSem }
                 if (pollDocs.isEmpty()) {
                     binding.emptyState.isVisible = true
                     binding.rvPolls.isVisible = false
@@ -132,7 +156,10 @@ class PollFragment : Fragment() {
     }
 
     private fun castVote(pollId: String, option: String) {
-        db.collection("polls")
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        db.collection("batches")
+            .document(batchId)
+            .collection("polls")
             .document(pollId)
             .collection("votes")
             .document(currentUserId)
@@ -161,7 +188,10 @@ class PollFragment : Fragment() {
             selectedOptions.add(option)
         }
 
-        db.collection("polls")
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        db.collection("batches")
+            .document(batchId)
+            .collection("polls")
             .document(poll.id)
             .collection("votes")
             .document(currentUserId)
@@ -187,6 +217,7 @@ class PollFragment : Fragment() {
     private fun buildPoll(doc: DocumentSnapshot, voteSnapshot: QuerySnapshot): Poll {
         return Poll(
             id = doc.id,
+            batchId = doc.getString("batchId") ?: com.shuaib.classmate.utils.AppContextManager.getBatchId(),
             question = doc.getString("question") ?: "",
             options = doc.get("options") as? List<String> ?: emptyList(),
             createdBy = doc.getString("createdBy") ?: "",
@@ -224,7 +255,12 @@ class PollFragment : Fragment() {
     }
 
     private fun deletePoll(pollId: String) {
-        db.collection("polls").document(pollId).delete()
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        db.collection("batches")
+            .document(batchId)
+            .collection("polls")
+            .document(pollId)
+            .delete()
     }
 
     override fun onDestroyView() {

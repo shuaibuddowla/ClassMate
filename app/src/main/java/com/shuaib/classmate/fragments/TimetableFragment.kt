@@ -101,7 +101,7 @@ class TimetableFragment : Fragment() {
         auth = FirebaseAuth.getInstance()
 
         loadUserGreeting()
-        setupWhatsAppButton()
+        setupAddPeriodButton()
         setupDaySelector()
         setupReactiveTimetableCollection()
         listenForAcademicCalendarExceptions()
@@ -111,6 +111,14 @@ class TimetableFragment : Fragment() {
         setupHeroCountdownTimer()
         setupScheduleToggle()
         timetableViewModel.refreshAll()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect {
+                    timetableViewModel.refreshAll()
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -172,20 +180,14 @@ class TimetableFragment : Fragment() {
         }
     }
 
-    private fun setupWhatsAppButton() {
-        binding.btnWhatsApp.setOnClickListener {
-            it.animateSpringScale(0.88f)
-            openWhatsAppGroup()
-        }
-    }
-
-    private fun openWhatsAppGroup() {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.data = Uri.parse(com.shuaib.classmate.utils.AppConstants.WHATSAPP_GROUP_LINK)
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Could not open WhatsApp group link", Toast.LENGTH_SHORT).show()
+    private fun setupAddPeriodButton() {
+        binding.btnAddPeriod.setOnClickListener {
+            it.animateSpringScale(0.9f)
+            if (isViewingRoutine) {
+                startActivity(Intent(context, com.shuaib.classmate.activities.TimetableManagementActivity::class.java))
+            } else {
+                startActivity(Intent(context, com.shuaib.classmate.activities.BusScheduleManagementActivity::class.java))
+            }
         }
     }
 
@@ -814,6 +816,7 @@ class TimetableFragment : Fragment() {
                 if (error != null || _binding == null) return@addSnapshotListener
                 val user = snapshot?.toObject(com.shuaib.classmate.models.User::class.java)
                 isAdmin = user?.canEditTimetable() ?: false
+                binding.btnAddPeriod.isVisible = isAdmin
             }
     }
 
@@ -823,6 +826,7 @@ class TimetableFragment : Fragment() {
             isViewingRoutine = true
             
             (activity as? MainActivity)?.isViewingRoutineInTimetable = true
+            binding.tvAddPeriod.text = "Add Period"
             
             // Remove bus listener since we are viewing the routine
             busScheduleRegistration?.remove()
@@ -842,6 +846,7 @@ class TimetableFragment : Fragment() {
             isViewingRoutine = false
             
             (activity as? MainActivity)?.isViewingRoutineInTimetable = false
+            binding.tvAddPeriod.text = "Add Bus"
             
             binding.btnToggleBus.setBackgroundResource(R.drawable.bg_toggle_item_selected)
             binding.btnToggleBus.setTextColor(Color.WHITE)

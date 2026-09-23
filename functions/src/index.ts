@@ -9,10 +9,9 @@ import * as admin from "firebase-admin";
 admin.initializeApp();
 
 /**
- * Triggers when a new document is created in the 'notices' collection.
- * Sends a push notification to the appropriate topic.
+ * Triggers for a batch-scoped notice and sends only to that batch's topic.
  */
-export const onnoticecreated = onDocumentCreated("notices/{noticeId}",
+export const onBatchNoticeCreated = onDocumentCreated("batches/{batchId}/notices/{noticeId}",
   async (event) => {
     const snapshot = event.data;
 
@@ -25,10 +24,9 @@ export const onnoticecreated = onDocumentCreated("notices/{noticeId}",
     const data = snapshot.data();
     const title = data.title || "New Announcement";
     const body = data.body || "A new notice has been posted in the app.";
-    const isCancel = data.isCancel === true;
-
-    // Logic: Cancellations go to 'cancellations' topic, others to 'notices'
-    const topic = isCancel ? "cancellations" : "notices";
+    const batchId = event.params.batchId;
+    // Topic names are tenant scoped. Never fall back to global notice topics.
+    const topic = `batch_${batchId}`;
 
     const message: admin.messaging.Message = {
       notification: {
@@ -39,6 +37,7 @@ export const onnoticecreated = onDocumentCreated("notices/{noticeId}",
       data: {
         OPEN_TAB: "notices",
         noticeId: event.params.noticeId,
+        batchId,
       },
       topic: topic,
     };

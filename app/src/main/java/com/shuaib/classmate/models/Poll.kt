@@ -2,6 +2,7 @@ package com.shuaib.classmate.models
 
 data class Poll(
     val id: String = "",
+    val batchId: String = "",
     val question: String = "",
     val options: List<String> = emptyList(),
     val createdBy: String = "",
@@ -10,7 +11,8 @@ data class Poll(
     val isActive: Boolean = true,
     val votes: Map<String, String> = emptyMap(),
     val allowMultipleAnswers: Boolean = false,
-    val multiVotes: Map<String, List<String>> = emptyMap()
+    val multiVotes: Map<String, List<String>> = emptyMap(),
+    val semester: String = "2nd"
 ) {
     fun votesFor(option: String): Int {
         return if (allowMultipleAnswers) {

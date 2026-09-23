@@ -23,5 +23,6 @@ data class PdfFile(
     val createdAt: com.google.firebase.Timestamp? = null,
     val updatedAt: com.google.firebase.Timestamp? = null,
     val downloadCount: Long = 0L,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val semester: String = "2nd"
 )

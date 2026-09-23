@@ -24,6 +24,7 @@ import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.adapters.LibrarySearchAdapter
 import com.shuaib.classmate.databinding.FragmentLibrarySearchBinding
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.utils.LibrarySystemBars
 import com.shuaib.classmate.utils.PdfDialogHelper
@@ -201,25 +202,22 @@ class LibrarySearchFragment : Fragment() {
     private fun loadFiles() {
         binding.shimmerView.isVisible = true
         binding.shimmerView.startShimmer()
-        db.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null) return@addOnSuccessListener
-                allFiles = snapshot.documents.map { doc -> doc.toPdfFile() }
-                    .filterNot { it.isDeleted }
-                    .sortedByDescending { it.timestamp ?: it.createdAt }
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
+        ArchiveLibraryRepository.load(batchId, activeSem, { _, resources ->
+                if (_binding == null) return@load
+                allFiles = resources.sortedByDescending { it.timestamp ?: it.createdAt }
                 binding.shimmerView.stopShimmer()
                 binding.shimmerView.isVisible = false
                 updateResults()
-            }
-            .addOnFailureListener { error ->
-                if (_binding == null) return@addOnFailureListener
+            }, { error ->
+                if (_binding == null) return@load
                 binding.shimmerView.stopShimmer()
                 binding.shimmerView.isVisible = false
                 Toast.makeText(context, "Failed to load search: ${error.message}", Toast.LENGTH_SHORT).show()
                 updateEmptyState(noResults = false)
-            }
+            })
     }
 
     private fun updateResults() {
@@ -302,7 +300,8 @@ class LibrarySearchFragment : Fragment() {
             createdAt = getTimestamp("createdAt"),
             updatedAt = getTimestamp("updatedAt"),
             downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false
+            isDeleted = getBoolean("isDeleted") ?: false,
+            semester = getString("semester") ?: "2nd"
         )
     }
 

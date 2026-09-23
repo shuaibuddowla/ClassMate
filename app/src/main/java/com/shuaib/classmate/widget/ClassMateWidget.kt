@@ -176,8 +176,9 @@ class ClassMateWidget : AppWidgetProvider() {
         }
 
         private fun bindLatestCachedNotice(context: Context, views: RemoteViews, widgetId: Int): Boolean {
+            val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
             val latestNotice = runCatching {
-                ClassMateDatabase.getInstance(context).noticeDao().getLatestNoticeSync()
+                ClassMateDatabase.getInstance(context).noticeDao().getLatestNoticeSync(batchId)
             }.getOrNull() ?: return false
 
             val title = latestNotice.title

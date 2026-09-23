@@ -159,26 +159,32 @@ class CreatePollActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val pollData = hashMapOf(
+            "batchId" to targetBatchId,
             "question" to question,
             "options" to validOptions,
             "createdBy" to currentUserName,
             "expiresAt" to expiresAt,
             "isActive" to true,
-            "allowMultipleAnswers" to binding.switchMultipleAnswers.isChecked
+            "allowMultipleAnswers" to binding.switchMultipleAnswers.isChecked,
+            "semester" to targetSemester
         )
 
+        val pollRef = db.collection("batches").document(targetBatchId).collection("polls")
         val task = if (pollId != null) {
-            db.collection("polls").document(pollId!!).update(pollData as Map<String, Any>)
+            pollRef.document(pollId!!).update(pollData as Map<String, Any>)
         } else {
             pollData["createdAt"] = FieldValue.serverTimestamp()
             pollData["votes"] = emptyMap<String, String>()
-            db.collection("polls").add(pollData)
+            pollRef.add(pollData)
         }
 
         task.addOnSuccessListener {
             if (pollId == null) {
-                NotificationSender.sendPollAlert(question = question)
+                NotificationSender.sendPollAlert(question = question, batchId = targetBatchId)
             }
             binding.progressBar.isVisible = false
             Toast.makeText(this, if (pollId != null) "Poll updated!" else "Poll published!", Toast.LENGTH_SHORT).show()

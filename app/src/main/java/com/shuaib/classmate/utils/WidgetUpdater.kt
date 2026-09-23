@@ -26,7 +26,7 @@ object WidgetUpdater {
         scope.launch {
             runCatching {
                 TimetableRepository.getInstance(appContext)
-                    .syncDayFromFirestore(DateHelper.todayDayString(), Source.DEFAULT)
+                    .syncDayFromFirestore(day = DateHelper.todayDayString(), source = Source.DEFAULT)
             }.onFailure {
                 Log.e("WidgetUpdater", "Timetable widget sync failed: ${it.message}")
             }

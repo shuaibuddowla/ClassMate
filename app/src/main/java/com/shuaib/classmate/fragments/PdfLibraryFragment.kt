@@ -21,11 +21,15 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.activities.PdfUploadActivity
@@ -45,6 +49,8 @@ import com.shuaib.classmate.utils.LibrarySystemBars
 import com.shuaib.classmate.utils.PdfDialogHelper
 import com.shuaib.classmate.utils.Subject
 import com.shuaib.classmate.utils.SubjectList
+import com.shuaib.classmate.repositories.CourseRepository
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.applyClickAnimation
 import java.util.Locale
@@ -71,6 +77,10 @@ class PdfLibraryFragment : Fragment() {
     private var pdfCounts = emptyMap<String, Int>()
     private var isAdmin = false
     private var previousStatusBarColor: Int? = null
+    private var courseListener: ListenerRegistration? = null
+    private var selectedCourseCategory = "regular"
+    private var selectedResourceFilter = "all"
+    private var coursesExpanded = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -86,9 +96,28 @@ class PdfLibraryFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
 
+        setupSubjects()
         setupSections()
         setupHeaderActions()
         checkAdminAccess()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.AppContextManager.activeBatchFlow.collect {
+                    setupSubjects()
+                    loadLibraryData()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.AppContextManager.activeSemesterFlow.collect {
+                    setupSubjects()
+                    loadLibraryData()
+                }
+            }
+        }
 
         binding.swipeRefresh.setOnRefreshListener {
             loadLibraryData()
@@ -112,26 +141,30 @@ class PdfLibraryFragment : Fragment() {
         super.onPause()
     }
 
+    private fun setupSubjects() {
+        courseListener?.remove()
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        if (batchId.isBlank() || semesterId.isBlank()) return
+        courseListener = CourseRepository.listen(batchId, semesterId, { courses ->
+            allSubjects = courses.map { it.toSubject() }
+            regularSubjects = allSubjects.filter { it.type == "regular" }
+            labSubjects = allSubjects.filter { it.type == "lab" }
+            otherSubjects = allSubjects.filter { it.type == "syllabus" }
+            updateLibraryView()
+        })
+    }
+
     private fun setupSections() {
-        allSubjects = SubjectList.subjects
-        labSubjects = allSubjects.filter { it.name.trim().lowercase().endsWith("lab") }
-        otherSubjects = allSubjects.filter {
-            val name = it.name.trim().lowercase()
-            name.contains("other") || name.contains("viva")
-        }
-        regularSubjects = allSubjects.filter { subject ->
-            subject !in labSubjects && subject !in otherSubjects
-        }
 
         recentAdapter = RecentPdfAdapter(recentPdfs, isAdmin, favoritePdfIds) { pdf -> handleResourceAction(pdf) }
         recentAdapter.onDeleteClick = { pdf -> showDeleteConfirmation(pdf) }
         recentAdapter.onFavoriteClick = { pdf -> togglePdfFavorite(pdf) }
 
         binding.rvRecent.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(context)
             adapter = recentAdapter
             layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
-            lockParentSwipeWhileTouching(this)
         }
 
         binding.btnOfflineDownloads.applyClickAnimation {
@@ -147,40 +180,38 @@ class PdfLibraryFragment : Fragment() {
         otherAdapter = SubjectAdapter(otherSubjects, pdfCounts) { subject -> navigateToPdfs(subject) }
 
         binding.rvRegular.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(context)
             adapter = regularAdapter
             layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
-            lockParentSwipeWhileTouching(this)
         }
         binding.rvLab.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(context)
             adapter = labAdapter
             layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
-            lockParentSwipeWhileTouching(this)
         }
         binding.rvOther.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            layoutManager = LinearLayoutManager(context)
             adapter = otherAdapter
             layoutAnimation = AnimationUtils.loadLayoutAnimation(context, R.anim.layout_animation_library_list)
-            lockParentSwipeWhileTouching(this)
         }
 
-        binding.headerRegular.applyClickAnimation {
-            toggleSection(binding.rvRegular, binding.ivArrowRegular)
-        }
-        binding.headerLab.applyClickAnimation {
-            toggleSection(binding.rvLab, binding.ivArrowLab)
-        }
-        binding.headerOther.applyClickAnimation {
-            toggleSection(binding.rvOther, binding.ivArrowOther)
-        }
+        binding.btnCategoryRegular.applyClickAnimation { coursesExpanded = false; selectCourseCategory("regular") }
+        binding.btnCategoryLab.applyClickAnimation { coursesExpanded = false; selectCourseCategory("lab") }
+        binding.btnCategorySyllabus.applyClickAnimation { coursesExpanded = false; selectCourseCategory("syllabus") }
         binding.tvCollapseAll.applyClickAnimation {
-            onGlobalExpandCollapseClicked()
+            coursesExpanded = !coursesExpanded
+            selectCourseCategory(selectedCourseCategory)
         }
+        binding.chipAll.applyClickAnimation { selectResourceFilter("all") }
+        binding.chipNotes.applyClickAnimation { selectResourceFilter("notes") }
+        binding.chipSlides.applyClickAnimation { selectResourceFilter("slides") }
+        binding.chipQuestions.applyClickAnimation { selectResourceFilter("questions") }
+        binding.chipStarred.applyClickAnimation { selectResourceFilter("starred") }
         binding.tvViewAll.applyClickAnimation {
             (activity as? MainActivity)?.openChildDestination(R.id.nav_pdf, R.id.fragment_library_all_files)
         }
         updateLibraryView()
+        selectCourseCategory("regular")
     }
 
     private fun setupHeaderActions() {
@@ -198,26 +229,24 @@ class PdfLibraryFragment : Fragment() {
 
         fetchFavoritePdfIds()
 
-        db.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null) return@addOnSuccessListener
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
 
-                allPdfs = snapshot.documents.map { doc -> doc.toPdfFile() }
-                    .filterNot { it.isDeleted }
-                    .sortedByDescending { it.timestamp ?: it.createdAt }
-
+        ArchiveLibraryRepository.load(batchId, activeSem, { courses, resources ->
+                allSubjects = courses.map { it.toSubject() }
+                regularSubjects = allSubjects.filter { it.type == "regular" }
+                labSubjects = allSubjects.filter { it.type == "lab" }
+                otherSubjects = allSubjects.filter { it.type == "syllabus" }
+                allPdfs = resources.sortedByDescending { it.timestamp ?: it.createdAt }
                 updateLibraryView()
                 binding.swipeRefresh.isRefreshing = false
-            }
-            .addOnFailureListener { e ->
-                if (_binding == null) return@addOnFailureListener
+            }, { e ->
+                if (_binding == null) return@load
                 binding.swipeRefresh.isRefreshing = false
                 binding.tvRecentEmpty.isVisible = true
                 binding.rvRecent.isVisible = false
                 Toast.makeText(context, "Failed to load library: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            })
     }
 
     private fun updateLibraryView() {
@@ -231,19 +260,20 @@ class PdfLibraryFragment : Fragment() {
         }
         binding.libraryNotificationDot.isVisible = hasRecentUploads
 
-        val filteredPdfs = allPdfs
+        binding.tvLibrarySubtitle.text = "${allPdfs.size} ${if (allPdfs.size == 1) "file" else "files"} this semester"
+        val filteredPdfs = allPdfs.filter { matchesResourceFilter(it) }
         pdfCounts = filteredPdfs.groupingBy { it.subject }.eachCount()
         val knownSubjectNames = allSubjects.map { it.name }.toSet()
-        val dynamicOtherSubjects = allPdfs
-            .filter { it.subject.isNotBlank() && it.subject !in knownSubjectNames }
+        val legacySyllabusSubjects = allPdfs
+            .filter { it.subject.isNotBlank() && it.subject !in knownSubjectNames && it.courseType in listOf("other", "syllabus") }
             .distinctBy { it.subject }
-            .map { Subject(it.subject, it.courseCode.ifBlank { "LIB0000" }) }
-        otherSubjects = (allSubjects.filter {
-            val name = it.name.trim().lowercase()
-            name.contains("other") || name.contains("viva")
-        } + dynamicOtherSubjects).distinctBy { it.name }
+            .map { Subject(it.subject, it.courseCode, "syllabus") }
+        otherSubjects = (allSubjects.filter { it.type == "syllabus" } + legacySyllabusSubjects).distinctBy { it.name }
 
-        recentPdfs = filteredPdfs.take(8)
+        val weekAgo = System.currentTimeMillis() - (7L * 24L * 60L * 60L * 1000L)
+        recentPdfs = filteredPdfs.filter {
+            ((it.timestamp ?: it.createdAt)?.toDate()?.time ?: 0L) >= weekAgo
+        }.take(3)
         recentAdapter.updateList(recentPdfs, isAdmin, favoritePdfIds)
         binding.rvRecent.isVisible = recentPdfs.isNotEmpty()
         binding.tvRecentEmpty.isVisible = recentPdfs.isEmpty()
@@ -252,30 +282,85 @@ class PdfLibraryFragment : Fragment() {
         val filteredLab = labSubjects
         val filteredOther = otherSubjects
 
-        regularAdapter.updateList(filteredRegular, pdfCounts)
-        labAdapter.updateList(filteredLab, pdfCounts)
-        otherAdapter.updateList(filteredOther, pdfCounts)
-        binding.rvRegular.scheduleLayoutAnimation()
-        binding.rvLab.scheduleLayoutAnimation()
-        binding.rvOther.scheduleLayoutAnimation()
-
         binding.tvRegularCount.text = filteredRegular.size.toString()
         binding.tvLabCount.text = filteredLab.size.toString()
         binding.tvOtherCount.text = filteredOther.size.toString()
         binding.tvRegularMeta.text = "${subjectCountText(filteredRegular.size)} - ${resourceCountText(resourceCountFor(filteredRegular, filteredPdfs))}"
         binding.tvLabMeta.text = "${subjectCountText(filteredLab.size)} - ${resourceCountText(resourceCountFor(filteredLab, filteredPdfs))}"
         binding.tvOtherMeta.text = "${subjectCountText(filteredOther.size)} - ${resourceCountText(resourceCountFor(filteredOther, filteredPdfs))}"
-        binding.tvLibrarySummary.text = "${resourceCountText(filteredPdfs.size)} across ${subjectCountText(pdfCounts.size)}"
+        binding.tvLibrarySummary.text = "${allSubjects.size} ${if (allSubjects.size == 1) "course" else "courses"}"
 
         val hasRegularResults = filteredRegular.isNotEmpty()
         val hasLabResults = filteredLab.isNotEmpty()
         val hasOtherResults = filteredOther.isNotEmpty()
-        binding.headerRegular.isVisible = hasRegularResults
-        binding.headerLab.isVisible = hasLabResults
-        binding.headerOther.isVisible = hasOtherResults
-        binding.tvNoSubjectResults.isVisible = !hasRegularResults && !hasLabResults && !hasOtherResults
+        binding.headerRegular.isVisible = false
+        binding.headerLab.isVisible = false
+        binding.headerOther.isVisible = false
+        selectCourseCategory(selectedCourseCategory)
+    }
 
-        updateGlobalExpandButton()
+    private fun selectCourseCategory(category: String) {
+        if (_binding == null) return
+        selectedCourseCategory = category
+        binding.rvRegular.isVisible = category == "regular" && regularSubjects.isNotEmpty()
+        binding.rvLab.isVisible = category == "lab" && labSubjects.isNotEmpty()
+        binding.rvOther.isVisible = category == "syllabus" && otherSubjects.isNotEmpty()
+        val selectedSubjects = when (category) {
+            "lab" -> labSubjects
+            "syllabus" -> otherSubjects
+            else -> regularSubjects
+        }
+        val visibleSubjects = if (coursesExpanded) selectedSubjects else selectedSubjects.take(4)
+        when (category) {
+            "lab" -> labAdapter.updateList(visibleSubjects, pdfCounts)
+            "syllabus" -> otherAdapter.updateList(visibleSubjects, pdfCounts)
+            else -> regularAdapter.updateList(visibleSubjects, pdfCounts)
+        }
+        binding.tvNoSubjectResults.isVisible = selectedSubjects.isEmpty()
+        if (selectedSubjects.isEmpty()) {
+            binding.tvNoSubjectResults.text = "No courses in this category yet"
+        }
+        val selected = listOf(binding.btnCategoryRegular, binding.btnCategoryLab, binding.btnCategorySyllabus)
+        val selectedView = when (category) {
+            "lab" -> binding.btnCategoryLab
+            "syllabus" -> binding.btnCategorySyllabus
+            else -> binding.btnCategoryRegular
+        }
+        selected.forEach { view ->
+            view.setBackgroundResource(if (view === selectedView) R.drawable.bg_library_segment_selected_html else android.R.color.transparent)
+            view.setTextColor(if (view === selectedView) android.graphics.Color.parseColor("#12152A") else android.graphics.Color.parseColor("#565C75"))
+        }
+        binding.tvCollapseAll.isVisible = selectedSubjects.size > 4
+        binding.tvCollapseAll.text = if (coursesExpanded) "Show less" else "See all"
+    }
+
+    private fun selectResourceFilter(filter: String) {
+        selectedResourceFilter = filter
+        val chips = mapOf(
+            "all" to binding.chipAll,
+            "notes" to binding.chipNotes,
+            "slides" to binding.chipSlides,
+            "questions" to binding.chipQuestions,
+            "starred" to binding.chipStarred
+        )
+        chips.forEach { (key, chip) ->
+            val selected = key == filter
+            chip.setBackgroundResource(if (selected) R.drawable.bg_library_chip_html_selected else R.drawable.bg_library_chip_html)
+            chip.setTextColor(android.graphics.Color.parseColor(if (selected) "#FFFFFF" else "#12152A"))
+        }
+        updateLibraryView()
+    }
+
+    private fun matchesResourceFilter(pdf: PdfFile): Boolean {
+        val searchable = "${pdf.title} ${pdf.description} ${pdf.fileType} ${pdf.mimeType}".lowercase()
+        return when (selectedResourceFilter) {
+            "slides" -> searchable.contains("slide") || searchable.contains("ppt") || searchable.contains("presentation")
+            "questions" -> listOf("question", "final", "midterm", "class test", "ct ").any { searchable.contains(it) }
+            "starred" -> pdf.id in favoritePdfIds
+            "notes" -> !searchable.contains("ppt") && !searchable.contains("slide") &&
+                !listOf("question", "final", "midterm", "class test").any { searchable.contains(it) }
+            else -> true
+        }
     }
 
     private fun resourceCountFor(subjects: List<Subject>, pdfs: List<PdfFile>): Int {
@@ -440,21 +525,18 @@ class PdfLibraryFragment : Fragment() {
         dialog.setContentView(dialogBinding.root)
         dialog.show()
 
-        db.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .limit(50)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null) return@addOnSuccessListener
-                val files = snapshot.documents.map { it.toPdfFile() }
-                    .filterNot { it.isDeleted }
-                    .sortedByDescending { it.timestamp ?: it.createdAt }
-                    .take(20)
-                updateNotificationSheet(dialogBinding, files, dialog)
-            }
-            .addOnFailureListener { e ->
-                handleNotificationError(e, dialogBinding)
-            }
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        ArchiveLibraryRepository.load(batchId, semesterId, { _, resources ->
+            if (_binding == null) return@load
+            val files = resources
+                .filterNot { it.isDeleted }
+                .sortedByDescending { it.timestamp ?: it.createdAt }
+                .take(20)
+            updateNotificationSheet(dialogBinding, files, dialog)
+        }, { error ->
+            handleNotificationError(error, dialogBinding)
+        })
     }
 
     private fun updateNotificationSheet(
@@ -715,47 +797,12 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun deletePdf(pdf: PdfFile) {
-        db.collection("library_files").document(pdf.id)
-            .update(
-                mapOf(
-                    "isDeleted" to true,
-                    "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
-            )
-            .addOnSuccessListener {
-                Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
-                loadLibraryData()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-    }
-
-    private fun DocumentSnapshot.toPdfFile(): PdfFile {
-        return PdfFile(
-            id = id,
-            title = getString("title") ?: "No Title",
-            subject = getString("subject") ?: "",
-            description = getString("description") ?: "",
-            uploadedBy = getString("uploadedByName") ?: getString("uploadedBy") ?: "",
-            telegramUrl = getString("telegramUrl") ?: "",
-            driveUrl = getString("driveUrl") ?: "",
-            fileId = getString("fileId") ?: "",
-            timestamp = getTimestamp("timestamp") ?: getTimestamp("createdAt"),
-            courseCode = getString("courseCode") ?: "",
-            courseType = getString("courseType") ?: "",
-            fileType = getString("fileType") ?: "other",
-            mimeType = getString("mimeType") ?: "application/octet-stream",
-            sizeBytes = getLong("sizeBytes") ?: 0L,
-            provider = getString("provider") ?: "",
-            downloadUrl = getString("downloadUrl") ?: "",
-            githubAssetId = getLong("githubAssetId") ?: 0L,
-            githubAssetName = getString("githubAssetName") ?: getString("title") ?: "",
-            createdAt = getTimestamp("createdAt"),
-            updatedAt = getTimestamp("updatedAt"),
-            downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false
-        )
+        ArchiveLibraryRepository.deleteResource(pdf.id, {
+            Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
+            loadLibraryData()
+        }, { error ->
+            Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_LONG).show()
+        })
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -769,6 +816,8 @@ class PdfLibraryFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        courseListener?.remove()
+        courseListener = null
         super.onDestroyView()
         _binding = null
     }

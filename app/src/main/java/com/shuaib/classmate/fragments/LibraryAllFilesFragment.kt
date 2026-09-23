@@ -12,9 +12,12 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.shuaib.classmate.R
+import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.adapters.PdfAdapter
 import com.shuaib.classmate.databinding.FragmentLibraryHomeBinding
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.utils.PdfDialogHelper
 import com.shuaib.classmate.utils.applyClickAnimation
@@ -68,6 +71,13 @@ class LibraryAllFilesFragment : Fragment() {
             findNavController().navigateUp()
         }
 
+        binding.btnSearchAllFiles.applyClickAnimation {
+            (activity as? MainActivity)?.openChildDestination(
+                R.id.nav_pdf,
+                R.id.fragment_library_search
+            )
+        }
+
         binding.swipeRefresh.setOnRefreshListener {
             loadAllFiles()
         }
@@ -105,14 +115,11 @@ class LibraryAllFilesFragment : Fragment() {
             binding.rvAllFiles.isVisible = false
         }
         
-        db.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null) return@addOnSuccessListener
-                val files = snapshot.documents.map { doc -> doc.toPdfFile() }
-                    .filter { !it.isDeleted }
-                    .sortedByDescending { it.timestamp ?: it.createdAt }
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
+        ArchiveLibraryRepository.load(batchId, activeSem, { _, resources ->
+                val files = resources.sortedByDescending { it.timestamp ?: it.createdAt }
                 
                 pdfAdapter.updateList(files)
                 
@@ -123,9 +130,8 @@ class LibraryAllFilesFragment : Fragment() {
                 binding.shimmerView.stopShimmer()
                 binding.shimmerView.isVisible = false
                 binding.rvAllFiles.isVisible = true
-            }
-            .addOnFailureListener { e ->
-                if (_binding == null) return@addOnFailureListener
+            }, { e ->
+                if (_binding == null) return@load
                 binding.swipeRefresh.isRefreshing = false
                 
                 binding.shimmerView.stopShimmer()
@@ -133,7 +139,7 @@ class LibraryAllFilesFragment : Fragment() {
                 binding.rvAllFiles.isVisible = true
 
                 Toast.makeText(context, "Failed to load: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            })
     }
 
     private fun showDeleteConfirmation(pdf: PdfFile) {
@@ -146,20 +152,12 @@ class LibraryAllFilesFragment : Fragment() {
     }
 
     private fun deletePdf(pdf: PdfFile) {
-        db.collection("library_files").document(pdf.id)
-            .update(
-                mapOf(
-                    "isDeleted" to true,
-                    "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
-            )
-            .addOnSuccessListener {
+        ArchiveLibraryRepository.deleteResource(pdf.id, {
                 Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
                 loadAllFiles()
-            }
-            .addOnFailureListener { e ->
+            }, { e ->
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            })
     }
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toPdfFile(): PdfFile {
@@ -185,7 +183,8 @@ class LibraryAllFilesFragment : Fragment() {
             createdAt = getTimestamp("createdAt"),
             updatedAt = getTimestamp("updatedAt"),
             downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false
+            isDeleted = getBoolean("isDeleted") ?: false,
+            semester = getString("semester") ?: "2nd"
         )
     }
 

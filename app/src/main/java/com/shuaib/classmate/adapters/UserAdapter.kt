@@ -42,7 +42,11 @@ class UserAdapter(
             val displayName = user.fullName.ifBlank { user.name }.ifBlank { "Unnamed user" }
             tvUserName.text = displayName
             tvUserEmail.text = user.email.ifBlank { "No email" }
-            tvStudentId.text = user.studentId.ifBlank { "No student ID" }
+            tvStudentId.text = if (user.batchId.isNotBlank()) {
+                "${user.studentId.ifBlank { "No ID" }} • ${com.shuaib.classmate.models.Batch.formatName(user.batchId)}"
+            } else {
+                user.studentId.ifBlank { "No student ID" }
+            }
             tvUserRole.text = user.role.ifBlank { "student" }.uppercase()
             applyRoleBadge(tvUserRole, user.role)
             tvAvatarLetter.text = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "U"

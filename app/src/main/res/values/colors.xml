@@ -105,6 +105,11 @@
     <color name="white">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
 
+    <color name="cm_brand_primary">@color/cm_primary</color>
+    <color name="cm_bg_primary">@color/cm_bg</color>
+    <color name="cm_border_default">@color/cm_border</color>
+    <color name="cm_bg_surface">@color/cm_surface</color>
+
     <color name="colorPrimary">#2563EB</color>
     <color name="colorPrimaryDark">#1E40AF</color>
     <color name="colorAccent">#D97706</color>

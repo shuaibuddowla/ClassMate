@@ -24,7 +24,10 @@ import androidx.core.view.isVisible
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -45,6 +48,7 @@ import com.shuaib.classmate.adapters.SubjectAdapter
 import com.shuaib.classmate.databinding.DialogEditProfileBinding
 import com.shuaib.classmate.databinding.FragmentProfileBinding
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 
 import com.shuaib.classmate.models.User
 import com.shuaib.classmate.storage.LibraryUrlOpener
@@ -120,6 +124,7 @@ class ProfileFragment : Fragment() {
         setupAutoMuteToggle()
         setupShakeToTorchToggle()
         setupAiSettings()
+        setupSemesterManagement()
         setupSavedResources()
         listenToFriendsConfig()
         fetchUserProfile()
@@ -516,24 +521,16 @@ class ProfileFragment : Fragment() {
     }
 
     private fun updateSubjectCountsOnly() {
-        firestore.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null || !isAdded) return@addOnSuccessListener
-                val files = snapshot.documents.map { doc -> doc.getString("subject") ?: "" }
-                pdfCounts = files.groupBy { it }.mapValues { it.value.size }
+        loadArchiveProfileResources { files ->
+                if (_binding == null || !isAdded) return@loadArchiveProfileResources
+                pdfCounts = files.groupBy { it.subject }.mapValues { it.value.size }
                 subjectAdapter.updateList(favoriteSubjects, pdfCounts)
-            }
+        }
     }
 
     private fun fetchFavoritePdfs(favoritePdfIds: List<String>) {
-        firestore.collection("library_files")
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null || !isAdded) return@addOnSuccessListener
-                val allFiles = snapshot.documents.map { doc -> doc.toPdfFile() }
+        loadArchiveProfileResources { allFiles ->
+                if (_binding == null || !isAdded) return@loadArchiveProfileResources
                 pdfCounts = allFiles.groupBy { it.subject }.mapValues { it.value.size }
 
                 val favoritePdfs = allFiles.filter { it.id in favoritePdfIds }
@@ -546,7 +543,13 @@ class ProfileFragment : Fragment() {
                     pdfAdapter.updateList(favoritePdfs, favoritePdfIdsSet)
                     binding.tvSavedPdfsTitle.text = "Saved PDFs (${favoritePdfs.size})"
                 }
-            }
+        }
+    }
+
+    private fun loadArchiveProfileResources(onSuccess: (List<PdfFile>) -> Unit) {
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        ArchiveLibraryRepository.load(batchId, semesterId, { _, files -> onSuccess(files) }, { })
     }
 
     private fun togglePdfFavorite(pdf: PdfFile) {
@@ -629,6 +632,9 @@ class ProfileFragment : Fragment() {
 
         val isAdmin = user.isAdmin()
         binding.adminSection.isVisible = isAdmin
+        binding.cardSemesterManagement.isVisible = user.isBatchAdmin(
+            com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        )
 
         val isSuperAdmin = user.role == "superadmin"
 
@@ -722,7 +728,8 @@ class ProfileFragment : Fragment() {
             createdAt = getTimestamp("createdAt"),
             updatedAt = getTimestamp("updatedAt"),
             downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false
+            isDeleted = getBoolean("isDeleted") ?: false,
+            semester = getString("semester") ?: "2nd"
         )
     }
 
@@ -772,6 +779,91 @@ class ProfileFragment : Fragment() {
             } else {
                 com.shuaib.classmate.services.ShakeToTorchService.stop(requireContext())
             }
+        }
+    }
+
+    private fun setupSemesterManagement() {
+        val chipMap = mapOf(
+            "1st" to binding.chipSem1,
+            "2nd" to binding.chipSem2,
+            "3rd" to binding.chipSem3,
+            "4th" to binding.chipSem4,
+            "5th" to binding.chipSem5,
+            "6th" to binding.chipSem6,
+            "7th" to binding.chipSem7,
+            "8th" to binding.chipSem8
+        )
+
+        fun updateChipSelection(activeSem: String) {
+            val normalized = com.shuaib.classmate.utils.SemesterManager.normalizeSemester(activeSem)
+            binding.tvActiveSemesterBadge.text = com.shuaib.classmate.utils.SemesterManager.formatDisplay(normalized).uppercase()
+            val targetChip = chipMap[normalized] ?: binding.chipSem2
+            targetChip.isChecked = true
+            binding.btnPublishSemester.isVisible = false
+        }
+
+        updateChipSelection(com.shuaib.classmate.utils.SemesterManager.getActiveSemester())
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect { activeSem ->
+                    updateChipSelection(activeSem)
+                }
+            }
+        }
+
+        chipMap.forEach { (sem, chip) ->
+            chip.setOnClickListener {
+                val user = currentUser
+                if (user == null || !user.isBatchAdmin(com.shuaib.classmate.utils.AppContextManager.getManagedBatchId())) {
+                    Toast.makeText(context, "You are not authorized to manage this batch.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val currentActive = com.shuaib.classmate.utils.SemesterManager.getActiveSemester()
+                if (sem != currentActive) {
+                    val display = com.shuaib.classmate.utils.SemesterManager.formatDisplay(sem)
+                    binding.btnPublishSemester.text = "Publish $display"
+                    binding.btnPublishSemester.isVisible = true
+                } else {
+                    binding.btnPublishSemester.isVisible = false
+                }
+            }
+        }
+
+        binding.btnPublishSemester.setOnClickListener {
+            val user = currentUser
+            if (user == null || !user.isBatchAdmin(com.shuaib.classmate.utils.AppContextManager.getManagedBatchId())) {
+                Toast.makeText(context, "You are not authorized to manage this batch.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val selectedChipId = binding.chipGroupSemesters.checkedChipId
+            val selectedSem = chipMap.entries.firstOrNull { it.value.id == selectedChipId }?.key ?: "2nd"
+            val displayTitle = com.shuaib.classmate.utils.SemesterManager.formatDisplay(selectedSem)
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Publish Semester Switch?")
+                .setMessage("Switching ${com.shuaib.classmate.models.Batch.formatName(com.shuaib.classmate.utils.AppContextManager.getManagedBatchId())} to $displayTitle will refresh that batch's academic resources. Notices remain batch-scoped.")
+                .setPositiveButton("Publish & Shift All") { _, _ ->
+                    binding.btnPublishSemester.isEnabled = false
+                    com.shuaib.classmate.utils.SemesterManager.updateActiveSemester(
+                        newSemester = selectedSem,
+                        onSuccess = {
+                            if (_binding != null) {
+                                binding.btnPublishSemester.isEnabled = true
+                                binding.btnPublishSemester.isVisible = false
+                                Toast.makeText(context, "✅ $displayTitle is now active system-wide!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onFailure = { err ->
+                            if (_binding != null) {
+                                binding.btnPublishSemester.isEnabled = true
+                                Toast.makeText(context, "Failed to switch semester: ${err.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    )
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
     }
 

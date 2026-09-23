@@ -43,6 +43,7 @@ import com.shuaib.classmate.databinding.ItemPollOptionBinding
 import com.shuaib.classmate.models.Notice
 import com.shuaib.classmate.models.PdfFile
 import com.shuaib.classmate.models.Poll
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.notices.NoticeEngagement
 import com.shuaib.classmate.notices.NoticeTextFormatter
 import com.shuaib.classmate.notices.NoticeUi
@@ -72,7 +73,6 @@ class NoticeAdapter(
     private val onLikeClick: (Notice) -> Unit = {},
     private val onCommentClick: (Notice) -> Unit = {},
     private val onPinClick: (Notice) -> Unit = {},
-    private val onForwardClick: (Notice) -> Unit = {},
     private val onReminderClick: (Notice) -> Unit = {},
     private val onNoticeLongClick: (Notice) -> Unit = {},
     private val onCopyClick: (Notice) -> Unit = {},
@@ -419,25 +419,23 @@ class NoticeAdapter(
                     }
                 } else {
                     binding.fileAttachmentContainer.visibility = View.GONE
-                    // Trigger Firestore fetch
+                    // Resolve the attachment from the shared CSE Archive.
                     libraryPdfCache[pdfId] = null
-                    FirebaseFirestore.getInstance().collection("library_files").document(pdfId).get()
-                        .addOnSuccessListener { doc ->
-                            if (doc.exists() && doc.getBoolean("isDeleted") != true) {
-                                val pdfFile = doc.toPdfFile()
-                                libraryPdfCache[pdfId] = pdfFile
-                                currentList.forEachIndexed { index, item ->
-                                    if (item is Notice && item.pdfId == pdfId) {
-                                        notifyItemChanged(index)
-                                    }
+                    ArchiveLibraryRepository.loadResource(
+                        pdfId,
+                        com.shuaib.classmate.utils.AppContextManager.getSemesterId(),
+                        onSuccess = { pdfFile ->
+                            libraryPdfCache[pdfId] = pdfFile
+                            currentList.forEachIndexed { index, item ->
+                                if (item is Notice && item.pdfId == pdfId) {
+                                    notifyItemChanged(index)
                                 }
-                            } else {
-                                libraryPdfCache[pdfId] = null
                             }
-                        }
-                        .addOnFailureListener {
+                        },
+                        onFailure = {
                             libraryPdfCache[pdfId] = null
                         }
+                    )
                 }
             } else {
                 binding.fileAttachmentContainer.visibility = View.GONE
@@ -509,11 +507,6 @@ class NoticeAdapter(
                 HapticHelper.lightPop(it)
                 it.animateSpringScale(1.1f)
                 onCommentClick(notice)
-            }
-            binding.btnForward.setOnClickListener {
-                HapticHelper.lightPop(it)
-                it.animateSpringScale(1.1f)
-                onForwardClick(notice)
             }
             binding.btnReminder.setOnClickListener {
                 HapticHelper.lightPop(it)
@@ -593,12 +586,6 @@ class NoticeAdapter(
             binding.btnReminder.backgroundTintList = null
             binding.ivReminderIcon.setColorFilter(actionMuted)
 
-            // Share Pill
-            binding.btnForward.backgroundTintList = null
-            binding.ivShareIcon.setColorFilter(actionMuted)
-            binding.tvShareCount.text = compactCount(engagement.shareCount)
-            binding.tvShareCount.setTextColor(actionMuted)
-            binding.tvShareCount.isVisible = engagement.shareCount > 0
         }
 
         fun bindPinState(notice: Notice, cardFill: Int) {
@@ -1195,6 +1182,7 @@ class NoticeAdapter(
             createdAt = getTimestamp("createdAt"),
             updatedAt = getTimestamp("updatedAt"),
             downloadCount = getLong("downloadCount") ?: 0L,
+            semester = getString("semester") ?: "2nd",
             isDeleted = getBoolean("isDeleted") ?: false
         )
     }

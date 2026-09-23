@@ -1,5 +1,6 @@
 package com.shuaib.classmate.utils
 
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.firebase.FirebaseNetworkException
@@ -10,6 +11,8 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 
 object AuthErrorMapper {
+    private const val TAG = "AuthErrorMapper"
+
     fun signupMessage(error: Exception): String {
         firebaseCodeMessage(error)?.let { return it }
         return when (error) {
@@ -46,18 +49,36 @@ object AuthErrorMapper {
      * [com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent].
      */
     fun googleSignInPickerMessage(statusCode: Int): String {
+        val statusName = CommonStatusCodes.getStatusCodeString(statusCode)
+        Log.e(TAG, "GoogleSignIn ApiException statusCode=$statusCode statusName=$statusName")
+
         return when (statusCode) {
             GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> ""
             GoogleSignInStatusCodes.SIGN_IN_CURRENTLY_IN_PROGRESS -> "Sign-in is already in progress. Wait a moment and try again."
             GoogleSignInStatusCodes.SIGN_IN_FAILED -> "Sign-in failed. Try again later."
-            CommonStatusCodes.DEVELOPER_ERROR ->
-                "This sign-in option is temporarily unavailable."
+            CommonStatusCodes.DEVELOPER_ERROR -> {
+                Log.e(TAG, "DEVELOPER_ERROR (10): SHA-1 fingerprint or OAuth web client ID mismatch. " +
+                        "Verify: (1) debug SHA-1 is registered in Firebase Console, " +
+                        "(2) google-services.json is up to date, " +
+                        "(3) OAuth consent screen is not in Testing mode, " +
+                        "(4) Web OAuth client exists in Google Cloud Console.")
+                "Google Sign-In configuration error. Contact the developer. [DEVELOPER_ERROR]"
+            }
             CommonStatusCodes.NETWORK_ERROR -> "Network error. Check your connection and try again."
-            CommonStatusCodes.INTERNAL_ERROR -> "Sign-in service error. Try again in a moment."
+            CommonStatusCodes.INTERNAL_ERROR -> {
+                Log.e(TAG, "INTERNAL_ERROR (8): Google Play Services internal error.")
+                "Sign-in service error. Try again in a moment."
+            }
             CommonStatusCodes.TIMEOUT -> "Sign-in timed out. Try again."
-            CommonStatusCodes.API_NOT_CONNECTED -> "This sign-in option is temporarily unavailable."
-            else ->
+            CommonStatusCodes.API_NOT_CONNECTED -> {
+                Log.e(TAG, "API_NOT_CONNECTED (17): Google Play Services API not connected. " +
+                        "Possible causes: Google Play Services outdated or unavailable.")
+                "Google Sign-In service unavailable. Update Google Play Services. [API_NOT_CONNECTED]"
+            }
+            else -> {
+                Log.e(TAG, "Unknown GoogleSignIn status code: $statusCode ($statusName)")
                 "Sign-in failed (code $statusCode)."
+            }
         }
     }
 

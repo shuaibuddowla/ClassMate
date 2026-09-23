@@ -1,219 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/cm_background">
+    android:background="#F2F4FA">
 
-    <com.shuaib.classmate.ui.StarfieldView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="64dp"
             android:background="@android:color/transparent"
-            app:title="AI Settings"
-            app:titleTextColor="@color/cm_text_primary"
+            android:paddingEnd="12dp"
             app:navigationIcon="@drawable/ic_chevron_left"
-            app:navigationIconTint="@color/cm_text_primary" />
+            app:navigationIconTint="#12152A"
+            app:title="AI settings"
+            app:titleTextColor="#12152A" />
 
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:clipToPadding="false"
-            android:paddingBottom="24dp">
+            android:paddingBottom="28dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="8dp">
+                android:paddingHorizontal="16dp">
 
-                <com.google.android.material.card.MaterialCardView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="16dp"
-                    app:cardBackgroundColor="@color/cm_surface"
-                    app:cardCornerRadius="20dp"
-                    app:cardElevation="2dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="@color/cm_border">
+                    android:background="@drawable/bg_ai_settings_hero"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="18dp">
+                    <FrameLayout android:layout_width="50dp" android:layout_height="50dp" android:background="@drawable/bg_library_header_action">
+                        <ImageView android:layout_width="26dp" android:layout_height="26dp" android:layout_gravity="center" android:src="@drawable/ic_ai_logo" app:tint="@color/white" />
+                    </FrameLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Assistant routing" android:textColor="@color/white" android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Choose the primary engine and model used by ClassMate." android:textColor="#DCE3FF" android:textSize="12.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <!-- Section 1: Provider -->
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="ROUTING CONFIGURATION"
-                            android:textColor="@color/cm_primary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.05"
-                            android:layout_marginBottom="8dp"/>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="4dp">
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:src="@drawable/ic_ai_logo"
-                                app:tint="@color/cm_primary"
-                                android:layout_marginEnd="12dp"/>
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Primary Provider"
-                                android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold"/>
-                            <androidx.appcompat.widget.AppCompatSpinner
-                                android:id="@+id/spinnerPrimaryProvider"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:spinnerMode="dropdown"/>
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Choose the main AI engine. If it fails or is rate-limited, the other engine will automatically serve as fallback."
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="12sp"
-                            android:layout_marginStart="34dp"
-                            android:layout_marginBottom="16dp"/>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="@color/cm_border"
-                            android:layout_marginBottom="16dp"/>
-
-                        <!-- Section 2: Gemini -->
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="GEMINI ENGINE CONFIGURATION"
-                            android:textColor="@color/cm_primary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.05"
-                            android:layout_marginBottom="8dp"/>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="4dp">
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:src="@drawable/ic_ai_logo"
-                                app:tint="@color/cm_primary"
-                                android:layout_marginEnd="12dp"/>
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Gemini Model"
-                                android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold"/>
-                            <androidx.appcompat.widget.AppCompatSpinner
-                                android:id="@+id/spinnerGeminiModel"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:spinnerMode="dropdown"/>
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Select the Gemini model variant. Defaults to gemini-2.5-flash."
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="12sp"
-                            android:layout_marginStart="34dp"
-                            android:layout_marginBottom="16dp"/>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="@color/cm_border"
-                            android:layout_marginBottom="16dp"/>
-
-                        <!-- Section 3: Groq -->
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="GROQ ENGINE CONFIGURATION"
-                            android:textColor="@color/cm_primary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.05"
-                            android:layout_marginBottom="8dp"/>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="4dp">
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:src="@drawable/ic_ai_logo"
-                                app:tint="@color/cm_primary"
-                                android:layout_marginEnd="12dp"/>
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Groq Model"
-                                android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold"/>
-                            <androidx.appcompat.widget.AppCompatSpinner
-                                android:id="@+id/spinnerGroqModel"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:gravity="end"
-                                android:spinnerMode="dropdown"/>
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Select the Groq model variant. Defaults to llama-3.3-70b-versatile."
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="12sp"
-                            android:layout_marginStart="34dp"
-                            android:layout_marginBottom="4dp"/>
-
+                <TextView style="@style/AiSettingsSectionLabel" android:layout_marginTop="22dp" android:text="PRIMARY ENGINE" />
+                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                        <TextView style="@style/AiSettingsTitle" android:text="Primary provider" />
+                        <TextView style="@style/AiSettingsDescription" android:text="Requests automatically fall back to the other provider if the primary service is unavailable." />
+                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerPrimaryProvider" style="@style/AiSettingsSpinner" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <TextView style="@style/AiSettingsSectionLabel" android:layout_marginTop="22dp" android:text="MODEL PREFERENCES" />
+                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                            <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_library_action_capsule" android:padding="8dp" android:src="@drawable/ic_ai_logo" app:tint="#2F45F0" />
+                            <TextView style="@style/AiSettingsTitle" android:layout_marginStart="10dp" android:text="Gemini model" />
+                        </LinearLayout>
+                        <TextView style="@style/AiSettingsDescription" android:text="Balanced for reasoning, speed and multimodal assistance." />
+                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerGeminiModel" style="@style/AiSettingsSpinner" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard" android:layout_marginTop="12dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                            <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_library_action_capsule" android:padding="8dp" android:src="@drawable/ic_ai_logo" app:tint="#7C3AED" />
+                            <TextView style="@style/AiSettingsTitle" android:layout_marginStart="10dp" android:text="Groq model" />
+                        </LinearLayout>
+                        <TextView style="@style/AiSettingsDescription" android:text="Optimized for fast text responses and backup routing." />
+                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerGroqModel" style="@style/AiSettingsSpinner" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="8dp"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="Changes are saved automatically on this device."
+                    android:textColor="#565C75"
+                    android:textSize="11.5sp" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
-
     </LinearLayout>
 </FrameLayout>

@@ -15,7 +15,7 @@
         android:fillViewport="true"
         android:overScrollMode="never"
         android:scrollbars="none"
-        app:layout_constraintBottom_toTopOf="@id/dividerBottom"
+        app:layout_constraintBottom_toTopOf="@id/layoutBottomSection"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -23,23 +23,23 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="520dp"
-            android:paddingStart="22dp"
-            android:paddingTop="44dp"
-            android:paddingEnd="22dp"
-            android:paddingBottom="20dp">
+            android:paddingStart="24dp"
+            android:paddingTop="48dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="24dp">
 
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- APP LOGO & BRANDING                                  -->
+            <!-- ═══════════════════════════════════════════════════ -->
             <ImageView
                 android:id="@+id/ivLogo"
-                android:layout_width="112dp"
-                android:layout_height="112dp"
+                android:layout_width="104dp"
+                android:layout_height="104dp"
                 android:contentDescription="@string/app_name"
                 android:src="@drawable/ic_classmate_app_icon"
-                app:layout_constraintBottom_toTopOf="@id/tvTitle"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintVertical_chainStyle="packed" />
+                app:layout_constraintTop_toTopOf="parent" />
 
             <TextView
                 android:id="@+id/tvTitle"
@@ -48,9 +48,9 @@
                 android:layout_marginTop="16dp"
                 android:text="@string/app_name"
                 android:textColor="@color/cm_text_primary"
-                android:textSize="26sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
-                app:layout_constraintBottom_toTopOf="@id/tvSubtitle"
+                android:letterSpacing="-0.02"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/ivLogo" />
@@ -59,185 +59,417 @@
                 android:id="@+id/tvSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:text="An app built for CSE-22, MBSTU"
                 android:textColor="@color/cm_text_disabled"
-                android:textSize="13sp"
-                app:layout_constraintBottom_toTopOf="@id/tilEmail"
+                android:textSize="14sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvTitle" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilEmail"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- VALUE PROPOSITION CARD                              -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardFeatures"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="40dp"
-                android:hint="Email or Student ID"
-                app:boxCornerRadiusBottomEnd="28dp"
-                app:boxCornerRadiusBottomStart="28dp"
-                app:boxCornerRadiusTopEnd="28dp"
-                app:boxCornerRadiusTopStart="28dp"
-                app:boxStrokeColor="@color/cm_border"
-                app:boxStrokeWidth="1dp"
-                app:boxStrokeWidthFocused="1.5dp"
-                app:hintTextColor="@color/cm_text_disabled"
-                app:layout_constraintBottom_toTopOf="@id/tilPassword"
+                android:layout_marginTop="36dp"
+                app:cardBackgroundColor="#F8FAFC"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#E2E8F0"
+                app:strokeWidth="1dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etEmail"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="58dp"
-                    android:gravity="center_vertical"
-                    android:imeOptions="actionNext"
-                    android:inputType="textEmailAddress"
-                    android:singleLine="true"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="16sp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="18dp">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilPassword"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    <!-- Item 1: Routine -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📅"
+                            android:textSize="18sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Live Class Routine"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Day-by-day timetable &amp; schedule"
+                                android:textColor="@color/cm_text_disabled"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="12dp"
+                        android:background="#EDF2F7" />
+
+                    <!-- Item 2: Notices -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📢"
+                            android:textSize="18sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Notices &amp; Announcements"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Real-time class updates &amp; polls"
+                                android:textColor="@color/cm_text_disabled"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="12dp"
+                        android:background="#EDF2F7" />
+
+                    <!-- Item 3: Library -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📚"
+                            android:textSize="18sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Study Materials &amp; Library"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="PDF slides, books &amp; previous questions"
+                                android:textColor="@color/cm_text_disabled"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- EMAIL SIGN IN CARD                                  -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardEmailSignIn"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:hint="Password"
-                app:boxCornerRadiusBottomEnd="28dp"
-                app:boxCornerRadiusBottomStart="28dp"
-                app:boxCornerRadiusTopEnd="28dp"
-                app:boxCornerRadiusTopStart="28dp"
-                app:boxStrokeColor="@color/cm_border"
-                app:boxStrokeWidth="1dp"
-                app:boxStrokeWidthFocused="1.5dp"
-                app:endIconMode="password_toggle"
-                app:endIconTint="@color/cm_text_disabled"
-                app:hintTextColor="@color/cm_text_disabled"
-                app:layout_constraintBottom_toTopOf="@id/cardLogin"
+                android:layout_marginTop="28dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#E2E8F0"
+                app:strokeWidth="1dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tilEmail">
+                app:layout_constraintTop_toBottomOf="@id/cardFeatures">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPassword"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="58dp"
-                    android:gravity="center_vertical"
-                    android:imeOptions="actionDone"
-                    android:inputType="textPassword"
-                    android:singleLine="true"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="16sp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="20dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="16dp">
 
-            <FrameLayout
-                android:id="@+id/cardLogin"
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Email"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
+                        app:boxStrokeColor="@color/cm_primary"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEmail"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textEmailAddress"
+                            android:imeOptions="actionNext"
+                            android:textSize="15sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:hint="Password"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
+                        app:boxStrokeColor="@color/cm_primary"
+                        app:endIconMode="password_toggle"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etPassword"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:imeOptions="actionDone"
+                            android:textSize="15sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/tvForgotPassword"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="8dp"
+                        android:text="Forgot password?"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="13sp"
+                        android:padding="4dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnEmailSignIn"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="12dp"
+                        android:text="Sign In"
+                        android:textSize="15sp"
+                        android:textAllCaps="false"
+                        app:cornerRadius="14dp"
+                        app:backgroundTint="@color/cm_primary" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- OR DIVIDER                                          -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <LinearLayout
+                android:id="@+id/layoutOrDivider"
                 android:layout_width="0dp"
-                android:layout_height="54dp"
-                android:layout_marginTop="16dp"
-                app:layout_constraintBottom_toTopOf="@id/tvForgotPassword"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tilPassword">
+                app:layout_constraintTop_toBottomOf="@id/cardEmailSignIn">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLogin"
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1"
+                    android:background="#E2E8F0" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:text="or"
+                    android:textColor="@color/cm_text_disabled"
+                    android:textSize="13sp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1"
+                    android:background="#E2E8F0" />
+            </LinearLayout>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- GOOGLE SIGN IN CONTAINER                           -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <FrameLayout
+                android:id="@+id/cardGoogleSignIn"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="20dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/layoutOrDivider">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnGoogleSignIn"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Log in"
-                    android:textAllCaps="false"
-                    android:textColor="@color/cm_on_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/cm_primary"
-                    app:cornerRadius="27dp" />
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@color/cm_surface"
+                    app:cardCornerRadius="28dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="@color/cm_border"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:id="@+id/layoutButtonContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="20dp">
+
+                        <ImageView
+                            android:id="@+id/ivGoogleIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="Google"
+                            android:src="@drawable/ic_google" />
+
+                        <TextView
+                            android:id="@+id/tvGoogleText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:text="Continue with Google"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/progressBar"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
                     android:visibility="gone"
-                    app:indicatorColor="@color/cm_on_primary"
-                    app:trackColor="#664D9FFF" />
+                    app:indicatorColor="@color/cm_primary"
+                    app:trackColor="#331D4ED8" />
             </FrameLayout>
 
+            <!-- Register link -->
             <TextView
-                android:id="@+id/tvForgotPassword"
+                android:id="@+id/tvRegister"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:gravity="center"
-                android:minHeight="44dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="Forgot password?"
-                android:textColor="@color/cm_text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toBottomOf="parent"
+                android:layout_marginTop="16dp"
+                android:text="Don't have an account? Register"
+                android:textColor="@color/cm_text_disabled"
+                android:textSize="13sp"
+                android:padding="4dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/cardLogin" />
+                app:layout_constraintTop_toBottomOf="@id/cardGoogleSignIn" />
+
+            <!-- Secure notice -->
+            <TextView
+                android:id="@+id/tvSecureNotice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="🔒  Secure sign-in with email or Google"
+                android:textColor="@color/cm_text_disabled"
+                android:textSize="12sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvRegister" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>
 
-    <View
-        android:id="@+id/dividerBottom"
-        android:layout_width="0dp"
-        android:layout_height="1dp"
-        android:background="@color/cm_divider"
-        app:layout_constraintBottom_toTopOf="@id/layoutBottomSection"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- BOTTOM FOOTER                                       -->
+    <!-- ═══════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/layoutBottomSection"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingStart="22dp"
-        android:paddingTop="18dp"
-        android:paddingEnd="22dp"
-        android:paddingBottom="22dp"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tvRegister"
+        <View
             android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:text="Create new account"
-            android:textAllCaps="false"
-            android:textColor="@color/cm_primary"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:backgroundTint="@android:color/transparent"
-            app:cornerRadius="25dp"
-            app:strokeColor="@color/cm_primary"
-            app:strokeWidth="1.5dp" />
+            android:layout_height="1dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/cm_divider" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_classmate_logo_mark"
                 app:tint="@color/cm_text_disabled" />
@@ -246,7 +478,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="@string/app_name"
+                android:text="Dept. of CSE, MBSTU"
                 android:textColor="@color/cm_text_disabled"
                 android:textSize="12sp"
                 android:textStyle="bold" />

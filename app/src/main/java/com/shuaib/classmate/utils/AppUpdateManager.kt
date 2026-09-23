@@ -66,7 +66,6 @@ object AppUpdateManager {
                     This is a **mock update** designed to verify that the in-app updater is functioning as expected.
                     
                     ### Key Improvements:
-                    * **Ask AI Tab**: Restructured the chat interface for a smoother experience.
                     * **Bus Schedules**: Integrated live bus timings and routes.
                     * **Offline Storage**: Improved PDF caching and database performance.
                     

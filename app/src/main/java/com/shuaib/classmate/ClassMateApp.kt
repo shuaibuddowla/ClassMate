@@ -38,13 +38,10 @@ import com.shuaib.classmate.utils.AppConstants
 import com.shuaib.classmate.utils.AppPreferences
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.Obfuscator
-import com.shuaib.classmate.workers.DailySchedulerWorker
-import com.shuaib.classmate.workers.MorningBriefWorker
 import com.shuaib.classmate.workers.OfflineSyncWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 @HiltAndroidApp
@@ -55,7 +52,10 @@ class ClassMateApp : Application() {
         super.onCreate()
         instance = this
         NoticeTextFormatter.init(this)
+        com.shuaib.classmate.utils.SemesterManager.init(this)
         FirestoreManager.enableOfflinePersistence()
+        // Production migrations must run through a privileged, reviewed server-side tool.
+        // Never copy tenant data from an untrusted Android client at application startup.
 
         val prefs = AppPreferences(this)
 
@@ -268,28 +268,13 @@ class ClassMateApp : Application() {
         CoroutineScope(Dispatchers.Default).launch {
             val workManager = WorkManager.getInstance(this@ClassMateApp)
 
-            // Daily Timetable Sync
-            val syncWorkRequest = PeriodicWorkRequestBuilder<DailySchedulerWorker>(
-                24, TimeUnit.HOURS
-            ).build()
-
-            workManager.enqueueUniquePeriodicWork(
-                "DailyTimetableSync",
-                ExistingPeriodicWorkPolicy.KEEP,
-                syncWorkRequest
-            )
-
-            // Morning Briefing at 8:00 AM
-            val morningBriefRequest = PeriodicWorkRequestBuilder<MorningBriefWorker>(
-                24, TimeUnit.HOURS
-            ).setInitialDelay(calculateDelayUntil8AM(), TimeUnit.MILLISECONDS)
-            .build()
-
-            workManager.enqueueUniquePeriodicWork(
-                "MorningBriefing",
-                ExistingPeriodicWorkPolicy.KEEP,
-                morningBriefRequest
-            )
+            // Cancel any legacy workers for morning brief and daily class reminders
+            try {
+                workManager.cancelUniqueWork("DailyTimetableSync")
+                workManager.cancelUniqueWork("MorningBriefing")
+                workManager.cancelUniqueWork("RefreshClassRemindersAfterCalendarChange")
+                workManager.cancelAllWorkByTag(com.shuaib.classmate.utils.ClassReminderWorkCoordinator.CLASS_REMINDER_TAG)
+            } catch (_: Exception) {}
 
             val offlineSyncRequest = OneTimeWorkRequestBuilder<OfflineSyncWorker>()
                 .setConstraints(
@@ -306,22 +291,6 @@ class ClassMateApp : Application() {
                 offlineSyncRequest
             )
         }
-    }
-
-    private fun calculateDelayUntil8AM(): Long {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 8)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
-        if (target.before(now)) {
-            target.add(Calendar.DAY_OF_YEAR, 1)
-        }
-
-        return target.timeInMillis - now.timeInMillis
     }
 
     companion object {

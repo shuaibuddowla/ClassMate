@@ -103,6 +103,8 @@ class UserDetailActivity : AppCompatActivity() {
             }
     }
 
+    private var selectedBatchId: String = ""
+
     private fun bindUser() {
         val displayName = targetUser.fullName.ifBlank { targetUser.name }.ifBlank { "Unnamed user" }
         binding.tvName.text = displayName
@@ -110,6 +112,11 @@ class UserDetailActivity : AppCompatActivity() {
         binding.tvAvatarLetter.text = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "U"
         bindAvatar(targetUser.photoUrl)
         bindRoleBadge(binding.tvRoleBadge, targetUser.role)
+
+        selectedBatchId = targetUser.batchId
+        val batchDisplayName = com.shuaib.classmate.models.Batch.formatName(selectedBatchId)
+        binding.tvBatch.text = field("Batch", batchDisplayName)
+        binding.tvCurrentBatchDisplay.text = batchDisplayName
 
         binding.tvUid.text = field("UID", targetUser.uid)
         binding.tvStudentId.text = field("Student ID", targetUser.studentId)
@@ -119,6 +126,12 @@ class UserDetailActivity : AppCompatActivity() {
         binding.tvHomeDistrict.text = field("Home District", targetUser.homeDistrict)
         binding.tvAddress.text = field("Address", targetUser.address)
         binding.tvAuthProvider.text = field("Auth Provider", targetUser.authProvider)
+
+        val canManage = currentUser.canManageUsers()
+        binding.layoutChangeBatch.visibility = if (canManage) View.VISIBLE else View.GONE
+        binding.layoutChangeBatch.setOnClickListener {
+            showBatchPickerDialog()
+        }
 
         when (targetUser.role) {
             "superadmin" -> binding.radioSuperadmin.isChecked = true
@@ -135,6 +148,26 @@ class UserDetailActivity : AppCompatActivity() {
         bindPermissionControls()
     }
 
+    private fun showBatchPickerDialog() {
+        val predefined = com.shuaib.classmate.models.Batch.PREDEFINED_BATCHES
+        val batchNames = predefined.map { it.name }.toTypedArray()
+        val batchIds = predefined.map { it.id }
+
+        val currentIndex = batchIds.indexOf(selectedBatchId.lowercase()).takeIf { it >= 0 } ?: 0
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Select Student's Batch")
+            .setSingleChoiceItems(batchNames, currentIndex) { dialog, which ->
+                selectedBatchId = batchIds[which]
+                val formatted = predefined[which].name
+                binding.tvBatch.text = field("Batch", formatted)
+                binding.tvCurrentBatchDisplay.text = formatted
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun bindPermissionControls() {
         var visibleCount = 0
         switchMap.forEach { (key, view) ->
@@ -145,7 +178,7 @@ class UserDetailActivity : AppCompatActivity() {
             if (canControl) visibleCount++
         }
         binding.tvPermissionHint.visibility = if (visibleCount == 0) View.VISIBLE else View.GONE
-        binding.btnSave.isEnabled = currentUser.role == "superadmin" || visibleCount > 0
+        binding.btnSave.isEnabled = currentUser.role == "superadmin" || visibleCount > 0 || currentUser.canManageUsers()
     }
 
     private fun saveChanges() {
@@ -157,7 +190,10 @@ class UserDetailActivity : AppCompatActivity() {
             newPermissions[key] = switchMap.getValue(key).isChecked
         }
 
-        val updates = mutableMapOf<String, Any>("permissions" to newPermissions)
+        val updates = mutableMapOf<String, Any>(
+            "permissions" to newPermissions,
+            "batchId" to selectedBatchId
+        )
         if (canEditRole) {
             val role = selectedRole()
             updates["role"] = role
@@ -177,7 +213,7 @@ class UserDetailActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 binding.progressBar.visibility = View.GONE
                 binding.btnSave.isEnabled = true
-                Toast.makeText(this, "User access updated", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "User details updated", Toast.LENGTH_SHORT).show()
                 finish()
                 overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
             }

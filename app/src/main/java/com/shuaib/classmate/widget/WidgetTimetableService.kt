@@ -27,8 +27,9 @@ class WidgetTimetableFactory(private val context: Context) : RemoteViewsService.
 
     override fun onDataSetChanged() {
         val db = ClassMateDatabase.getInstance(context)
-        val today = DateHelper.todayDayString()
-        periodsList = db.timetableDao().getPeriodsSync(today)
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        periodsList = db.timetableDao().getPeriodsSync(batchId, semesterId, DateHelper.todayDayString())
     }
 
     override fun onDestroy() {

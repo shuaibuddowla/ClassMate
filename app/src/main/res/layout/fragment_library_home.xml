@@ -4,66 +4,74 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_premium_gradient"
+    android:background="#F2F4FA"
     tools:context=".fragments.LibraryAllFilesFragment">
-
-    <com.shuaib.classmate.ui.StarfieldView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.04" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
 
-        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="88dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="10dp">
+            android:orientation="horizontal">
 
             <FrameLayout
                 android:id="@+id/btnBack"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_library_icon_button">
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless">
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/back"
                     android:src="@drawable/ic_chevron_left"
-                    app:tint="@color/cm_text_primary" />
+                    app:tint="#12152A" />
             </FrameLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="All Uploads"
-                    android:textColor="@color/cm_text_primary_premium"
-                    android:textSize="24sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="All files"
+                    android:textColor="#12152A"
+                    android:textSize="28sp"
                     android:textStyle="bold" />
                 <TextView
                     android:id="@+id/tvAllFilesMeta"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Loading resources"
-                    android:textColor="@color/cm_text_secondary_premium"
-                    android:textSize="12sp" />
+                    android:layout_marginTop="2dp"
+                    android:text="Loading files"
+                    android:textColor="#565C75"
+                    android:textSize="13sp" />
             </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/btnSearchAllFiles"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginBottom="14dp"
+            android:background="@drawable/bg_library_search_html"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:contentDescription="Search" android:src="@drawable/ic_search_modern" app:tint="#565C75" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:text="Search all library files" android:textColor="#565C75" android:textSize="14sp" />
         </LinearLayout>
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -72,10 +80,7 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
+            <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
                 <com.facebook.shimmer.ShimmerFrameLayout
                     android:id="@+id/shimmerView"
                     android:layout_width="match_parent"
@@ -85,18 +90,8 @@
                     app:shimmer_base_alpha="0.5"
                     app:shimmer_duration="1200"
                     app:shimmer_highlight_alpha="0.7">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
-                        <include layout="@layout/shimmer_item_pdf" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                        <include layout="@layout/shimmer_item_pdf" /><include layout="@layout/shimmer_item_pdf" /><include layout="@layout/shimmer_item_pdf" /><include layout="@layout/shimmer_item_pdf" />
                     </LinearLayout>
                 </com.facebook.shimmer.ShimmerFrameLayout>
 
@@ -104,9 +99,9 @@
                     android:id="@+id/rvAllFiles"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
+                    android:background="@drawable/bg_library_panel_html"
                     android:clipToPadding="false"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="20dp"
+                    android:paddingBottom="120dp"
                     tools:listitem="@layout/item_pdf" />
 
                 <TextView
@@ -114,13 +109,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginHorizontal="24dp"
-                    android:background="@drawable/bg_glass_card"
+                    android:background="@drawable/bg_library_panel_html"
                     android:gravity="center"
-                    android:padding="18dp"
+                    android:padding="28dp"
                     android:text="No uploaded files yet."
-                    android:textColor="@color/cm_text_secondary_premium"
-                    android:textSize="13sp"
+                    android:textColor="#565C75"
+                    android:textSize="14sp"
                     android:visibility="gone" />
             </FrameLayout>
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

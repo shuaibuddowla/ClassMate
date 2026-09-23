@@ -5,9 +5,9 @@ import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import com.google.firebase.Timestamp
-import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.activities.OfflinePdfViewerActivity
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.network.BackendApiClient
 import okhttp3.*
 import org.json.JSONObject
 import java.io.File
@@ -81,53 +81,45 @@ object LibraryDownloadManager {
         val isTelegram = pdfFile.provider == "telegram" ||
                 (pdfFile.fileId.isNotBlank() && (url.contains("t.me", ignoreCase = true) || pdfFile.telegramUrl.contains("t.me", ignoreCase = true)))
 
-        if (isTelegram && pdfFile.fileId.isNotBlank() && com.shuaib.classmate.utils.AppConstants.TELEGRAM_BOT_TOKEN.isNotBlank()) {
-            val botToken = com.shuaib.classmate.utils.AppConstants.TELEGRAM_BOT_TOKEN
-            val getFileUrl = "https://api.telegram.org/bot$botToken/getFile?file_id=${pdfFile.fileId}"
-            val getFileRequest = Request.Builder()
-                .url(getFileUrl)
-                .build()
-
-            client.newCall(getFileRequest).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    Log.w(TAG, "Failed to resolve Telegram file path, attempting direct URL: $url", e)
-                    performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    response.use { resp ->
-                        var resolvedUrl: String? = null
-                        if (resp.isSuccessful) {
-                            val bodyStr = resp.body?.string()
-                            if (!bodyStr.isNullOrBlank()) {
-                                try {
-                                    val json = JSONObject(bodyStr)
-                                    if (json.optBoolean("ok", false)) {
-                                        val result = json.optJSONObject("result")
-                                        val filePath = result?.optString("file_path", "") ?: ""
-                                        if (filePath.isNotBlank()) {
-                                            resolvedUrl = "https://api.telegram.org/file/bot$botToken/$filePath"
-                                            Log.d(TAG, "Resolved Telegram download URL: $resolvedUrl")
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error parsing Telegram getFile response", e)
-                                }
-                            }
-                        }
-
-                        if (resolvedUrl != null) {
-                            performDownload(client, context, pdfFile, resolvedUrl!!, onProgress, onSuccess, onFailure)
-                        } else {
-                            Log.w(TAG, "Telegram getFile response unsuccessful or invalid. Attempting direct URL: $url")
-                            performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
-                        }
-                    }
-                }
-            })
-        } else {
-            performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+        if (isTelegram && pdfFile.fileId.isNotBlank()) {
+            performProtectedDownload(
+                client, context, pdfFile,
+                "/v1/telegram/files/${java.net.URLEncoder.encode(pdfFile.fileId, Charsets.UTF_8.name())}",
+                onProgress, onSuccess, onFailure
+            )
+            return
         }
+
+        if (isGitHubReleaseAsset(pdfFile)) {
+            performProtectedDownload(
+                client, context, pdfFile, "/v1/github/assets/${pdfFile.githubAssetId}",
+                onProgress, onSuccess, onFailure
+            )
+            return
+        }
+
+        performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+    }
+
+    private fun performProtectedDownload(
+        client: OkHttpClient,
+        context: Context,
+        pdfFile: PdfFile,
+        backendPath: String,
+        onProgress: (Int) -> Unit,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        Thread {
+            try {
+                val request = BackendApiClient.authenticated(
+                    Request.Builder().url(BackendApiClient.url(backendPath))
+                )
+                performDownload(client, context, pdfFile, request.url.toString(), onProgress, onSuccess, onFailure, request)
+            } catch (e: Exception) {
+                onFailure(e)
+            }
+        }.start()
     }
 
     private fun performDownload(
@@ -137,9 +129,10 @@ object LibraryDownloadManager {
         url: String,
         onProgress: (Int) -> Unit,
         onSuccess: () -> Unit,
-        onFailure: (Exception) -> Unit
+        onFailure: (Exception) -> Unit,
+        requestOverride: Request? = null
     ) {
-        val request = buildDownloadRequest(pdfFile, url)
+        val request = requestOverride ?: buildDownloadRequest(pdfFile, url)
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.e(TAG, "Download failed", e)
@@ -246,24 +239,10 @@ object LibraryDownloadManager {
     }
 
     private fun buildDownloadRequest(pdfFile: PdfFile, url: String): Request {
-        val useGitHubAssetApi = isGitHubReleaseAsset(pdfFile) &&
-            BuildConfig.GITHUB_OWNER.isNotBlank() &&
-            BuildConfig.GITHUB_REPO.isNotBlank()
-        val builder = Request.Builder()
-            .url(if (useGitHubAssetApi) githubAssetApiUrl(pdfFile) else directDownloadUrl(url, pdfFile.fileId))
+        return Request.Builder()
+            .url(directDownloadUrl(url, pdfFile.fileId))
             .header("User-Agent", "ClassMate-Android")
-
-        if (useGitHubAssetApi) {
-            builder.header("Accept", "application/octet-stream")
-        }
-
-        if (useGitHubAssetApi && BuildConfig.GITHUB_LIBRARY_TOKEN.isNotBlank()) {
-            builder
-                .header("Authorization", "Bearer ${BuildConfig.GITHUB_LIBRARY_TOKEN}")
-                .header("X-GitHub-Api-Version", "2022-11-28")
-        }
-
-        return builder.build()
+            .build()
     }
 
     private fun directDownloadUrl(url: String, storedFileId: String): String {
@@ -285,10 +264,6 @@ object LibraryDownloadManager {
 
     private fun isGitHubReleaseAsset(pdfFile: PdfFile): Boolean {
         return pdfFile.provider == "github_releases" && pdfFile.githubAssetId > 0L
-    }
-
-    private fun githubAssetApiUrl(pdfFile: PdfFile): String {
-        return "https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/releases/assets/${pdfFile.githubAssetId}"
     }
 
     private fun saveMetadata(context: Context, pdf: PdfFile, cachedSizeBytes: Long) {

@@ -9,12 +9,26 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import com.shuaib.classmate.R
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 
 object LibraryUrlOpener {
     private const val TAG = "LibraryOpenDebug"
 
     fun open(context: Context, file: PdfFile) {
+        if (file.provider == "archive") {
+            Toast.makeText(context, "Preparing secure resource...", Toast.LENGTH_SHORT).show()
+            ArchiveLibraryRepository.resolveDownloadUrl(file.id, { url ->
+                openResolved(context, file, url)
+            }, { error ->
+                Toast.makeText(context, "Unable to open resource: ${error.message}", Toast.LENGTH_LONG).show()
+            })
+            return
+        }
         val url = file.downloadUrl.ifBlank { file.driveUrl.ifBlank { file.telegramUrl } }
+        openResolved(context, file, url)
+    }
+
+    private fun openResolved(context: Context, file: PdfFile, url: String) {
         if (url.isBlank()) {
             Toast.makeText(context, "Resource link not available", Toast.LENGTH_SHORT).show()
             return

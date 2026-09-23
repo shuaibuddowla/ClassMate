@@ -14,8 +14,8 @@ class OfflineSyncWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            NoticeRepository.getInstance(applicationContext).syncFromFirestore(Source.SERVER)
-            TimetableRepository.getInstance(applicationContext).syncAllFromFirestore(Source.SERVER)
+            NoticeRepository.getInstance(applicationContext).syncFromFirestore(source = Source.SERVER)
+            TimetableRepository.getInstance(applicationContext).syncAllFromFirestore(source = Source.SERVER)
             Result.success()
         } catch (_: Exception) {
             Result.retry()

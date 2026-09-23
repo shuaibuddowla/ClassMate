@@ -66,7 +66,9 @@ object NoticeUi {
             topic = doc.getString("topic").orEmpty(),
             submissionDate = doc.getString("submissionDate").orEmpty(),
             deadlineType = doc.getString("deadlineType") ?: "assignment",
-            pdfId = doc.getString("pdfId").orEmpty()
+            pdfId = doc.getString("pdfId").orEmpty(),
+            semester = doc.getString("semester") ?: "2nd",
+            batchId = doc.getString("batchId") ?: ""
         )
     }
 

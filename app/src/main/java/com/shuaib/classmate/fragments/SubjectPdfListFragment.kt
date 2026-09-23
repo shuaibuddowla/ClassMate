@@ -23,6 +23,7 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.adapters.PdfAdapter
 import com.shuaib.classmate.databinding.FragmentSubjectPdfListBinding
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.utils.LibrarySystemBars
 import com.shuaib.classmate.utils.PdfDialogHelper
@@ -222,32 +223,30 @@ class SubjectPdfListFragment : Fragment() {
         binding.swipeRefresh.isRefreshing = true
         binding.tvEmptyState.isVisible = false
 
-        db.collection("library_files")
-            .whereEqualTo("subject", args.subjectName)
-            .whereEqualTo("isDeleted", false)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (_binding == null) return@addOnSuccessListener
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
+        ArchiveLibraryRepository.load(batchId, activeSem, { _, resources ->
+                if (_binding == null) return@load
                 binding.shimmerView.stopShimmer()
                 binding.shimmerView.isVisible = false
                 binding.rvSubjectPdfs.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
 
-                allResources = snapshot.documents.map { doc -> doc.toPdfFile() }
-                    .filterNot { it.isDeleted }
+                allResources = resources
+                    .filter { it.subject.equals(args.subjectName, ignoreCase = true) }
                     .sortedByDescending { it.timestamp ?: it.createdAt }
 
                 binding.tvSubjectCode.text = "${subjectCode()} - ${allResources.size} resources"
                 applyResourceFilter()
-            }
-            .addOnFailureListener { e ->
-                if (_binding == null) return@addOnFailureListener
+            }, { e ->
+                if (_binding == null) return@load
                 binding.shimmerView.stopShimmer()
                 binding.shimmerView.isVisible = false
                 binding.rvSubjectPdfs.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            })
     }
 
     private fun applyResourceFilter() {
@@ -311,24 +310,16 @@ class SubjectPdfListFragment : Fragment() {
 
     private fun deletePdf(pdf: PdfFile) {
         binding.progressBar.visibility = View.VISIBLE
-        db.collection("library_files").document(pdf.id)
-            .update(
-                mapOf(
-                    "isDeleted" to true,
-                    "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
-            )
-            .addOnSuccessListener {
-                if (_binding == null) return@addOnSuccessListener
+        ArchiveLibraryRepository.deleteResource(pdf.id, {
+                if (_binding == null) return@deleteResource
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
                 fetchPdfs()
-            }
-            .addOnFailureListener {
-                if (_binding == null) return@addOnFailureListener
+            }, {
+                if (_binding == null) return@deleteResource
                 binding.progressBar.visibility = View.GONE
-                Toast.makeText(context, "Failed to delete", Toast.LENGTH_SHORT).show()
-            }
+                Toast.makeText(context, "Failed to delete: ${it.message}", Toast.LENGTH_SHORT).show()
+            })
     }
 
     private fun handleResourceAction(pdf: PdfFile) {
@@ -358,7 +349,8 @@ class SubjectPdfListFragment : Fragment() {
             createdAt = getTimestamp("createdAt"),
             updatedAt = getTimestamp("updatedAt"),
             downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false
+            isDeleted = getBoolean("isDeleted") ?: false,
+            semester = getString("semester") ?: "2nd"
         )
     }
 

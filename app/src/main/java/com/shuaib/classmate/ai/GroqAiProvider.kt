@@ -3,6 +3,7 @@ package com.shuaib.classmate.ai
 import android.util.Log
 import com.google.gson.Gson
 import com.shuaib.classmate.models.AiNoticeDraft
+import com.shuaib.classmate.network.BackendApiClient
 import com.shuaib.classmate.utils.AppConstants
 import com.shuaib.classmate.utils.AppPreferences
 import com.shuaib.classmate.ClassMateApp
@@ -202,37 +203,6 @@ class GroqAiProvider(private val client: OkHttpClient, private val gson: Gson) :
         }
     }
 
-    override suspend fun chatWithAi(input: AiChatInput): Result<String> = withContext(Dispatchers.IO) {
-        val messages = mutableListOf<Map<String, String>>()
-        messages.add(mapOf("role" to "system", "content" to input.systemPrompt))
-        input.messages.forEach { msg ->
-            val apiRole = if (msg.role == "user") "user" else "assistant"
-            messages.add(mapOf("role" to apiRole, "content" to msg.content))
-        }
-
-        val requestBody = mapOf(
-            "model" to getSelectedModel(),
-            "messages" to messages,
-            "temperature" to 0.4,
-            "max_tokens" to 2048
-        )
-
-        executeRequest(requestBody) { responseText ->
-            try {
-                val parsedText = parseTextResponse(responseText)
-                val cleanedText = cleanMarkdownResponse(parsedText)
-                if (cleanedText.isBlank()) {
-                    Result.failure(AiProviderError.InvalidResponse("Empty response from Groq"))
-                } else {
-                    Result.success(cleanedText)
-                }
-            } catch (e: Exception) {
-                Result.failure(AiProviderError.InvalidResponse(e.message ?: "Failed to parse response"))
-            }
-        }
-    }
-
-
     private fun cleanMarkdownResponse(text: String): String {
         var cleaned = text.trim()
         if (cleaned.startsWith("```")) {
@@ -271,23 +241,17 @@ class GroqAiProvider(private val client: OkHttpClient, private val gson: Gson) :
     }
 
     private fun <T> executeRequest(bodyMap: Any, parser: (String) -> Result<T>): Result<T> {
-        val apiKey = AppConstants.GROQ_API_KEY
-        if (apiKey.isBlank() || apiKey.startsWith("TODO")) {
-            return Result.failure(AiProviderError.InvalidApiKey("Groq API key is missing"))
-        }
-
-        val url = "https://api.groq.com/openai/v1/chat/completions"
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val requestJson = gson.toJson(bodyMap)
         val requestBody = requestJson.toRequestBody(mediaType)
 
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .post(requestBody)
-            .build()
-
         return try {
+            val request = BackendApiClient.authenticated(
+                Request.Builder()
+                    .url(BackendApiClient.url("/v1/ai/groq"))
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBody)
+            )
             client.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string()
                 if (response.isSuccessful && responseBody != null) {
@@ -303,8 +267,6 @@ class GroqAiProvider(private val client: OkHttpClient, private val gson: Gson) :
             Result.failure(AiProviderError.Unknown(e.message ?: "Unknown error", null, null))
         }
     }
-
-
 
     private fun mapError(code: Int, body: String?): AiProviderError {
         val message = body ?: "Error code $code"

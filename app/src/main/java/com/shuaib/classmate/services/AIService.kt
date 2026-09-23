@@ -10,7 +10,6 @@ import com.shuaib.classmate.ai.NoticeSummaryInput
 import com.shuaib.classmate.ai.AiProviderError
 import com.shuaib.classmate.models.AiNoticeDraft
 import com.shuaib.classmate.models.Period
-import com.shuaib.classmate.utils.AppConstants
 import okhttp3.OkHttpClient
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -38,46 +37,6 @@ object AIService {
         )
     }
 
-    private fun isKeyMissing(): Boolean {
-        val key = AppConstants.GEMINI_API_KEY
-        val groqKey = AppConstants.GROQ_API_KEY
-        return (key.isBlank() || key.startsWith("TODO") || key == "null") &&
-               (groqKey.isBlank() || groqKey.startsWith("TODO") || groqKey == "null")
-    }
-
-    /**
-     * Generates a warm, friendly morning summary of classes and assignments.
-     */
-    suspend fun generateMorningBrief(periods: List<Period>, assignments: List<String>): String? {
-        if (isKeyMissing()) return null
-
-        val prompt = StringBuilder().apply {
-            append("You are ClassMate AI, a friendly and helpful student assistant. ")
-            append("Generate a warm, encouraging morning brief for a student's day. ")
-            if (periods.isEmpty() && assignments.isEmpty()) {
-                append("Today is completely free with no classes or assignments. Tell them to relax and have a great day!")
-            } else {
-                append("Here is their schedule for today:\n")
-                periods.forEach { append("- ${it.subject} at ${it.startTime} with ${it.teacher}\n") }
-                if (assignments.isNotEmpty()) {
-                    append("\nDeadlines today:\n")
-                    assignments.forEach { append("- $it\n") }
-                }
-                append("\nProvide a concise (max 80 words) summary. Highlight the first class time and any tight schedules. Use a supportive tone.")
-            }
-        }.toString()
-
-        return try {
-            // Reusing summarizeNotice logic for simple text prompt for now
-            val input = NoticeSummaryInput("Morning Brief", prompt)
-            val result = coordinator.summarizeNotice(input)
-            result.getOrNull()?.data
-        } catch (e: Exception) {
-            Log.e("AIService", "Brief generation failed: ${e.message}")
-            null
-        }
-    }
-
     /**
      * Summarizes long notices into short, actionable bullet points or sentences.
      * Passes notice type and subject for richer context-aware summaries.
@@ -89,14 +48,6 @@ object AIService {
         subject: String? = null,
         date: String? = null
     ): Result<String> {
-        if (isKeyMissing()) {
-            return Result.failure(
-                AiProviderError.InvalidApiKey(
-                    "AI API Keys are missing. Please configure GEMINI_API_KEY or GROQ_API_KEY in your local.properties file."
-                )
-            )
-        }
-
         val input = NoticeSummaryInput(
             title = title,
             body = content,
@@ -124,9 +75,7 @@ object AIService {
         currentDayName: String,
         subjects: List<String>
     ): AiNoticeDraft? {
-        if (isKeyMissing()) return null
-
-        // Build teacher context from SubjectList or timetable info if available
+        // Course names come from the current batch/semester Firestore collection.
         val teacherContext = buildTeacherContext()
 
         val input = NoticeDraftInput(
@@ -146,47 +95,9 @@ object AIService {
         }
     }
 
-    suspend fun chatWithAi(
-        messages: List<com.shuaib.classmate.ai.AiChatMessageInput>,
-        systemPrompt: String
-    ): String? {
-        if (isKeyMissing()) {
-            Log.e("AIService", "AI API Keys are missing or invalid.")
-            return null
-        }
-
-        val input = com.shuaib.classmate.ai.AiChatInput(messages, systemPrompt)
-
-        return try {
-            val result = coordinator.chatWithAi(input)
-            val aiResult = result.getOrNull()
-            if (aiResult == null) {
-                Log.w("AIService", "AI chat generated an empty response or failed.")
-                null
-            } else {
-                aiResult.data
-            }
-        } catch (e: Exception) {
-            Log.e("AIService", "AI chat failed: ${e.message}", e)
-            null
-        }
-    }
 
 
-    private fun buildTeacherContext(): String {
-        // Known teacher-subject mappings, locations, and schedules for MBSTU CSE-22
-        // These are the faculty members and typical schedules teaching in this batch
-        return """
-            Known course-teacher associations and schedules (CSE-22 batch):
-            - Electronic Devices and Circuits (CSE1201): Faculty from ECE department (e.g., Hadifur Sir / হাদিফুর স্যার)
-            - Structured Programming (CSE1203): Faculty from CSE department (typical class: 9:30 AM)
-            - Structured Programming Lab (CSE1204): Faculty from CSE department
-            - Digital Electronics (CSE1205): Faculty from ECE department (e.g., Hadifur Sir / হাদিফুর স্যার)
-            - Digital Electronics Lab (CSE1206): Faculty from ECE department
-            - Physics (CSE1207): Faculty from Physics department (typical class: 9:00 AM, Location: Academic Building 2, 1st floor)
-            - Statistics (CSE1209): Faculty from Mathematics department
-            - Integral Calculus (CSE1211): Faculty from Mathematics department (typical class: 11:30 AM)
-            Note: Actual teacher names are assigned by course coordinator. Hadifur Sir (হাদিফুর স্যার) is associated with ECE/Digital Electronics subjects. Do NOT invent other teacher names.
-        """.trimIndent()
-    }
+    private fun buildTeacherContext(): String =
+        "Use only the current batch and semester courses supplied in knownSubjects. " +
+            "Do not invent course names, codes, teachers, rooms, or schedules."
 }

@@ -7,16 +7,21 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
 import com.shuaib.classmate.models.Notice
 import com.shuaib.classmate.repositories.NoticeRepository
+import com.shuaib.classmate.utils.AppContextManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class NoticeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NoticeRepository.getInstance(application)
     private var realtimeListener: ListenerRegistration? = null
 
-    val notices: StateFlow<List<Notice>> = repository.observeNotices()
+    val notices: StateFlow<List<Notice>> = AppContextManager.activeBatchFlow
+        .flatMapLatest { batch -> repository.observeNotices(batch) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _isRefreshing = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -24,23 +29,25 @@ class NoticeViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         viewModelScope.launch {
-            runCatching { repository.syncFromFirestore(com.google.firebase.firestore.Source.CACHE) }
+            AppContextManager.activeBatchFlow.collect { batch ->
+                startRealtimeSync(batch)
+                runCatching { repository.syncFromFirestore(batch, Source.DEFAULT) }
+            }
         }
-        startRealtimeSync()
     }
 
-    private fun startRealtimeSync() {
+    private fun startRealtimeSync(batchId: String = AppContextManager.getBatchId()) {
         realtimeListener?.remove()
-        realtimeListener = repository.startRealtimeSync(viewModelScope)
+        realtimeListener = repository.startRealtimeSync(viewModelScope, batchId)
     }
 
     fun refresh() {
-        // We still keep refresh for manual triggers, but realtime handles the rest
+        val batch = AppContextManager.getBatchId()
         repository.enqueueNetworkSync()
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                repository.syncFromFirestore(com.google.firebase.firestore.Source.SERVER)
+                repository.syncFromFirestore(batch, Source.SERVER)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {

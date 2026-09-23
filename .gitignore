@@ -9,6 +9,8 @@
 /.agents/
 /.claude/
 /.cursor/
+/.codex-remote-attachments/
+/.wrangler/
 .roorc
 skills-lock.json
 .DS_Store
@@ -21,6 +23,8 @@ app/release/
 release/
 web-staging/
 build_output.txt
+build_out.txt
+install_out.txt
 build_test.log
 hs_err_pid*.log
 replay_pid*.log
@@ -30,3 +34,4 @@ library*.xml
 notice*.xml
 *.hprof
 *.apk
+/adb

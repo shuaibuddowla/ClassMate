@@ -43,7 +43,9 @@ object AutoMuteScheduler {
                 val todayDateStr = DateHelper.today()
                 
                 val db = ClassMateDatabase.getInstance(context)
-                val periodEntities = db.timetableDao().getPeriodsSync(todayDay)
+                val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+                val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+                val periodEntities = db.timetableDao().getPeriodsSync(batchId, semesterId, todayDay)
                 val periods = periodEntities.map { it.toPeriod(todayDateStr) }
 
                 if (periods.isEmpty()) {
@@ -128,10 +130,12 @@ object AutoMuteScheduler {
     private fun cancelAllAlarms(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val db = ClassMateDatabase.getInstance(context)
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
         
         // Cancel all periods from all days to be safe
         TimetableRepository.DAYS.forEach { day ->
-            val periodEntities = db.timetableDao().getPeriodsSync(day)
+            val periodEntities = db.timetableDao().getPeriodsSync(batchId, semesterId, day)
             periodEntities.forEach { entity ->
                 val muteRequestCode = entity.id.hashCode() * 2
                 val unmuteRequestCode = entity.id.hashCode() * 2 + 1

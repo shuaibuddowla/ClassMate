@@ -14,10 +14,15 @@ import androidx.core.view.isVisible
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityPdfUploadBinding
 import com.shuaib.classmate.storage.GitHubReleaseStorageClient
 import com.shuaib.classmate.utils.NotificationSender
+import com.shuaib.classmate.utils.SemesterManager
+import com.shuaib.classmate.models.Course
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
+import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.TelegramUploader
 
@@ -29,6 +34,8 @@ class PdfUploadActivity : AppCompatActivity() {
     private var selectedFileUri: Uri? = null
     private var selectedFileInfo: SelectedFileInfo? = null
     private var currentUserName = ""
+    private var courseListener: ListenerRegistration? = null
+    private var availableCourses: List<Course> = emptyList()
     private enum class UploadMode {
         GITHUB, TELEGRAM, LINK
     }
@@ -67,6 +74,8 @@ class PdfUploadActivity : AppCompatActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
         updateMode()
+        binding.toggleGroup.isVisible = false
+        binding.layoutDrive.isVisible = false
 
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).get()
@@ -74,12 +83,8 @@ class PdfUploadActivity : AppCompatActivity() {
                 currentUserName = doc.getString("name") ?: "Admin"
             }
 
-        val subjectNames = SubjectList.subjects.map { it.name }
-        binding.dropdownSubject.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, subjectNames)
-        )
-        binding.dropdownSubject.setOnItemClickListener { _, _, position, _ ->
-            binding.etCourseCode.setText(SubjectList.subjects.getOrNull(position)?.code.orEmpty())
+        courseListener = CoursePicker.bind(this, binding.dropdownSubject, binding.etCourseCode) {
+            availableCourses = it
         }
 
         binding.toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -98,26 +103,70 @@ class PdfUploadActivity : AppCompatActivity() {
         }
 
         binding.btnSave.setOnClickListener {
-            when (currentMode) {
-                UploadMode.LINK -> handleLinkUpload()
-                UploadMode.GITHUB -> handleGitHubUpload()
-                UploadMode.TELEGRAM -> handleTelegramUpload()
-            }
+            handleArchiveUpload()
         }
     }
 
     private fun updateMode() {
-        val linkMode = currentMode == UploadMode.LINK
-        binding.layoutTelegram.isVisible = !linkMode
-        binding.layoutDrive.isVisible = linkMode
-        binding.btnSave.isEnabled = linkMode || selectedFileUri != null
-        binding.btnSave.text = if (linkMode) {
-            "Add Link to Library"
-        } else if (currentMode == UploadMode.TELEGRAM) {
-            "Post to Telegram & Save"
-        } else {
-            "Upload to Library"
+        binding.layoutTelegram.isVisible = true
+        binding.layoutDrive.isVisible = false
+        binding.btnSave.isEnabled = selectedFileUri != null
+        binding.btnSave.text = "Upload to CSE Archive"
+    }
+
+    private fun handleArchiveUpload() {
+        val input = validateCommonInputs() ?: return
+        val uri = selectedFileUri ?: run {
+            Toast.makeText(this, "Pick a file first", Toast.LENGTH_SHORT).show()
+            return
         }
+        val info = selectedFileInfo ?: getSelectedFileInfo(uri)
+        if (info.mimeType !in ARCHIVE_MIME_TYPES) {
+            Toast.makeText(this, "Use a PDF, PowerPoint, Word, JPG or PNG file.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (info.sizeBytes <= 0 || info.sizeBytes > ARCHIVE_MAX_UPLOAD_BYTES) {
+            Toast.makeText(this, "Archive uploads must be between 1 byte and 25 MB.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val course = availableCourses.firstOrNull { it.name.equals(input.subject, ignoreCase = true) }
+        if (course == null) {
+            Toast.makeText(this, "Select a saved course first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val materialType = when {
+            course.type == "syllabus" -> "Syllabus"
+            course.type == "lab" -> "Lab"
+            info.fileType in listOf("ppt", "pptx") -> "Slides"
+            input.title.contains("question", true) -> "Question Bank"
+            else -> "Notes"
+        }
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+            .ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
+        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+        setUploading(true, "Preparing secure archive upload...")
+        ArchiveLibraryRepository.upload(
+            applicationContext,
+            uri,
+            batchId,
+            semesterId,
+            course,
+            input.title,
+            info.displayName,
+            info.sizeBytes,
+            info.mimeType,
+            materialType,
+            onProgress = { progress ->
+                runOnUiThread { binding.tvProgress.text = "Uploading to CSE Archive... $progress%" }
+            },
+            onSuccess = { resourceId ->
+                postResourceNotice(input.title, input.subject, resourceId, input.description)
+                setUploading(false)
+                Toast.makeText(this, "Published to the shared CSE Archive!", Toast.LENGTH_SHORT).show()
+                finish()
+            },
+            onFailure = { error -> handleUploadError(error.message ?: "Archive upload failed") }
+        )
     }
 
     private fun handleLinkUpload() {
@@ -187,7 +236,11 @@ class PdfUploadActivity : AppCompatActivity() {
         binding.tvProgress.text = "Saving to library..."
         val uid = auth.currentUser?.uid.orEmpty()
         val courseType = courseTypeFor(input.subject)
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val data = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to input.title,
             "subject" to input.subject,
             "courseCode" to input.courseCode,
@@ -208,10 +261,15 @@ class PdfUploadActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "timestamp" to FieldValue.serverTimestamp(),
             "downloadCount" to 0L,
-            "isDeleted" to false
+            "isDeleted" to false,
+            "semester" to targetSemester
         )
 
-        db.collection("library_files")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("semesters")
+            .document(targetSemester)
+            .collection("library")
             .add(data)
             .addOnSuccessListener { doc ->
                 postResourceNotice(input.title, input.subject, doc.id, input.description)
@@ -273,7 +331,11 @@ class PdfUploadActivity : AppCompatActivity() {
         binding.tvProgress.text = "Saving to library..."
         val uid = auth.currentUser?.uid.orEmpty()
         val courseType = courseTypeFor(input.subject)
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val data = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to input.title,
             "subject" to input.subject,
             "courseCode" to input.courseCode,
@@ -296,10 +358,15 @@ class PdfUploadActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "timestamp" to FieldValue.serverTimestamp(),
             "downloadCount" to 0L,
-            "isDeleted" to false
+            "isDeleted" to false,
+            "semester" to targetSemester
         )
 
-        db.collection("library_files")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("semesters")
+            .document(targetSemester)
+            .collection("library")
             .add(data)
             .addOnSuccessListener { doc ->
                 postResourceNotice(input.title, input.subject, doc.id, input.description)
@@ -316,7 +383,11 @@ class PdfUploadActivity : AppCompatActivity() {
     private fun saveExternalLink(input: UploadInput, link: String) {
         setUploading(true, "Saving to library...")
         val uid = auth.currentUser?.uid.orEmpty()
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val data = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to input.title,
             "subject" to input.subject,
             "courseCode" to input.courseCode,
@@ -337,9 +408,14 @@ class PdfUploadActivity : AppCompatActivity() {
             "updatedAt" to FieldValue.serverTimestamp(),
             "timestamp" to FieldValue.serverTimestamp(),
             "downloadCount" to 0L,
-            "isDeleted" to false
+            "isDeleted" to false,
+            "semester" to targetSemester
         )
-        db.collection("library_files")
+        db.collection("batches")
+            .document(targetBatchId)
+            .collection("semesters")
+            .document(targetSemester)
+            .collection("library")
             .add(data)
             .addOnSuccessListener { doc ->
                 postResourceNotice(input.title, input.subject, doc.id, input.description)
@@ -365,7 +441,11 @@ class PdfUploadActivity : AppCompatActivity() {
         }
 
         val uid = auth.currentUser?.uid.orEmpty()
+        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
+
         val noticeData = hashMapOf(
+            "batchId" to targetBatchId,
             "title" to "📚 Resource: $title",
             "body" to noticeBody,
             "content" to noticeBody,
@@ -384,12 +464,14 @@ class PdfUploadActivity : AppCompatActivity() {
             "subject" to subject,
             "pdfId" to resourceId,
             "isPinned" to false,
-            "isDeleted" to false
+            "isDeleted" to false,
+            "semester" to targetSemester
         )
-        db.collection("notices").add(noticeData)
+        db.collection("batches").document(targetBatchId).collection("notices").add(noticeData)
         NotificationSender.sendResourceAlert(
             title = title,
             subject = subject,
+            batchId = targetBatchId,
             onSuccess = { Log.d(TAG, "Resource notification sent") },
             onFailure = { err -> Log.e(TAG, "Resource notification failed: $err") }
         )
@@ -465,11 +547,12 @@ class PdfUploadActivity : AppCompatActivity() {
     }
 
     private fun courseTypeFor(subject: String): String {
-        return when {
-            subject.endsWith("Lab", ignoreCase = true) -> "lab"
-            subject.equals("Other Document", ignoreCase = true) -> "other"
-            else -> "regular"
-        }
+        return availableCourses.firstOrNull { it.name.equals(subject, ignoreCase = true) }?.type ?: "regular"
+    }
+
+    override fun onDestroy() {
+        courseListener?.remove()
+        super.onDestroy()
     }
 
     private fun createSafeAssetFileName(courseCode: String, subject: String, originalName: String): String {
@@ -522,6 +605,16 @@ class PdfUploadActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "GitHubStorageDebug"
         private const val MAX_UPLOAD_BYTES = 100L * 1024L * 1024L
+        private const val ARCHIVE_MAX_UPLOAD_BYTES = 25L * 1024L * 1024L
+        private val ARCHIVE_MIME_TYPES = setOf(
+            "application/pdf",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "image/png",
+            "image/jpeg"
+        )
         private val SUPPORTED_MIME_TYPES = setOf(
             "application/pdf",
             "application/vnd.ms-powerpoint",
