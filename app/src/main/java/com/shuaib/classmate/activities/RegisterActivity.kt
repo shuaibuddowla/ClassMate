@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -28,13 +29,21 @@ import com.onesignal.OneSignal
 import com.shuaib.classmate.R
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.databinding.ActivityRegisterBinding
+import com.shuaib.classmate.domain.auth.SessionRepository
 import com.shuaib.classmate.models.User
 import com.shuaib.classmate.utils.AuthDebug
 import com.shuaib.classmate.utils.AuthErrorMapper
 import com.shuaib.classmate.utils.StudentIdUtils
 import com.shuaib.classmate.utils.applyClickAnimation
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class RegisterActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var sessionRepository: SessionRepository
 
     private lateinit var binding: ActivityRegisterBinding
     private lateinit var auth: FirebaseAuth
@@ -304,13 +313,15 @@ class RegisterActivity : AppCompatActivity() {
                 Log.d("AuthTrace", "7. uid: ${user.uid}")
                 Log.d("AuthTrace", "8. isNewUser: ${result.additionalUserInfo?.isNewUser == true}")
                 AuthDebug.d("Google signup Firebase auth success uid=${user.uid} isNewUser=${result.additionalUserInfo?.isNewUser == true}")
-                saveGoogleUserToFirestore(
-                    uid = user.uid,
-                    name = user.displayName.orEmpty(),
-                    email = user.email.orEmpty(),
-                    photoUrl = user.photoUrl?.toString().orEmpty(),
-                    isNewUser = result.additionalUserInfo?.isNewUser == true
-                )
+                continueAfterSupabaseShadowSignIn(idToken) {
+                    saveGoogleUserToFirestore(
+                        uid = user.uid,
+                        name = user.displayName.orEmpty(),
+                        email = user.email.orEmpty(),
+                        photoUrl = user.photoUrl?.toString().orEmpty(),
+                        isNewUser = result.additionalUserInfo?.isNewUser == true
+                    )
+                }
             }
             .addOnFailureListener {
                 Log.d("AuthTrace", "6. Firebase credential failure: ${it.message}")
@@ -319,6 +330,24 @@ class RegisterActivity : AppCompatActivity() {
                 showError(AuthErrorMapper.googleMessage(it))
                 shakeForm()
             }
+    }
+
+    private fun continueAfterSupabaseShadowSignIn(idToken: String, continueFirebaseFlow: () -> Unit) {
+        if (!sessionRepository.isConfigured) {
+            continueFirebaseFlow()
+            return
+        }
+
+        lifecycleScope.launch {
+            sessionRepository.signInWithGoogleIdToken(idToken)
+                .onSuccess { profile ->
+                    Log.d("AuthTrace", "Supabase shadow signup success status=${profile.status}")
+                }
+                .onFailure { error ->
+                    Log.w("AuthTrace", "Supabase shadow signup failed; continuing with Firebase", error)
+                }
+            continueFirebaseFlow()
+        }
     }
 
     private fun saveGoogleUserToFirestore(uid: String, name: String, email: String, photoUrl: String, isNewUser: Boolean) {

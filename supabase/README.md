@@ -29,4 +29,6 @@ SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
 
 Only a publishable/anon client key belongs in the Android app. The current
 Firebase screens remain active while V2 authentication and data slices are
-verified against a disposable Supabase project.
+verified against a disposable Supabase project. When both values are present,
+Google sign-in also creates or refreshes the Supabase session in shadow mode;
+failure is logged and the Firebase flow continues.

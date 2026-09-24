@@ -13,6 +13,7 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.TranslateAnimation
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -28,13 +29,21 @@ import com.onesignal.OneSignal
 import com.shuaib.classmate.R
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.databinding.ActivityLoginBinding
+import com.shuaib.classmate.domain.auth.SessionRepository
 import com.shuaib.classmate.models.User
 import com.shuaib.classmate.utils.AnimUtils
 import com.shuaib.classmate.utils.AuthDebug
 import com.shuaib.classmate.utils.AuthErrorMapper
 import com.shuaib.classmate.utils.applyClickAnimation
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class LoginActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var sessionRepository: SessionRepository
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
@@ -204,6 +213,28 @@ class LoginActivity : AppCompatActivity() {
         return valid
     }
 
+    private fun continueAfterSupabaseShadowSignIn(
+        idToken: String,
+        uid: String,
+        user: FirebaseUser
+    ) {
+        if (!sessionRepository.isConfigured) {
+            normalizeUserProfile(uid, user)
+            return
+        }
+
+        lifecycleScope.launch {
+            sessionRepository.signInWithGoogleIdToken(idToken)
+                .onSuccess { profile ->
+                    Log.d("AuthTrace", "Supabase shadow auth success status=${profile.status}")
+                }
+                .onFailure { error ->
+                    Log.w("AuthTrace", "Supabase shadow auth failed; continuing with Firebase", error)
+                }
+            normalizeUserProfile(uid, user)
+        }
+    }
+
     // ═══════════════════════════════════════════════════
     // GOOGLE SIGN-IN
     // ═══════════════════════════════════════════════════
@@ -243,7 +274,7 @@ class LoginActivity : AppCompatActivity() {
                 val user = result.user ?: return@addOnSuccessListener
                 Log.d("AuthTrace", "Firebase credential success, uid: ${user.uid}")
                 AuthDebug.d("Google signin Firebase auth success uid=${user.uid} isNewUser=${result.additionalUserInfo?.isNewUser == true}")
-                normalizeUserProfile(user.uid, user)
+                continueAfterSupabaseShadowSignIn(idToken, user.uid, user)
             }
             .addOnFailureListener {
                 Log.d("AuthTrace", "Firebase credential failure: ${it.message}")
