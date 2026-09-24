@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.Flow
 interface SessionRepository {
     val session: Flow<SessionProfile?>
 
+    val isConfigured: Boolean
+
+    suspend fun signInWithGoogleIdToken(idToken: String): Result<SessionProfile>
+
     suspend fun refresh(): Result<SessionProfile>
 
     suspend fun signOut(): Result<Unit>

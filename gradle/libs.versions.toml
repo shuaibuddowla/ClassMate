@@ -1,6 +1,6 @@
 [versions]
-agp = "8.4.0"
-kotlin = "2.1.0"
+agp = "8.10.1"
+kotlin = "2.2.21"
 coreKtx = "1.13.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -16,9 +16,11 @@ navigation = "2.7.7"
 swiperefreshlayout = "1.1.0"
 generativeai = "0.9.0"
 gson = "2.10.1"
-hilt = "2.51.1"
-ksp = "2.1.0-1.0.29"
+hilt = "2.58"
+ksp = "2.2.21-2.0.5"
 markwon = "4.6.2"
+supabase = "3.2.6"
+ktor = "3.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +55,10 @@ markwon-strikethrough = { group = "io.noties.markwon", name = "ext-strikethrough
 markwon-html = { group = "io.noties.markwon", name = "html", version.ref = "markwon" }
 markwon-tables = { group = "io.noties.markwon", name = "ext-tables", version.ref = "markwon" }
 markwon-linkify = { group = "io.noties.markwon", name = "linkify", version.ref = "markwon" }
+supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
+supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
+supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -61,3 +67,4 @@ google-services = { id = "com.google.gms.google-services", version.ref = "google
 navigation-safeargs = { id = "androidx.navigation.safeargs.kotlin", version.ref = "navigation" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

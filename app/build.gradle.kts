@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.navigation.safeargs)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 val localProperties = Properties().apply {
@@ -22,7 +23,7 @@ fun getLocalProperty(name: String): String {
 
 android {
     namespace = "com.shuaib.classmate"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.shuaib.classmate"
@@ -33,6 +34,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"${getLocalProperty("BACKEND_BASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${getLocalProperty("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${getLocalProperty("SUPABASE_PUBLISHABLE_KEY")}\"")
         buildConfigField("String", "ONESIGNAL_APP_ID", "\"${getLocalProperty("ONESIGNAL_APP_ID")}\"")
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
         buildConfigField("String", "GEMINI_MODEL", "\"gemini-2.5-flash\"")
@@ -79,6 +82,10 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.ktor.client.android)
     implementation("com.google.android.gms:play-services-auth:21.0.0")
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
