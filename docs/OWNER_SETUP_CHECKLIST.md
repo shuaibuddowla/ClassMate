@@ -84,15 +84,24 @@ testing V2 data access.
 From the repository root, log in to the Firebase CLI, verify that `.firebaserc`
 points to the disposable/development Firebase project, then deploy functions:
 
+> Firebase Functions deployment requires the Blaze plan because Firebase must
+> enable Cloud Build and Artifact Registry. Enabling billing is an owner-only
+> financial action. The existing-user backfill below can still be run without
+> deploying the trigger.
+
 ```powershell
 firebase login
 firebase use
 cd functions
-npm ci
-npm run build
+npm ci --ignore-scripts
 cd ..
+node functions/scripts/predeploy.js
 firebase deploy --only functions:onFirebaseUserCreated
 ```
+
+`--ignore-scripts` is intentional for this repository on Windows: the `&` in
+the workspace path breaks npm's `cmd.exe` lifecycle-script wrapper. The
+path-safe predeploy script directly runs ESLint and TypeScript afterward.
 
 The trigger handles only users created after deployment. Existing Firebase
 users need the one-time backfill. The safest route is Google Cloud Shell for
