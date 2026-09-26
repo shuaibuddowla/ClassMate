@@ -2,6 +2,7 @@
 .gradle
 /app/build/
 /functions/node_modules/
+/node_modules/
 /functions/lib/
 /local.properties
 /.idea/
@@ -20,6 +21,7 @@ skills-lock.json
 .cxx
 local.properties
 supabase/bootstrap.local.sql
+supabase/.temp/
 keystore.properties
 *.jks
 *.keystore
