@@ -3,15 +3,15 @@ package com.shuaib.classmate.domain.auth
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Authentication boundary used during the Firebase-to-Supabase migration.
- * Implementations own provider-specific session and token behavior.
+ * Bridges the Firebase session into the V2 Supabase data layer.
+ * Firebase remains the only authentication provider.
  */
 interface SessionRepository {
     val session: Flow<SessionProfile?>
 
     val isConfigured: Boolean
 
-    suspend fun signInWithGoogleIdToken(idToken: String): Result<SessionProfile>
+    suspend fun synchronizeFirebaseSession(): Result<SessionProfile>
 
     suspend fun refresh(): Result<SessionProfile>
 

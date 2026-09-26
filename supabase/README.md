@@ -27,11 +27,16 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
 ```
 
-Only a publishable/anon client key belongs in the Android app. The current
-Firebase screens remain active while V2 authentication and data slices are
-verified against a disposable Supabase project. When both values are present,
-Google sign-in also creates or refreshes the Supabase session in shadow mode;
-failure is logged and the Firebase flow continues.
+Only a publishable/anon client key belongs in the Android app. Firebase Auth is
+the single identity provider. The client supplies its Firebase ID token to
+Supabase Third-Party Auth; there is no second Supabase user session. When both
+values are present, Google sign-in bootstraps/refreshes the linked V2 profile;
+failure is logged and the legacy Firebase data flow continues during migration.
+
+In Supabase, add the Firebase project under **Authentication > Third-Party
+Auth**. Do not configure Supabase's Google provider. Every Firebase user token
+that accesses Supabase must contain the custom claim `role: "authenticated"`;
+see the owner checklist for the deploy and existing-user backfill commands.
 
 The complete owner-operated setup and verification procedure is documented in
 `docs/OWNER_SETUP_CHECKLIST.md`. Start from `bootstrap.example.sql` when seeding

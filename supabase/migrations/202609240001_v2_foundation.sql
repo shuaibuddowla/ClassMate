@@ -93,7 +93,8 @@ alter table public.batches
   references public.batch_semesters(id) on delete set null;
 
 create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  firebase_uid text not null unique,
   university_id uuid references public.universities(id) on delete restrict,
   email citext not null unique,
   display_name text not null default '',
@@ -349,6 +350,28 @@ create table public.audit_log (
   created_at timestamptz not null default now()
 );
 
+create or replace function public.current_firebase_uid()
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select nullif(auth.jwt() ->> 'sub', '');
+$$;
+
+create or replace function public.current_profile_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.id
+  from public.profiles p
+  where p.firebase_uid = public.current_firebase_uid()
+  limit 1;
+$$;
+
 create or replace function public.is_active_user()
 returns boolean
 language sql
@@ -359,7 +382,7 @@ as $$
   select exists (
     select 1
     from public.profiles p
-    where p.id = auth.uid()
+    where p.id = public.current_profile_id()
       and p.status in ('active', 'graduated')
   );
 $$;
@@ -380,7 +403,7 @@ as $$
   select exists (
     select 1
     from public.role_grants g
-    where g.profile_id = auth.uid()
+    where g.profile_id = public.current_profile_id()
       and g.role = requested_role
       and g.revoked_at is null
       and g.starts_at <= now()
@@ -402,7 +425,7 @@ as $$
   select public.is_active_user() and exists (
     select 1
     from public.role_grants g
-    where g.profile_id = auth.uid()
+    where g.profile_id = public.current_profile_id()
       and g.role in ('cr', 'teacher', 'admin')
       and g.revoked_at is null
       and g.starts_at <= now()
@@ -420,11 +443,11 @@ as $$
   select public.is_active_user() and (
     exists (
       select 1 from public.student_profiles s
-      where s.profile_id = auth.uid() and s.assigned_batch_id = target_batch
+      where s.profile_id = public.current_profile_id() and s.assigned_batch_id = target_batch
     )
     or exists (
       select 1 from public.role_grants g
-      where g.profile_id = auth.uid()
+      where g.profile_id = public.current_profile_id()
         and g.revoked_at is null
         and g.starts_at <= now()
         and (g.expires_at is null or g.expires_at > now())
@@ -456,12 +479,12 @@ as $$
   select public.is_active_user() and (
     exists (
       select 1 from public.student_profiles s
-      where s.profile_id = auth.uid() and s.department_id = target_department
+      where s.profile_id = public.current_profile_id() and s.department_id = target_department
     )
     or exists (
       select 1
       from public.role_grants g
-      where g.profile_id = auth.uid()
+      where g.profile_id = public.current_profile_id()
         and g.revoked_at is null
         and g.starts_at <= now()
         and (g.expires_at is null or g.expires_at > now())
@@ -499,13 +522,13 @@ as $$
       and (
         exists (
           select 1 from public.student_profiles sp
-          where sp.profile_id = auth.uid()
+          where sp.profile_id = public.current_profile_id()
             and sp.assigned_batch_id = s.batch_id
             and sp.section_id = s.id
         )
         or exists (
           select 1 from public.role_grants g
-          where g.profile_id = auth.uid()
+          where g.profile_id = public.current_profile_id()
             and g.revoked_at is null
             and g.starts_at <= now()
             and (g.expires_at is null or g.expires_at > now())
@@ -575,7 +598,7 @@ as $$
   select public.is_active_user() and exists (
     select 1
     from resolved_scope scope
-    join public.role_grants g on g.profile_id = auth.uid()
+    join public.role_grants g on g.profile_id = public.current_profile_id()
     where g.revoked_at is null
       and g.starts_at <= now()
       and (g.expires_at is null or g.expires_at > now())
@@ -616,7 +639,7 @@ as $$
   select public.is_active_user() and exists (
     select 1
     from resolved_scope scope
-    join public.role_grants g on g.profile_id = auth.uid()
+    join public.role_grants g on g.profile_id = public.current_profile_id()
     where g.role = 'admin'
       and g.revoked_at is null
       and g.starts_at <= now()
@@ -642,7 +665,7 @@ as $$
       and (
         (t.university_id is not null and exists (
           select 1 from public.profiles p
-          where p.id = auth.uid() and p.university_id = t.university_id
+          where p.id = public.current_profile_id() and p.university_id = t.university_id
         ))
         or (t.department_id is not null and public.can_access_department(t.department_id))
         or (t.batch_id is not null and public.can_access_batch(t.batch_id))
@@ -719,14 +742,15 @@ as $$
   );
 $$;
 
-create or replace function public.handle_new_auth_user()
-returns trigger
+create or replace function public.bootstrap_firebase_profile()
+returns uuid
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  normalized_email citext := lower(new.email);
+  token_firebase_uid text := public.current_firebase_uid();
+  normalized_email citext := lower(auth.jwt() ->> 'email');
   normalized_domain citext;
   identity_parts text[];
   matched_university public.universities%rowtype;
@@ -734,12 +758,18 @@ declare
   matched_batch public.batches%rowtype;
   allowed_staff public.staff_allowlist%rowtype;
   profile_state public.profile_status := 'blocked';
+  resolved_profile_id uuid;
 begin
-  if new.email is null or new.email_confirmed_at is null then
+  if token_firebase_uid is null then
+    raise exception 'A verified Firebase identity is required';
+  end if;
+
+  if normalized_email is null
+     or coalesce((auth.jwt() ->> 'email_verified')::boolean, false) is not true then
     raise exception 'A verified email address is required';
   end if;
 
-  if coalesce(new.raw_app_meta_data ->> 'provider', '') <> 'google' then
+  if coalesce(auth.jwt() -> 'firebase' ->> 'sign_in_provider', '') <> 'google.com' then
     raise exception 'Google authentication is required';
   end if;
 
@@ -763,7 +793,9 @@ begin
   where a.email = normalized_email and a.is_active
   limit 1;
 
-  if identity_parts is not null then
+  if allowed_staff.id is not null then
+    profile_state := 'active';
+  elsif identity_parts is not null then
     select * into matched_department
     from public.departments d
     where d.university_id = matched_university.id
@@ -784,22 +816,39 @@ begin
       when matched_batch.id is not null then 'active'::public.profile_status
       else 'pending_setup'::public.profile_status
     end;
-  elsif allowed_staff.id is not null then
-    profile_state := 'active';
   end if;
 
   insert into public.profiles (
-    id, university_id, email, display_name, avatar_url, status
+    firebase_uid, university_id, email, display_name, avatar_url, status
   ) values (
-    new.id,
+    token_firebase_uid,
     matched_university.id,
     normalized_email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', ''),
-    new.raw_user_meta_data ->> 'avatar_url',
+    coalesce(auth.jwt() ->> 'name', normalized_email::text),
+    auth.jwt() ->> 'picture',
     profile_state
-  );
+  )
+  on conflict (firebase_uid) do update set
+    email = excluded.email,
+    display_name = excluded.display_name,
+    avatar_url = excluded.avatar_url,
+    updated_at = now()
+  returning id into resolved_profile_id;
 
-  if identity_parts is not null then
+  if allowed_staff.id is not null and allowed_staff.role = 'admin' then
+    insert into public.role_grants (
+      profile_id, role, department_id
+    )
+    select resolved_profile_id, allowed_staff.role, allowed_staff.department_id
+    where not exists (
+      select 1
+      from public.role_grants g
+      where g.profile_id = resolved_profile_id
+        and g.role = allowed_staff.role
+        and g.department_id is not distinct from allowed_staff.department_id
+        and g.revoked_at is null
+    );
+  elsif identity_parts is not null then
     insert into public.student_profiles (
       profile_id,
       department_id,
@@ -807,27 +856,22 @@ begin
       assigned_batch_id,
       roll_number
     ) values (
-      new.id,
+      resolved_profile_id,
       matched_department.id,
       identity_parts[2],
       matched_batch.id,
       identity_parts[3]
-    );
-  elsif allowed_staff.id is not null and allowed_staff.role = 'admin' then
-    insert into public.role_grants (
-      profile_id, role, department_id
-    ) values (
-      new.id, allowed_staff.role, allowed_staff.department_id
-    );
+    )
+    on conflict (profile_id) do nothing;
   end if;
 
-  return new;
+  return resolved_profile_id;
 end;
 $$;
 
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_auth_user();
+revoke all on function public.bootstrap_firebase_profile() from public;
+revoke all on function public.bootstrap_firebase_profile() from anon;
+grant execute on function public.bootstrap_firebase_profile() to authenticated;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -891,7 +935,7 @@ create policy "authenticated users read universities"
     public.is_active_user()
     and exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.university_id = id
+      where p.id = public.current_profile_id() and p.university_id = id
     )
   );
 create policy "authenticated users read departments"
@@ -900,7 +944,7 @@ create policy "authenticated users read departments"
     public.is_active_user()
     and exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.university_id = university_id
+      where p.id = public.current_profile_id() and p.university_id = university_id
     )
   );
 create policy "authenticated users read semesters"
@@ -909,7 +953,7 @@ create policy "authenticated users read semesters"
     public.is_active_user()
     and exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.university_id = university_id
+      where p.id = public.current_profile_id() and p.university_id = university_id
     )
   );
 create policy "users read accessible batches"
@@ -924,14 +968,16 @@ create policy "users read accessible batch semesters"
 
 create policy "users read own profile"
   on public.profiles for select to authenticated
-  using (id = auth.uid());
+  using (id = public.current_profile_id());
 create policy "users update safe own profile fields"
   on public.profiles for update to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using (id = public.current_profile_id())
+  with check (id = public.current_profile_id());
+revoke update on table public.profiles from authenticated;
+grant update (display_name, avatar_url) on table public.profiles to authenticated;
 create policy "users read own student profile"
   on public.student_profiles for select to authenticated
-  using (profile_id = auth.uid());
+  using (profile_id = public.current_profile_id());
 
 create policy "users read active courses"
   on public.courses for select to authenticated
@@ -942,7 +988,7 @@ create policy "users read active courses"
       select 1
       from public.departments d
       join public.profiles p on p.university_id = d.university_id
-      where d.id = department_id and p.id = auth.uid()
+      where d.id = department_id and p.id = public.current_profile_id()
     )
   );
 create policy "users read accessible offerings"
@@ -950,7 +996,7 @@ create policy "users read accessible offerings"
   using (public.can_access_offering(id));
 create policy "users read own grants"
   on public.role_grants for select to authenticated
-  using (profile_id = auth.uid());
+  using (profile_id = public.current_profile_id());
 
 create policy "users read accessible routine slots"
   on public.routine_slots for select to authenticated
@@ -958,7 +1004,7 @@ create policy "users read accessible routine slots"
 create policy "authorized users create routine slots"
   on public.routine_slots for insert to authenticated
   with check (
-    created_by = auth.uid()
+    created_by = public.current_profile_id()
     and public.can_admin_academic_scope(null, null, null, course_offering_id)
   );
 create policy "authorized users update routine slots"
@@ -970,12 +1016,12 @@ create policy "users read targeted published notices"
   on public.notices for select to authenticated
   using (
     (state = 'published' and deleted_at is null and public.can_read_notice(id))
-    or author_id = auth.uid()
+    or author_id = public.current_profile_id()
     or public.can_manage_notice(id)
   );
 create policy "authorized users create notices"
   on public.notices for insert to authenticated
-  with check (author_id = auth.uid() and public.has_publisher_role());
+  with check (author_id = public.current_profile_id() and public.has_publisher_role());
 create policy "authorized users update notices"
   on public.notices for update to authenticated
   using (public.can_manage_notice(id))
@@ -986,7 +1032,7 @@ create policy "users read accessible notice targets"
 create policy "authors create authorized notice targets"
   on public.notice_targets for insert to authenticated
   with check (
-    exists (select 1 from public.notices n where n.id = notice_id and n.author_id = auth.uid())
+    exists (select 1 from public.notices n where n.id = notice_id and n.author_id = public.current_profile_id())
     and public.can_manage_notice_target(university_id, department_id, batch_id, section_id, course_offering_id)
   );
 create policy "managers delete notice targets"
@@ -1005,7 +1051,7 @@ create policy "users read accessible class changes"
 create policy "authorized users create class changes"
   on public.class_changes for insert to authenticated
   with check (
-    created_by = auth.uid()
+    created_by = public.current_profile_id()
     and exists (
       select 1 from public.routine_slots r
       where r.id = routine_slot_id
@@ -1028,13 +1074,13 @@ create policy "university users read bus schedules"
     deleted_at is null
     and exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.university_id = university_id
+      where p.id = public.current_profile_id() and p.university_id = university_id
     )
   );
 create policy "admins create bus schedules"
   on public.bus_schedules for insert to authenticated
   with check (
-    created_by = auth.uid()
+    created_by = public.current_profile_id()
     and public.has_active_role('admin', null, null, null, null)
   );
 create policy "admins update bus schedules"
@@ -1051,7 +1097,7 @@ create policy "users read accessible resources"
 create policy "authorized users create resources"
   on public.resources for insert to authenticated
   with check (
-    uploader_id = auth.uid()
+    uploader_id = public.current_profile_id()
     and public.can_manage_academic_scope(null, null, null, course_offering_id)
   );
 create policy "authorized users update resources"
@@ -1083,24 +1129,24 @@ create policy "users read likes for visible notices"
   using (public.can_read_notice(notice_id));
 create policy "users manage own notice likes"
   on public.notice_likes for all to authenticated
-  using (profile_id = auth.uid())
-  with check (profile_id = auth.uid() and public.can_read_notice(notice_id));
+  using (profile_id = public.current_profile_id())
+  with check (profile_id = public.current_profile_id() and public.can_read_notice(notice_id));
 create policy "users manage own notice pins"
   on public.notice_pins for all to authenticated
-  using (profile_id = auth.uid())
-  with check (profile_id = auth.uid() and public.can_read_notice(notice_id));
+  using (profile_id = public.current_profile_id())
+  with check (profile_id = public.current_profile_id() and public.can_read_notice(notice_id));
 create policy "users manage own notice reminders"
   on public.notice_reminders for all to authenticated
-  using (profile_id = auth.uid())
-  with check (profile_id = auth.uid() and public.can_read_notice(notice_id));
+  using (profile_id = public.current_profile_id())
+  with check (profile_id = public.current_profile_id() and public.can_read_notice(notice_id));
 create policy "users manage own device tokens"
   on public.device_tokens for all to authenticated
-  using (profile_id = auth.uid())
-  with check (profile_id = auth.uid());
+  using (profile_id = public.current_profile_id())
+  with check (profile_id = public.current_profile_id());
 create policy "users manage own notification preferences"
   on public.course_notification_preferences for all to authenticated
-  using (profile_id = auth.uid())
-  with check (profile_id = auth.uid() and public.can_access_offering(course_offering_id));
+  using (profile_id = public.current_profile_id())
+  with check (profile_id = public.current_profile_id() and public.can_access_offering(course_offering_id));
 
 revoke all on public.staff_allowlist from anon, authenticated;
 revoke all on public.audit_log from anon, authenticated;

@@ -83,7 +83,6 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
     implementation(platform(libs.supabase.bom))
-    implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
     implementation(libs.ktor.client.android)
     implementation("com.google.android.gms:play-services-auth:21.0.0")

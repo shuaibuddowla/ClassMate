@@ -313,7 +313,7 @@ class RegisterActivity : AppCompatActivity() {
                 Log.d("AuthTrace", "7. uid: ${user.uid}")
                 Log.d("AuthTrace", "8. isNewUser: ${result.additionalUserInfo?.isNewUser == true}")
                 AuthDebug.d("Google signup Firebase auth success uid=${user.uid} isNewUser=${result.additionalUserInfo?.isNewUser == true}")
-                continueAfterSupabaseShadowSignIn(idToken) {
+                continueAfterFirebaseSignIn {
                     saveGoogleUserToFirestore(
                         uid = user.uid,
                         name = user.displayName.orEmpty(),
@@ -332,19 +332,19 @@ class RegisterActivity : AppCompatActivity() {
             }
     }
 
-    private fun continueAfterSupabaseShadowSignIn(idToken: String, continueFirebaseFlow: () -> Unit) {
+    private fun continueAfterFirebaseSignIn(continueFirebaseFlow: () -> Unit) {
         if (!sessionRepository.isConfigured) {
             continueFirebaseFlow()
             return
         }
 
         lifecycleScope.launch {
-            sessionRepository.signInWithGoogleIdToken(idToken)
+            sessionRepository.synchronizeFirebaseSession()
                 .onSuccess { profile ->
-                    Log.d("AuthTrace", "Supabase shadow signup success status=${profile.status}")
+                    Log.d("AuthTrace", "Firebase-to-Supabase profile sync success status=${profile.status}")
                 }
                 .onFailure { error ->
-                    Log.w("AuthTrace", "Supabase shadow signup failed; continuing with Firebase", error)
+                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed; continuing with legacy data", error)
                 }
             continueFirebaseFlow()
         }

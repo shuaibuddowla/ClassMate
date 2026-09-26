@@ -4,9 +4,23 @@
  */
 
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {auth as authV1} from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
+
+/**
+ * Makes Firebase ID tokens usable as authenticated Supabase third-party JWTs.
+ * Existing custom claims are preserved. Existing users are handled by the
+ * owner-run backfill script in functions/scripts.
+ */
+export const onFirebaseUserCreated = authV1.user().onCreate(async (user) => {
+  await admin.auth().setCustomUserClaims(user.uid, {
+    ...(user.customClaims || {}),
+    role: "authenticated",
+  });
+  console.log(`Assigned Supabase role claim to Firebase user ${user.uid}`);
+});
 
 /**
  * Triggers for a batch-scoped notice and sends only to that batch's topic.

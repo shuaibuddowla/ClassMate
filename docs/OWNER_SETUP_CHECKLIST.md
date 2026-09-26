@@ -56,31 +56,63 @@ SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_CLIENT_KEY
 ```
 
-Adding both values activates the existing shadow-auth path. Firebase remains
-the main app session while Supabase failures are logged for migration testing.
+Adding both values activates the V2 data client. Firebase remains the only app
+session; its ID token is sent to Supabase for RLS-protected data access.
 
-## 4. Configure Google OAuth for Supabase
+## 4. Connect Firebase Authentication to Supabase
 
-1. Open Google Auth Platform / Google Cloud Console for the project that owns
-   the current Google Sign-In web client.
-2. Confirm the OAuth consent screen and add your own university account as a
-   test user while the app is in Testing status.
-3. Create or select a **Web application** OAuth client.
-4. In Supabase **Authentication > Providers > Google**, copy the displayed
-   callback URL.
-5. Add that exact callback URL under the web client's **Authorized redirect
-   URIs** in Google Cloud.
-6. Put the web client ID and client secret into Supabase's Google provider page.
-   The client secret belongs only in Supabase/Google, never in Android.
-7. If separate Android and web client IDs are used, configure Supabase's Google
-   client-ID list with the web ID first, followed by the Android ID.
-8. Ensure the Android OAuth client uses package `com.shuaib.classmate` and both
-   the debug and release SHA-1 fingerprints.
+Do **not** enable the Google provider under Supabase **Authentication > Sign In
+/ Providers**. Do not copy a Google client secret into Supabase.
 
-The app obtains `default_web_client_id` from `app/google-services.json`, so its
-web client must be one accepted by the Supabase Google provider.
+1. In Firebase Console, open **Project settings > General** and copy the exact
+   **Project ID** (not the project number or Android app ID).
+2. In Supabase, open **Authentication > Third-Party Auth**.
+3. Add a **Firebase** integration and enter that Firebase Project ID.
+4. Save it. Hosted Supabase will then verify Firebase ID tokens issued by that
+   registered project.
+5. Keep Google enabled in Firebase **Authentication > Sign-in method**.
+6. Ensure the Android Firebase app uses package `com.shuaib.classmate` and has
+   both debug and release SHA-1/SHA-256 fingerprints.
 
-## 5. Apply the database migrations
+Supabase requires the custom Firebase claim `role: "authenticated"`. The
+repository contains `onFirebaseUserCreated` for future users and a one-time
+backfill script for existing users. Deploy and backfill them in Step 5 before
+testing V2 data access.
+
+## 5. Deploy the Firebase role-claim function
+
+From the repository root, log in to the Firebase CLI, verify that `.firebaserc`
+points to the disposable/development Firebase project, then deploy functions:
+
+```powershell
+firebase login
+firebase use
+cd functions
+npm ci
+npm run build
+cd ..
+firebase deploy --only functions:onFirebaseUserCreated
+```
+
+The trigger handles only users created after deployment. Existing Firebase
+users need the one-time backfill. The safest route is Google Cloud Shell for
+the same project because it supplies Application Default Credentials:
+
+```bash
+git clone YOUR_PRIVATE_REPOSITORY_URL
+cd ClassMate/functions
+npm ci
+gcloud config set project YOUR_FIREBASE_PROJECT_ID
+npm run auth:backfill
+```
+
+If you run it locally instead, set `GOOGLE_APPLICATION_CREDENTIALS` to a
+service-account JSON file stored outside this repository, run the command, then
+remove/revoke that key as appropriate. Never send or commit the JSON file.
+Changing custom claims does not update an already-issued token; sign out and
+back in, or force a token refresh, before testing.
+
+## 6. Apply the database migrations
 
 Install the Supabase CLI, then from the repository root:
 
@@ -103,7 +135,7 @@ The migrations currently create:
   grants/revocation, and student assignment overrides;
 - a private 50 MB `academic-resources` Storage bucket with RLS.
 
-## 6. Seed real structure and bootstrap the first admin
+## 7. Seed real structure and bootstrap the first admin
 
 1. Copy `supabase/bootstrap.example.sql` to
    `supabase/bootstrap.local.sql`.
@@ -113,8 +145,9 @@ The migrations currently create:
 5. Only after it succeeds, use **Continue with Google** in the app with that
    exact owner email.
 
-The pre-login allowlist entry is essential: the auth trigger creates the owner
-profile and global admin grant when that Google account first signs in.
+The pre-login allowlist entry is essential: the secured
+`bootstrap_firebase_profile` RPC creates the owner profile and global admin
+grant when that Google account first signs in.
 
 Before testing ordinary students, create every needed department prefix and
 batch code. For example, `ce25045@mbstu.ac.bd` needs an active department whose
@@ -125,7 +158,7 @@ Do not invent or send me institutional data. You must supply the department
 list, prefixes, batches, sections, semester dates, course catalog, teacher
 emails, CR accounts, routine, and bus schedule.
 
-## 7. Configure staff and roles
+## 8. Configure staff and roles
 
 - Add a teacher/admin email to `staff_allowlist` before that staff member's
   first sign-in.
@@ -138,7 +171,7 @@ emails, CR accounts, routine, and bus schedule.
   `override_student_assignment` through the admin client/RPC once its screens
   are connected; avoid direct table edits after bootstrap.
 
-## 8. Verify Firebase and FCM
+## 9. Verify Firebase and FCM
 
 The existing Firebase project remains necessary for FCM during and after this
 migration.
@@ -151,7 +184,7 @@ migration.
 5. Keep FCM server/service-account credentials only in a trusted server or
    Supabase Edge Function secret store.
 
-## 9. Security test matrix before enabling V2 as primary
+## 10. Security test matrix before enabling V2 as primary
 
 Create separate test accounts and verify both allowed and rejected operations:
 
@@ -168,7 +201,7 @@ Also test a fake client request directly against the REST API. Hiding buttons is
 not an authorization test. Confirm private Storage files cannot be downloaded
 without an authorized JWT.
 
-## 10. Physical-device acceptance tests
+## 11. Physical-device acceptance tests
 
 Test at least:
 
@@ -182,7 +215,7 @@ Test at least:
 - APK update, SHA-256 verification, and upgrade over the installed version;
 - one older or lower-end Android device.
 
-## 11. Production readiness
+## 12. Production readiness
 
 Before production, create a separate production Supabase project, repeat the
 reviewed migrations and real seed, configure backups, publish a privacy policy,
@@ -192,7 +225,7 @@ matrix again. Keep development and production keys separate.
 Useful official references:
 
 - Supabase CLI workflow: https://supabase.com/docs/guides/local-development/cli-workflows
-- Supabase Google provider: https://supabase.com/docs/guides/auth/social-login/auth-google
+- Supabase Firebase third-party auth: https://supabase.com/docs/guides/auth/third-party/firebase-auth
 - Supabase Storage access control: https://supabase.com/docs/guides/storage/security/access-control
 - Firebase Android setup: https://firebase.google.com/docs/android/setup
 - Android app signing: https://developer.android.com/studio/publish/app-signing

@@ -213,8 +213,7 @@ class LoginActivity : AppCompatActivity() {
         return valid
     }
 
-    private fun continueAfterSupabaseShadowSignIn(
-        idToken: String,
+    private fun continueAfterFirebaseSignIn(
         uid: String,
         user: FirebaseUser
     ) {
@@ -224,12 +223,12 @@ class LoginActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            sessionRepository.signInWithGoogleIdToken(idToken)
+            sessionRepository.synchronizeFirebaseSession()
                 .onSuccess { profile ->
-                    Log.d("AuthTrace", "Supabase shadow auth success status=${profile.status}")
+                    Log.d("AuthTrace", "Firebase-to-Supabase profile sync success status=${profile.status}")
                 }
                 .onFailure { error ->
-                    Log.w("AuthTrace", "Supabase shadow auth failed; continuing with Firebase", error)
+                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed; continuing with legacy data", error)
                 }
             normalizeUserProfile(uid, user)
         }
@@ -274,7 +273,7 @@ class LoginActivity : AppCompatActivity() {
                 val user = result.user ?: return@addOnSuccessListener
                 Log.d("AuthTrace", "Firebase credential success, uid: ${user.uid}")
                 AuthDebug.d("Google signin Firebase auth success uid=${user.uid} isNewUser=${result.additionalUserInfo?.isNewUser == true}")
-                continueAfterSupabaseShadowSignIn(idToken, user.uid, user)
+                continueAfterFirebaseSignIn(user.uid, user)
             }
             .addOnFailureListener {
                 Log.d("AuthTrace", "Firebase credential failure: ${it.message}")

@@ -194,104 +194,6 @@ create trigger role_grants_validate_scope
   before insert or update on public.role_grants
   for each row execute procedure public.validate_role_grant_scope();
 
--- Explicit staff authorization is trusted over the student-shaped email parser.
--- This also allows the owner to bootstrap an admin account even when their
--- university address happens to match the student pattern.
-create or replace function public.handle_new_auth_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  normalized_email text := lower(new.email);
-  normalized_domain text;
-  identity_parts text[];
-  matched_university public.universities%rowtype;
-  matched_department public.departments%rowtype;
-  matched_batch public.batches%rowtype;
-  allowed_staff public.staff_allowlist%rowtype;
-  profile_state public.profile_status := 'blocked';
-begin
-  if new.email is null or new.email_confirmed_at is null then
-    raise exception 'A verified email address is required';
-  end if;
-  if coalesce(new.raw_app_meta_data ->> 'provider', '') <> 'google' then
-    raise exception 'Google authentication is required';
-  end if;
-
-  normalized_domain := split_part(normalized_email, '@', 2);
-  select * into matched_university
-  from public.universities u
-  where u.email_domain = normalized_domain and u.is_active
-  limit 1;
-
-  if matched_university.id is null then
-    raise exception 'University email domain is not authorized';
-  end if;
-
-  select * into allowed_staff
-  from public.staff_allowlist a
-  where a.email = normalized_email and a.is_active
-  limit 1;
-
-  identity_parts := regexp_match(
-    normalized_email,
-    '^([a-z]+)([0-9]{2})([0-9]{3})@' ||
-      replace(matched_university.email_domain::text, '.', '[.]') || '$'
-  );
-
-  if allowed_staff.id is not null then
-    profile_state := 'active';
-  elsif identity_parts is not null then
-    select * into matched_department
-    from public.departments d
-    where d.university_id = matched_university.id
-      and d.email_prefix = identity_parts[1]
-      and d.is_active
-    limit 1;
-
-    if matched_department.id is not null then
-      select * into matched_batch
-      from public.batches b
-      where b.department_id = matched_department.id
-        and b.cohort_code = identity_parts[2]
-        and not b.is_archived
-      limit 1;
-    end if;
-
-    profile_state := case
-      when matched_batch.id is not null then 'active'::public.profile_status
-      else 'pending_setup'::public.profile_status
-    end;
-  end if;
-
-  insert into public.profiles (
-    id, university_id, email, display_name, avatar_url, status
-  ) values (
-    new.id,
-    matched_university.id,
-    normalized_email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', ''),
-    new.raw_user_meta_data ->> 'avatar_url',
-    profile_state
-  );
-
-  if allowed_staff.id is not null and allowed_staff.role = 'admin' then
-    insert into public.role_grants (profile_id, role, department_id)
-    values (new.id, allowed_staff.role, allowed_staff.department_id);
-  elsif allowed_staff.id is null and identity_parts is not null then
-    insert into public.student_profiles (
-      profile_id, department_id, detected_batch_code, assigned_batch_id, roll_number
-    ) values (
-      new.id, matched_department.id, identity_parts[2], matched_batch.id, identity_parts[3]
-    );
-  end if;
-
-  return new;
-end;
-$$;
-
 -- Admin CRUD remains protected by RLS. University and semester creation require
 -- a global admin; lower academic records may be managed by a scoped admin.
 create policy "global admins create universities"
@@ -469,7 +371,7 @@ begin
       course_offering_id, weekday, starts_at, ends_at, room, class_kind, created_by
     )
     select
-      new_offering, weekday, starts_at, ends_at, room, class_kind, auth.uid()
+      new_offering, weekday, starts_at, ends_at, room, class_kind, public.current_profile_id()
     from public.routine_slots
     where course_offering_id = source_offering.id and deleted_at is null;
   end loop;
@@ -515,7 +417,7 @@ begin
     university_id, email, role, department_id, is_active, notes, created_by
   ) values (
     target_university, lower(target_email)::citext, target_role,
-    target_department, target_is_active, target_notes, auth.uid()
+    target_department, target_is_active, target_notes, public.current_profile_id()
   )
   on conflict (email) do update set
     university_id = excluded.university_id,
@@ -573,7 +475,7 @@ begin
     course_offering_id, expires_at, granted_by
   ) values (
     target_profile, target_role, target_department, target_batch, target_section,
-    target_offering, target_expires_at, auth.uid()
+    target_offering, target_expires_at, public.current_profile_id()
   ) returning id into grant_id;
 
   return grant_id;
@@ -670,7 +572,7 @@ begin
   end if;
   insert into public.audit_log (actor_id, action, entity_table, entity_id, old_data, new_data)
   values (
-    auth.uid(), lower(tg_op), tg_table_name, row_id,
+    public.current_profile_id(), lower(tg_op), tg_table_name, row_id,
     case when tg_op in ('UPDATE', 'DELETE') then to_jsonb(old) end,
     case when tg_op in ('INSERT', 'UPDATE') then to_jsonb(new) end
   );
@@ -706,7 +608,6 @@ create trigger audit_bus_schedules after insert or update or delete on public.bu
 create trigger audit_resources after insert or update or delete on public.resources
   for each row execute procedure public.write_audit_log();
 
-revoke execute on function public.handle_new_auth_user() from public, anon, authenticated;
 revoke execute on function public.set_updated_at() from public, anon, authenticated;
 revoke execute on function public.validate_batch_semester_scope() from public, anon, authenticated;
 revoke execute on function public.validate_course_offering_scope() from public, anon, authenticated;

@@ -47,7 +47,7 @@ create policy "publishers upload managed academic resources"
 on storage.objects for insert to authenticated
 with check (
   bucket_id = 'academic-resources'
-  and owner_id = auth.uid()::text
+  and owner_id = public.current_firebase_uid()
   and exists (
     select 1
     from public.resources r
@@ -55,7 +55,7 @@ with check (
       and r.course_offering_id::text = (storage.foldername(name))[1]
       and r.storage_provider = 'supabase'
       and r.storage_key = name
-      and r.uploader_id = auth.uid()
+      and r.uploader_id = public.current_profile_id()
       and r.deleted_at is null
       and public.can_manage_academic_scope(null, null, null, r.course_offering_id)
   )

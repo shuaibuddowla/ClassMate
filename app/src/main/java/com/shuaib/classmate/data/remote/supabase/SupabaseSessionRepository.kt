@@ -1,25 +1,26 @@
 package com.shuaib.classmate.data.remote.supabase
 
+import com.google.firebase.auth.FirebaseAuth
 import com.shuaib.classmate.domain.auth.AcademicScope
 import com.shuaib.classmate.domain.auth.ProfileStatus
 import com.shuaib.classmate.domain.auth.RoleGrant
 import com.shuaib.classmate.domain.auth.SessionProfile
 import com.shuaib.classmate.domain.auth.SessionRepository
 import com.shuaib.classmate.domain.auth.UserRole
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.Google
-import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
 
 @Singleton
 class SupabaseSessionRepository @Inject constructor(
-    private val clientProvider: SupabaseClientProvider
+    private val clientProvider: SupabaseClientProvider,
+    private val firebaseAuth: FirebaseAuth
 ) : SessionRepository {
     private val mutableSession = MutableStateFlow<SessionProfile?>(null)
 
@@ -28,38 +29,36 @@ class SupabaseSessionRepository @Inject constructor(
     override val isConfigured: Boolean
         get() = clientProvider.isConfigured
 
-    override suspend fun signInWithGoogleIdToken(idToken: String): Result<SessionProfile> =
+    override suspend fun synchronizeFirebaseSession(): Result<SessionProfile> =
         runCatching {
-            require(idToken.isNotBlank()) { "Google ID token cannot be blank." }
-            val client = clientProvider.client
-            client.auth.signInWith(IDToken) {
-                this.idToken = idToken
-                provider = Google
+            val firebaseUser = checkNotNull(firebaseAuth.currentUser) {
+                "No active Firebase session."
             }
+            // Refresh once so newly assigned Firebase custom claims are visible.
+            firebaseUser.getIdToken(true).await()
+            val client = clientProvider.client
+            client.postgrest.rpc("bootstrap_firebase_profile")
             loadCurrentProfile()
         }.onFailure { mutableSession.value = null }
 
     override suspend fun refresh(): Result<SessionProfile> =
-        runCatching { loadCurrentProfile() }
-            .onFailure { mutableSession.value = null }
+        synchronizeFirebaseSession()
 
     override suspend fun signOut(): Result<Unit> =
         runCatching {
-            if (isConfigured) {
-                clientProvider.client.auth.signOut()
-            }
             mutableSession.value = null
         }
 
     private suspend fun loadCurrentProfile(): SessionProfile {
         val client = clientProvider.client
-        val userId = checkNotNull(client.auth.currentUserOrNull()?.id) {
-            "No active Supabase session."
+        val firebaseUid = checkNotNull(firebaseAuth.currentUser?.uid) {
+            "No active Firebase session."
         }
 
         val profile = client.from("profiles")
-            .select { filter { eq("id", userId) } }
+            .select { filter { eq("firebase_uid", firebaseUid) } }
             .decodeSingle<ProfileRow>()
+        val userId = profile.id
 
         val student = client.from("student_profiles")
             .select { filter { eq("profile_id", userId) } }

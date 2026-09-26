@@ -8,6 +8,7 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
+    "auth:backfill": "node scripts/backfill-supabase-role.js",
     "logs": "firebase functions:log"
   },
   "engines": {
