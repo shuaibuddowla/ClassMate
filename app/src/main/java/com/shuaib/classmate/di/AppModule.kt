@@ -10,7 +10,9 @@ import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.data.FirestoreManager
 import com.shuaib.classmate.data.remote.supabase.SupabaseSessionRepository
 import com.shuaib.classmate.data.remote.supabase.SupabaseAcademicCatalogRepository
+import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
 import com.shuaib.classmate.domain.academic.AcademicCatalogRepository
+import com.shuaib.classmate.domain.schedule.ScheduleRepository
 import com.shuaib.classmate.domain.auth.SessionRepository
 import dagger.Module
 import dagger.Provides
@@ -78,4 +80,8 @@ object AppModule {
     fun provideAcademicCatalogRepository(
         repository: SupabaseAcademicCatalogRepository
     ): AcademicCatalogRepository = repository
+
+    @Provides
+    @Singleton
+    fun provideScheduleRepository(repository: SupabaseScheduleRepository): ScheduleRepository = repository
 }

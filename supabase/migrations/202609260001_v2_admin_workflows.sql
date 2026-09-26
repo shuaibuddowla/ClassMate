@@ -1,5 +1,10 @@
 begin;
 
+comment on column public.routine_slots.weekday is
+  'PostgreSQL DOW convention: 0=Sunday, 1=Monday, ..., 6=Saturday';
+comment on column public.bus_schedules.weekdays is
+  'PostgreSQL DOW convention: 0=Sunday, 1=Monday, ..., 6=Saturday';
+
 -- Keep related academic records in the same university/department/batch. These
 -- checks run in PostgreSQL so a modified Android client cannot bypass them.
 create or replace function public.validate_batch_semester_scope()
