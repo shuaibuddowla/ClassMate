@@ -9,6 +9,8 @@ import com.shuaib.classmate.ai.GroqAiProvider
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.data.FirestoreManager
 import com.shuaib.classmate.data.remote.supabase.SupabaseSessionRepository
+import com.shuaib.classmate.data.remote.supabase.SupabaseAcademicCatalogRepository
+import com.shuaib.classmate.domain.academic.AcademicCatalogRepository
 import com.shuaib.classmate.domain.auth.SessionRepository
 import dagger.Module
 import dagger.Provides
@@ -70,4 +72,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSessionRepository(repository: SupabaseSessionRepository): SessionRepository = repository
+
+    @Provides
+    @Singleton
+    fun provideAcademicCatalogRepository(
+        repository: SupabaseAcademicCatalogRepository
+    ): AcademicCatalogRepository = repository
 }

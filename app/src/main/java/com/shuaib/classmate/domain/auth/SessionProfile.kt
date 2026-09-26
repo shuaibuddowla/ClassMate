@@ -26,6 +26,7 @@ data class RoleGrant(
 /** A backend-neutral replacement target for the Firebase-specific User model. */
 data class SessionProfile(
     val id: String,
+    val universityId: String,
     val email: String,
     val displayName: String,
     val avatarUrl: String? = null,

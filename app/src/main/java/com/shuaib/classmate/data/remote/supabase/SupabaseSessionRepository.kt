@@ -78,6 +78,9 @@ class SupabaseSessionRepository @Inject constructor(
 
         return SessionProfile(
             id = profile.id,
+            universityId = requireNotNull(profile.universityId) {
+                "Authenticated profile has no university assignment."
+            },
             email = profile.email,
             displayName = profile.displayName.ifBlank { profile.email.substringBefore('@') },
             avatarUrl = profile.avatarUrl,

@@ -727,7 +727,7 @@ set search_path = ''
 as $$
 declare
   normalized_email citext := lower(new.email);
-  email_domain citext;
+  normalized_domain citext;
   identity_parts text[];
   matched_university public.universities%rowtype;
   matched_department public.departments%rowtype;
@@ -743,10 +743,10 @@ begin
     raise exception 'Google authentication is required';
   end if;
 
-  email_domain := split_part(normalized_email::text, '@', 2)::citext;
+  normalized_domain := split_part(normalized_email::text, '@', 2)::citext;
   select * into matched_university
   from public.universities u
-  where u.email_domain = email_domain and u.is_active
+  where u.email_domain = normalized_domain and u.is_active
   limit 1;
 
   if matched_university.id is null then

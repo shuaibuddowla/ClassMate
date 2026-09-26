@@ -19,6 +19,11 @@ skills-lock.json
 .externalNativeBuild
 .cxx
 local.properties
+supabase/bootstrap.local.sql
+keystore.properties
+*.jks
+*.keystore
+service-account*.json
 app/release/
 release/
 web-staging/

@@ -32,3 +32,8 @@ Firebase screens remain active while V2 authentication and data slices are
 verified against a disposable Supabase project. When both values are present,
 Google sign-in also creates or refreshes the Supabase session in shadow mode;
 failure is logged and the Firebase flow continues.
+
+The complete owner-operated setup and verification procedure is documented in
+`docs/OWNER_SETUP_CHECKLIST.md`. Start from `bootstrap.example.sql` when seeding
+a disposable project; never put real owner/institutional data into that tracked
+template.
