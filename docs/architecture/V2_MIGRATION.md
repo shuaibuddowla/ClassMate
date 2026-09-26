@@ -74,3 +74,32 @@ project and tested with separate student, CR, teacher, and admin accounts.
 - Teacher writes are restricted to assigned course offerings.
 - Admin writes are restricted by their granted scope.
 - RLS behavior has been manually tested with all four user roles.
+
+## Implementation status
+
+Completed in source control:
+
+- V2 PostgreSQL schema, RLS, server-side Google profile bootstrap, scoped roles,
+  integrity triggers, audit logging, semester publish/clone functions, and
+  private academic-resource Storage policies.
+- Android Supabase client, shadow Google session creation, profile/role loading,
+  backend-neutral academic catalog, and schedule repositories.
+- Owner bootstrap template and external-account setup checklist.
+- Embedded PostgreSQL smoke coverage for migration syntax, allowlisted admin
+  bootstrap, student email parsing, and active-semester publication.
+
+Awaiting owner-operated environment setup:
+
+- create and configure the development Supabase project and Google provider;
+- apply migrations and seed real institutional structure;
+- test RLS and private Storage using separate role accounts and physical devices.
+
+Next coding slices:
+
+1. Notices, targets, likes, pins, reminders, and FCM event delivery.
+2. Library/resource metadata, Supabase Storage upload/download, bookmarks, and
+   version replacement.
+3. Replace timetable/bus UI reads after live data parity is verified.
+4. Admin management screens backed by the scoped RPCs.
+5. Harden the GitHub release updater with required version metadata and SHA-256.
+6. Retire obsolete Firebase Auth/Firestore/Storage paths only after parity.
