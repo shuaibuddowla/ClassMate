@@ -13,6 +13,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +41,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
+import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.chat.ChatNotificationHelper
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.databinding.ActivityMainBinding
@@ -49,6 +51,7 @@ import com.shuaib.classmate.fragments.PdfLibraryFragment
 import com.shuaib.classmate.fragments.ProfileFragment
 import com.shuaib.classmate.fragments.TimetableFragment
 import com.shuaib.classmate.models.User
+import com.shuaib.classmate.domain.auth.SessionRepository
 import com.shuaib.classmate.notices.NoticeReminderManager
 import com.shuaib.classmate.ui.BottomNavAnimator
 import com.shuaib.classmate.utils.HapticHelper
@@ -60,6 +63,7 @@ import com.shuaib.classmate.utils.AppUpdateManager
 import com.shuaib.classmate.workers.TimetableResetWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 import android.hardware.Sensor
 import android.hardware.SensorManager
@@ -70,6 +74,9 @@ import com.shuaib.classmate.utils.AppPreferences
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+
+    @Inject
+    lateinit var sessionRepository: SessionRepository
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var auth: FirebaseAuth
@@ -121,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
         appPrefs = AppPreferences(this)
+        synchronizeV2Session()
         if (appPrefs.isShakeToTorchEnabled()) {
             val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
                 this,
@@ -179,6 +187,30 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun synchronizeV2Session() {
+        if (auth.currentUser == null || !sessionRepository.isConfigured) return
+
+        lifecycleScope.launch {
+            sessionRepository.synchronizeFirebaseSession()
+                .onSuccess { profile ->
+                    Log.i(
+                        "V2Session",
+                        "Firebase-to-Supabase startup sync succeeded: ${profile.status}"
+                    )
+                }
+                .onFailure { error ->
+                    Log.e("V2Session", "Firebase-to-Supabase startup sync failed", error)
+                    if (BuildConfig.DEBUG) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "V2 setup failed: ${error.message ?: error.javaClass.simpleName}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+        }
     }
 
     fun setMainPageSwipeEnabled(enabled: Boolean) {
