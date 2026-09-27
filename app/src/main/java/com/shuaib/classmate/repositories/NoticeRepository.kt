@@ -16,6 +16,7 @@ import com.shuaib.classmate.data.local.ClassMateDatabase
 import com.shuaib.classmate.data.local.NoticeEntity
 import com.shuaib.classmate.data.remote.supabase.SupabaseClientProvider
 import com.shuaib.classmate.data.remote.supabase.SupabaseNoticeFeed
+import com.shuaib.classmate.notices.NoticeEngagement
 import com.shuaib.classmate.models.Notice
 import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.utils.AppContextManager
@@ -149,6 +150,18 @@ class NoticeRepository private constructor(context: Context) {
                 WidgetUpdater.refresh(appContext, syncTodayTimetable = false)
             }
         }
+
+    suspend fun loadSupabaseEngagement(noticeIds: Set<String>): Map<String, NoticeEngagement> =
+        supabaseFeed.loadEngagement(noticeIds)
+
+    suspend fun setSupabaseLike(noticeId: String, liked: Boolean) =
+        supabaseFeed.setLiked(noticeId, liked)
+
+    suspend fun setSupabasePersonalPin(noticeId: String, pinned: Boolean) =
+        supabaseFeed.setPersonalPin(noticeId, pinned)
+
+    suspend fun setSupabaseGlobalPin(noticeId: String, pinned: Boolean) =
+        supabaseFeed.setGlobalPin(noticeId, pinned)
 
     fun enqueueNetworkSync() {
         val request = OneTimeWorkRequestBuilder<OfflineSyncWorker>()

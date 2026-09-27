@@ -47,6 +47,8 @@ import com.shuaib.classmate.models.Poll
 import com.shuaib.classmate.notices.NoticeEngagement
 import com.shuaib.classmate.notices.NoticeCommentsBottomSheetFragment
 import com.shuaib.classmate.notices.NoticeLikeManager
+import com.shuaib.classmate.notices.NoticeBookmarkManager
+import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.notices.NoticeReminderManager
 import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.utils.NetworkMonitor
@@ -56,6 +58,8 @@ import com.shuaib.classmate.utils.applyClickAnimation
 import com.shuaib.classmate.viewmodels.NoticeViewModel
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+private val UUID_PATTERN = Regex("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 class NoticeFragment : Fragment() {
 
@@ -81,6 +85,7 @@ class NoticeFragment : Fragment() {
     private val likeCountByNotice = mutableMapOf<String, Int>()
     private var likedNoticeIds: Set<String> = emptySet()
     private val pendingPinnedState = mutableMapOf<String, Boolean>()
+    private val personallyPinnedNoticeIds = mutableSetOf<String>()
     private var currentRenderedItems: List<Any> = emptyList()
     private var todayReminderShown = false
 
@@ -623,21 +628,70 @@ class NoticeFragment : Fragment() {
         likedNoticeIds = if (targetLiked) likedNoticeIds + notice.id else likedNoticeIds - notice.id
         likeCountByNotice[notice.id] = ((likeCountByNotice[notice.id] ?: 0) + if (targetLiked) 1 else -1).coerceAtLeast(0)
         noticeAdapter.setEngagementState(buildEngagementState())
-        NoticeLikeManager.setLiked(uid, notice.id, targetLiked) { success, error ->
-            if (!success && _binding != null) {
-                likedNoticeIds = if (targetLiked) likedNoticeIds - notice.id else likedNoticeIds + notice.id
-                likeCountByNotice[notice.id] = ((likeCountByNotice[notice.id] ?: 0) + if (targetLiked) -1 else 1).coerceAtLeast(0)
-                noticeAdapter.setEngagementState(buildEngagementState())
-                Toast.makeText(requireContext(), "Like update failed: ${actionErrorMessage(error)}", Toast.LENGTH_LONG).show()
+        if (UUID_PATTERN.matches(notice.id)) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                runCatching { NoticeRepository.getInstance(requireContext()).setSupabaseLike(notice.id, targetLiked) }
+                    .onFailure { error -> revertOptimisticLike(notice, targetLiked, error) }
+            }
+        } else {
+            NoticeLikeManager.setLiked(uid, notice.id, targetLiked) { success, error ->
+                if (!success) revertOptimisticLike(notice, targetLiked, error)
             }
         }
     }
 
+    private fun revertOptimisticLike(notice: Notice, targetLiked: Boolean, error: Throwable?) {
+        if (_binding == null) return
+        likedNoticeIds = if (targetLiked) likedNoticeIds - notice.id else likedNoticeIds + notice.id
+        likeCountByNotice[notice.id] = ((likeCountByNotice[notice.id] ?: 0) + if (targetLiked) -1 else 1).coerceAtLeast(0)
+        noticeAdapter.setEngagementState(buildEngagementState())
+        Toast.makeText(requireContext(), "Like update failed: ${actionErrorMessage(error)}", Toast.LENGTH_LONG).show()
+    }
+
     private fun togglePin(notice: Notice) {
-        if (!isAdmin) return
-        val nextPinned = !isPinned(notice)
+        val isSupabaseNotice = UUID_PATTERN.matches(notice.id)
+        if (!isAdmin && !isSupabaseNotice) {
+            val nextPersonalPin = notice.id !in personallyPinnedNoticeIds
+            if (nextPersonalPin) personallyPinnedNoticeIds.add(notice.id)
+            else personallyPinnedNoticeIds.remove(notice.id)
+            NoticeBookmarkManager.setBookmarked(currentUserId, notice.id, nextPersonalPin) { success ->
+                if (!success && _binding != null) {
+                    if (nextPersonalPin) personallyPinnedNoticeIds.remove(notice.id)
+                    else personallyPinnedNoticeIds.add(notice.id)
+                }
+                if (_binding != null) renderFeed()
+            }
+            renderFeed(scrollToTop = nextPersonalPin)
+            return
+        }
+        val nextPinned = if (isAdmin) !notice.isPinned else notice.id !in personallyPinnedNoticeIds
         pendingPinnedState[notice.id] = nextPinned
         renderFeed(scrollToTop = nextPinned) // Scroll to top only if pinning
+        if (isSupabaseNotice) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val result = runCatching {
+                    val repository = NoticeRepository.getInstance(requireContext())
+                    if (isAdmin) repository.setSupabaseGlobalPin(notice.id, nextPinned)
+                    else repository.setSupabasePersonalPin(notice.id, nextPinned)
+                }
+                result.onSuccess {
+                    pendingPinnedState.remove(notice.id)
+                    if (!isAdmin) {
+                        if (nextPinned) personallyPinnedNoticeIds.add(notice.id)
+                        else personallyPinnedNoticeIds.remove(notice.id)
+                    }
+                    runCatching { NoticeRepository.getInstance(requireContext()).syncFromSupabase() }
+                    if (_binding != null) renderFeed()
+                }.onFailure { error ->
+                    pendingPinnedState.remove(notice.id)
+                    if (_binding != null) {
+                        renderFeed()
+                        Toast.makeText(requireContext(), "Pin update failed: ${actionErrorMessage(error)}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            return
+        }
         db.collection("notices").document(notice.id)
             .update(mapOf("isPinned" to nextPinned, "updatedAt" to FieldValue.serverTimestamp()))
             .addOnSuccessListener {
@@ -820,8 +874,31 @@ class NoticeFragment : Fragment() {
 
         fetchedEngagementNoticeIds.addAll(toFetch)
 
+        val supabaseIds = toFetch.filterTo(mutableSetOf(), UUID_PATTERN::matches)
+        if (supabaseIds.isNotEmpty()) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                runCatching {
+                    NoticeRepository.getInstance(requireContext()).loadSupabaseEngagement(supabaseIds)
+                }.onSuccess { engagement ->
+                    if (_binding == null) return@onSuccess
+                    engagement.forEach { (id, state) ->
+                        likeCountByNotice[id] = state.likeCount
+                        if (state.isLiked) likedNoticeIds = likedNoticeIds + id
+                        else likedNoticeIds = likedNoticeIds - id
+                        if (state.isPersonallyPinned) personallyPinnedNoticeIds.add(id)
+                        else personallyPinnedNoticeIds.remove(id)
+                    }
+                    noticeAdapter.setEngagementState(buildEngagementState())
+                }.onFailure { error ->
+                    android.util.Log.w("NoticeFragment", "Supabase engagement refresh failed", error)
+                }
+            }
+        }
+
+        val legacyIds = toFetch.filterNotTo(mutableSetOf(), UUID_PATTERN::matches)
+        if (legacyIds.isEmpty()) return
         viewLifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            toFetch.chunked(30).forEach { chunk ->
+            legacyIds.chunked(30).forEach { chunk ->
                 try {
                     val likesTask = db.collection("notice_likes")
                         .whereIn("noticeId", chunk)
@@ -860,13 +937,13 @@ class NoticeFragment : Fragment() {
                 commentCount = notice.discussionCount,
                 shareCount = 0,
                 isLiked = notice.id in likedNoticeIds,
-                isPinned = pendingPinnedState[notice.id] ?: notice.isPinned
+                isPinned = pendingPinnedState[notice.id] ?: (notice.isPinned || notice.id in personallyPinnedNoticeIds)
             )
         }
     }
 
     private fun isPinned(notice: Notice): Boolean {
-        return pendingPinnedState[notice.id] ?: notice.isPinned
+        return pendingPinnedState[notice.id] ?: (notice.isPinned || notice.id in personallyPinnedNoticeIds)
     }
 
     private fun pinnedNoticeIds(): Set<String> {
@@ -893,7 +970,7 @@ class NoticeFragment : Fragment() {
         return uid
     }
 
-    private fun actionErrorMessage(error: Exception?): String {
+    private fun actionErrorMessage(error: Throwable?): String {
         return error?.message ?: "Unknown error"
     }
 

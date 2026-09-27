@@ -6,6 +6,8 @@ data class NoticeEngagement(
     val commentCount: Int = 0,
     val shareCount: Int = 0,
     val isLiked: Boolean = false,
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val isGloballyPinned: Boolean = false,
+    val isPersonallyPinned: Boolean = false
 )
 
