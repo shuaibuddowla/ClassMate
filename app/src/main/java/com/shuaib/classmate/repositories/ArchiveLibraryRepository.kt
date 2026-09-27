@@ -16,7 +16,6 @@ import com.shuaib.classmate.utils.SemesterManager
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.time.Instant
@@ -163,54 +162,12 @@ object ArchiveLibraryRepository {
         onFailure: (Exception) -> Unit,
         description: String = ""
     ) = runAsync(onFailure) {
-        // Firestore remains the source of truth for published semesters and courses.
-        // Until that catalog is synchronized to the V2 tables, use the existing
-        // authorized archive upload route even for users with a V2 session.
-        val payload = mapOf(
-            "batchId" to archiveBatch(batchId),
-            "semesterNumber" to semesterNumber(semesterId),
-            "courseId" to course.id,
-            "title" to title.trim(),
-            "materialType" to materialType,
-            "fileName" to fileName,
-            "fileSize" to sizeBytes,
-            "mimeType" to mimeType,
-            "tags" to emptyList<String>()
-        )
-        val create = BackendApiClient.authenticated(
-            Request.Builder()
-                .url(BackendApiClient.url("v1/archive/uploads"))
-                .post(gson.toJson(payload).toRequestBody(JSON))
-        )
-        val session = executeJson(create)
-        val id = session.get("id").asString
-        val signedUrl = session.get("url").asString
-        val body = object : RequestBody() {
-            override fun contentType() = mimeType.toMediaTypeOrNull()
-            override fun contentLength() = sizeBytes
-            override fun writeTo(sink: okio.BufferedSink) {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    val buffer = ByteArray(64 * 1024)
-                    var sent = 0L
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        sink.write(buffer, 0, count)
-                        sent += count
-                        if (sizeBytes > 0) onProgress(((sent * 100) / sizeBytes).toInt().coerceIn(0, 100))
-                    }
-                } ?: throw IOException("Unable to read the selected file")
-            }
+        if (!AppContextManager.appContextFlow.value.v2SessionActive || !v2Resources.isConfigured) {
+            throw IOException("Supabase V2 is not ready for uploads. Sign in to your V2 account and check Supabase configuration.")
         }
-        client.newCall(Request.Builder().url(signedUrl).put(body).build()).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("File transfer failed (${response.code})")
+        val id = runBlocking {
+            v2Resources.upload(context, uri, batchId, semesterId, course, title, fileName, sizeBytes, mimeType, materialType, description, onProgress)
         }
-        val complete = BackendApiClient.authenticated(
-            Request.Builder()
-                .url(BackendApiClient.url("v1/archive/uploads/$id/complete"))
-                .post("{}".toRequestBody(JSON))
-        )
-        executeJson(complete)
         mainHandler.post { onSuccess(id) }
     }
 

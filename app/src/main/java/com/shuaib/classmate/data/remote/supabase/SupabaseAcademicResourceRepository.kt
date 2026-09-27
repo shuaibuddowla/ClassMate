@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.utils.SemesterManager
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
@@ -105,6 +106,28 @@ internal class SupabaseAcademicResourceRepository {
     ): String {
         check(isConfigured) { "Supabase is not configured." }
         val client = clientProvider.client
+        // Re-run the trusted identity bootstrap before upload. This turns the
+        // owner allowlist entry into the global-admin role grant checked by RLS.
+        client.postgrest.rpc("bootstrap_firebase_profile")
+        val firebaseUid = checkNotNull(FirebaseAuth.getInstance().currentUser?.uid) { "Please sign in again." }
+        val profile = client.from("profiles").select()
+            .decodeList<ProfileRow>()
+            .firstOrNull { it.firebaseUid == firebaseUid }
+            ?: throw IOException("Your account does not have a Supabase profile yet. Sign in again.")
+        if (profile.status !in setOf("active", "graduated")) {
+            throw IOException("Your Supabase profile is not active. Ask the owner to allowlist your university email.")
+        }
+        val now = Instant.now()
+        val hasPublishingGrant = client.from("role_grants").select()
+            .decodeList<RoleGrantRow>()
+            .any { grant ->
+                grant.profileId == profile.id && grant.role in setOf("admin", "teacher", "cr") &&
+                    grant.revokedAt == null && Instant.parse(grant.startsAt).let { !it.isAfter(now) } &&
+                    (grant.expiresAt == null || Instant.parse(grant.expiresAt).isAfter(now))
+            }
+        if (!hasPublishingGrant) {
+            throw IOException("Your Supabase account has no publishing role. Add the owner email to Supabase staff allowlist, then sign in again.")
+        }
         val departments = client.from("departments").select().decodeList<DepartmentRow>()
         val batches = client.from("batches").select().decodeList<BatchRow>()
         val semesters = client.from("semesters").select().decodeList<SemesterRow>()
@@ -122,17 +145,15 @@ internal class SupabaseAcademicResourceRepository {
             .filter { semesterById[it.semesterId]?.ordinal == semesterOrdinal(semesterRoute) }
             .map { it.id }
             .toSet()
+        if (batchSemesterIds.isEmpty()) {
+            throw IOException("${SemesterManager.formatDisplay(semesterRoute)} for this batch has not been published in Supabase V2 yet. Firestore semester publishing does not copy it into Supabase.")
+        }
         val courseRecord = courses.firstOrNull {
             it.code.equals(course.code, true) || it.name.equals(course.name, true)
         } ?: throw IOException("The selected course is not configured in ClassMate V2 yet.")
         val offering = offerings.firstOrNull {
             it.batchSemesterId in batchSemesterIds && it.courseId == courseRecord.id
         } ?: throw IOException("This course has no published V2 offering for the selected semester.")
-        val firebaseUid = checkNotNull(FirebaseAuth.getInstance().currentUser?.uid) { "Please sign in again." }
-        val profile = client.from("profiles").select().decodeList<ProfileRow>()
-            .firstOrNull { it.firebaseUid == firebaseUid }
-            ?: throw IOException("Your ClassMate V2 profile is not ready. Sign in again and retry.")
-
         val resourceId = UUID.randomUUID().toString()
         val storageKey = "${offering.id}/$resourceId/${safeFileName(fileName)}"
         client.from("resources").insert(
@@ -343,6 +364,16 @@ internal class SupabaseAcademicResourceRepository {
         val status: String,
         @SerialName("created_at") val createdAt: String,
         @SerialName("updated_at") val updatedAt: String
+    )
+
+    @Serializable
+    private data class RoleGrantRow(
+        val id: String,
+        @SerialName("profile_id") val profileId: String,
+        val role: String,
+        @SerialName("starts_at") val startsAt: String,
+        @SerialName("expires_at") val expiresAt: String? = null,
+        @SerialName("revoked_at") val revokedAt: String? = null
     )
 
     private object BuildConfigValue {
