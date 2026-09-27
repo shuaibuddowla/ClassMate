@@ -1,6 +1,7 @@
 package com.shuaib.classmate.data.remote.supabase
 
 import com.google.firebase.auth.FirebaseAuth
+import com.shuaib.classmate.data.remote.auth.FirebaseRoleClaimProvisioner
 import com.shuaib.classmate.domain.auth.AcademicScope
 import com.shuaib.classmate.domain.auth.ProfileStatus
 import com.shuaib.classmate.domain.auth.RoleGrant
@@ -15,12 +16,12 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.tasks.await
 
 @Singleton
 class SupabaseSessionRepository @Inject constructor(
     private val clientProvider: SupabaseClientProvider,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val roleClaimProvisioner: FirebaseRoleClaimProvisioner
 ) : SessionRepository {
     private val mutableSession = MutableStateFlow<SessionProfile?>(null)
 
@@ -31,11 +32,7 @@ class SupabaseSessionRepository @Inject constructor(
 
     override suspend fun synchronizeFirebaseSession(): Result<SessionProfile> =
         runCatching {
-            val firebaseUser = checkNotNull(firebaseAuth.currentUser) {
-                "No active Firebase session."
-            }
-            // Refresh once so newly assigned Firebase custom claims are visible.
-            firebaseUser.getIdToken(true).await()
+            roleClaimProvisioner.ensureAuthenticatedClaim()
             val client = clientProvider.client
             client.postgrest.rpc("bootstrap_firebase_profile")
             loadCurrentProfile()

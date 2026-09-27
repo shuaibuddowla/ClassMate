@@ -57,8 +57,8 @@ specification and should be reviewed before implementation.
 
 Before applying migrations, the project owner must create the Supabase project,
 retain the service-role secret only in trusted server environments, register
-the Firebase Third-Party Auth integration, deploy the Firebase role-claim
-function, and decide how the first administrator will be
+the Firebase Third-Party Auth integration, verify the Vercel role-claim bridge,
+and decide how the first administrator will be
 bootstrapped. Database changes should first be applied to a disposable Supabase
 project and tested with separate student, CR, teacher, and admin accounts.
 
@@ -86,6 +86,8 @@ Completed in source control:
 - Android Supabase client using Firebase ID tokens, secured Firebase-profile
   bootstrap, profile/role loading,
   backend-neutral academic catalog, and schedule repositories.
+- Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
+  Workload Identity Federation, with no service-account private key.
 - Owner bootstrap template and external-account setup checklist.
 - Embedded PostgreSQL smoke coverage for migration syntax, allowlisted admin
   bootstrap, student email parsing, and active-semester publication.
@@ -93,7 +95,7 @@ Completed in source control:
 Awaiting owner-operated environment setup:
 
 - create the development Supabase project and connect Firebase Third-Party Auth;
-- deploy the Firebase custom-claim function and backfill existing users;
+- verify a real Android Google sign-in reaches the deployed Vercel claim bridge;
 - apply migrations and seed real institutional structure;
 - test RLS and private Storage using separate role accounts and physical devices.
 

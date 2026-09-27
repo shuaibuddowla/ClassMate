@@ -36,7 +36,9 @@ failure is logged and the legacy Firebase data flow continues during migration.
 In Supabase, add the Firebase project under **Authentication > Third-Party
 Auth**. Do not configure Supabase's Google provider. Every Firebase user token
 that accesses Supabase must contain the custom claim `role: "authenticated"`;
-see the owner checklist for the deploy and existing-user backfill commands.
+the Android client obtains it through the Vercel role bridge before its first
+Supabase request. See the owner checklist for deployment, verification, and the
+optional existing-user backfill command.
 
 The complete owner-operated setup and verification procedure is documented in
 `docs/OWNER_SETUP_CHECKLIST.md`. Start from `bootstrap.example.sql` when seeding

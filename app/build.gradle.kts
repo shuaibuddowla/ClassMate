@@ -21,6 +21,9 @@ fun getLocalProperty(name: String): String {
     return localProperties.getProperty(name)?.trim() ?: ""
 }
 
+val firebaseRoleBridgeUrl = getLocalProperty("FIREBASE_ROLE_BRIDGE_URL")
+    .ifBlank { "https://classmate-auth-bridge.vercel.app/api/firebase-role" }
+
 android {
     namespace = "com.shuaib.classmate"
     compileSdk = 36
@@ -36,6 +39,7 @@ android {
         buildConfigField("String", "BACKEND_BASE_URL", "\"${getLocalProperty("BACKEND_BASE_URL")}\"")
         buildConfigField("String", "SUPABASE_URL", "\"${getLocalProperty("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${getLocalProperty("SUPABASE_PUBLISHABLE_KEY")}\"")
+        buildConfigField("String", "FIREBASE_ROLE_BRIDGE_URL", "\"$firebaseRoleBridgeUrl\"")
         buildConfigField("String", "ONESIGNAL_APP_ID", "\"${getLocalProperty("ONESIGNAL_APP_ID")}\"")
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
         buildConfigField("String", "GEMINI_MODEL", "\"gemini-2.5-flash\"")

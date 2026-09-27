@@ -75,36 +75,41 @@ Do **not** enable the Google provider under Supabase **Authentication > Sign In
    both debug and release SHA-1/SHA-256 fingerprints.
 
 Supabase requires the custom Firebase claim `role: "authenticated"`. The
-repository contains `onFirebaseUserCreated` for future users and a one-time
-backfill script for existing users. Deploy and backfill them in Step 5 before
-testing V2 data access.
+Android client requests that claim from the Vercel bridge before its first
+Supabase call. Verify the bridge in Step 5 before testing V2 data access.
 
-## 5. Deploy the Firebase role-claim function
+## 5. Verify the Vercel Firebase role bridge
 
-From the repository root, log in to the Firebase CLI, verify that `.firebaserc`
-points to the disposable/development Firebase project, then deploy functions:
+The role bridge is deployed at:
 
-> Firebase Functions deployment requires the Blaze plan because Firebase must
-> enable Cloud Build and Artifact Registry. Enabling billing is an owner-only
-> financial action. The existing-user backfill below can still be run without
-> deploying the trigger.
-
-```powershell
-firebase login
-firebase use
-cd functions
-npm ci --ignore-scripts
-cd ..
-node functions/scripts/predeploy.js
-firebase deploy --only functions:onFirebaseUserCreated
+```text
+https://classmate-auth-bridge.vercel.app/api/firebase-role
 ```
 
-`--ignore-scripts` is intentional for this repository on Windows: the `&` in
-the workspace path breaks npm's `cmd.exe` lifecycle-script wrapper. The
-path-safe predeploy script directly runs ESLint and TypeScript afterward.
+It replaces the Blaze-dependent Firebase Auth creation trigger. The Android
+build uses this production URL by default; `FIREBASE_ROLE_BRIDGE_URL` in the
+untracked root `local.properties` can override it for development.
 
-The trigger handles only users created after deployment. Existing Firebase
-users need the one-time backfill. The safest route is Google Cloud Shell for
+The Vercel project uses OIDC plus Google Workload Identity Federation, so no
+long-lived service-account key is stored in Vercel or this repository. Its
+dedicated Google identity is restricted to reading Firebase users and updating
+their custom claims. To redeploy after changing `vercel-auth/`:
+
+```powershell
+cd vercel-auth
+npm ci
+npx vercel deploy --prod --yes
+```
+
+For the live verification, sign out of the Android app, sign in with a verified
+Google account, and confirm the V2 profile bootstrap succeeds. A token issued
+before a claim change is stale; the app force-refreshes it after the bridge
+responds. Vercel request logs should show `POST /api/firebase-role` without a
+5xx response. Never paste an ID token into a chat or commit it.
+
+The bridge provisions every caller on demand, so a backfill is not required for
+normal use. If an administrator still wants all existing Firebase users ready
+in advance, the optional one-time script is best run in Google Cloud Shell for
 the same project because it supplies Application Default Credentials:
 
 ```bash

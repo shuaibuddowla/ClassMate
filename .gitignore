@@ -3,6 +3,9 @@
 /app/build/
 /functions/node_modules/
 /node_modules/
+/vercel-auth/node_modules/
+/vercel-auth/.vercel/
+/vercel-auth/.env*.local
 /functions/lib/
 /local.properties
 /.idea/
