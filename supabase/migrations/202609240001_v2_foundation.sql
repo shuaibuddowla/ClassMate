@@ -742,6 +742,24 @@ as $$
   );
 $$;
 
+create or replace function public.batch_code_from_admission_session(session_code text)
+returns text
+language plpgsql
+immutable
+strict
+set search_path = ''
+as $$
+begin
+  if session_code !~ '^[0-9]{2}$' then
+    raise exception 'Admission session code must contain exactly two digits';
+  end if;
+
+  return lpad(mod(session_code::integer + 97, 100)::text, 2, '0');
+end;
+$$;
+
+revoke all on function public.batch_code_from_admission_session(text) from public;
+
 create or replace function public.bootstrap_firebase_profile()
 returns uuid
 language plpgsql
@@ -753,6 +771,7 @@ declare
   normalized_email extensions.citext := lower(auth.jwt() ->> 'email');
   normalized_domain extensions.citext;
   identity_parts text[];
+  derived_batch_code text;
   matched_university public.universities%rowtype;
   matched_department public.departments%rowtype;
   matched_batch public.batches%rowtype;
@@ -788,6 +807,10 @@ begin
     '^([a-z]+)([0-9]{2})([0-9]{3})@' || replace(matched_university.email_domain::text, '.', '[.]') || '$'
   );
 
+  if identity_parts is not null then
+    derived_batch_code := public.batch_code_from_admission_session(identity_parts[2]);
+  end if;
+
   select * into allowed_staff
   from public.staff_allowlist a
   where a.email = normalized_email and a.is_active
@@ -807,7 +830,7 @@ begin
       select * into matched_batch
       from public.batches b
       where b.department_id = matched_department.id
-        and b.cohort_code = identity_parts[2]
+        and b.cohort_code = derived_batch_code
         and not b.is_archived
       limit 1;
     end if;
@@ -858,7 +881,7 @@ begin
     ) values (
       resolved_profile_id,
       matched_department.id,
-      identity_parts[2],
+      derived_batch_code,
       matched_batch.id,
       identity_parts[3]
     )

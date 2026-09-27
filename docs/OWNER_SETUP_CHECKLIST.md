@@ -164,9 +164,11 @@ The pre-login allowlist entry is essential: the secured
 grant when that Google account first signs in.
 
 Before testing ordinary students, create every needed department prefix and
-batch code. For example, `ce25045@mbstu.ac.bd` needs an active department whose
-email prefix is `ce` and a non-archived batch whose cohort code is `25`.
-Otherwise the account correctly becomes `pending_setup`.
+batch code. The two digits after the department prefix are the admission
+session; the academic batch code is that number minus three. For example,
+`ce25045@mbstu.ac.bd` needs an active department whose email prefix is `ce` and
+a non-archived batch whose cohort code is `22`. Otherwise the account correctly
+becomes `pending_setup`.
 
 Do not invent or send me institutional data. You must supply the department
 list, prefixes, batches, sections, semester dates, course catalog, teacher

@@ -11,6 +11,8 @@ application to the architecture in the master project specification.
 - Keep Firebase Cloud Messaging for push delivery.
 - Derive student department, batch code, and roll number on the server from a
   verified `@mbstu.ac.bd` Google account.
+- Interpret the email's two-digit student session as the admission session and
+  derive the academic batch code by subtracting three (`25` becomes `22`).
 - Authorize staff from server-side records. Never trust a role or academic scope
   supplied by the Android client.
 - Model university, department, batch, section, semester, and course scope from

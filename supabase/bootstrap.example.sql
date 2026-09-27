@@ -14,6 +14,8 @@ declare
   department_code constant text := 'CHANGE_ME_DEPARTMENT_CODE';
   department_name constant text := 'CHANGE_ME_DEPARTMENT_NAME';
   department_email_prefix constant text := 'CHANGE_ME_PREFIX';
+  -- Academic batch number: the two-digit admission session minus three.
+  -- Example: email session 25 maps to batch 22.
   batch_code constant text := 'CHANGE_ME_TWO_DIGIT_BATCH';
   batch_name constant text := 'CHANGE_ME_BATCH_DISPLAY_NAME';
   batch_admission_year constant smallint := 0;
