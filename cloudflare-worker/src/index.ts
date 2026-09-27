@@ -14,6 +14,8 @@ interface Env {
   ONESIGNAL_APP_ID: string;
   ARCHIVE_API_URL: string;
   ARCHIVE_INTEGRATION_SECRET: string;
+  SUPABASE_URL: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
 }
 
 interface AuthContext {
@@ -315,9 +317,13 @@ async function sendNotification(request: Request, env: Env, auth: AuthContext): 
     const batchId = String(data.batchId ?? "").trim().toLowerCase();
     const context = targetContext(request);
     if (batchId !== context.batchId) throw new HttpError(400, "Notification batch does not match request context");
-    const access = await loadUserAccess(env, auth);
-    const permitted = canManageBatch(access, batchId) ||
-      (access.batchId === batchId && permissions.some((permission) => access.permissions[permission]));
+    const v2Authorized = type === "notice" && await canSendV2Notification(env, auth, batchId);
+    let permitted = v2Authorized;
+    if (!permitted) {
+      const access = await loadUserAccess(env, auth);
+      permitted = canManageBatch(access, batchId) ||
+        (access.batchId === batchId && permissions.some((permission) => access.permissions[permission]));
+    }
     if (!permitted) throw new HttpError(403, "You are not authorized for this notification batch");
     // Never forward caller-controlled broadcast segments or filters. Batch
     // delivery is derived solely from the verified tenant context.
@@ -332,6 +338,22 @@ async function sendNotification(request: Request, env: Env, auth: AuthContext): 
     headers: {"Content-Type": "application/json", Authorization: `Key ${env.ONESIGNAL_REST_API_KEY}`},
     body: JSON.stringify(payload),
   });
+}
+
+async function canSendV2Notification(env: Env, auth: AuthContext, batchId: string): Promise<boolean> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return false;
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_send_v2_batch_notification`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({target_batch_code: batchId}),
+  });
+  if (!response.ok) return false;
+  const result: unknown = await response.json();
+  return result === true || (Array.isArray(result) && result[0] === true);
 }
 
 async function proxyTelegramUpload(request: Request, env: Env): Promise<Response> {

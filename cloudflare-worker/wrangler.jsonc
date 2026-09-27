@@ -5,6 +5,7 @@
   "compatibility_date": "2026-09-19",
   "vars": {
     "FIREBASE_PROJECT_ID": "classmate-a016a",
-    "ARCHIVE_API_URL": "https://mbstu-cse-archive.vercel.app/api"
+    "ARCHIVE_API_URL": "https://mbstu-cse-archive.vercel.app/api",
+    "SUPABASE_URL": "https://cbskpifgbdbgdmnnxfrh.supabase.co"
   }
 }
