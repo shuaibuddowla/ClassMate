@@ -51,6 +51,7 @@ import com.shuaib.classmate.notices.NoticeReminderManager
 import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.utils.NetworkMonitor
 import com.shuaib.classmate.utils.ThemeColors
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.applyClickAnimation
 import com.shuaib.classmate.viewmodels.NoticeViewModel
 import kotlinx.coroutines.launch
@@ -320,6 +321,14 @@ class NoticeFragment : Fragment() {
                         if (!refreshing) {
                             binding.swipeRefresh.isRefreshing = false
                         }
+                    }
+                }
+                launch {
+                    AppContextManager.appContextFlow.collect { context ->
+                        if (_binding == null || !context.v2SessionActive) return@collect
+                        isAdmin = context.role in setOf("admin", "teacher", "cr")
+                        binding.btnPostNotice.isVisible = isAdmin
+                        binding.btnEmptyPost.isVisible = isAdmin && allNotices.isEmpty() && allPolls.isEmpty()
                     }
                 }
             }
@@ -775,11 +784,19 @@ class NoticeFragment : Fragment() {
 
     private fun checkAdminAccess() {
         val uid = auth.currentUser?.uid ?: return
+        val v2Context = AppContextManager.appContextFlow.value
+        val v2CanPost = v2Context.role in setOf("admin", "teacher", "cr")
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 if (_binding == null) return@addOnSuccessListener
                 val user = doc.toObject(com.shuaib.classmate.models.User::class.java)
-                isAdmin = user?.canPostNotices() ?: false
+                isAdmin = if (v2Context.v2SessionActive) v2CanPost else user?.canPostNotices() == true
+                binding.btnPostNotice.isVisible = isAdmin
+                binding.btnEmptyPost.isVisible = isAdmin && allNotices.isEmpty() && allPolls.isEmpty()
+            }
+            .addOnFailureListener {
+                if (_binding == null) return@addOnFailureListener
+                isAdmin = v2CanPost
                 binding.btnPostNotice.isVisible = isAdmin
                 binding.btnEmptyPost.isVisible = isAdmin && allNotices.isEmpty() && allPolls.isEmpty()
             }

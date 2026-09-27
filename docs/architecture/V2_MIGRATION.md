@@ -86,7 +86,9 @@ Completed in source control:
   integrity triggers, audit logging, semester publish/clone functions, and
   private academic-resource Storage policies.
 - Android Supabase client using Firebase ID tokens, secured Firebase-profile
-  bootstrap, profile/role loading,
+  bootstrap, profile/role loading, and a compatibility bridge that makes the
+  server-verified V2 role and student academic scope authoritative in the
+  existing Android UI during feature-by-feature cutover,
   backend-neutral academic catalog, and schedule repositories.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.

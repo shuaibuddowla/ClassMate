@@ -9,6 +9,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.onesignal.OneSignal
 import com.shuaib.classmate.data.local.ClassMateDatabase
+import com.shuaib.classmate.domain.auth.SessionProfile
+import com.shuaib.classmate.domain.auth.UserRole
 import com.shuaib.classmate.models.Batch
 import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.repositories.TimetableRepository
@@ -25,7 +27,8 @@ data class AppContextState(
     val semesterId: String = "",
     val role: String = "student",
     val adminBatchIds: List<String> = emptyList(),
-    val managedBatchId: String = ""
+    val managedBatchId: String = "",
+    val v2SessionActive: Boolean = false
 ) {
     fun isGlobalSuperAdmin(): Boolean = role == "global_super_admin" || role == "global_superadmin"
 
@@ -62,6 +65,9 @@ object AppContextManager {
     private var userDocListener: ListenerRegistration? = null
     private var batchDocListener: ListenerRegistration? = null
     private var lastTaggedBatchId: String = ""
+    private var v2RoleAuthoritative = false
+    private var v2BatchAuthoritative = false
+    private var v2SemesterAuthoritative = false
 
     private val _stateFlow = MutableStateFlow(AppContextState())
     val appContextFlow: StateFlow<AppContextState> = _stateFlow.asStateFlow()
@@ -122,6 +128,9 @@ object AppContextManager {
         batchDocListener?.remove()
         userDocListener = null
         batchDocListener = null
+        v2RoleAuthoritative = false
+        v2BatchAuthoritative = false
+        v2SemesterAuthoritative = false
         prefs?.edit()?.clear()?.apply()
         updateState(AppContextState())
     }
@@ -139,6 +148,52 @@ object AppContextManager {
     fun getAdminBatchIds(): List<String> = _stateFlow.value.adminBatchIds
 
     fun getManagedBatchId(): String = _stateFlow.value.managedBatchId
+
+    /**
+     * Applies server-verified V2 identity data to the legacy UI context while
+     * Firestore-backed features are being replaced. Codes are used only for
+     * routing old collections; Supabase IDs and RLS remain authoritative.
+     */
+    fun applyV2Session(profile: SessionProfile) {
+        val role = when {
+            profile.roleGrants.any { it.role == UserRole.ADMIN } -> "admin"
+            profile.roleGrants.any { it.role == UserRole.TEACHER } -> "teacher"
+            profile.roleGrants.any { it.role == UserRole.CR } -> "cr"
+            else -> "student"
+        }
+        val scope = profile.studentScope
+        val legacyBatch = listOfNotNull(scope?.departmentCode, scope?.batchCode)
+            .joinToString("")
+            .lowercase()
+            .takeIf { it.isNotBlank() }
+        val semester = scope?.semesterOrdinal
+            ?.takeIf { it in 1..8 }
+            ?.let { SemesterManager.normalizeSemester(it.toString()) }
+
+        v2RoleAuthoritative = true
+        v2BatchAuthoritative = legacyBatch != null
+        v2SemesterAuthoritative = semester != null
+
+        val current = _stateFlow.value
+        val updatedBatch = legacyBatch ?: current.batchId
+        val updated = current.copy(
+            role = role,
+            v2SessionActive = true,
+            batchId = updatedBatch,
+            managedBatchId = if (current.managedBatchId.isBlank() || legacyBatch != null) {
+                updatedBatch
+            } else {
+                current.managedBatchId
+            },
+            semesterId = semester ?: current.semesterId
+        )
+        updateState(updated)
+        persistState(updated)
+        if (updatedBatch.isNotBlank()) {
+            updatePushNotificationBatchTag(updatedBatch)
+            startBatchListener(updatedBatch)
+        }
+    }
 
     fun setManagedBatchId(batchId: String) {
         val norm = normalizeBatch(batchId)
@@ -224,14 +279,15 @@ object AppContextManager {
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
-                    val batch = normalizeBatch(snapshot.getString("batchId"))
+                    val current = _stateFlow.value
+                    val firestoreBatch = normalizeBatch(snapshot.getString("batchId"))
+                    val batch = if (v2BatchAuthoritative) current.batchId else firestoreBatch
                     if (batch.isBlank()) return@addSnapshotListener
-                    val role = snapshot.getString("role") ?: "student"
+                    val role = if (v2RoleAuthoritative) current.role else snapshot.getString("role") ?: "student"
                     val adminBatches = (snapshot.get("adminBatchIds") as? List<*>)
                         ?.mapNotNull { it?.toString()?.let { b -> normalizeBatch(b) } }
                         .orEmpty()
 
-                    val current = _stateFlow.value
                     val managed = if (current.managedBatchId.isNotBlank() && (adminBatches.contains(current.managedBatchId) || role == "global_super_admin" || role == "global_superadmin")) {
                         current.managedBatchId
                     } else {
@@ -274,6 +330,7 @@ object AppContextManager {
     }
 
     private fun handleSemesterChange(newSemester: String) {
+        if (v2SemesterAuthoritative) return
         val current = _stateFlow.value
         if (newSemester != current.semesterId) {
             Log.i(TAG, "Batch ${current.batchId} semester switched to $newSemester")

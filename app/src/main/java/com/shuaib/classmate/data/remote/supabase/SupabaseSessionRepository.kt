@@ -62,6 +62,31 @@ class SupabaseSessionRepository @Inject constructor(
             .decodeList<StudentProfileRow>()
             .singleOrNull()
 
+        val department = student?.departmentId?.let { departmentId ->
+            client.from("departments")
+                .select { filter { eq("id", departmentId) } }
+                .decodeList<DepartmentRow>()
+                .singleOrNull()
+        }
+        val batch = student?.assignedBatchId?.let { batchId ->
+            client.from("batches")
+                .select { filter { eq("id", batchId) } }
+                .decodeList<BatchRow>()
+                .singleOrNull()
+        }
+        val activeBatchSemester = batch?.activeBatchSemesterId?.let { batchSemesterId ->
+            client.from("batch_semesters")
+                .select { filter { eq("id", batchSemesterId) } }
+                .decodeList<BatchSemesterRow>()
+                .singleOrNull()
+        }
+        val activeSemester = activeBatchSemester?.semesterId?.let { semesterId ->
+            client.from("semesters")
+                .select { filter { eq("id", semesterId) } }
+                .decodeList<SemesterRow>()
+                .singleOrNull()
+        }
+
         val now = Instant.now()
         val grants = client.from("role_grants")
             .select { filter { eq("profile_id", userId) } }
@@ -86,7 +111,11 @@ class SupabaseSessionRepository @Inject constructor(
                     universityId = requireNotNull(profile.universityId),
                     departmentId = it.departmentId,
                     batchId = it.assignedBatchId,
-                    sectionId = it.sectionId
+                    sectionId = it.sectionId,
+                    batchSemesterId = activeBatchSemester?.id,
+                    departmentCode = department?.code,
+                    batchCode = batch?.cohortCode,
+                    semesterOrdinal = activeSemester?.ordinal
                 )
             },
             roleGrants = grants

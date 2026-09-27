@@ -13,5 +13,9 @@ data class AcademicScope(
     val batchId: String? = null,
     val sectionId: String? = null,
     val batchSemesterId: String? = null,
-    val courseOfferingId: String? = null
+    val courseOfferingId: String? = null,
+    // Display/routing metadata only. PostgreSQL RLS still authorizes by the IDs above.
+    val departmentCode: String? = null,
+    val batchCode: String? = null,
+    val semesterOrdinal: Int? = null
 )

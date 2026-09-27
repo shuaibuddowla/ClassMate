@@ -71,6 +71,7 @@ import android.content.Context
 import com.shuaib.classmate.utils.ShakeDetector
 import com.shuaib.classmate.utils.TorchManager
 import com.shuaib.classmate.utils.AppPreferences
+import com.shuaib.classmate.utils.AppContextManager
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -195,6 +196,8 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             sessionRepository.synchronizeFirebaseSession()
                 .onSuccess { profile ->
+                    AppContextManager.applyV2Session(profile)
+                    checkAdminStatus()
                     Log.i(
                         "V2Session",
                         "Firebase-to-Supabase startup sync succeeded: ${profile.status}"
@@ -331,15 +334,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAdminStatus() {
         val uid = auth.currentUser?.uid ?: return
+        val v2Context = AppContextManager.appContextFlow.value
+        val v2Admin = v2Context.isAdmin()
         firestore.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
-                if (!doc.exists()) return@addOnSuccessListener
+                if (!doc.exists()) {
+                    isAdmin = v2Admin
+                    return@addOnSuccessListener
+                }
                 val user = doc.toObject(User::class.java)
-                isAdmin = user?.isAdmin() ?: false
+                isAdmin = if (v2Context.v2SessionActive) v2Admin else user?.isAdmin() == true
             }
             .addOnFailureListener {
-                // If offline or error, we default to student role which is safe
-                isAdmin = false
+                isAdmin = v2Admin
             }
     }
 
