@@ -30,9 +30,6 @@ internal data class SupabaseNoticeFeedRow(
     @SerialName("is_personally_pinned") val isPersonallyPinned: Boolean = false
 )
 
-@Serializable
-internal data class PublishedNoticeResult(val id: String)
-
 internal class SupabaseNoticeFeed(
     private val clientProvider: SupabaseClientProvider
 ) {
@@ -80,9 +77,9 @@ internal class SupabaseNoticeFeed(
         })
     }
 
-    suspend fun publishBatchNotice(batchCode: String, title: String, body: String): String {
+    suspend fun publishBatchNotice(batchCode: String, title: String, body: String) {
         check(isConfigured) { "Supabase is not configured." }
-        return clientProvider.client.postgrest.rpc(
+        clientProvider.client.postgrest.rpc(
             "publish_batch_notice",
             parameters = buildJsonObject {
                 put("target_batch_code", batchCode)
@@ -90,7 +87,7 @@ internal class SupabaseNoticeFeed(
                 put("notice_body", body)
                 put("notice_priority", "normal")
             }
-        ).decodeSingle<PublishedNoticeResult>().id
+        )
     }
 
     private suspend fun loadRows(): List<SupabaseNoticeFeedRow> {

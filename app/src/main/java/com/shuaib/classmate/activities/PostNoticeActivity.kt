@@ -551,8 +551,23 @@ class PostNoticeActivity : AppCompatActivity() {
                 }.onSuccess {
                     runCatching { NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(targetBatchId) }
                     WidgetUpdater.refresh(this@PostNoticeActivity)
-                    Toast.makeText(this@PostNoticeActivity, "✅ Notice posted!", Toast.LENGTH_SHORT).show()
-                    finish()
+                    NotificationSender.sendNoticeAlert(
+                        title = title,
+                        body = body,
+                        batchId = targetBatchId,
+                        onSuccess = {
+                            Toast.makeText(this@PostNoticeActivity, "✅ Notice posted and notification sent!", Toast.LENGTH_SHORT).show()
+                            finish()
+                        },
+                        onFailure = { notificationError ->
+                            Toast.makeText(
+                                this@PostNoticeActivity,
+                                "Notice posted, but notification could not be sent: $notificationError",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            finish()
+                        }
+                    )
                 }.onFailure { error ->
                     binding.progressBar.isVisible = false
                     binding.btnPublish.isEnabled = true

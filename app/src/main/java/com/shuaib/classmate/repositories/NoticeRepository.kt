@@ -163,7 +163,7 @@ class NoticeRepository private constructor(context: Context) {
     suspend fun setSupabaseGlobalPin(noticeId: String, pinned: Boolean) =
         supabaseFeed.setGlobalPin(noticeId, pinned)
 
-    suspend fun publishSupabaseBatchNotice(batchCode: String, title: String, body: String): String =
+    suspend fun publishSupabaseBatchNotice(batchCode: String, title: String, body: String) =
         supabaseFeed.publishBatchNotice(batchCode, title, body)
 
     fun enqueueNetworkSync() {
