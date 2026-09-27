@@ -13,6 +13,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.AppPreferences
+import com.shuaib.classmate.BuildConfig
 
 @AndroidEntryPoint
 class SplashActivity : AppCompatActivity() {
@@ -40,7 +41,13 @@ class SplashActivity : AppCompatActivity() {
         if (!prefs.isOnboardingComplete()) {
             navigate(OnboardingActivity::class.java)
         } else if (currentUser != null) {
-            fetchProfileAndRoute(currentUser.uid)
+            if (BuildConfig.SUPABASE_URL.startsWith("https://") &&
+                BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()) {
+                AppContextManager.attachUser(currentUser.uid)
+                navigate(MainActivity::class.java)
+            } else {
+                fetchProfileAndRoute(currentUser.uid)
+            }
         } else {
             navigate(LoginActivity::class.java)
         }

@@ -119,6 +119,17 @@ class PdfLibraryFragment : Fragment() {
             }
         }
 
+        if (ArchiveLibraryRepository.usesSupabaseCatalog) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                    com.shuaib.classmate.utils.AppContextManager.appContextFlow
+                        .collect { state ->
+                            if (state.v2SessionActive && _binding != null) checkAdminAccess()
+                        }
+                }
+            }
+        }
+
         binding.swipeRefresh.setOnRefreshListener {
             loadLibraryData()
         }
@@ -225,6 +236,11 @@ class PdfLibraryFragment : Fragment() {
 
     private fun loadLibraryData() {
         if (_binding == null) return
+        if (ArchiveLibraryRepository.usesSupabaseCatalog &&
+            !com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+            binding.swipeRefresh.isRefreshing = false
+            return
+        }
         binding.swipeRefresh.isRefreshing = true
 
         fetchFavoritePdfIds()
@@ -766,6 +782,14 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun checkAdminAccess() {
+        val v2Context = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+        if (ArchiveLibraryRepository.usesSupabaseCatalog) {
+            isAdmin = v2Context.v2SessionActive &&
+                (v2Context.isAdmin() || v2Context.role == "teacher" || v2Context.role == "cr")
+            binding.btnUploadPdf.isVisible = isAdmin
+            if (v2Context.v2SessionActive) loadLibraryData()
+            return
+        }
         val uid = auth.currentUser?.uid
         if (uid == null) {
             loadLibraryData()

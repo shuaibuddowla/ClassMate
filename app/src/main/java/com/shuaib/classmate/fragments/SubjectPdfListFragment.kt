@@ -182,6 +182,13 @@ class SubjectPdfListFragment : Fragment() {
     }
 
     private fun checkAdminAccess(onComplete: () -> Unit) {
+        if (ArchiveLibraryRepository.usesSupabaseCatalog) {
+            val context = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+            isAdmin = context.v2SessionActive &&
+                (context.isAdmin() || context.role == "teacher" || context.role == "cr")
+            onComplete()
+            return
+        }
         val uid = auth.currentUser?.uid ?: run {
             onComplete()
             return

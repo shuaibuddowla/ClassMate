@@ -28,7 +28,8 @@ data class AppContextState(
     val role: String = "student",
     val adminBatchIds: List<String> = emptyList(),
     val managedBatchId: String = "",
-    val v2SessionActive: Boolean = false
+    val v2SessionActive: Boolean = false,
+    val v2GlobalAdmin: Boolean = false
 ) {
     fun isGlobalSuperAdmin(): Boolean = role == "global_super_admin" || role == "global_superadmin"
 
@@ -38,6 +39,7 @@ data class AppContextState(
 
     fun canManageBatch(targetBatch: String): Boolean {
         if (isGlobalSuperAdmin()) return true
+        if (v2SessionActive && v2GlobalAdmin && isAdmin()) return true
         if (role == "superadmin" || role == "super_admin" || role == "admin") {
             return adminBatchIds.contains(targetBatch.lowercase())
         }
@@ -120,7 +122,7 @@ object AppContextManager {
             prefs?.edit()?.putString(KEY_UID, uid)?.apply()
         }
 
-        startUserListener(uid)
+        if (!isV2Configured()) startUserListener(uid)
     }
 
     fun detachUser() {
@@ -161,7 +163,12 @@ object AppContextManager {
             profile.roleGrants.any { it.role == UserRole.CR } -> "cr"
             else -> "student"
         }
-        val scope = profile.studentScope
+        val isGlobalAdmin = profile.roleGrants.any { grant ->
+            grant.role == UserRole.ADMIN && grant.scope.departmentId == null &&
+                grant.scope.batchId == null && grant.scope.sectionId == null &&
+                grant.scope.batchSemesterId == null && grant.scope.courseOfferingId == null
+        }
+        val scope = profile.studentScope ?: profile.navigationScope
         val legacyBatch = listOfNotNull(scope?.departmentCode, scope?.batchCode)
             .joinToString("")
             .lowercase()
@@ -173,25 +180,30 @@ object AppContextManager {
         v2RoleAuthoritative = true
         v2BatchAuthoritative = legacyBatch != null
         v2SemesterAuthoritative = semester != null
+        userDocListener?.remove()
+        batchDocListener?.remove()
+        userDocListener = null
+        batchDocListener = null
 
         val current = _stateFlow.value
         val updatedBatch = legacyBatch ?: current.batchId
         val updated = current.copy(
             role = role,
             v2SessionActive = true,
+            v2GlobalAdmin = isGlobalAdmin,
             batchId = updatedBatch,
             managedBatchId = if (current.managedBatchId.isBlank() || legacyBatch != null) {
                 updatedBatch
             } else {
                 current.managedBatchId
             },
-            semesterId = semester ?: current.semesterId
+            semesterId = semester ?: current.semesterId.ifBlank { DEFAULT_SEMESTER }
         )
         updateState(updated)
         persistState(updated)
         if (updatedBatch.isNotBlank()) {
             updatePushNotificationBatchTag(updatedBatch)
-            startBatchListener(updatedBatch)
+            if (!isV2Configured()) startBatchListener(updatedBatch)
         }
     }
 
@@ -224,7 +236,7 @@ object AppContextManager {
             updateState(current.copy(batchId = norm, managedBatchId = norm))
             prefs?.edit()?.putString(KEY_BATCH_ID, norm)?.putString(KEY_MANAGED_BATCH_ID, norm)?.apply()
             updatePushNotificationBatchTag(norm)
-            startBatchListener(norm)
+            if (!isV2Configured()) startBatchListener(norm)
         }
     }
 
@@ -270,6 +282,7 @@ object AppContextManager {
     }
 
     private fun startUserListener(uid: String) {
+        if (isV2Configured()) return
         userDocListener?.remove()
         val db = FirebaseFirestore.getInstance()
         userDocListener = db.collection("users").document(uid)
@@ -311,6 +324,7 @@ object AppContextManager {
     }
 
     private fun startBatchListener(batchId: String) {
+        if (isV2Configured()) return
         val normBatch = normalizeBatch(batchId)
         batchDocListener?.remove()
         val db = FirebaseFirestore.getInstance()
@@ -401,6 +415,10 @@ object AppContextManager {
         _activeSemesterFlow.value = newState.semesterId
         _managedBatchFlow.value = newState.managedBatchId
     }
+
+    private fun isV2Configured(): Boolean =
+        com.shuaib.classmate.BuildConfig.SUPABASE_URL.startsWith("https://") &&
+            com.shuaib.classmate.BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
 
     private fun persistState(state: AppContextState) {
         prefs?.edit()

@@ -263,8 +263,12 @@ class RegisterActivity : AppCompatActivity() {
                     .build()
 
                 firebaseUser.updateProfile(profileUpdates).addOnCompleteListener {
-                    ChatRepository.init(this@RegisterActivity, firebaseUser.uid, name, firebaseUser.photoUrl?.toString() ?: "")
-                    saveUserToFirestore(firebaseUser.uid, name, studentId, email, "")
+                    if (sessionRepository.isConfigured) {
+                        continueAfterFirebaseSignIn { }
+                    } else {
+                        ChatRepository.init(this@RegisterActivity, firebaseUser.uid, name, firebaseUser.photoUrl?.toString() ?: "")
+                        saveUserToFirestore(firebaseUser.uid, name, studentId, email, "")
+                    }
                 }
             }
             .addOnFailureListener {
@@ -342,11 +346,18 @@ class RegisterActivity : AppCompatActivity() {
             sessionRepository.synchronizeFirebaseSession()
                 .onSuccess { profile ->
                     Log.d("AuthTrace", "Firebase-to-Supabase profile sync success status=${profile.status}")
+                    com.shuaib.classmate.utils.AppContextManager.attachUser(auth.currentUser?.uid.orEmpty())
+                    com.shuaib.classmate.utils.AppContextManager.applyV2Session(profile)
+                    auth.currentUser?.uid?.let { identifyUserInOneSignal(it) }
+                    setLoading(false)
+                    startActivity(Intent(this@RegisterActivity, MainActivity::class.java))
+                    finishAffinity()
                 }
                 .onFailure { error ->
-                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed; continuing with legacy data", error)
+                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed", error)
+                    setLoading(false)
+                    showError("Could not set up your ClassMate profile: ${error.message}")
                 }
-            continueFirebaseFlow()
         }
     }
 

@@ -48,7 +48,16 @@ object CourseRepository {
             name,
             code,
             normalizedType,
-            onSuccess = { refresh(batchId, semesterId, onSuccess) },
+            onSuccess = { addedCourse ->
+                val key = key(batchId, semesterId)
+                val current = cache[key].orEmpty()
+                cache[key] = (current.filterNot {
+                    it.code.equals(addedCourse.code, true) || it.name.equals(addedCourse.name, true)
+                } + addedCourse).sortedBy { it.name.lowercase() }
+                observers[key]?.forEach { it.onChanged(cache[key].orEmpty()) }
+                onSuccess()
+                refresh(batchId, semesterId)
+            },
             onFailure = onFailure
         )
     }
@@ -56,7 +65,16 @@ object CourseRepository {
     fun refresh(batchId: String, semesterId: String, afterRefresh: (() -> Unit)? = null) {
         val key = key(batchId, semesterId)
         ArchiveLibraryRepository.load(batchId, semesterId, { courses, _ ->
-            val sorted = courses.filter { it.name.isNotBlank() }.sortedBy { it.name.lowercase() }
+            val previous = cache[key].orEmpty()
+            val sorted = courses.filter { it.name.isNotBlank() }.map { course ->
+                if (course.archiveId.isNotBlank()) course else {
+                    val cached = previous.firstOrNull {
+                        (course.code.isNotBlank() && it.code.equals(course.code, true)) ||
+                            it.name.equals(course.name, true)
+                    }
+                    course.copy(archiveId = cached?.archiveId.orEmpty())
+                }
+            }.sortedBy { it.name.lowercase() }
             cache[key] = sorted
             SubjectList.replaceForContext(batchId, semesterId, sorted.map { it.toSubject() })
             observers[key]?.forEach { it.onChanged(sorted) }

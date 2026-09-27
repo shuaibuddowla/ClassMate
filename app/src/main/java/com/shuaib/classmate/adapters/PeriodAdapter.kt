@@ -58,10 +58,14 @@ class PeriodAdapter(
 
         val visual = SubjectVisuals.forSubject(period.subject)
         val accent = visual.startColor
-        val isLabSession = period.subject.trim().endsWith("lab", ignoreCase = true) || period.subject.trim().endsWith("labs", ignoreCase = true)
+        val isLabSession = period.classKind.equals("lab", true) ||
+            period.subject.trim().endsWith("lab", ignoreCase = true) || period.subject.trim().endsWith("labs", ignoreCase = true)
 
         b.tvSubject.text = period.subject
-        b.tvTeacher.text = period.teacher
+        b.tvTeacher.text = listOfNotNull(
+            period.teacher.takeIf { it.isNotBlank() },
+            period.room?.takeIf { it.isNotBlank() }?.let { "Room $it" }
+        ).joinToString(" · ")
         b.tvStartTime.text = formatTo12Hour(period.startTime)
         b.tvEndTime.text = formatTo12Hour(period.endTime)
         b.tvDuration.text = durationLabel(period)
@@ -142,6 +146,15 @@ class PeriodAdapter(
                     }
                 }
             }
+        }
+
+        if (!period.isCancelled && !period.scheduleChange.isNullOrBlank()) {
+            b.tvSubstituteMsg.isVisible = true
+            b.tvSubstituteMsg.text = period.scheduleChange
+            b.tvTypeBadge.text = "CHANGED"
+        } else if (period.isCancelled && !period.scheduleChange.isNullOrBlank()) {
+            b.tvSubstituteMsg.isVisible = true
+            b.tvSubstituteMsg.text = period.scheduleChange
         }
 
         b.root.setOnClickListener {

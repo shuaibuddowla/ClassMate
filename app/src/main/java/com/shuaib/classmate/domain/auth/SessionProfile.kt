@@ -32,5 +32,6 @@ data class SessionProfile(
     val avatarUrl: String? = null,
     val status: ProfileStatus,
     val studentScope: AcademicScope? = null,
-    val roleGrants: List<RoleGrant> = emptyList()
+    val roleGrants: List<RoleGrant> = emptyList(),
+    val navigationScope: AcademicScope? = null
 )

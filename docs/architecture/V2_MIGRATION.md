@@ -100,6 +100,10 @@ Completed in source control:
   Supabase RLS; local reminder delivery continues through WorkManager.
 - Batch notice push authorization through the deployed Cloudflare worker, with
   V2 Supabase role checks and legacy Firestore authorization retained.
+- V2 academic course and routine reads from Supabase. Library file uploads
+  continue through the MBSTU CSE Archive API so its R2 file and website
+  metadata stay in one workflow. The ClassMate Worker now checks archive
+  access against Supabase roles rather than Firestore roles.
 - Stable JSON response decoding for Android notice publishing.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.
@@ -116,10 +120,30 @@ Awaiting owner-operated environment setup:
 
 Next coding slices:
 
-1. Library/resource metadata, Supabase Storage upload/download, bookmarks, and
-   version replacement.
-2. Replace timetable/bus UI reads after live data parity is verified.
-3. Admin management screens backed by the scoped RPCs.
+1. Notice-resource attachments, Library bookmarks, and resource version replacement.
+2. Schedule source cutover is implemented: V2 Supabase routine and bus reads
+   feed the existing student UI and offline Room cache; admin routine and bus
+   edits use Supabase tables protected by RLS; structured class changes can be
+   posted and are reflected in the timetable; teacher display uses a scoped
+   read function. Firestore remains a compatibility fallback when V2 is not
+   configured.
+3. `202609280008_v2_schedule_teacher_read.sql` and
+   `202609280009_v2_archive_access.sql` are applied to the linked development
+   project. Add real course, routine and bus data through the app, then verify
+   student, teacher and admin behavior with separate accounts.
 4. Harden the GitHub release updater with required version metadata and SHA-256.
 5. Retire obsolete Firestore/Storage data paths only after parity; Firebase Auth
    and FCM remain part of the final architecture.
+
+## Current V2 boundary
+
+The app can create a Supabase course offering from the timetable or Library
+course picker, then create a Supabase routine slot for that offering. The
+Library lists the Supabase courses and sends file bytes and archive metadata to
+MBSTU CSE Archive through the Cloudflare Worker. New Library uploads therefore
+appear on the Archive website once its upload completion endpoint succeeds.
+
+V2 is still incomplete outside those paths: Library favorites and the separate
+Question Bank screen, academic calendar exceptions, user profile screens,
+chat, friends, polls and other older screens still access Firestore. Do not
+describe the app as Firestore-free until those screens are ported and verified.

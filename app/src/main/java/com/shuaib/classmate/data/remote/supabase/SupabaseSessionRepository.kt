@@ -97,6 +97,38 @@ class SupabaseSessionRepository @Inject constructor(
             }
             .map { it.toDomain(profile.universityId) }
 
+        // Staff members may have no student_profiles row. Pick an accessible
+        // batch for navigation from the Supabase catalog, never from Firestore.
+        val staffBatch = if (student == null && grants.any {
+            it.role in setOf(UserRole.ADMIN, UserRole.TEACHER, UserRole.CR)
+        }) {
+            val departmentIds = client.from("departments")
+                .select { filter { eq("university_id", requireNotNull(profile.universityId)) } }
+                .decodeList<DepartmentRow>()
+                .map { it.id }
+                .toSet()
+            client.from("batches").select().decodeList<BatchRow>()
+                .filter { it.departmentId in departmentIds }
+                .sortedWith(compareByDescending<BatchRow> { it.activeBatchSemesterId != null }
+                    .thenBy { it.cohortCode })
+                .firstOrNull()
+        } else null
+        val staffDepartment = staffBatch?.let { selected ->
+            client.from("departments")
+                .select { filter { eq("id", selected.departmentId) } }
+                .decodeList<DepartmentRow>().firstOrNull()
+        }
+        val staffBatchSemester = staffBatch?.activeBatchSemesterId?.let { selected ->
+            client.from("batch_semesters")
+                .select { filter { eq("id", selected) } }
+                .decodeList<BatchSemesterRow>().firstOrNull()
+        }
+        val staffSemester = staffBatchSemester?.semesterId?.let { selected ->
+            client.from("semesters")
+                .select { filter { eq("id", selected) } }
+                .decodeList<SemesterRow>().firstOrNull()
+        }
+
         return SessionProfile(
             id = profile.id,
             universityId = requireNotNull(profile.universityId) {
@@ -118,7 +150,18 @@ class SupabaseSessionRepository @Inject constructor(
                     semesterOrdinal = activeSemester?.ordinal
                 )
             },
-            roleGrants = grants
+            roleGrants = grants,
+            navigationScope = staffBatch?.let { selected ->
+                AcademicScope(
+                    universityId = requireNotNull(profile.universityId),
+                    departmentId = selected.departmentId,
+                    batchId = selected.id,
+                    batchSemesterId = staffBatchSemester?.id,
+                    departmentCode = staffDepartment?.code,
+                    batchCode = selected.cohortCode,
+                    semesterOrdinal = staffSemester?.ordinal
+                )
+            }
         ).also { mutableSession.value = it }
     }
 

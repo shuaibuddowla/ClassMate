@@ -15,6 +15,7 @@ import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -90,6 +91,74 @@ internal class SupabaseAcademicResourceRepository {
         return accessibleCourses to visibleResources
     }
 
+    suspend fun addCourse(
+        batchRoute: String,
+        semesterRoute: String,
+        name: String,
+        code: String,
+        type: String
+    ): Course {
+        check(isConfigured) { "Supabase is not configured." }
+        require(code.isNotBlank()) { "A course code is required for the Supabase catalogue." }
+        require(type in setOf("regular", "lab")) { "Choose a theory or lab course." }
+        val client = clientProvider.client
+        client.postgrest.rpc("bootstrap_firebase_profile")
+
+        val departments = client.from("departments").select().decodeList<DepartmentRow>()
+        val batches = client.from("batches").select().decodeList<BatchRow>()
+        val targetBatch = batches.firstOrNull { batch ->
+            val department = departments.firstOrNull { it.id == batch.departmentId } ?: return@firstOrNull false
+            normalizeCode(department.code + batch.cohortCode) == normalizeCode(batchRoute)
+        } ?: throw IOException("This batch is not configured in Supabase yet.")
+        val department = departments.first { it.id == targetBatch.departmentId }
+        val semesters = client.from("semesters").select().decodeList<SemesterRow>()
+        val ordinal = semesterOrdinal(semesterRoute)
+            ?: throw IOException("Select a valid semester before adding a course.")
+        val semester = semesters.firstOrNull { it.ordinal == ordinal }
+            ?: throw IOException("Semester $ordinal is not configured in Supabase yet.")
+
+        val existingCourse = client.from("courses").select().decodeList<CourseRow>()
+            .firstOrNull { it.departmentId == department.id && it.code.equals(code.trim(), true) }
+        val courseRow = existingCourse ?: run {
+            client.from("courses").insert(
+                CourseInsert(
+                    departmentId = department.id,
+                    code = code.trim().uppercase(),
+                    name = name.trim(),
+                    kind = if (type == "lab") "lab" else "theory"
+                )
+            ) { select() }.decodeSingle<CourseRow>()
+        }
+        if (!courseRow.name.equals(name.trim(), true)) {
+            throw IOException("Course code ${courseRow.code} already belongs to ${courseRow.name}.")
+        }
+
+        val batchSemesters = client.from("batch_semesters").select().decodeList<BatchSemesterRow>()
+        val batchSemester = batchSemesters.firstOrNull {
+            it.batchId == targetBatch.id && it.semesterId == semester.id
+        } ?: client.from("batch_semesters").insert(
+            BatchSemesterInsert(batchId = targetBatch.id, semesterId = semester.id)
+        ) { select() }.decodeSingle<BatchSemesterRow>()
+
+        val existingOffering = client.from("course_offerings").select().decodeList<CourseOfferingRow>()
+            .firstOrNull { it.batchSemesterId == batchSemester.id && it.courseId == courseRow.id && it.sectionId == null }
+        val offering = existingOffering ?: client.from("course_offerings").insert(
+            CourseOfferingInsert(batchSemesterId = batchSemester.id, courseId = courseRow.id)
+        ) { select() }.decodeSingle<CourseOfferingRow>()
+
+        client.postgrest.rpc("publish_semester", parameters = buildJsonObject {
+            put("target_batch_semester", batchSemester.id)
+        })
+        return Course(
+            id = offering.id,
+            name = courseRow.name,
+            code = courseRow.code,
+            type = if (courseRow.kind == "lab") "lab" else "regular",
+            batchId = batchRoute,
+            semesterId = semesterRoute
+        )
+    }
+
     suspend fun upload(
         context: Context,
         uri: Uri,
@@ -150,7 +219,7 @@ internal class SupabaseAcademicResourceRepository {
         }
         val courseRecord = courses.firstOrNull {
             it.code.equals(course.code, true) || it.name.equals(course.name, true)
-        } ?: throw IOException("The selected course is not configured in ClassMate V2 yet.")
+        } ?: throw IOException("The selected course is not configured in the ClassMate V2 yet.")
         val offering = offerings.firstOrNull {
             it.batchSemesterId in batchSemesterIds && it.courseId == courseRecord.id
         } ?: throw IOException("This course has no published V2 offering for the selected semester.")
@@ -310,6 +379,27 @@ internal class SupabaseAcademicResourceRepository {
         .replace(Regex("[^A-Za-z0-9._-]"), "_").take(180).ifBlank { "resource.bin" }
 
     private fun encodePath(value: String): String = value.split('/').joinToString("/") { Uri.encode(it) }
+
+    @Serializable
+    private data class CourseInsert(
+        @SerialName("department_id") val departmentId: String,
+        val code: String,
+        val name: String,
+        val kind: String
+    )
+
+    @Serializable
+    private data class BatchSemesterInsert(
+        @SerialName("batch_id") val batchId: String,
+        @SerialName("semester_id") val semesterId: String
+    )
+
+    @Serializable
+    private data class CourseOfferingInsert(
+        @SerialName("batch_semester_id") val batchSemesterId: String,
+        @SerialName("course_id") val courseId: String,
+        @SerialName("section_id") val sectionId: String? = null
+    )
 
     @Serializable
     private data class ResourceInsert(

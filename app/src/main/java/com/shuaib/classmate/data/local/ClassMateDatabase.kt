@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [NoticeEntity::class, TimetableEntity::class],
-    version = 6,
+    entities = [NoticeEntity::class, TimetableEntity::class, BusScheduleEntity::class],
+    version = 10,
     exportSchema = false
 )
 abstract class ClassMateDatabase : RoomDatabase() {
     abstract fun noticeDao(): NoticeDao
     abstract fun timetableDao(): TimetableDao
+    abstract fun busScheduleDao(): BusScheduleDao
 
     companion object {
         @Volatile private var instance: ClassMateDatabase? = null

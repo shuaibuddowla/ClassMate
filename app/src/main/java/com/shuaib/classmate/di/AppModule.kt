@@ -14,6 +14,9 @@ import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
 import com.shuaib.classmate.domain.academic.AcademicCatalogRepository
 import com.shuaib.classmate.domain.schedule.ScheduleRepository
 import com.shuaib.classmate.domain.auth.SessionRepository
+import com.shuaib.classmate.repositories.TimetableRepository
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,6 +28,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    @Provides
+    @Singleton
+    fun provideTimetableRepository(@ApplicationContext context: Context): TimetableRepository =
+        TimetableRepository.getInstance(context)
 
     @Provides
     @Singleton

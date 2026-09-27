@@ -10,6 +10,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.shuaib.classmate.R
@@ -18,15 +21,29 @@ import com.shuaib.classmate.databinding.ActivityBusScheduleManagementBinding
 import com.shuaib.classmate.databinding.DialogAddBusScheduleBinding
 import com.shuaib.classmate.models.BusSchedule
 import com.shuaib.classmate.utils.ThemeColors
+import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
+import com.shuaib.classmate.domain.auth.SessionRepository
+import com.shuaib.classmate.utils.AppContextManager
+import com.shuaib.classmate.repositories.TimetableRepository
+import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+@AndroidEntryPoint
 class BusScheduleManagementActivity : AppCompatActivity() {
+
+    @Inject lateinit var v2ScheduleRepository: SupabaseScheduleRepository
+    @Inject lateinit var v2SessionRepository: SessionRepository
 
     private lateinit var binding: ActivityBusScheduleManagementBinding
     private lateinit var firestore: FirebaseFirestore
     private lateinit var busAdapter: BusScheduleAdapter
     private val busList = mutableListOf<BusSchedule>()
     private var currentType = "class_day" // "class_day" or "off_day"
+    private var usingSupabase = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +63,17 @@ class BusScheduleManagementActivity : AppCompatActivity() {
             showBusDialog(null)
         }
 
-        fetchBusSchedules()
+        usingSupabase = v2ScheduleRepository.isConfigured
+
+        if (usingSupabase) lifecycleScope.launch {
+            v2SessionRepository.refresh().onSuccess { AppContextManager.applyV2Session(it) }
+                .onFailure { error ->
+                    binding.fabAddBus.isEnabled = false
+                    Toast.makeText(this@BusScheduleManagementActivity, "V2 sign-in failed: ${error.message}", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+            fetchBusSchedules()
+        } else fetchBusSchedules()
     }
 
     private fun setupRecyclerView() {
@@ -116,6 +143,45 @@ class BusScheduleManagementActivity : AppCompatActivity() {
         binding.progressBar.visibility = View.VISIBLE
         binding.tvEmptyState.visibility = View.GONE
 
+        if (usingSupabase) {
+            lifecycleScope.launch {
+                val result = v2ScheduleRepository.loadAllBusDepartures()
+                binding.progressBar.visibility = View.GONE
+                result.onSuccess { departures ->
+                    val schedules = departures.map { departure ->
+                        BusSchedule(
+                            id = departure.id,
+                            time = departure.departureTime.take(5),
+                            departureFrom = departure.origin,
+                            busName = departure.routeName,
+                            route = departure.notes.orEmpty(),
+                            scheduleType = if (departure.weekdays.any { it in OFF_DAYS }) "off_day" else "class_day",
+                            destination = departure.destination,
+                            weekdays = departure.weekdays,
+                            notes = departure.notes
+                        )
+                    }
+                    val repository = TimetableRepository.getInstance(this@BusScheduleManagementActivity)
+                    WEEKDAYS.forEach { weekday ->
+                        repository.cacheBusSchedules(weekday, schedules.filter { weekday in it.weekdays })
+                    }
+                    updateSchedules(schedules.filter { schedule ->
+                        if (currentType == "off_day") schedule.weekdays.any { it in OFF_DAYS }
+                        else schedule.weekdays.any { it in CLASS_DAYS }
+                    })
+                }.onFailure { error ->
+                    val repository = TimetableRepository.getInstance(this@BusScheduleManagementActivity)
+                    val cached = WEEKDAYS.flatMap { weekday -> repository.getCachedBusSchedules(weekday) }.distinctBy { it.id }
+                    updateSchedules(cached.filter {
+                        if (currentType == "off_day") it.weekdays.any { weekday -> weekday in OFF_DAYS }
+                        else it.weekdays.any { weekday -> weekday in CLASS_DAYS }
+                    })
+                    Toast.makeText(this@BusScheduleManagementActivity, "${if (cached.isEmpty()) "Could not load" else "Showing saved"} bus schedules: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
+
         firestore.collection("bus_schedules")
             .whereEqualTo("scheduleType", currentType)
             .get()
@@ -125,22 +191,20 @@ class BusScheduleManagementActivity : AppCompatActivity() {
                     doc.toObject(BusSchedule::class.java).copy(id = doc.id)
                 }.sortedBy { parseTimeToMinutes(it.time) }
 
-                busList.clear()
-                busList.addAll(fetched)
-
-                if (busList.isEmpty()) {
-                    binding.tvEmptyState.visibility = View.VISIBLE
-                    binding.rvBusSchedules.visibility = View.GONE
-                } else {
-                    binding.tvEmptyState.visibility = View.GONE
-                    binding.rvBusSchedules.visibility = View.VISIBLE
-                    busAdapter.updateList(busList)
-                }
+                updateSchedules(fetched)
             }
             .addOnFailureListener { e ->
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun updateSchedules(schedules: List<BusSchedule>) {
+        busList.clear()
+        busList.addAll(schedules.sortedBy { parseTimeToMinutes(it.time) })
+        binding.tvEmptyState.visibility = if (busList.isEmpty()) View.VISIBLE else View.GONE
+        binding.rvBusSchedules.visibility = if (busList.isEmpty()) View.GONE else View.VISIBLE
+        busAdapter.updateList(busList)
     }
 
     private fun showBusDialog(schedule: BusSchedule?) {
@@ -152,6 +216,10 @@ class BusScheduleManagementActivity : AppCompatActivity() {
             dialogBinding.etTime.setText(schedule?.time)
             dialogBinding.etBusName.setText(schedule?.busName)
             dialogBinding.etRoute.setText(schedule?.route)
+            if (!schedule?.destination.isNullOrBlank()) {
+                if (schedule?.departureFrom.equals("City", true)) dialogBinding.rbCity.isChecked = true
+                else dialogBinding.rbCampus.isChecked = true
+            }
             if (schedule?.departureFrom.equals("City", ignoreCase = true)) {
                 dialogBinding.rbCity.isChecked = true
             } else {
@@ -178,7 +246,10 @@ class BusScheduleManagementActivity : AppCompatActivity() {
                         departureFrom = departureFrom,
                         busName = busName,
                         route = route,
-                        scheduleType = currentType
+                        scheduleType = currentType,
+                        destination = schedule?.destination.orEmpty(),
+                        weekdays = schedule?.weekdays.orEmpty(),
+                        notes = route
                     )
                     saveBusSchedule(updated, isEdit)
                 } else {
@@ -208,6 +279,32 @@ class BusScheduleManagementActivity : AppCompatActivity() {
 
     private fun saveBusSchedule(schedule: BusSchedule, isEdit: Boolean) {
         binding.progressBar.visibility = View.VISIBLE
+
+        if (usingSupabase) {
+            lifecycleScope.launch {
+                val origin = schedule.departureFrom
+                val destination = schedule.destination.ifBlank { if (origin.equals("Campus", true)) "City" else "Campus" }
+                val time24 = runCatching {
+                    LocalTime.parse(schedule.time.uppercase(Locale.US), DateTimeFormatter.ofPattern("hh:mm a", Locale.US)).toString()
+                }.getOrElse { schedule.time }
+                val weekdays = schedule.weekdays.ifEmpty {
+                    if (schedule.scheduleType == "off_day") listOf(4, 5) else listOf(0, 1, 2, 3, 6)
+                }
+                val result = if (isEdit) {
+                    v2ScheduleRepository.updateBus(schedule.id, schedule.busName, time24, origin, destination, weekdays, schedule.route)
+                } else {
+                    v2ScheduleRepository.createBus(schedule.busName, time24, origin, destination, weekdays, schedule.route)
+                }
+                binding.progressBar.visibility = View.GONE
+                result.onSuccess {
+                    Toast.makeText(this@BusScheduleManagementActivity, if (isEdit) "Bus schedule updated" else "Bus schedule added", Toast.LENGTH_SHORT).show()
+                    fetchBusSchedules()
+                }.onFailure { error ->
+                    Toast.makeText(this@BusScheduleManagementActivity, "Save failed: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
         
         val data = hashMapOf(
             "time" to schedule.time,
@@ -235,6 +332,19 @@ class BusScheduleManagementActivity : AppCompatActivity() {
 
     private fun deleteBusSchedule(schedule: BusSchedule) {
         binding.progressBar.visibility = View.VISIBLE
+        if (usingSupabase) {
+            lifecycleScope.launch {
+                v2ScheduleRepository.deleteBus(schedule.id).onSuccess {
+                    Toast.makeText(this@BusScheduleManagementActivity, "Bus departure deleted", Toast.LENGTH_SHORT).show()
+                    fetchBusSchedules()
+                }.onFailure { error ->
+                    binding.progressBar.visibility = View.GONE
+                    Toast.makeText(this@BusScheduleManagementActivity, "Delete failed: ${error.message}", Toast.LENGTH_LONG).show()
+                    fetchBusSchedules()
+                }
+            }
+            return
+        }
         firestore.collection("bus_schedules").document(schedule.id).delete()
             .addOnSuccessListener {
                 binding.progressBar.visibility = View.GONE
@@ -250,6 +360,10 @@ class BusScheduleManagementActivity : AppCompatActivity() {
 
     private fun parseTimeToMinutes(timeStr: String): Int {
         try {
+            if (timeStr.matches(Regex("^\\d{2}:\\d{2}$"))) {
+                val parts = timeStr.split(":")
+                return parts[0].toInt() * 60 + parts[1].toInt()
+            }
             val parts = timeStr.trim().split(" ")
             if (parts.size != 2) return 0
             val timeParts = parts[0].split(":")
@@ -264,5 +378,11 @@ class BusScheduleManagementActivity : AppCompatActivity() {
         } catch (e: Exception) {
             return 0
         }
+    }
+
+    private companion object {
+        val WEEKDAYS = (0..6).toList()
+        val OFF_DAYS = setOf(4, 5)
+        val CLASS_DAYS = setOf(0, 1, 2, 3, 6)
     }
 }

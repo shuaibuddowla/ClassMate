@@ -224,22 +224,10 @@ async function proxyArchive(
   }
 
   const context = targetContext(request);
-  const access = await loadUserAccess(env, auth);
-  const belongsToBatch = access.batchId === context.batchId;
-  const managesBatch = canManageBatch(access, context.batchId);
-  if (!belongsToBatch && !managesBatch) {
-    throw new HttpError(403, "You are not authorized for this batch");
-  }
-  if (courseCreate && !managesBatch) {
-    throw new HttpError(403, "Only an authorized batch administrator can create courses");
-  }
-  if (uploadMutation) {
-    const canUpload = managesBatch || (belongsToBatch &&
-      (access.permissions.canUploadPDF || access.permissions.canUploadLibrary));
-    if (!canUpload) throw new HttpError(403, "You do not have permission to upload library files");
-  }
-  if (resourceAdmin && !isGlobalSuperAdmin(access)) {
-    throw new HttpError(403, "Global super administrator access required");
+  const action = courseCreate ? "course_create" : uploadMutation ? "upload" :
+    resourceAdmin ? "resource_admin" : "read";
+  if (!await canAccessV2ArchiveBatch(env, auth, context.batchId, action)) {
+    throw new HttpError(403, "Your Supabase role does not allow this Archive action for the selected batch");
   }
 
   const endpoint = env.ARCHIVE_API_URL.replace(/\/$/, "") + relativePath + url.search;
@@ -265,6 +253,28 @@ async function proxyArchive(
       "Cache-Control": "no-store",
     },
   });
+}
+
+async function canAccessV2ArchiveBatch(
+  env: Env,
+  auth: AuthContext,
+  batchId: string,
+  action: string,
+): Promise<boolean> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
+    throw new HttpError(503, "Supabase authorization is not configured");
+  }
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_access_v2_archive_batch`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({target_batch_code: batchId, target_action: action}),
+  });
+  if (!response.ok) throw new HttpError(503, "Unable to verify Supabase Archive access");
+  return await response.json<unknown>() === true;
 }
 
 async function proxyGemini(request: Request, env: Env): Promise<Response> {

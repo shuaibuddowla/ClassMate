@@ -8,6 +8,8 @@ data class Course(
     val name: String = "",
     val code: String = "",
     val type: String = "regular",
+    /** Archive catalogue id used only by the Cloudflare/R2 upload workflow. */
+    val archiveId: String = "",
     val batchId: String = "",
     val semesterId: String = "",
     val createdBy: String = "",

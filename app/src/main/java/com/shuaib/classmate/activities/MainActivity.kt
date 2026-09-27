@@ -336,6 +336,11 @@ class MainActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         val v2Context = AppContextManager.appContextFlow.value
         val v2Admin = v2Context.isAdmin()
+        if (sessionRepository.isConfigured && !v2Context.v2SessionActive) return
+        if (v2Context.v2SessionActive) {
+            isAdmin = v2Admin
+            return
+        }
         firestore.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) {
@@ -687,6 +692,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun listenForUnreadNotices() {
         noticeBadgeListener?.remove()
+        noticeBadgeListener = null
+        if (sessionRepository.isConfigured) {
+            // The legacy Firestore badge is not a valid count for the V2 feed.
+            updateNoticeBadge(0)
+            return
+        }
         val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
         val lastReadTime = com.google.firebase.Timestamp(java.util.Date(NoticeReadTracker.lastReadMillis(this)))
         noticeBadgeListener = firestore.collection("batches").document(batchId).collection("notices")

@@ -33,17 +33,16 @@ object ArchiveLibraryRepository {
         .build()
     private val v2Resources by lazy { SupabaseAcademicResourceRepository() }
 
+    val usesSupabaseCatalog: Boolean get() = v2Resources.isConfigured
+
     fun load(
         batchId: String,
         semesterId: String,
         onSuccess: (List<Course>, List<PdfFile>) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
-        val v2 = if (AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
-            runCatching { runBlocking { v2Resources.load(batchId, semesterId) } }
-                .onFailure { android.util.Log.w("AcademicResources", "V2 resource load failed; retaining archive data", it) }
-                .getOrNull()
-        } else null
+        val useV2Catalog = usesSupabaseCatalog
+        val v2 = if (useV2Catalog) runBlocking { v2Resources.load(batchId, semesterId) } else null
 
         val archiveResult = runCatching {
             val batch = archiveBatch(batchId)
@@ -64,14 +63,20 @@ object ArchiveLibraryRepository {
                 .map { it.toPdfFile(semesterId, categories[it.courseId]) }
             courses to resources
         }
-        val data = when {
-            v2 != null && archiveResult.isSuccess -> {
-                val (legacyCourses, legacyResources) = archiveResult.getOrThrow()
-                (v2.first.ifEmpty { legacyCourses }) to (v2.second + legacyResources).distinctBy { "${it.provider}:${it.id}" }
+        // In V2, Supabase owns the academic course catalogue. Archive remains
+        // an additional source only for already-published legacy resources.
+        val data = if (useV2Catalog && v2 != null) {
+            val legacyResources = archiveResult.getOrNull()?.second.orEmpty()
+            val archiveCourses = archiveResult.getOrNull()?.first.orEmpty()
+            val mirroredCourses = v2.first.map { course ->
+                val archiveCourse = archiveCourses.firstOrNull {
+                    (course.code.isNotBlank() && it.code.equals(course.code, true)) ||
+                        it.name.equals(course.name, true)
+                }
+                course.copy(archiveId = archiveCourse?.id.orEmpty())
             }
-            v2 != null -> v2
-            else -> archiveResult.getOrThrow()
-        }
+            mirroredCourses to (v2.second + legacyResources).distinctBy { "${it.provider}:${it.id}" }
+        } else archiveResult.getOrThrow()
         mainHandler.post { onSuccess(data.first, data.second) }
     }
 
@@ -84,6 +89,11 @@ object ArchiveLibraryRepository {
         onSuccess: (Course) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
+        if (usesSupabaseCatalog) {
+            val course = runBlocking { v2Resources.addCourse(batchId, semesterId, name, code, type) }
+            mainHandler.post { onSuccess(course) }
+            return@runAsync
+        }
         val payload = mapOf(
             "batchId" to archiveBatch(batchId),
             "semesterNumber" to semesterNumber(semesterId),
@@ -102,7 +112,7 @@ object ArchiveLibraryRepository {
 
     fun deleteResource(id: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit, provider: String = "archive") =
         runAsync(onFailure) {
-            if (provider == "supabase" && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            if (provider == "supabase" && usesSupabaseCatalog) {
                 runBlocking { v2Resources.delete(id) }
                 mainHandler.post(onSuccess)
                 return@runAsync
@@ -134,7 +144,7 @@ object ArchiveLibraryRepository {
 
     fun resolveDownloadUrl(id: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit, provider: String = "archive") =
         runAsync(onFailure) {
-            if (provider == "supabase" && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            if (provider == "supabase" && usesSupabaseCatalog) {
                 val url = runBlocking { v2Resources.resolveDownloadUrl(id) }
                 mainHandler.post { onSuccess(url) }
                 return@runAsync
@@ -162,12 +172,68 @@ object ArchiveLibraryRepository {
         onFailure: (Exception) -> Unit,
         description: String = ""
     ) = runAsync(onFailure) {
-        if (!AppContextManager.appContextFlow.value.v2SessionActive || !v2Resources.isConfigured) {
-            throw IOException("Supabase V2 is not ready for uploads. Sign in to your V2 account and check Supabase configuration.")
+        // Library bytes and upload metadata are deliberately sent through the
+        // existing Archive API: it writes the R2 object and the archive website
+        // database record in one authorized flow.
+        val archiveCourseId = course.archiveId.takeIf(String::isNotBlank) ?: run {
+            val archivePayload = mapOf(
+                "batchId" to archiveBatch(batchId),
+                "semesterNumber" to semesterNumber(semesterId),
+                "courseName" to course.name.trim(),
+                "courseCode" to course.code.trim().uppercase(),
+                "category" to if (course.type == "lab") "lab" else "regular"
+            )
+            val archiveRequest = BackendApiClient.authenticated(
+                Request.Builder().url(BackendApiClient.url("v1/archive/courses"))
+                    .post(gson.toJson(archivePayload).toRequestBody(JSON))
+            )
+            gson.fromJson(executeJson(archiveRequest).get("course"), ArchiveCourse::class.java)?.id
+                ?.takeIf(String::isNotBlank)
+                ?: throw IOException("Archive did not create a course reference for this upload.")
         }
-        val id = runBlocking {
-            v2Resources.upload(context, uri, batchId, semesterId, course, title, fileName, sizeBytes, mimeType, materialType, description, onProgress)
+        val payload = mapOf(
+            "batchId" to archiveBatch(batchId),
+            "semesterNumber" to semesterNumber(semesterId),
+            "courseId" to archiveCourseId,
+            "title" to title.trim(),
+            "materialType" to materialType,
+            "fileName" to fileName,
+            "fileSize" to sizeBytes,
+            "mimeType" to mimeType,
+            "tags" to emptyList<String>()
+        )
+        val create = BackendApiClient.authenticated(
+            Request.Builder().url(BackendApiClient.url("v1/archive/uploads"))
+                .post(gson.toJson(payload).toRequestBody(JSON))
+        )
+        val session = executeJson(create)
+        val id = session.get("id")?.asString ?: throw IOException("Archive did not return an upload id.")
+        val signedUrl = session.get("url")?.asString ?: throw IOException("Archive did not return a secure upload URL.")
+        val body = object : okhttp3.RequestBody() {
+            override fun contentType() = mimeType.toMediaTypeOrNull()
+            override fun contentLength() = sizeBytes
+            override fun writeTo(sink: okio.BufferedSink) {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    var sent = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        sink.write(buffer, 0, count)
+                        sent += count
+                        if (sizeBytes > 0) onProgress(((sent * 100) / sizeBytes).toInt().coerceIn(0, 100))
+                    }
+                } ?: throw IOException("Unable to read the selected file.")
+            }
         }
+        client.newCall(Request.Builder().url(signedUrl).put(body).build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("File transfer failed (${response.code}).")
+        }
+        val complete = BackendApiClient.authenticated(
+            Request.Builder().url(BackendApiClient.url("v1/archive/uploads/$id/complete"))
+                .post("{}".toRequestBody(JSON))
+        )
+        executeJson(complete)
         mainHandler.post { onSuccess(id) }
     }
 
@@ -214,6 +280,7 @@ object ArchiveLibraryRepository {
     ) {
         fun toCourse(semesterId: String) = Course(
             id = id,
+            archiveId = id,
             name = courseName,
             code = courseCode,
             type = category.ifBlank { if (courseName.contains("lab", true)) "lab" else "regular" },

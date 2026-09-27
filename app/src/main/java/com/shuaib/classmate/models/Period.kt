@@ -17,6 +17,9 @@ data class Period(
     // Substitute fields
     val isSubstitute: Boolean = false,
     val substituteTeacher: String = "",
-    val substituteDate: String = ""
+    val substituteDate: String = "",
+    val room: String? = null,
+    val scheduleChange: String? = null,
+    val classKind: String = "class"
     // Format: "2026-04-11" (yyyy-MM-dd)
 )

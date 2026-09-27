@@ -33,7 +33,10 @@ class BusScheduleAdapter(
         val context = holder.itemView.context
 
         b.tvBusName.text = schedule.busName
-        b.tvRoute.text = schedule.route
+        b.tvRoute.text = listOfNotNull(
+            schedule.destination.takeIf { it.isNotBlank() }?.let { "To $it" },
+            schedule.route.takeIf { it.isNotBlank() }
+        ).joinToString(" · ").ifBlank { schedule.route }
         b.tvDepartureTime.text = schedule.time
         b.tvDirectionBadge.text = "From ${schedule.departureFrom}"
 

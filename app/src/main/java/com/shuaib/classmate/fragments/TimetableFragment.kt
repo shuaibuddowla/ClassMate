@@ -17,6 +17,7 @@ import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -51,6 +52,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@AndroidEntryPoint
 class TimetableFragment : Fragment() {
 
     private var _binding: FragmentTimetableBinding? = null
@@ -119,10 +121,24 @@ class TimetableFragment : Fragment() {
                 }
             }
         }
+        if (timetableViewModel.isV2Configured) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                var lastRoute = ""
+                com.shuaib.classmate.utils.AppContextManager.appContextFlow.collect { state ->
+                    val route = "${state.batchId}:${state.semesterId}"
+                    if (state.v2SessionActive && state.batchId.isNotBlank() && route != lastRoute) {
+                        lastRoute = route
+                        timetableViewModel.refreshAll(state.semesterId, state.batchId)
+                    }
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
+
+        if (timetableViewModel.isV2Configured) timetableViewModel.refreshAll()
 
         // Refresh greeting (time of day may have changed)
         binding.tvGreeting.text = getGreeting()
@@ -157,7 +173,9 @@ class TimetableFragment : Fragment() {
             binding.tvUserName.text = displayName.split(" ").firstOrNull() ?: displayName
         }
 
-        // Fetch from Firestore for accurate name
+        if (timetableViewModel.isV2Configured) return
+
+        // Legacy profile display until the remaining profile screen is migrated.
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
@@ -795,6 +813,10 @@ class TimetableFragment : Fragment() {
 
     private fun showDeleteDialog(period: Period) {
         if (!isAdded) return
+        if (timetableViewModel.isV2Configured) {
+            startActivity(Intent(context, com.shuaib.classmate.activities.TimetableManagementActivity::class.java))
+            return
+        }
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Period")
             .setMessage("Are you sure you want to delete this period?")
@@ -809,6 +831,19 @@ class TimetableFragment : Fragment() {
     }
 
     private fun checkAdminAccess() {
+        if (timetableViewModel.isV2Configured) {
+            userRoleRegistration?.remove()
+            userRoleRegistration = null
+            viewLifecycleOwner.lifecycleScope.launch {
+                com.shuaib.classmate.utils.AppContextManager.appContextFlow.collect { state ->
+                    if (_binding == null) return@collect
+                    isAdmin = state.v2SessionActive &&
+                        state.canManageBatch(state.batchId)
+                    binding.btnAddPeriod.isVisible = isAdmin
+                }
+            }
+            return
+        }
         val uid = auth.currentUser?.uid ?: return
         userRoleRegistration?.remove()
         userRoleRegistration = db.collection("users").document(uid)
@@ -858,6 +893,41 @@ class TimetableFragment : Fragment() {
     }
 
     private fun fetchBusSchedules(day: String) {
+        if (_binding == null) return
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val v2Schedules = timetableViewModel.loadBusSchedules(day)
+            if (v2Schedules.isSuccess) {
+                busScheduleRegistration?.remove()
+                busScheduleRegistration = null
+                handler.removeCallbacks(showLoadingRunnable)
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                busSchedules.clear()
+                busSchedules.addAll(v2Schedules.getOrThrow().sortedBy { it.time })
+                renderBusSchedules(if (day.equals("thursday", true) || day.equals("friday", true)) "off_day" else "class_day")
+                return@launch
+            }
+            if (!timetableViewModel.isV2Configured) {
+                fetchBusSchedulesFromFirestore(day)
+            } else if (_binding != null) {
+                handler.removeCallbacks(showLoadingRunnable)
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                val cached = timetableViewModel.getCachedBusSchedules(day)
+                busSchedules.clear()
+                busSchedules.addAll(cached)
+                renderBusSchedules(if (day.equals("thursday", true) || day.equals("friday", true)) "off_day" else "class_day")
+                if (cached.isNotEmpty()) {
+                    Toast.makeText(context, "Showing the saved bus schedule while offline.", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                Toast.makeText(context, "Could not load bus schedule: ${v2Schedules.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun fetchBusSchedulesFromFirestore(day: String) {
         if (_binding == null) return
         
         handler.removeCallbacks(showLoadingRunnable)

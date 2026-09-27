@@ -81,11 +81,12 @@ class PdfUploadActivity : AppCompatActivity() {
         binding.toggleGroup.isVisible = false
         binding.layoutDrive.isVisible = false
 
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { doc ->
-                currentUserName = doc.getString("name") ?: "Admin"
-            }
+        if (auth.currentUser == null) {
+            Toast.makeText(this, "Please sign in before uploading.", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        currentUserName = auth.currentUser?.displayName.orEmpty().ifBlank { "ClassMate user" }
 
         courseListener = CoursePicker.bind(this, binding.dropdownSubject, binding.etCourseCode) {
             availableCourses = it

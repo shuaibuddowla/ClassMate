@@ -12,11 +12,13 @@ data class RoutineSlot(
     val courseOfferingId: String,
     val courseCode: String,
     val courseName: String,
+    val sectionCode: String?,
     val weekday: Int,
     val startsAt: String,
     val endsAt: String,
     val room: String?,
-    val classKind: String
+    val classKind: String,
+    val teacherName: String = ""
 )
 
 data class ClassChange(

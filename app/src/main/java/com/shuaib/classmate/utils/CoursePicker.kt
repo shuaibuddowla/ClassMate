@@ -12,6 +12,7 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.DialogAddCourseBinding
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.repositories.CourseRepository
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 
 object CoursePicker {
     private const val ADD_NEW = "+ Add new course"
@@ -33,17 +34,24 @@ object CoursePicker {
         dropdown.setOnItemClickListener { _, _, position, _ ->
             if (canAddCourse && position == courses.size) {
                 dropdown.setText("", false)
-                showAddDialog(context, batchId, semesterId)
+                showAddCourseDialog(context, batchId, semesterId) { }
             } else if (position in courses.indices) {
                 codeField?.setText(courses[position].code)
             }
         }
     }, { Toast.makeText(context, "Could not load courses: ${it.message}", Toast.LENGTH_LONG).show() })
 
-    private fun showAddDialog(context: Context, batchId: String, semesterId: String) {
+    fun showAddCourseDialog(
+        context: Context,
+        batchId: String,
+        semesterId: String,
+        onSaved: () -> Unit = {}
+    ) {
         val binding = DialogAddCourseBinding.inflate(android.view.LayoutInflater.from(context))
         binding.tvCourseScope.text = "${com.shuaib.classmate.models.Batch.formatName(batchId)}  •  ${SemesterManager.formatDisplay(semesterId)}"
-        val categories = listOf("Regular Course", "Lab Course", "Syllabus")
+        val v2Catalog = ArchiveLibraryRepository.usesSupabaseCatalog
+        val categories = if (v2Catalog) listOf("Theory Course", "Lab Course")
+        else listOf("Regular Course", "Lab Course", "Syllabus")
         binding.dropdownCourseType.setAdapter(ArrayAdapter(context, R.layout.item_course_dropdown, categories))
         binding.dropdownCourseType.setText(categories.first(), false)
         binding.dropdownCourseType.setDropDownBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.bg_course_dropdown_popup))
@@ -62,15 +70,21 @@ object CoursePicker {
                     binding.etCourseName.error = "Course name is required"
                     return@setOnClickListener
                 }
+                val code = binding.etCourseCode.text.toString().trim()
+                if (v2Catalog && code.isBlank()) {
+                    binding.etCourseCode.error = "Course code is required for the Supabase catalogue"
+                    return@setOnClickListener
+                }
                 val type = when (binding.dropdownCourseType.text.toString()) {
                     "Lab Course" -> "lab"
                     "Syllabus" -> "syllabus"
                     else -> "regular"
                 }
                 dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                CourseRepository.add(batchId, semesterId, name, binding.etCourseCode.text.toString(), type, {
+                CourseRepository.add(batchId, semesterId, name, code, type, {
                     Toast.makeText(context, "$name added", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
+                    onSaved()
                 }, { error ->
                     dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = true
                     Toast.makeText(context, "Could not add course: ${error.message}", Toast.LENGTH_LONG).show()

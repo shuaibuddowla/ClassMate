@@ -14,6 +14,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
@@ -29,12 +31,20 @@ import com.shuaib.classmate.utils.SemesterManager
 import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.WidgetUpdater
+import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
+import com.shuaib.classmate.data.remote.supabase.CourseOfferingOption
+import com.shuaib.classmate.domain.auth.SessionRepository
+import com.shuaib.classmate.utils.AppContextManager
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.util.Calendar
 
+@AndroidEntryPoint
 class TimetableManagementActivity : AppCompatActivity() {
+
+    @Inject lateinit var v2ScheduleRepository: SupabaseScheduleRepository
+    @Inject lateinit var v2SessionRepository: SessionRepository
 
     private lateinit var binding: ActivityTimetableManagementBinding
     private lateinit var firestore: FirebaseFirestore
@@ -42,6 +52,8 @@ class TimetableManagementActivity : AppCompatActivity() {
     private val periodList = mutableListOf<Period>()
     private var currentDay = "saturday"
     private var courseListener: ListenerRegistration? = null
+    private var usingSupabase = false
+    private var offeringOptions: List<CourseOfferingOption> = emptyList()
 
     private val days = listOf("saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday")
     private val dayShort = listOf("SAT", "SUN", "MON", "TUE", "WED", "THU", "FRI")
@@ -53,6 +65,7 @@ class TimetableManagementActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         firestore = FirebaseFirestore.getInstance()
+        usingSupabase = v2ScheduleRepository.isConfigured
         setupRecyclerView()
         setupDaySelector()
         setupSwipeToDelete()
@@ -63,12 +76,32 @@ class TimetableManagementActivity : AppCompatActivity() {
         }
 
         binding.fabAddPeriod.setOnClickListener { showPeriodDialog(null) }
+        if (usingSupabase) lifecycleScope.launch {
+            v2SessionRepository.refresh().onSuccess { profile ->
+                AppContextManager.applyV2Session(profile)
+            }.onFailure { error ->
+                binding.fabAddPeriod.isEnabled = false
+                Toast.makeText(this@TimetableManagementActivity, "V2 sign-in failed: ${error.message}", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            v2ScheduleRepository.manageableOfferings(
+                AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
+                SemesterManager.getActiveSemester()
+            ).onSuccess { options ->
+                offeringOptions = options
+                fetchTimetable(currentDay)
+            }.onFailure { error ->
+                binding.fabAddPeriod.isEnabled = false
+                Toast.makeText(this@TimetableManagementActivity, "V2 schedule setup is unavailable: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun setupRecyclerView() {
         periodAdapter = PeriodAdapter(
             periods = periodList,
-            onPeriodClick = { period -> showPeriodDialog(period) }
+            onPeriodClick = { period -> showPeriodDialog(period) },
+            onPeriodLongClick = { period -> if (usingSupabase) showClassChangeOptions(period) }
         )
 
         binding.rvTimetable.apply {
@@ -206,9 +239,118 @@ class TimetableManagementActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showClassChangeOptions(period: Period) {
+        val labels = arrayOf("Cancel this class", "Change room", "Change time", "Reschedule")
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Class change for ${dateForDay(currentDay)}")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> promptForChange(period, "cancelled", "Reason (optional)", null)
+                    1 -> promptForChange(period, "room_changed", "New room", period.room)
+                    2 -> promptForChange(period, "time_changed", "New start and end (HH:mm, HH:mm)", "${period.startTime}, ${period.endTime}")
+                    3 -> promptForChange(period, "rescheduled", "New start and end (HH:mm, HH:mm)", "${period.startTime}, ${period.endTime}")
+                }
+            }
+            .show()
+    }
+
+    private fun promptForChange(period: Period, kind: String, hint: String, initial: String?) {
+        val input = android.widget.EditText(this).apply {
+            this.hint = hint
+            setText(initial.orEmpty())
+            setPadding(48, 24, 48, 24)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("${kind.replace('_', ' ').replaceFirstChar(Char::uppercase)}")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val value = input.text.toString().trim()
+                val times = if (kind == "time_changed" || kind == "rescheduled") {
+                    value.split(',').map(String::trim).takeIf { it.size == 2 && it.all { time -> TIME_PATTERN.matches(time) } }
+                } else null
+                if ((kind == "time_changed" || kind == "rescheduled") && times == null) {
+                    Toast.makeText(this, "Enter times as HH:mm, HH:mm", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if ((kind == "time_changed" || kind == "rescheduled") &&
+                    runCatching { java.time.LocalTime.parse(times!![1]) <= java.time.LocalTime.parse(times[0]) }.getOrDefault(true)
+                ) {
+                    Toast.makeText(this, "The end time must be after the start time.", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (kind == "room_changed" && value.isBlank()) {
+                    Toast.makeText(this, "Enter the new room.", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    v2ScheduleRepository.createClassChange(
+                        routineSlotId = period.id,
+                        effectiveDate = dateForDay(currentDay).toString(),
+                        kind = kind,
+                        previousRoom = period.room,
+                        newRoom = if (kind == "room_changed") value else null,
+                        previousStartsAt = if (kind == "time_changed" || kind == "rescheduled") period.startTime else null,
+                        previousEndsAt = if (kind == "time_changed" || kind == "rescheduled") period.endTime else null,
+                        newStartsAt = times?.get(0),
+                        newEndsAt = times?.get(1),
+                        reason = value.takeIf { kind == "cancelled" }
+                    ).onSuccess {
+                        Toast.makeText(this@TimetableManagementActivity, "Class change saved", Toast.LENGTH_SHORT).show()
+                        fetchTimetable(currentDay)
+                        refreshWidgetAfterTimetableChange(currentDay)
+                    }.onFailure { error ->
+                        Toast.makeText(this@TimetableManagementActivity, "Could not save change: ${error.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun dateForDay(day: String): LocalDate {
+        val today = LocalDate.now()
+        val daysAfterSaturday = (today.dayOfWeek.value + 1) % 7
+        val saturday = today.minusDays(daysAfterSaturday.toLong())
+        return saturday.plusDays(days.indexOf(day).coerceAtLeast(0).toLong())
+    }
+
     private fun fetchTimetable(day: String) {
         binding.progressBar.visibility = View.VISIBLE
         binding.tvEmptyState.visibility = View.GONE
+
+        if (usingSupabase) {
+            if (!AppContextManager.appContextFlow.value.v2SessionActive) return
+            lifecycleScope.launch {
+                val weekday = POSTGRES_WEEKDAYS[day] ?: 6
+                val result = v2ScheduleRepository.loadDay(
+                    weekday, dateForDay(day).toString(),
+                    AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
+                    SemesterManager.getActiveSemester()
+                )
+                binding.progressBar.visibility = View.GONE
+                result.onSuccess { schedule ->
+                    periodList.clear()
+                    periodList.addAll(schedule.routine.map { slot ->
+                        Period(
+                            id = slot.id,
+                            subject = listOfNotNull(
+                                "${slot.courseCode} — ${slot.courseName}",
+                                slot.sectionCode?.let { "Section $it" }
+                            ).joinToString(" · "),
+                            startTime = slot.startsAt.take(5),
+                            endTime = slot.endsAt.take(5),
+                            room = slot.room,
+                            teacher = slot.teacherName,
+                            classKind = slot.classKind
+                        )
+                    })
+                    renderPeriods(day)
+                }.onFailure { error ->
+                    Toast.makeText(this@TimetableManagementActivity, "Could not load V2 timetable: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
 
         TimetableRepository.getInstance(this).getPeriodsCollection(day)
             .get()
@@ -221,15 +363,7 @@ class TimetableManagementActivity : AppCompatActivity() {
                 periodList.clear()
                 periodList.addAll(fetchedPeriods)
 
-                if (periodList.isEmpty()) {
-                    binding.tvEmptyState.visibility = View.VISIBLE
-                    binding.rvTimetable.visibility = View.GONE
-                } else {
-                    binding.tvEmptyState.visibility = View.GONE
-                    binding.rvTimetable.visibility = View.VISIBLE
-                    val isToday = day == getTodayName()
-                    periodAdapter.updateList(periodList, isToday)
-                }
+                renderPeriods(day)
             }
             .addOnFailureListener { e ->
                 binding.progressBar.visibility = View.GONE
@@ -255,13 +389,54 @@ class TimetableManagementActivity : AppCompatActivity() {
         val isEdit = period != null
 
         courseListener?.remove()
-        courseListener = CoursePicker.bind(this, dialogBinding.dropdownSubject)
+        if (usingSupabase) {
+            val batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
+            val semesterId = SemesterManager.getActiveSemester()
+            fun bindOfferings(preferredCourse: String? = null) {
+                val mayAddCourse = AppContextManager.appContextFlow.value.canManageBatch(batchId)
+                val labels = offeringOptions.map { it.label } + if (mayAddCourse) listOf("+ Add new course") else emptyList()
+                dialogBinding.dropdownSubject.setAdapter(
+                    ArrayAdapter(this, R.layout.item_course_dropdown, labels)
+                )
+                dialogBinding.dropdownSubject.setOnItemClickListener { _, _, position, _ ->
+                    if (mayAddCourse && position == offeringOptions.size) {
+                        dialogBinding.dropdownSubject.setText("", false)
+                        CoursePicker.showAddCourseDialog(this, batchId, semesterId) {
+                            lifecycleScope.launch {
+                                v2ScheduleRepository.manageableOfferings(batchId, semesterId)
+                                    .onSuccess { options ->
+                                        offeringOptions = options
+                                        bindOfferings(preferredCourse)
+                                        val preferred = offeringOptions.firstOrNull {
+                                            it.name.equals(preferredCourse, true)
+                                        }
+                                        if (preferred != null) dialogBinding.dropdownSubject.setText(preferred.label, false)
+                                    }
+                                    .onFailure { error ->
+                                        Toast.makeText(this@TimetableManagementActivity, "Course added, but offerings could not refresh: ${error.message}", Toast.LENGTH_LONG).show()
+                                    }
+                            }
+                        }
+                    }
+                }
+                if (!preferredCourse.isNullOrBlank()) {
+                    offeringOptions.firstOrNull { it.name.equals(preferredCourse, true) }
+                        ?.let { dialogBinding.dropdownSubject.setText(it.label, false) }
+                }
+            }
+            bindOfferings()
+            dialogBinding.layoutTeacher.visibility = View.GONE
+        } else {
+            dialogBinding.layoutTeacher.visibility = View.VISIBLE
+            courseListener = CoursePicker.bind(this, dialogBinding.dropdownSubject)
+        }
 
         if (isEdit) {
             dialogBinding.dropdownSubject.setText("${period?.subject}", false)
             dialogBinding.etTeacher.setText(period?.teacher)
             dialogBinding.etStartTime.setText(period?.startTime)
             dialogBinding.etEndTime.setText(period?.endTime)
+            dialogBinding.etRoom.setText(period?.room)
         }
 
         dialogBinding.etStartTime.setOnClickListener {
@@ -280,14 +455,25 @@ class TimetableManagementActivity : AppCompatActivity() {
                 val teacher = dialogBinding.etTeacher.text.toString().trim()
                 val start = dialogBinding.etStartTime.text.toString()
                 val end = dialogBinding.etEndTime.text.toString()
+                val room = dialogBinding.etRoom.text.toString().trim().ifBlank { null }
 
-                if (selectedSubject.isNotEmpty() && teacher.isNotEmpty()) {
-                    val updatedPeriod = Period(
+                if (usingSupabase && !runCatching {
+                        !start.isBlank() && !end.isBlank() && java.time.LocalTime.parse(end) > java.time.LocalTime.parse(start)
+                    }.getOrDefault(false)
+                ) {
+                    Toast.makeText(this, "Enter a valid start and end time.", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                    if (selectedSubject.isNotEmpty() && (usingSupabase || teacher.isNotEmpty())) {
+                        val updatedPeriod = Period(
                         id = period?.id ?: "",
                         subject = selectedSubject,
                         teacher = teacher,
                         startTime = start,
-                        endTime = end
+                        endTime = end,
+                        room = room,
+                        classKind = period?.classKind ?: "theory"
                     )
                     savePeriod(updatedPeriod, isEdit)
                 } else {
@@ -309,6 +495,30 @@ class TimetableManagementActivity : AppCompatActivity() {
     }
 
     private fun savePeriod(period: Period, isEdit: Boolean) {
+        if (usingSupabase) {
+            val offering = offeringOptions.firstOrNull { it.label == period.subject }
+            if (offering == null) {
+                Toast.makeText(this, "Choose a course offering from the list.", Toast.LENGTH_SHORT).show()
+                return
+            }
+            lifecycleScope.launch {
+                val weekday = POSTGRES_WEEKDAYS[currentDay] ?: 6
+                val classKind = if (isEdit) period.classKind else offering.classKind
+                val result = if (isEdit) {
+                    v2ScheduleRepository.updateRoutine(period.id, offering.id, weekday, period.startTime, period.endTime, period.room, classKind)
+                } else {
+                    v2ScheduleRepository.createRoutine(offering.id, weekday, period.startTime, period.endTime, period.room, classKind)
+                }
+                result.onSuccess {
+                    Toast.makeText(this@TimetableManagementActivity, if (isEdit) "Period updated" else "Period added", Toast.LENGTH_SHORT).show()
+                    fetchTimetable(currentDay)
+                    refreshWidgetAfterTimetableChange(currentDay)
+                }.onFailure { error ->
+                    Toast.makeText(this@TimetableManagementActivity, "Save failed: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
         val collection = TimetableRepository.getInstance(this).getPeriodsCollection(currentDay)
         val task = if (isEdit) {
             collection.document(period.id).set(period)
@@ -326,12 +536,36 @@ class TimetableManagementActivity : AppCompatActivity() {
         }
     }
 
+    private fun renderPeriods(day: String) {
+        if (periodList.isEmpty()) {
+            binding.tvEmptyState.visibility = View.VISIBLE
+            binding.rvTimetable.visibility = View.GONE
+        } else {
+            binding.tvEmptyState.visibility = View.GONE
+            binding.rvTimetable.visibility = View.VISIBLE
+            periodAdapter.updateList(periodList, day == getTodayName())
+        }
+    }
+
     override fun onDestroy() {
         courseListener?.remove()
         super.onDestroy()
     }
 
     private fun deletePeriod(period: Period) {
+        if (usingSupabase) {
+            lifecycleScope.launch {
+                v2ScheduleRepository.deleteRoutine(period.id).onSuccess {
+                    Toast.makeText(this@TimetableManagementActivity, "Period deleted", Toast.LENGTH_SHORT).show()
+                    fetchTimetable(currentDay)
+                    refreshWidgetAfterTimetableChange(currentDay)
+                }.onFailure { error ->
+                    Toast.makeText(this@TimetableManagementActivity, "Delete failed: ${error.message}", Toast.LENGTH_LONG).show()
+                    fetchTimetable(currentDay)
+                }
+            }
+            return
+        }
         TimetableRepository.getInstance(this).getPeriodsCollection(currentDay)
             .document(period.id)
             .delete()
@@ -347,13 +581,60 @@ class TimetableManagementActivity : AppCompatActivity() {
 
     private fun refreshWidgetAfterTimetableChange(day: String) {
         lifecycleScope.launch {
-            runCatching {
-                TimetableRepository.getInstance(this@TimetableManagementActivity)
-                    .syncDayFromFirestore(day = day, source = Source.DEFAULT)
+            if (usingSupabase) {
+                val weekday = POSTGRES_WEEKDAYS[day] ?: 6
+                val batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
+                val semesterId = AppContextManager.getSemesterId()
+                v2ScheduleRepository.loadDay(weekday, dateForDay(day).toString(), batchId, semesterId).onSuccess { schedule ->
+                    val changes = schedule.classChanges.associateBy { it.routineSlotId }
+                    val periods = schedule.routine.map { slot ->
+                        val change = changes[slot.id]
+                        Period(
+                            id = slot.id,
+                            subject = listOfNotNull(
+                                "${slot.courseCode} — ${slot.courseName}",
+                                slot.sectionCode?.let { "Section $it" }
+                            ).joinToString(" · "),
+                            teacher = slot.teacherName,
+                            startTime = (change?.newStartsAt ?: slot.startsAt).take(5),
+                            endTime = (change?.newEndsAt ?: slot.endsAt).take(5),
+                            isCancelled = change?.kind == com.shuaib.classmate.domain.schedule.ClassChangeKind.CANCELLED,
+                            cancelDate = if (change?.kind == com.shuaib.classmate.domain.schedule.ClassChangeKind.CANCELLED) schedule.effectiveDate else "",
+                            room = change?.newRoom ?: slot.room,
+                            scheduleChange = when (change?.kind) {
+                                com.shuaib.classmate.domain.schedule.ClassChangeKind.CANCELLED -> change.reason ?: "Class cancelled"
+                                com.shuaib.classmate.domain.schedule.ClassChangeKind.ROOM_CHANGED -> listOfNotNull(
+                                    change.previousRoom?.let { "Room changed from $it" },
+                                    change.newRoom?.let { "to $it" }, change.reason
+                                ).joinToString(" ")
+                                com.shuaib.classmate.domain.schedule.ClassChangeKind.TIME_CHANGED -> change.reason ?: "Class time changed"
+                                com.shuaib.classmate.domain.schedule.ClassChangeKind.RESCHEDULED -> change.reason ?: "Class rescheduled"
+                                null -> null
+                            },
+                            classKind = slot.classKind
+                        )
+                    }
+                    TimetableRepository.getInstance(this@TimetableManagementActivity).cacheSupabaseDay(
+                        batchId, semesterId, day, periods
+                    )
+                }
+            } else {
+                runCatching {
+                    TimetableRepository.getInstance(this@TimetableManagementActivity)
+                        .syncDayFromFirestore(day = day, source = Source.DEFAULT)
+                }
             }
             if (day == DateHelper.todayDayString()) {
                 WidgetUpdater.refresh(this@TimetableManagementActivity, syncTodayTimetable = false)
             }
         }
+    }
+
+    private companion object {
+        val TIME_PATTERN = Regex("^(?:[01]\\d|2[0-3]):[0-5]\\d$")
+        val POSTGRES_WEEKDAYS = mapOf(
+            "sunday" to 0, "monday" to 1, "tuesday" to 2, "wednesday" to 3,
+            "thursday" to 4, "friday" to 5, "saturday" to 6
+        )
     }
 }

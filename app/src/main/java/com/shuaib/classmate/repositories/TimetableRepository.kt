@@ -10,7 +10,9 @@ import com.google.firebase.firestore.Source
 import com.shuaib.classmate.data.FirestoreManager
 import com.shuaib.classmate.data.local.ClassMateDatabase
 import com.shuaib.classmate.data.local.TimetableEntity
+import com.shuaib.classmate.data.local.BusScheduleEntity
 import com.shuaib.classmate.models.Period
+import com.shuaib.classmate.models.BusSchedule
 import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.utils.SemesterManager
@@ -25,18 +27,20 @@ import java.util.concurrent.TimeUnit
 
 class TimetableRepository private constructor(private val context: Context) {
     private val timetableDao = ClassMateDatabase.getInstance(context).timetableDao()
+    private val busScheduleDao = ClassMateDatabase.getInstance(context).busScheduleDao()
     private val db = FirestoreManager.db
 
     fun observePeriods(
         day: String,
         semester: String = AppContextManager.getSemesterId(),
-        batch: String = AppContextManager.getBatchId()
+        batch: String = AppContextManager.getBatchId(),
+        effectiveDate: String = DateHelper.today()
     ): Flow<List<Period>> {
         val normalizedDay = day.lowercase()
         val normalizedSem = SemesterManager.normalizeSemester(semester)
         val normalizedBatch = batch.lowercase()
         return timetableDao.observePeriods(normalizedBatch, normalizedSem, normalizedDay)
-            .map { entities -> entities.map { it.toPeriod(DateHelper.today()) } }
+            .map { entities -> entities.map { it.toPeriod(effectiveDate) } }
     }
 
     fun getPeriodsCollection(
@@ -58,6 +62,31 @@ class TimetableRepository private constructor(private val context: Context) {
 
     suspend fun clearCache() {
         timetableDao.clearAll()
+    }
+
+    suspend fun cacheSupabaseDay(
+        batchId: String,
+        semesterId: String,
+        day: String,
+        periods: List<Period>
+    ) {
+        val normalizedDay = day.lowercase()
+        val normalizedSem = semesterId.trim().lowercase()
+        val normalizedBatch = batchId.lowercase()
+        val entities = periods.map {
+            TimetableEntity.fromPeriod(normalizedBatch, normalizedSem, normalizedDay, it)
+        }
+        timetableDao.replaceDay(normalizedBatch, normalizedSem, normalizedDay, entities)
+    }
+
+    suspend fun cacheBusSchedules(weekday: Int, schedules: List<BusSchedule>) {
+        require(weekday in 0..6)
+        busScheduleDao.replaceWeekday(weekday, schedules.map { BusScheduleEntity.fromBusSchedule(weekday, it) })
+    }
+
+    suspend fun getCachedBusSchedules(weekday: Int): List<BusSchedule> {
+        require(weekday in 0..6)
+        return busScheduleDao.getForWeekday(weekday).map { it.toBusSchedule() }
     }
 
     suspend fun syncDayFromFirestore(

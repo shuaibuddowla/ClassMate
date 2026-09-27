@@ -84,6 +84,17 @@ class LibraryAllFilesFragment : Fragment() {
     }
 
     private fun checkAdminStatus() {
+        if (ArchiveLibraryRepository.usesSupabaseCatalog) {
+            val context = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+            isAdmin = context.v2SessionActive &&
+                (context.isAdmin() || context.role == "teacher" || context.role == "cr")
+            pdfAdapter = PdfAdapter(emptyList(), isAdmin)
+            pdfAdapter.onItemClick = { pdf -> PdfDialogHelper.showPdfOptions(requireActivity(), requireContext(), pdf) }
+            pdfAdapter.onDeleteClick = { pdf -> showDeleteConfirmation(pdf) }
+            binding.rvAllFiles.adapter = pdfAdapter
+            loadAllFiles()
+            return
+        }
         val uid = auth.currentUser?.uid ?: run {
             loadAllFiles()
             return

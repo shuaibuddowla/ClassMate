@@ -1,6 +1,6 @@
 # ClassMate secure API
 
-Cloudflare Worker that keeps ClassMate service credentials out of the Android APK. Every non-health route verifies a Firebase Authentication ID token. Privileged routes additionally read the caller's existing `users/{uid}` Firestore document and enforce its role/permissions.
+Cloudflare Worker that keeps ClassMate service credentials out of the Android APK. Every non-health route verifies a Firebase Authentication ID token. Archive routes authorize the caller against Supabase `can_access_v2_archive_batch`; other older privileged routes still read the caller's `users/{uid}` Firestore document until they are migrated.
 
 ## Configure and deploy
 

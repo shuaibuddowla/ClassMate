@@ -185,7 +185,7 @@ class LoginActivity : AppCompatActivity() {
                 val user = result.user ?: return@addOnSuccessListener
                 Log.d("AuthTrace", "Email sign-in success, uid: ${user.uid}")
                 AuthDebug.d("Email signin success uid=${user.uid}")
-                normalizeUserProfile(user.uid, user)
+                continueAfterFirebaseSignIn(user.uid, user)
             }
             .addOnFailureListener { e ->
                 Log.d("AuthTrace", "Email sign-in failure: ${e.message}")
@@ -226,11 +226,16 @@ class LoginActivity : AppCompatActivity() {
             sessionRepository.synchronizeFirebaseSession()
                 .onSuccess { profile ->
                     Log.d("AuthTrace", "Firebase-to-Supabase profile sync success status=${profile.status}")
+                    com.shuaib.classmate.utils.AppContextManager.attachUser(uid)
+                    com.shuaib.classmate.utils.AppContextManager.applyV2Session(profile)
+                    OneSignal.login(uid)
+                    navigateToMain()
                 }
                 .onFailure { error ->
-                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed; continuing with legacy data", error)
+                    Log.w("AuthTrace", "Firebase-to-Supabase profile sync failed", error)
+                    setLoading(false)
+                    showError("Could not load your ClassMate profile: ${error.message}")
                 }
-            normalizeUserProfile(uid, user)
         }
     }
 

@@ -24,6 +24,9 @@ data class TimetableEntity(
     val cancelDate: String,
     val substituteTeacher: String,
     val substituteDate: String,
+    val room: String? = null,
+    val scheduleChange: String? = null,
+    val classKind: String = "class",
     val cachedAtMillis: Long = System.currentTimeMillis()
 ) {
     fun toPeriod(today: String): Period {
@@ -39,7 +42,10 @@ data class TimetableEntity(
             cancelDate = cancelDate,
             isSubstitute = isActuallySubstitute,
             substituteTeacher = if (isActuallySubstitute) substituteTeacher else "",
-            substituteDate = substituteDate
+            substituteDate = substituteDate,
+            room = room,
+            scheduleChange = scheduleChange,
+            classKind = classKind
         )
     }
 
@@ -61,7 +67,10 @@ data class TimetableEntity(
             endTime = period.endTime,
             cancelDate = period.cancelDate,
             substituteTeacher = period.substituteTeacher,
-            substituteDate = period.substituteDate
+            substituteDate = period.substituteDate,
+            room = period.room,
+            scheduleChange = period.scheduleChange,
+            classKind = period.classKind
         )
 
         fun cacheKey(batchId: String, semesterId: String, day: String, id: String): String =

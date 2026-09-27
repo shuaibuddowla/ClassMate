@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.google.firebase.firestore.Source
 import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.repositories.TimetableRepository
+import com.shuaib.classmate.utils.AppContextManager
 
 class OfflineSyncWorker(
     appContext: Context,
@@ -17,7 +18,9 @@ class OfflineSyncWorker(
             val noticeRepository = NoticeRepository.getInstance(applicationContext)
             runCatching { noticeRepository.syncFromSupabase() }
             noticeRepository.syncFromFirestore(source = Source.SERVER)
-            TimetableRepository.getInstance(applicationContext).syncAllFromFirestore(source = Source.SERVER)
+            if (!AppContextManager.appContextFlow.value.v2SessionActive) {
+                TimetableRepository.getInstance(applicationContext).syncAllFromFirestore(source = Source.SERVER)
+            }
             Result.success()
         } catch (_: Exception) {
             Result.retry()

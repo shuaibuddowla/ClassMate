@@ -6,5 +6,8 @@ data class BusSchedule(
     val departureFrom: String = "",  // "Campus" or "City"
     val busName: String = "",       // e.g., "Double Decker", "Staff Bus"
     val route: String = "",         // e.g., "Via Town Hall, Bypass"
-    val scheduleType: String = ""    // "class_day" or "off_day"
+    val scheduleType: String = "",    // "class_day" or "off_day"
+    val destination: String = "",
+    val weekdays: List<Int> = emptyList(),
+    val notes: String? = null
 )
