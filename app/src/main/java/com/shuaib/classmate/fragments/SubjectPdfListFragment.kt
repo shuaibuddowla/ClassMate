@@ -319,7 +319,7 @@ class SubjectPdfListFragment : Fragment() {
                 if (_binding == null) return@deleteResource
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(context, "Failed to delete: ${it.message}", Toast.LENGTH_SHORT).show()
-            })
+            }, provider = pdf.provider)
     }
 
     private fun handleResourceAction(pdf: PdfFile) {

@@ -802,7 +802,7 @@ class PdfLibraryFragment : Fragment() {
             loadLibraryData()
         }, { error ->
             Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_LONG).show()
-        })
+        }, provider = pdf.provider)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

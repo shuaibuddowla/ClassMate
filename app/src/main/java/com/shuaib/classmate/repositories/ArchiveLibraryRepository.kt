@@ -101,9 +101,9 @@ object ArchiveLibraryRepository {
         mainHandler.post { onSuccess(course.toCourse(semesterId)) }
     }
 
-    fun deleteResource(id: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) =
+    fun deleteResource(id: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit, provider: String = "archive") =
         runAsync(onFailure) {
-            if (isV2ResourceId(id) && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            if (provider == "supabase" && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
                 runBlocking { v2Resources.delete(id) }
                 mainHandler.post(onSuccess)
                 return@runAsync
@@ -133,9 +133,9 @@ object ArchiveLibraryRepository {
         mainHandler.post { onSuccess(resource.toPdfFile(semesterId, null)) }
     }
 
-    fun resolveDownloadUrl(id: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) =
+    fun resolveDownloadUrl(id: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit, provider: String = "archive") =
         runAsync(onFailure) {
-            if (isV2ResourceId(id) && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            if (provider == "supabase" && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
                 val url = runBlocking { v2Resources.resolveDownloadUrl(id) }
                 mainHandler.post { onSuccess(url) }
                 return@runAsync
@@ -163,13 +163,9 @@ object ArchiveLibraryRepository {
         onFailure: (Exception) -> Unit,
         description: String = ""
     ) = runAsync(onFailure) {
-        if (AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
-            val id = runBlocking {
-                v2Resources.upload(context, uri, batchId, semesterId, course, title, fileName, sizeBytes, mimeType, materialType, description, onProgress)
-            }
-            mainHandler.post { onSuccess(id) }
-            return@runAsync
-        }
+        // Firestore remains the source of truth for published semesters and courses.
+        // Until that catalog is synchronized to the V2 tables, use the existing
+        // authorized archive upload route even for users with a V2 session.
         val payload = mapOf(
             "batchId" to archiveBatch(batchId),
             "semesterNumber" to semesterNumber(semesterId),
@@ -228,9 +224,6 @@ object ArchiveLibraryRepository {
         }
         gson.fromJson(text, JsonObject::class.java) ?: JsonObject()
     }
-
-    private fun isV2ResourceId(id: String): Boolean =
-        id.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"))
 
     private fun runAsync(onFailure: (Exception) -> Unit, action: () -> Unit) {
         Thread {

@@ -21,7 +21,7 @@ object LibraryUrlOpener {
                 openResolved(context, file, url)
             }, { error ->
                 Toast.makeText(context, "Unable to open resource: ${error.message}", Toast.LENGTH_LONG).show()
-            })
+            }, provider = file.provider)
             return
         }
         val url = file.downloadUrl.ifBlank { file.driveUrl.ifBlank { file.telegramUrl } }

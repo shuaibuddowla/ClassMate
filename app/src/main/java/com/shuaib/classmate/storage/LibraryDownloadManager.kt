@@ -70,10 +70,10 @@ object LibraryDownloadManager {
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
     ) {
-        if (pdfFile.provider == "supabase") {
+        if (pdfFile.provider == "archive" || pdfFile.provider == "supabase") {
             ArchiveLibraryRepository.resolveDownloadUrl(pdfFile.id, { url ->
                 downloadResolvedFile(context, pdfFile, url, onProgress, onSuccess, onFailure)
-            }, onFailure)
+            }, onFailure, provider = pdfFile.provider)
             return
         }
         val url = pdfFile.downloadUrl.ifBlank { pdfFile.driveUrl.ifBlank { pdfFile.telegramUrl } }

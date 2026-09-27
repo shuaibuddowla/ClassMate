@@ -157,7 +157,7 @@ class LibraryAllFilesFragment : Fragment() {
                 loadAllFiles()
             }, { e ->
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            })
+            }, provider = pdf.provider)
     }
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toPdfFile(): PdfFile {
