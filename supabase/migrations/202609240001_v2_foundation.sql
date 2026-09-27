@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgcrypto;
-create extension if not exists citext;
+create extension if not exists citext with schema extensions;
 
 create type public.profile_status as enum (
   'active',
@@ -28,7 +28,7 @@ create table public.universities (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   name text not null,
-  email_domain citext not null unique,
+  email_domain extensions.citext not null unique,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -38,7 +38,7 @@ create table public.departments (
   university_id uuid not null references public.universities(id) on delete cascade,
   code text not null,
   name text not null,
-  email_prefix citext not null,
+  email_prefix extensions.citext not null,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (university_id, code),
@@ -96,7 +96,7 @@ create table public.profiles (
   id uuid primary key default gen_random_uuid(),
   firebase_uid text not null unique,
   university_id uuid references public.universities(id) on delete restrict,
-  email citext not null unique,
+  email extensions.citext not null unique,
   display_name text not null default '',
   avatar_url text,
   status public.profile_status not null default 'pending_setup',
@@ -118,7 +118,7 @@ create table public.student_profiles (
 create table public.staff_allowlist (
   id uuid primary key default gen_random_uuid(),
   university_id uuid not null references public.universities(id) on delete cascade,
-  email citext not null unique,
+  email extensions.citext not null unique,
   role public.app_role not null check (role in ('teacher', 'admin')),
   department_id uuid references public.departments(id) on delete set null,
   is_active boolean not null default true,
@@ -750,8 +750,8 @@ set search_path = ''
 as $$
 declare
   token_firebase_uid text := public.current_firebase_uid();
-  normalized_email citext := lower(auth.jwt() ->> 'email');
-  normalized_domain citext;
+  normalized_email extensions.citext := lower(auth.jwt() ->> 'email');
+  normalized_domain extensions.citext;
   identity_parts text[];
   matched_university public.universities%rowtype;
   matched_department public.departments%rowtype;
@@ -773,7 +773,7 @@ begin
     raise exception 'Google authentication is required';
   end if;
 
-  normalized_domain := split_part(normalized_email::text, '@', 2)::citext;
+  normalized_domain := split_part(normalized_email::text, '@', 2)::extensions.citext;
   select * into matched_university
   from public.universities u
   where u.email_domain = normalized_domain and u.is_active
@@ -799,7 +799,7 @@ begin
     select * into matched_department
     from public.departments d
     where d.university_id = matched_university.id
-      and d.email_prefix = identity_parts[1]::citext
+      and d.email_prefix = identity_parts[1]::extensions.citext
       and d.is_active
     limit 1;
 

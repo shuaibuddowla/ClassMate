@@ -1,0 +1,5 @@
+project_id = "ClassMate"
+
+[auth.third_party.firebase]
+enabled = true
+project_id = "classmate-a016a"

@@ -416,7 +416,7 @@ begin
   insert into public.staff_allowlist (
     university_id, email, role, department_id, is_active, notes, created_by
   ) values (
-    target_university, lower(target_email)::citext, target_role,
+    target_university, lower(target_email)::extensions.citext, target_role,
     target_department, target_is_active, target_notes, public.current_profile_id()
   )
   on conflict (email) do update set
