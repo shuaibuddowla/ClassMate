@@ -107,7 +107,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.1")
 
     // AI
-    implementation(libs.google.generativeai)
     implementation(libs.gson)
 
     // Lifecycle
