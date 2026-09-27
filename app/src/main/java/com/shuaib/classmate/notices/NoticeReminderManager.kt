@@ -1,6 +1,8 @@
 package com.shuaib.classmate.notices
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
@@ -13,6 +15,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.shuaib.classmate.models.Notice
+import com.shuaib.classmate.data.remote.supabase.SupabaseNoticeReminderRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -20,6 +27,9 @@ object NoticeReminderManager {
     private const val DEBUG_TAG = "NoticeReminderDebug"
     private const val COLLECTION = "user_notice_reminders"
     private val db: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val v2Repository by lazy { SupabaseNoticeReminderRepository() }
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun showReminderOptions(context: Context, notice: Notice) {
         val activity = context as? FragmentActivity
@@ -32,6 +42,13 @@ object NoticeReminderManager {
     }
 
     fun getCurrentReminder(noticeId: String, onResult: (Long?) -> Unit) {
+        if (isV2Notice(noticeId) && v2Repository.isConfigured) {
+            ioScope.launch {
+                val result = runCatching { v2Repository.current(noticeId) }.getOrNull()
+                mainHandler.post { onResult(result) }
+            }
+            return
+        }
         val userId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         if (userId.isBlank() || noticeId.isBlank()) {
             onResult(null)
@@ -56,6 +73,19 @@ object NoticeReminderManager {
      */
     fun syncRemindersWithLocal(context: Context) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (v2Repository.isConfigured) {
+            ioScope.launch {
+                runCatching { v2Repository.active() }
+                    .onSuccess { reminders ->
+                        reminders.forEach { (noticeId, reminderAt) ->
+                            if (isV2Notice(noticeId) && reminderAt > System.currentTimeMillis()) {
+                                scheduleWork(context, userId, noticeId, "Notice Reminder", "Tap to view notice details", reminderAt, isV2 = true)
+                            }
+                        }
+                    }
+                    .onFailure { Log.e(DEBUG_TAG, "V2 reminder sync failed", it) }
+            }
+        }
         Log.d(DEBUG_TAG, "Starting sync for user: $userId")
         db.collection(COLLECTION)
             .whereEqualTo("userId", userId)
@@ -123,6 +153,26 @@ object NoticeReminderManager {
             onComplete(false, IllegalArgumentException("Reminder time must be in the future."))
             return
         }
+
+        if (isV2Notice(noticeId) && v2Repository.isConfigured) {
+            ioScope.launch {
+                val result = runCatching { v2Repository.set(noticeId, reminderAt) }
+                mainHandler.post {
+                    result.fold(
+                        onSuccess = {
+                            scheduleWork(context, userId, noticeId, title, body, reminderAt, isV2 = true)
+                            Toast.makeText(context, "Reminder set: $label", Toast.LENGTH_SHORT).show()
+                            onComplete(true, null)
+                        },
+                        onFailure = { error ->
+                            Toast.makeText(context, "Reminder failed: ${error.message}", Toast.LENGTH_LONG).show()
+                            onComplete(false, error as? Exception ?: Exception(error))
+                        }
+                    )
+                }
+            }
+            return
+        }
         
         val reminderDocId = docId(userId, noticeId)
         val data = hashMapOf(
@@ -153,6 +203,22 @@ object NoticeReminderManager {
 
     fun remove(context: Context, noticeId: String, onComplete: (Boolean, Exception?) -> Unit = { _, _ -> }) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (isV2Notice(noticeId) && v2Repository.isConfigured) {
+            ioScope.launch {
+                val result = runCatching { v2Repository.remove(noticeId) }
+                mainHandler.post {
+                    result.fold(
+                        onSuccess = {
+                            WorkManager.getInstance(context).cancelUniqueWork(workName(userId, noticeId))
+                            Toast.makeText(context, "Reminder removed", Toast.LENGTH_SHORT).show()
+                            onComplete(true, null)
+                        },
+                        onFailure = { error -> onComplete(false, error as? Exception ?: Exception(error)) }
+                    )
+                }
+            }
+            return
+        }
         val reminderDocId = docId(userId, noticeId)
         db.collection(COLLECTION)
             .document(reminderDocId)
@@ -174,7 +240,8 @@ object NoticeReminderManager {
         noticeId: String,
         title: String,
         body: String,
-        reminderAt: Long
+        reminderAt: Long,
+        isV2: Boolean = false
     ) {
         val request = OneTimeWorkRequestBuilder<NoticeReminderWorker>()
             .setInputData(
@@ -182,6 +249,7 @@ object NoticeReminderManager {
                     .putString("noticeId", noticeId)
                     .putString("title", title)
                     .putString("body", body)
+                    .putBoolean("isV2", isV2)
                     .build()
             )
             .setInitialDelay(reminderAt - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
@@ -195,6 +263,9 @@ object NoticeReminderManager {
     }
 
     private fun docId(userId: String, noticeId: String): String = "${noticeId}_$userId"
+
+    private fun isV2Notice(noticeId: String): Boolean =
+        noticeId.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"))
 
     private fun workName(userId: String, noticeId: String): String = "notice_reminder_${noticeId}_$userId"
 

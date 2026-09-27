@@ -28,7 +28,7 @@ class NoticeReminderWorker(
         val body = inputData.getString("body").orEmpty()
         
         val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId != null && noticeId.isNotBlank()) {
+        if (inputData.getBoolean("isV2", false).not() && userId != null && noticeId.isNotBlank()) {
             val docId = "${noticeId}_$userId"
             FirebaseFirestore.getInstance()
                 .collection("user_notice_reminders")

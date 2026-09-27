@@ -96,6 +96,10 @@ Completed in source control:
   authorized global pins, with engagement counts returned by the feed.
 - Scoped publishing for plain-text batch notices, with target resolution and
   authorization enforced inside PostgreSQL.
+- V2 notice likes, personal/global pins, and per-user reminders stored under
+  Supabase RLS; local reminder delivery continues through WorkManager.
+- Batch notice push authorization through the deployed Cloudflare worker, with
+  V2 Supabase role checks and legacy Firestore authorization retained.
 - Stable JSON response decoding for Android notice publishing.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.
@@ -112,11 +116,10 @@ Awaiting owner-operated environment setup:
 
 Next coding slices:
 
-1. Notices, targets, likes, pins, reminders, and FCM event delivery.
-2. Library/resource metadata, Supabase Storage upload/download, bookmarks, and
+1. Library/resource metadata, Supabase Storage upload/download, bookmarks, and
    version replacement.
-3. Replace timetable/bus UI reads after live data parity is verified.
-4. Admin management screens backed by the scoped RPCs.
-5. Harden the GitHub release updater with required version metadata and SHA-256.
-6. Retire obsolete Firestore/Storage data paths only after parity; Firebase Auth
+2. Replace timetable/bus UI reads after live data parity is verified.
+3. Admin management screens backed by the scoped RPCs.
+4. Harden the GitHub release updater with required version metadata and SHA-256.
+5. Retire obsolete Firestore/Storage data paths only after parity; Firebase Auth
    and FCM remain part of the final architecture.
