@@ -30,6 +30,9 @@ internal data class SupabaseNoticeFeedRow(
     @SerialName("is_personally_pinned") val isPersonallyPinned: Boolean = false
 )
 
+@Serializable
+internal data class PublishedNoticeResult(val id: String)
+
 internal class SupabaseNoticeFeed(
     private val clientProvider: SupabaseClientProvider
 ) {
@@ -87,7 +90,7 @@ internal class SupabaseNoticeFeed(
                 put("notice_body", body)
                 put("notice_priority", "normal")
             }
-        ).decodeSingle<String>()
+        ).decodeSingle<PublishedNoticeResult>().id
     }
 
     private suspend fun loadRows(): List<SupabaseNoticeFeedRow> {

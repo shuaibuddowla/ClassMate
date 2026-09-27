@@ -96,6 +96,7 @@ Completed in source control:
   authorized global pins, with engagement counts returned by the feed.
 - Scoped publishing for plain-text batch notices, with target resolution and
   authorization enforced inside PostgreSQL.
+- Stable JSON response decoding for Android notice publishing.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.
 - Owner bootstrap template and external-account setup checklist.
