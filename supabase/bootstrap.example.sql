@@ -17,9 +17,9 @@ declare
   batch_code constant text := 'CHANGE_ME_TWO_DIGIT_BATCH';
   batch_name constant text := 'CHANGE_ME_BATCH_DISPLAY_NAME';
   batch_admission_year constant smallint := 0;
-  university_id uuid;
-  department_id uuid;
-  batch_id uuid;
+  v_university_id uuid;
+  v_department_id uuid;
+  v_batch_id uuid;
 begin
   if owner_email like 'CHANGE_ME_%'
      or department_code like 'CHANGE_ME_%'
@@ -35,40 +35,41 @@ begin
     name = excluded.name,
     email_domain = excluded.email_domain,
     is_active = true
-  returning id into university_id;
+  returning id into v_university_id;
 
   insert into public.departments (university_id, code, name, email_prefix)
-  values (university_id, department_code, department_name, department_email_prefix)
+  values (v_university_id, department_code, department_name, department_email_prefix)
   on conflict (university_id, code) do update set
     name = excluded.name,
     email_prefix = excluded.email_prefix,
     is_active = true
-  returning id into department_id;
+  returning id into v_department_id;
 
   insert into public.semesters (university_id, ordinal, name)
-  select university_id, ordinal, 'Semester ' || ordinal
-  from generate_series(1, 8) as ordinal
+  select v_university_id, generated.semester_ordinal,
+         'Semester ' || generated.semester_ordinal
+  from generate_series(1, 8) as generated(semester_ordinal)
   on conflict (university_id, ordinal) do update set name = excluded.name;
 
   insert into public.batches (
     department_id, cohort_code, display_name, admission_year
   ) values (
-    department_id, batch_code, batch_name, batch_admission_year
+    v_department_id, batch_code, batch_name, batch_admission_year
   )
   on conflict (department_id, cohort_code) do update set
     display_name = excluded.display_name,
     admission_year = excluded.admission_year,
     is_archived = false
-  returning id into batch_id;
+  returning id into v_batch_id;
 
   insert into public.sections (batch_id, code, name)
-  values (batch_id, 'A', 'Section A')
+  values (v_batch_id, 'A', 'Section A')
   on conflict (batch_id, code) do update set name = excluded.name, is_active = true;
 
   insert into public.staff_allowlist (
     university_id, email, role, department_id, is_active, notes
   ) values (
-    university_id, lower(owner_email), 'admin', null, true,
+    v_university_id, lower(owner_email), 'admin', null, true,
     'Initial global administrator'
   )
   on conflict (email) do update set
