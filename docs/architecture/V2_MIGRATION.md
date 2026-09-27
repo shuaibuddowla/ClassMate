@@ -90,6 +90,8 @@ Completed in source control:
   server-verified V2 role and student academic scope authoritative in the
   existing Android UI during feature-by-feature cutover,
   backend-neutral academic catalog, and schedule repositories.
+- RLS-filtered Supabase notice feed read model connected to the existing Room
+  cache alongside legacy Firestore notices for a non-destructive cutover.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.
 - Owner bootstrap template and external-account setup checklist.

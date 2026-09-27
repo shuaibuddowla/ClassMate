@@ -14,6 +14,8 @@ import com.google.firebase.firestore.Source
 import com.shuaib.classmate.data.FirestoreManager
 import com.shuaib.classmate.data.local.ClassMateDatabase
 import com.shuaib.classmate.data.local.NoticeEntity
+import com.shuaib.classmate.data.remote.supabase.SupabaseClientProvider
+import com.shuaib.classmate.data.remote.supabase.SupabaseNoticeFeed
 import com.shuaib.classmate.models.Notice
 import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.utils.AppContextManager
@@ -31,6 +33,9 @@ class NoticeRepository private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val noticeDao = ClassMateDatabase.getInstance(appContext).noticeDao()
     private val db = FirestoreManager.db
+    private val supabaseFeed = SupabaseNoticeFeed(
+        SupabaseClientProvider(com.google.firebase.auth.FirebaseAuth.getInstance())
+    )
 
     fun getNoticesCollection(batchId: String = AppContextManager.getBatchId()): CollectionReference {
         val norm = AppContextManager.normalizeBatch(batchId)
@@ -133,6 +138,17 @@ class NoticeRepository private constructor(context: Context) {
             android.util.Log.e("NoticeRepository", "Sync failed: ${e.message}")
         }
     }
+
+    suspend fun syncFromSupabase(batchId: String = AppContextManager.getBatchId()) =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            if (!supabaseFeed.isConfigured) return@withContext
+            val normBatch = AppContextManager.normalizeBatch(batchId)
+            val notices = supabaseFeed.load(normBatch)
+            if (notices.isNotEmpty()) {
+                noticeDao.upsertAll(notices.map { NoticeEntity.fromNotice(it) })
+                WidgetUpdater.refresh(appContext, syncTodayTimetable = false)
+            }
+        }
 
     fun enqueueNetworkSync() {
         val request = OneTimeWorkRequestBuilder<OfflineSyncWorker>()

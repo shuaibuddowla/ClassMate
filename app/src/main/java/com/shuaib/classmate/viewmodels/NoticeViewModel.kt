@@ -31,6 +31,8 @@ class NoticeViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             AppContextManager.activeBatchFlow.collect { batch ->
                 startRealtimeSync(batch)
+                runCatching { repository.syncFromSupabase(batch) }
+                    .onFailure { android.util.Log.w("NoticeViewModel", "V2 notice sync failed", it) }
                 runCatching { repository.syncFromFirestore(batch, Source.DEFAULT) }
             }
         }
@@ -47,6 +49,8 @@ class NoticeViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
+                runCatching { repository.syncFromSupabase(batch) }
+                    .onFailure { android.util.Log.w("NoticeViewModel", "V2 notice refresh failed", it) }
                 repository.syncFromFirestore(batch, Source.SERVER)
             } catch (e: Exception) {
                 e.printStackTrace()
