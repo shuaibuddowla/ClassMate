@@ -15,7 +15,7 @@ object LibraryUrlOpener {
     private const val TAG = "LibraryOpenDebug"
 
     fun open(context: Context, file: PdfFile) {
-        if (file.provider == "archive") {
+        if (file.provider == "archive" || file.provider == "supabase") {
             Toast.makeText(context, "Preparing secure resource...", Toast.LENGTH_SHORT).show()
             ArchiveLibraryRepository.resolveDownloadUrl(file.id, { url ->
                 openResolved(context, file, url)

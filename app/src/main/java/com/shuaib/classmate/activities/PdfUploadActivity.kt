@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -22,9 +23,12 @@ import com.shuaib.classmate.utils.NotificationSender
 import com.shuaib.classmate.utils.SemesterManager
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.repositories.ArchiveLibraryRepository
+import com.shuaib.classmate.data.remote.supabase.SupabaseClientProvider
+import com.shuaib.classmate.data.remote.supabase.SupabaseNoticeFeed
 import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.TelegramUploader
+import kotlinx.coroutines.launch
 
 class PdfUploadActivity : AppCompatActivity() {
 
@@ -160,13 +164,48 @@ class PdfUploadActivity : AppCompatActivity() {
                 runOnUiThread { binding.tvProgress.text = "Uploading to CSE Archive... $progress%" }
             },
             onSuccess = { resourceId ->
-                postResourceNotice(input.title, input.subject, resourceId, input.description)
                 setUploading(false)
-                Toast.makeText(this, "Published to the shared CSE Archive!", Toast.LENGTH_SHORT).show()
-                finish()
+                if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+                    Toast.makeText(this, "Uploaded to the ClassMate Library", Toast.LENGTH_SHORT).show()
+                    publishV2ResourceNotice(input.title, input.subject, input.description) { finish() }
+                } else {
+                    Toast.makeText(this, "Published to the shared CSE Archive!", Toast.LENGTH_SHORT).show()
+                    postResourceNotice(input.title, input.subject, resourceId, input.description)
+                    finish()
+                }
             },
-            onFailure = { error -> handleUploadError(error.message ?: "Archive upload failed") }
+            onFailure = { error -> handleUploadError(error.message ?: "Archive upload failed") },
+            description = input.description
         )
+    }
+
+    private fun publishV2ResourceNotice(title: String, subject: String, description: String, onComplete: () -> Unit) {
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+            .ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
+        val noticeTitle = "📚 Resource: $title"
+        val body = buildString {
+            if (description.isNotBlank()) {
+                append(description.trim())
+                append("\n\n")
+            }
+            append("A new learning resource for $subject was added to the Library. Open Library to view or download it.")
+        }
+        lifecycleScope.launch {
+            val result = runCatching {
+                SupabaseNoticeFeed(SupabaseClientProvider(auth)).publishBatchNotice(batchId, noticeTitle, body)
+            }
+            result.onSuccess {
+                NotificationSender.sendNoticeAlert(
+                    title = noticeTitle,
+                    body = body,
+                    batchId = batchId,
+                    onFailure = { error -> Log.e(TAG, "V2 resource alert failed: $error") }
+                )
+            }.onFailure { error ->
+                Toast.makeText(this@PdfUploadActivity, "Resource uploaded, but its notice could not be posted: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+            onComplete()
+        }
     }
 
     private fun handleLinkUpload() {

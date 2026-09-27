@@ -9,7 +9,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.data.remote.supabase.SupabaseAcademicResourceRepository
 import com.shuaib.classmate.network.BackendApiClient
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.SemesterManager
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -20,6 +22,7 @@ import java.io.IOException
 import java.time.Instant
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 
 object ArchiveLibraryRepository {
     private val gson = Gson()
@@ -29,6 +32,7 @@ object ArchiveLibraryRepository {
         .readTimeout(90, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.MINUTES)
         .build()
+    private val v2Resources by lazy { SupabaseAcademicResourceRepository() }
 
     fun load(
         batchId: String,
@@ -36,23 +40,40 @@ object ArchiveLibraryRepository {
         onSuccess: (List<Course>, List<PdfFile>) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
-        val batch = archiveBatch(batchId)
-        val semester = semesterNumber(semesterId)
-        val request = BackendApiClient.authenticated(
-            Request.Builder().url(
-                BackendApiClient.url("v1/archive/archive") +
-                    "?batchId=$batch&semesterNumber=$semester"
+        val v2 = if (AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            runCatching { runBlocking { v2Resources.load(batchId, semesterId) } }
+                .onFailure { android.util.Log.w("AcademicResources", "V2 resource load failed; retaining archive data", it) }
+                .getOrNull()
+        } else null
+
+        val archiveResult = runCatching {
+            val batch = archiveBatch(batchId)
+            val semester = semesterNumber(semesterId)
+            val request = BackendApiClient.authenticated(
+                Request.Builder().url(
+                    BackendApiClient.url("v1/archive/archive") +
+                        "?batchId=$batch&semesterNumber=$semester"
+                )
             )
-        )
-        val root = executeJson(request)
-        val courses = gson.fromJson(root.getAsJsonArray("courses"), Array<ArchiveCourse>::class.java)
-            .orEmpty()
-            .map { it.toCourse(semesterId) }
-        val categories = courses.associate { it.id to it.type }
-        val resources = gson.fromJson(root.getAsJsonArray("resources"), Array<ArchiveResource>::class.java)
-            .orEmpty()
-            .map { it.toPdfFile(semesterId, categories[it.courseId]) }
-        mainHandler.post { onSuccess(courses, resources) }
+            val root = executeJson(request)
+            val courses = gson.fromJson(root.getAsJsonArray("courses"), Array<ArchiveCourse>::class.java)
+                .orEmpty()
+                .map { it.toCourse(semesterId) }
+            val categories = courses.associate { it.id to it.type }
+            val resources = gson.fromJson(root.getAsJsonArray("resources"), Array<ArchiveResource>::class.java)
+                .orEmpty()
+                .map { it.toPdfFile(semesterId, categories[it.courseId]) }
+            courses to resources
+        }
+        val data = when {
+            v2 != null && archiveResult.isSuccess -> {
+                val (legacyCourses, legacyResources) = archiveResult.getOrThrow()
+                (v2.first.ifEmpty { legacyCourses }) to (v2.second + legacyResources).distinctBy { "${it.provider}:${it.id}" }
+            }
+            v2 != null -> v2
+            else -> archiveResult.getOrThrow()
+        }
+        mainHandler.post { onSuccess(data.first, data.second) }
     }
 
     fun addCourse(
@@ -82,6 +103,11 @@ object ArchiveLibraryRepository {
 
     fun deleteResource(id: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) =
         runAsync(onFailure) {
+            if (isV2ResourceId(id) && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+                runBlocking { v2Resources.delete(id) }
+                mainHandler.post(onSuccess)
+                return@runAsync
+            }
             val request = BackendApiClient.authenticated(
                 Request.Builder()
                     .url(BackendApiClient.url("v1/archive/resources/$id/delete"))
@@ -109,6 +135,11 @@ object ArchiveLibraryRepository {
 
     fun resolveDownloadUrl(id: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) =
         runAsync(onFailure) {
+            if (isV2ResourceId(id) && AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+                val url = runBlocking { v2Resources.resolveDownloadUrl(id) }
+                mainHandler.post { onSuccess(url) }
+                return@runAsync
+            }
             val request = BackendApiClient.authenticated(
                 Request.Builder().url(BackendApiClient.url("v1/archive/download/$id"))
             )
@@ -129,8 +160,16 @@ object ArchiveLibraryRepository {
         materialType: String,
         onProgress: (Int) -> Unit,
         onSuccess: (String) -> Unit,
-        onFailure: (Exception) -> Unit
+        onFailure: (Exception) -> Unit,
+        description: String = ""
     ) = runAsync(onFailure) {
+        if (AppContextManager.appContextFlow.value.v2SessionActive && v2Resources.isConfigured) {
+            val id = runBlocking {
+                v2Resources.upload(context, uri, batchId, semesterId, course, title, fileName, sizeBytes, mimeType, materialType, description, onProgress)
+            }
+            mainHandler.post { onSuccess(id) }
+            return@runAsync
+        }
         val payload = mapOf(
             "batchId" to archiveBatch(batchId),
             "semesterNumber" to semesterNumber(semesterId),
@@ -189,6 +228,9 @@ object ArchiveLibraryRepository {
         }
         gson.fromJson(text, JsonObject::class.java) ?: JsonObject()
     }
+
+    private fun isV2ResourceId(id: String): Boolean =
+        id.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"))
 
     private fun runAsync(onFailure: (Exception) -> Unit, action: () -> Unit) {
         Thread {

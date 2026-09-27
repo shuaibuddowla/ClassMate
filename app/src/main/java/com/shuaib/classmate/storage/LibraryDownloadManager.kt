@@ -7,6 +7,7 @@ import android.widget.Toast
 import com.google.firebase.Timestamp
 import com.shuaib.classmate.activities.OfflinePdfViewerActivity
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.repositories.ArchiveLibraryRepository
 import com.shuaib.classmate.network.BackendApiClient
 import okhttp3.*
 import org.json.JSONObject
@@ -69,6 +70,12 @@ object LibraryDownloadManager {
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
     ) {
+        if (pdfFile.provider == "supabase") {
+            ArchiveLibraryRepository.resolveDownloadUrl(pdfFile.id, { url ->
+                downloadResolvedFile(context, pdfFile, url, onProgress, onSuccess, onFailure)
+            }, onFailure)
+            return
+        }
         val url = pdfFile.downloadUrl.ifBlank { pdfFile.driveUrl.ifBlank { pdfFile.telegramUrl } }
         if (url.isBlank()) {
             onFailure(IllegalArgumentException("No download link available"))
@@ -99,6 +106,21 @@ object LibraryDownloadManager {
         }
 
         performDownload(client, context, pdfFile, url, onProgress, onSuccess, onFailure)
+    }
+
+    private fun downloadResolvedFile(
+        context: Context,
+        pdfFile: PdfFile,
+        url: String,
+        onProgress: (Int) -> Unit,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        if (url.isBlank()) {
+            onFailure(IllegalArgumentException("Secure download link is unavailable"))
+            return
+        }
+        performDownload(OkHttpClient.Builder().build(), context, pdfFile, url, onProgress, onSuccess, onFailure)
     }
 
     private fun performProtectedDownload(
