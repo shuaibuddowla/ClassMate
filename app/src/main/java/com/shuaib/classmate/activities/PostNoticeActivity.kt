@@ -37,6 +37,7 @@ import com.shuaib.classmate.utils.TelegramUploader
 import com.shuaib.classmate.utils.WidgetUpdater
 import com.shuaib.classmate.models.AcademicCalendarException
 import com.shuaib.classmate.repositories.AcademicCalendarRepository
+import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.utils.ClassReminderWorkCoordinator
 import java.util.Calendar
 import java.util.Date
@@ -469,6 +470,11 @@ class PostNoticeActivity : AppCompatActivity() {
             return
         }
 
+        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive && attachmentType != "none") {
+            Toast.makeText(this, "Notice attachments are coming in the next V2 update. Remove the attachment to post this notice.", Toast.LENGTH_LONG).show()
+            return
+        }
+
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
@@ -528,6 +534,34 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun saveNoticeToFirestore(title: String, body: String) {
+        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+            if (attachmentType != "none") {
+                binding.progressBar.isVisible = false
+                binding.btnPublish.isEnabled = true
+                Toast.makeText(this, "V2 notice attachments are not available yet.", Toast.LENGTH_LONG).show()
+                return
+            }
+            val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+            binding.progressBar.isVisible = true
+            binding.btnPublish.isEnabled = false
+            lifecycleScope.launch {
+                runCatching {
+                    NoticeRepository.getInstance(this@PostNoticeActivity)
+                        .publishSupabaseBatchNotice(targetBatchId, title, body)
+                }.onSuccess {
+                    runCatching { NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(targetBatchId) }
+                    WidgetUpdater.refresh(this@PostNoticeActivity)
+                    Toast.makeText(this@PostNoticeActivity, "✅ Notice posted!", Toast.LENGTH_SHORT).show()
+                    finish()
+                }.onFailure { error ->
+                    binding.progressBar.isVisible = false
+                    binding.btnPublish.isEnabled = true
+                    Toast.makeText(this@PostNoticeActivity, "Notice could not be posted: ${error.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
+
         val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
         val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
 

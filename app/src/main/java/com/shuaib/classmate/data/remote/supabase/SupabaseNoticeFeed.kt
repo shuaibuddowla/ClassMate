@@ -77,6 +77,19 @@ internal class SupabaseNoticeFeed(
         })
     }
 
+    suspend fun publishBatchNotice(batchCode: String, title: String, body: String): String {
+        check(isConfigured) { "Supabase is not configured." }
+        return clientProvider.client.postgrest.rpc(
+            "publish_batch_notice",
+            parameters = buildJsonObject {
+                put("target_batch_code", batchCode)
+                put("notice_title", title)
+                put("notice_body", body)
+                put("notice_priority", "normal")
+            }
+        ).decodeSingle<String>()
+    }
+
     private suspend fun loadRows(): List<SupabaseNoticeFeedRow> {
         check(isConfigured) { "Supabase is not configured." }
         return clientProvider.client.postgrest

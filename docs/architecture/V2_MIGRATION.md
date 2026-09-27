@@ -92,6 +92,10 @@ Completed in source control:
   backend-neutral academic catalog, and schedule repositories.
 - RLS-filtered Supabase notice feed read model connected to the existing Room
   cache alongside legacy Firestore notices for a non-destructive cutover.
+- Authenticated Supabase RPC actions for notice likes, personal pins, and
+  authorized global pins, with engagement counts returned by the feed.
+- Scoped publishing for plain-text batch notices, with target resolution and
+  authorization enforced inside PostgreSQL.
 - Vercel role-claim bridge using short-lived Vercel OIDC credentials and Google
   Workload Identity Federation, with no service-account private key.
 - Owner bootstrap template and external-account setup checklist.
