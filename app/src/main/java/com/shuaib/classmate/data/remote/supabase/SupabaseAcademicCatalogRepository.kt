@@ -31,11 +31,6 @@ class SupabaseAcademicCatalogRepository @Inject constructor(
         val client = clientProvider.client
 
         coroutineScope {
-            val university = async {
-                client.from("universities")
-                    .select { filter { eq("id", session.universityId) } }
-                    .decodeSingle<UniversityRow>()
-            }
             val departments = async {
                 client.from("departments").select().decodeList<DepartmentRow>()
             }
@@ -59,7 +54,10 @@ class SupabaseAcademicCatalogRepository @Inject constructor(
             }
 
             AcademicCatalog(
-                university = university.await().toDomain(),
+                // Schedule and Library operations use the university ID from the
+                // authenticated Supabase profile. The university display row is
+                // not needed for these flows and can be hidden by project RLS.
+                university = UniversityInfo(session.universityId, "", "", ""),
                 departments = departments.await().map { it.toDomain() },
                 batches = batches.await().map { it.toDomain() },
                 sections = sections.await().map { it.toDomain() },

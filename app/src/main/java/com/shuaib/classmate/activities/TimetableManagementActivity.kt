@@ -401,15 +401,15 @@ class TimetableManagementActivity : AppCompatActivity() {
                 dialogBinding.dropdownSubject.setOnItemClickListener { _, _, position, _ ->
                     if (mayAddCourse && position == offeringOptions.size) {
                         dialogBinding.dropdownSubject.setText("", false)
+                        val previousOfferingIds = offeringOptions.map { it.id }.toSet()
                         CoursePicker.showAddCourseDialog(this, batchId, semesterId) {
                             lifecycleScope.launch {
                                 v2ScheduleRepository.manageableOfferings(batchId, semesterId)
                                     .onSuccess { options ->
                                         offeringOptions = options
                                         bindOfferings(preferredCourse)
-                                        val preferred = offeringOptions.firstOrNull {
-                                            it.name.equals(preferredCourse, true)
-                                        }
+                                        val preferred = offeringOptions.firstOrNull { it.id !in previousOfferingIds }
+                                            ?: offeringOptions.firstOrNull { it.name.equals(preferredCourse, true) }
                                         if (preferred != null) dialogBinding.dropdownSubject.setText(preferred.label, false)
                                     }
                                     .onFailure { error ->

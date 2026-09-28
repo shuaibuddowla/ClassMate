@@ -120,14 +120,16 @@ internal class SupabaseAcademicResourceRepository {
         val existingCourse = client.from("courses").select().decodeList<CourseRow>()
             .firstOrNull { it.departmentId == department.id && it.code.equals(code.trim(), true) }
         val courseRow = existingCourse ?: run {
-            client.from("courses").insert(
-                CourseInsert(
-                    departmentId = department.id,
-                    code = code.trim().uppercase(),
-                    name = name.trim(),
-                    kind = if (type == "lab") "lab" else "theory"
-                )
-            ) { select() }.decodeSingle<CourseRow>()
+            runCatching {
+                client.from("courses").insert(
+                    CourseInsert(
+                        departmentId = department.id,
+                        code = code.trim().uppercase(),
+                        name = name.trim(),
+                        kind = if (type == "lab") "lab" else "theory"
+                    )
+                ) { select() }.decodeSingle<CourseRow>()
+            }.getOrElse { throw IOException("Supabase rejected the course row: ${it.message}", it) }
         }
         if (!courseRow.name.equals(name.trim(), true)) {
             throw IOException("Course code ${courseRow.code} already belongs to ${courseRow.name}.")
@@ -136,19 +138,25 @@ internal class SupabaseAcademicResourceRepository {
         val batchSemesters = client.from("batch_semesters").select().decodeList<BatchSemesterRow>()
         val batchSemester = batchSemesters.firstOrNull {
             it.batchId == targetBatch.id && it.semesterId == semester.id
-        } ?: client.from("batch_semesters").insert(
-            BatchSemesterInsert(batchId = targetBatch.id, semesterId = semester.id)
-        ) { select() }.decodeSingle<BatchSemesterRow>()
+        } ?: runCatching {
+            client.from("batch_semesters").insert(
+                BatchSemesterInsert(batchId = targetBatch.id, semesterId = semester.id)
+            ) { select() }.decodeSingle<BatchSemesterRow>()
+        }.getOrElse { throw IOException("Supabase rejected the semester row: ${it.message}", it) }
 
         val existingOffering = client.from("course_offerings").select().decodeList<CourseOfferingRow>()
             .firstOrNull { it.batchSemesterId == batchSemester.id && it.courseId == courseRow.id && it.sectionId == null }
-        val offering = existingOffering ?: client.from("course_offerings").insert(
-            CourseOfferingInsert(batchSemesterId = batchSemester.id, courseId = courseRow.id)
-        ) { select() }.decodeSingle<CourseOfferingRow>()
+        val offering = existingOffering ?: runCatching {
+            client.from("course_offerings").insert(
+                CourseOfferingInsert(batchSemesterId = batchSemester.id, courseId = courseRow.id)
+            ) { select() }.decodeSingle<CourseOfferingRow>()
+        }.getOrElse { throw IOException("Supabase rejected the course offering: ${it.message}", it) }
 
-        client.postgrest.rpc("publish_semester", parameters = buildJsonObject {
-            put("target_batch_semester", batchSemester.id)
-        })
+        runCatching {
+            client.postgrest.rpc("publish_semester", parameters = buildJsonObject {
+                put("target_batch_semester", batchSemester.id)
+            })
+        }.getOrElse { throw IOException("Supabase could not publish the semester: ${it.message}", it) }
         return Course(
             id = offering.id,
             name = courseRow.name,
