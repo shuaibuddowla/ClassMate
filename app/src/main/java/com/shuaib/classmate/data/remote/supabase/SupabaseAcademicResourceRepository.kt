@@ -147,9 +147,10 @@ internal class SupabaseAcademicResourceRepository {
         val existingOffering = client.from("course_offerings").select().decodeList<CourseOfferingRow>()
             .firstOrNull { it.batchSemesterId == batchSemester.id && it.courseId == courseRow.id && it.sectionId == null }
         val offering = existingOffering ?: runCatching {
-            client.from("course_offerings").insert(
-                CourseOfferingInsert(batchSemesterId = batchSemester.id, courseId = courseRow.id)
-            ) { select() }.decodeSingle<CourseOfferingRow>()
+            client.postgrest.rpc("create_v2_course_offering", parameters = buildJsonObject {
+                put("target_batch_semester", batchSemester.id)
+                put("target_course", courseRow.id)
+            }).decodeSingle<CourseOfferingRow>()
         }.getOrElse { throw IOException("Supabase rejected the course offering: ${it.message}", it) }
 
         runCatching {
@@ -400,13 +401,6 @@ internal class SupabaseAcademicResourceRepository {
     private data class BatchSemesterInsert(
         @SerialName("batch_id") val batchId: String,
         @SerialName("semester_id") val semesterId: String
-    )
-
-    @Serializable
-    private data class CourseOfferingInsert(
-        @SerialName("batch_semester_id") val batchSemesterId: String,
-        @SerialName("course_id") val courseId: String,
-        @SerialName("section_id") val sectionId: String? = null
     )
 
     @Serializable
