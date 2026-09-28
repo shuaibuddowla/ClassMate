@@ -47,7 +47,7 @@ class SupabaseScheduleRepository @Inject constructor(
                 CourseOfferingOption(
                     offering.id, course.code, course.name, offering.sectionId,
                     offering.sectionId?.let { sectionId -> catalog.sections.firstOrNull { it.id == sectionId }?.code },
-                    course.kind.name.lowercase()
+                    course.kind.name.lowercase(), course.teacherName.orEmpty()
                 )
             }
         }.sortedBy { "${it.code} ${it.name}" }
@@ -100,7 +100,7 @@ class SupabaseScheduleRepository @Inject constructor(
         )
     }
 
-    suspend fun loadAllBusDepartures(): Result<List<BusDeparture>> = runCatching {
+    override suspend fun loadAllBusDepartures(): Result<List<BusDeparture>> = runCatching {
         check(clientProvider.isConfigured) { "Supabase is not configured." }
         clientProvider.client.from("bus_schedules").select().decodeList<BusScheduleRow>()
             .map { it.toDomain() }
@@ -161,16 +161,19 @@ class SupabaseScheduleRepository @Inject constructor(
         weekday: Int,
         effectiveDate: String,
         batchRoute: String?,
-        semesterRoute: String?
+        semesterRoute: String?,
+        includeBusDepartures: Boolean
     ): Result<DailySchedule> =
         runCatching {
             require(weekday in 0..6) { "Weekday must be between 0 and 6." }
             require(ISO_DATE.matches(effectiveDate)) { "Date must use yyyy-MM-dd." }
             check(clientProvider.isConfigured) { "Supabase is not configured." }
 
-            val catalog = academicCatalogRepository.loadAccessibleCatalog().getOrThrow()
             val client = clientProvider.client
             coroutineScope {
+                val catalogRequest = async {
+                    academicCatalogRepository.loadAccessibleCatalog().getOrThrow()
+                }
                 val routineRows = async {
                     client.from("routine_slots")
                         .select()
@@ -182,8 +185,11 @@ class SupabaseScheduleRepository @Inject constructor(
                         .decodeList<ClassChangeRow>()
                 }
                 val busRows = async {
-                    client.from("bus_schedules").select().decodeList<BusScheduleRow>()
+                    if (includeBusDepartures) client.from("bus_schedules").select().decodeList<BusScheduleRow>()
+                    else emptyList()
                 }
+
+                val catalog = catalogRequest.await()
 
                 val scopedOfferingIds = if (batchRoute.isNullOrBlank() || semesterRoute.isNullOrBlank()) {
                     null
@@ -244,6 +250,7 @@ class SupabaseScheduleRepository @Inject constructor(
                         room = row.room,
                         classKind = row.classKind,
                         teacherName = teacherNames[row.courseOfferingId].orEmpty()
+                            .ifBlank { course.teacherName.orEmpty() }
                     )
                 }.sortedBy { it.startsAt }
 

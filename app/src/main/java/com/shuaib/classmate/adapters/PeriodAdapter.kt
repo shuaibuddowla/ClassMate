@@ -62,10 +62,10 @@ class PeriodAdapter(
             period.subject.trim().endsWith("lab", ignoreCase = true) || period.subject.trim().endsWith("labs", ignoreCase = true)
 
         b.tvSubject.text = period.subject
-        b.tvTeacher.text = listOfNotNull(
-            period.teacher.takeIf { it.isNotBlank() },
-            period.room?.takeIf { it.isNotBlank() }?.let { "Room $it" }
-        ).joinToString(" · ")
+        b.tvTeacher.text = period.teacher
+        b.layoutTeacherInfo.isVisible = period.teacher.isNotBlank()
+        b.tvRoom.text = period.room?.takeIf { it.isNotBlank() }?.let { "Room $it" }.orEmpty()
+        b.layoutRoomInfo.isVisible = !period.room.isNullOrBlank()
         b.tvStartTime.text = formatTo12Hour(period.startTime)
         b.tvEndTime.text = formatTo12Hour(period.endTime)
         b.tvDuration.text = durationLabel(period)

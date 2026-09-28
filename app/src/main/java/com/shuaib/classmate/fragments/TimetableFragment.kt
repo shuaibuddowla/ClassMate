@@ -78,6 +78,7 @@ class TimetableFragment : Fragment() {
     private var isHeroExpanded = false
     private var todayPeriods: List<Period>? = null
     private var currentHeroSubject: String? = null
+    private var hasResumedOnce = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val showLoadingRunnable = Runnable { showLoadingState() }
 
@@ -112,12 +113,14 @@ class TimetableFragment : Fragment() {
         setupHeroClassClickListeners()
         setupHeroCountdownTimer()
         setupScheduleToggle()
-        timetableViewModel.refreshAll()
+        if (!timetableViewModel.isV2Configured) timetableViewModel.refreshAll()
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect {
-                    timetableViewModel.refreshAll()
+        if (!timetableViewModel.isV2Configured) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                    com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect {
+                        timetableViewModel.refreshAll()
+                    }
                 }
             }
         }
@@ -128,7 +131,11 @@ class TimetableFragment : Fragment() {
                     val route = "${state.batchId}:${state.semesterId}"
                     if (state.v2SessionActive && state.batchId.isNotBlank() && route != lastRoute) {
                         lastRoute = route
-                        timetableViewModel.refreshAll(state.semesterId, state.batchId)
+                        timetableViewModel.refreshDay(
+                            selectedDayFlow.value.ifBlank { days[getTodayIndex()] },
+                            state.semesterId,
+                            state.batchId
+                        )
                     }
                 }
             }
@@ -138,7 +145,17 @@ class TimetableFragment : Fragment() {
     override fun onResume() {
         super.onResume()
 
-        if (timetableViewModel.isV2Configured) timetableViewModel.refreshAll()
+        if (timetableViewModel.isV2Configured && hasResumedOnce) {
+            val state = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+            if (state.v2SessionActive) {
+                timetableViewModel.refreshDay(
+                    selectedDayFlow.value.ifBlank { days[getTodayIndex()] },
+                    state.semesterId,
+                    state.batchId
+                )
+            }
+        }
+        hasResumedOnce = true
 
         // Refresh greeting (time of day may have changed)
         binding.tvGreeting.text = getGreeting()
@@ -259,6 +276,10 @@ class TimetableFragment : Fragment() {
         if (_binding == null) return
         val day = days[index]
         loadTimetable(day)
+        if (isViewingRoutine && timetableViewModel.isV2Configured) {
+            val state = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+            if (state.v2SessionActive) timetableViewModel.refreshDay(day, state.semesterId, state.batchId)
+        }
 
         // Update schedule section label
         val todayIndex = getTodayIndex()

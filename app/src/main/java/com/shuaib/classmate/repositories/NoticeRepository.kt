@@ -166,6 +166,10 @@ class NoticeRepository private constructor(context: Context) {
     suspend fun publishSupabaseBatchNotice(batchCode: String, title: String, body: String) =
         supabaseFeed.publishBatchNotice(batchCode, title, body)
 
+    suspend fun publishSupabaseClassCancellation(
+        batchCode: String, offeringId: String, date: String, title: String, body: String
+    ) = supabaseFeed.publishClassCancellation(batchCode, offeringId, date, title, body)
+
     fun enqueueNetworkSync() {
         val request = OneTimeWorkRequestBuilder<OfflineSyncWorker>()
             .setConstraints(

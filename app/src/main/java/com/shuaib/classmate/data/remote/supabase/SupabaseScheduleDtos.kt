@@ -48,9 +48,10 @@ data class CourseOfferingOption(
     val name: String,
     val sectionId: String?,
     val sectionCode: String?,
-    val classKind: String
+    val classKind: String,
+    val teacherName: String
 ) {
-    val label: String get() = listOf(code, name).filter(String::isNotBlank).joinToString(" — ") +
+    val label: String get() = name +
         sectionCode?.let { " · Section $it" }.orEmpty()
 }
 

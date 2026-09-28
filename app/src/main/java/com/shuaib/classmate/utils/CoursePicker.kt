@@ -23,6 +23,7 @@ object CoursePicker {
         codeField: EditText? = null,
         batchId: String = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() },
         semesterId: String = AppContextManager.getSemesterId(),
+        onCourseSelected: (Course) -> Unit = {},
         onCoursesChanged: (List<Course>) -> Unit = {}
     ): ListenerRegistration = CourseRepository.listen(batchId, semesterId, { courses ->
         onCoursesChanged(courses)
@@ -37,6 +38,7 @@ object CoursePicker {
                 showAddCourseDialog(context, batchId, semesterId) { }
             } else if (position in courses.indices) {
                 codeField?.setText(courses[position].code)
+                onCourseSelected(courses[position])
             }
         }
     }, { Toast.makeText(context, "Could not load courses: ${it.message}", Toast.LENGTH_LONG).show() })
@@ -45,6 +47,7 @@ object CoursePicker {
         context: Context,
         batchId: String,
         semesterId: String,
+        existing: Course? = null,
         onSaved: () -> Unit = {}
     ) {
         val binding = DialogAddCourseBinding.inflate(android.view.LayoutInflater.from(context))
@@ -55,10 +58,19 @@ object CoursePicker {
         binding.dropdownCourseType.setAdapter(ArrayAdapter(context, R.layout.item_course_dropdown, categories))
         binding.dropdownCourseType.setText(categories.first(), false)
         binding.dropdownCourseType.setDropDownBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.bg_course_dropdown_popup))
+        if (existing != null) {
+            binding.etCourseName.setText(existing.name)
+            binding.etCourseCode.setText(existing.code)
+            binding.etCourseTeacher.setText(existing.teacherName)
+            binding.dropdownCourseType.setText(if (existing.type == "lab") "Lab Course" else categories.first(), false)
+            binding.etCourseName.isEnabled = false
+            binding.etCourseCode.isEnabled = false
+            binding.dropdownCourseType.isEnabled = false
+        }
 
         val dialog = MaterialAlertDialogBuilder(context)
-            .setTitle("Create a course")
-            .setMessage("It will be available everywhere this semester.")
+            .setTitle(if (existing == null) "Create a course" else "Set course teacher")
+            .setMessage(if (existing == null) "It will be available everywhere this semester." else "This teacher will appear on the timetable for this course.")
             .setView(binding.root)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Save", null)
@@ -75,14 +87,19 @@ object CoursePicker {
                     binding.etCourseCode.error = "Course code is required for the Supabase catalogue"
                     return@setOnClickListener
                 }
+                val teacherName = binding.etCourseTeacher.text.toString().trim()
+                if (teacherName.isBlank()) {
+                    binding.etCourseTeacher.error = "Teacher name is required"
+                    return@setOnClickListener
+                }
                 val type = when (binding.dropdownCourseType.text.toString()) {
                     "Lab Course" -> "lab"
                     "Syllabus" -> "syllabus"
                     else -> "regular"
                 }
                 dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
-                CourseRepository.add(batchId, semesterId, name, code, type, {
-                    Toast.makeText(context, "$name added", Toast.LENGTH_SHORT).show()
+                CourseRepository.add(batchId, semesterId, name, code, teacherName, type, {
+                    Toast.makeText(context, if (existing == null) "$name added" else "Teacher saved", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
                     onSaved()
                 }, { error ->

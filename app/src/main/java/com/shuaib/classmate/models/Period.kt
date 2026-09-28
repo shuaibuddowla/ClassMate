@@ -20,6 +20,7 @@ data class Period(
     val substituteDate: String = "",
     val room: String? = null,
     val scheduleChange: String? = null,
-    val classKind: String = "class"
+    val classKind: String = "class",
+    val courseOfferingId: String = ""
     // Format: "2026-04-11" (yyyy-MM-dd)
 )

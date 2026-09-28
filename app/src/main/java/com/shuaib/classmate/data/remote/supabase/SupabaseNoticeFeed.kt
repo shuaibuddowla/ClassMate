@@ -27,7 +27,9 @@ internal data class SupabaseNoticeFeedRow(
     @SerialName("updated_at") val updatedAt: String,
     @SerialName("like_count") val likeCount: Long = 0,
     @SerialName("is_liked") val isLiked: Boolean = false,
-    @SerialName("is_personally_pinned") val isPersonallyPinned: Boolean = false
+    @SerialName("is_personally_pinned") val isPersonallyPinned: Boolean = false,
+    @SerialName("is_cancellation") val isCancellation: Boolean = false,
+    val subject: String? = null
 )
 
 internal class SupabaseNoticeFeed(
@@ -90,6 +92,26 @@ internal class SupabaseNoticeFeed(
         )
     }
 
+    suspend fun publishClassCancellation(
+        batchCode: String,
+        offeringId: String,
+        date: String,
+        title: String,
+        body: String
+    ) {
+        check(isConfigured) { "Supabase is not configured." }
+        clientProvider.client.postgrest.rpc(
+            "publish_class_cancellation",
+            parameters = buildJsonObject {
+                put("target_batch_code", batchCode)
+                put("target_offering", offeringId)
+                put("target_date", date)
+                put("notice_title", title)
+                put("notice_body", body)
+            }
+        )
+    }
+
     private suspend fun loadRows(): List<SupabaseNoticeFeedRow> {
         check(isConfigured) { "Supabase is not configured." }
         return clientProvider.client.postgrest
@@ -105,6 +127,8 @@ internal fun SupabaseNoticeFeedRow.toNotice(batchRoute: String): Notice = Notice
     postedBy = authorName,
     timestamp = (publishedAt ?: createdAt).toFirebaseTimestamp(),
     priority = priority,
+    isCancel = isCancellation,
+    subject = subject.orEmpty(),
     createdBy = authorId,
     createdByName = authorName,
     updatedAt = updatedAt.toFirebaseTimestamp(),

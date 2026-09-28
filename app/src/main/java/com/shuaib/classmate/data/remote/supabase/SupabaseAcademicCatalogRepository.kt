@@ -18,6 +18,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.firstOrNull
 
 @Singleton
 class SupabaseAcademicCatalogRepository @Inject constructor(
@@ -27,7 +28,8 @@ class SupabaseAcademicCatalogRepository @Inject constructor(
 
     override suspend fun loadAccessibleCatalog(): Result<AcademicCatalog> = runCatching {
         check(clientProvider.isConfigured) { "Supabase is not configured." }
-        val session = sessionRepository.refresh().getOrThrow()
+        val session = sessionRepository.session.firstOrNull()
+            ?: sessionRepository.refresh().getOrThrow()
         val client = clientProvider.client
 
         coroutineScope {
@@ -99,7 +101,7 @@ class SupabaseAcademicCatalogRepository @Inject constructor(
             "theory" -> CourseKind.THEORY
             "lab" -> CourseKind.LAB
             else -> error("Unsupported course kind: $kind")
-        }
+        }, teacherName
     )
 
     private fun CourseOfferingRow.toDomain() =

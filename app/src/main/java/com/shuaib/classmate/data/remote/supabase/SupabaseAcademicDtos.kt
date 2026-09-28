@@ -62,6 +62,7 @@ internal data class CourseRow(
     @SerialName("department_id") val departmentId: String,
     val code: String,
     val name: String,
+    @SerialName("teacher_name") val teacherName: String? = null,
     val kind: String
 )
 

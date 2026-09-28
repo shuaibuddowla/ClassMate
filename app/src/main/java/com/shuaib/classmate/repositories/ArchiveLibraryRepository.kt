@@ -85,12 +85,13 @@ object ArchiveLibraryRepository {
         semesterId: String,
         name: String,
         code: String,
+        teacherName: String,
         type: String,
         onSuccess: (Course) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
         if (usesSupabaseCatalog) {
-            val course = runBlocking { v2Resources.addCourse(batchId, semesterId, name, code, type) }
+            val course = runBlocking { v2Resources.addCourse(batchId, semesterId, name, code, teacherName, type) }
             mainHandler.post { onSuccess(course) }
             return@runAsync
         }
@@ -99,6 +100,7 @@ object ArchiveLibraryRepository {
             "semesterNumber" to semesterNumber(semesterId),
             "courseName" to name.trim(),
             "courseCode" to code.trim().uppercase(),
+            "teacherName" to teacherName.trim(),
             "category" to type
         )
         val request = BackendApiClient.authenticated(

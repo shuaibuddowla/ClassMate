@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import com.bumptech.glide.Glide
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -26,6 +27,7 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityPostNoticeBinding
 import com.shuaib.classmate.notices.NoticeTextFormatter
 import com.shuaib.classmate.models.Assignment
+import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.services.AIService
 import com.shuaib.classmate.utils.CloudinaryUploader
 import com.shuaib.classmate.utils.CountdownManager
@@ -38,14 +40,21 @@ import com.shuaib.classmate.utils.WidgetUpdater
 import com.shuaib.classmate.models.AcademicCalendarException
 import com.shuaib.classmate.repositories.AcademicCalendarRepository
 import com.shuaib.classmate.repositories.NoticeRepository
+import com.shuaib.classmate.repositories.TimetableRepository
+import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
 import com.shuaib.classmate.utils.ClassReminderWorkCoordinator
+import com.shuaib.classmate.utils.toTimetablePeriods
 import java.util.Calendar
 import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PostNoticeActivity : AppCompatActivity() {
+
+    @Inject lateinit var v2ScheduleRepository: SupabaseScheduleRepository
 
     private lateinit var binding: ActivityPostNoticeBinding
     private lateinit var db: FirebaseFirestore
@@ -55,6 +64,8 @@ class PostNoticeActivity : AppCompatActivity() {
     private var selectedDeadlineType = "assignment"
     private var editNoticeId: String? = null
     private var courseListener: ListenerRegistration? = null
+    private var cancellationCourses: List<Course> = emptyList()
+    private var selectedCancellationCourseId: String? = null
 
     private var isAiPostingMode = false
     private var aiPolishedNotice: com.shuaib.classmate.models.AiNoticeDraft? = null
@@ -327,7 +338,11 @@ class PostNoticeActivity : AppCompatActivity() {
 
     private fun setupSubjectPicker() {
         courseListener?.remove()
-        courseListener = CoursePicker.bind(this, binding.dropdownSubject)
+        courseListener = CoursePicker.bind(
+            this, binding.dropdownSubject,
+            onCourseSelected = { selectedCancellationCourseId = it.id },
+            onCoursesChanged = { cancellationCourses = it }
+        )
     }
 
     override fun onDestroy() {
@@ -407,6 +422,14 @@ class PostNoticeActivity : AppCompatActivity() {
         }
         if (subject.isBlank() || subject == "General") {
             Toast.makeText(this, "AI needs a subject for class cancellation.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+            publishSupabaseCancellationNotice(
+                subject, targetDate, targetDay, whenText,
+                result.title ?: "Class Cancelled", result.body ?: "$subject class has been cancelled for $whenText"
+            )
             return
         }
 
@@ -650,6 +673,14 @@ class PostNoticeActivity : AppCompatActivity() {
         val targetDate = if (isToday) DateHelper.today() else DateHelper.tomorrow()
         val whenText = if (isToday) "today" else "tomorrow"
 
+        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+            publishSupabaseCancellationNotice(
+                selectedSubject, targetDate, targetDayString, whenText,
+                "Class Cancelled", "$selectedSubject class has been cancelled for $whenText"
+            )
+            return
+        }
+
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
@@ -701,6 +732,80 @@ class PostNoticeActivity : AppCompatActivity() {
                 binding.btnPublish.isEnabled = true
                 Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
+    }
+
+    private fun publishSupabaseCancellationNotice(
+        subject: String,
+        targetDate: String,
+        targetDay: String,
+        whenText: String,
+        title: String,
+        body: String
+    ) {
+        if (runCatching { java.time.LocalDate.parse(targetDate) }.isFailure) {
+            Toast.makeText(this, "Choose a valid class date.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val matchingCourses = cancellationCourses.filter {
+            it.name.equals(subject, true) || it.code.equals(subject, true)
+        }
+        val selected = matchingCourses.firstOrNull { it.id == selectedCancellationCourseId }
+            ?: matchingCourses.singleOrNull()
+        if (selected == null || selected.id.isBlank()) {
+            Toast.makeText(this, "Select the scheduled course from the subject list.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val batchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+            .ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
+        binding.progressBar.isVisible = true
+        binding.btnPublish.isEnabled = false
+        lifecycleScope.launch {
+            runCatching {
+                NoticeRepository.getInstance(this@PostNoticeActivity)
+                    .publishSupabaseClassCancellation(batchId, selected.id, targetDate, title, body)
+            }.onSuccess {
+                runCatching { NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(batchId) }
+                if (targetDate == DateHelper.today() || targetDate == DateHelper.tomorrow()) {
+                    val weekday = java.time.LocalDate.parse(targetDate).dayOfWeek.value % 7
+                    runCatching {
+                        val schedule = v2ScheduleRepository.loadDay(
+                            weekday, targetDate, batchId,
+                            com.shuaib.classmate.utils.AppContextManager.getSemesterId(), false
+                        ).getOrThrow()
+                        TimetableRepository.getInstance(this@PostNoticeActivity).cacheSupabaseDay(
+                            "v2-$batchId",
+                            com.shuaib.classmate.utils.AppContextManager.getSemesterId(),
+                            targetDay,
+                            schedule.toTimetablePeriods()
+                        )
+                    }.onFailure { error ->
+                        Log.w("PostNoticeActivity", "Cancellation posted; local timetable refresh failed", error)
+                    }
+                }
+                WidgetUpdater.refresh(this@PostNoticeActivity, syncTodayTimetable = false)
+                NotificationSender.sendCancellationAlert(
+                    subject = selected.name,
+                    whenText = whenText,
+                    day = targetDay,
+                    batchId = batchId,
+                    onSuccess = {
+                        binding.progressBar.isVisible = false
+                        Toast.makeText(this@PostNoticeActivity, "Cancellation published!", Toast.LENGTH_SHORT).show()
+                        finish()
+                    },
+                    onFailure = { error ->
+                        binding.progressBar.isVisible = false
+                        Toast.makeText(this@PostNoticeActivity, "Cancellation published, but notification could not be sent: $error", Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                )
+            }.onFailure { error ->
+                binding.progressBar.isVisible = false
+                binding.btnPublish.isEnabled = true
+                Toast.makeText(this@PostNoticeActivity, "Cancellation could not be posted: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun markPeriodAsCancelled(subject: String, day: String, cancelDate: String, whenText: String, noticeId: String? = null) {

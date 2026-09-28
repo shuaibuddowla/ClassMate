@@ -223,7 +223,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupViewPager() {
         val adapter = MainPagerAdapter(this)
         binding.mainViewPager.adapter = adapter
-        binding.mainViewPager.offscreenPageLimit = 3 // Keep notices and chat alive
+        // Load distant tabs when opened so Library and Profile requests do not
+        // compete with the timetable on the first screen.
+        binding.mainViewPager.offscreenPageLimit = 1
 
         binding.mainViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {

@@ -7,6 +7,7 @@ data class Course(
     val id: String = "",
     val name: String = "",
     val code: String = "",
+    val teacherName: String = "",
     val type: String = "regular",
     /** Archive catalogue id used only by the Cloudflare/R2 upload workflow. */
     val archiveId: String = "",

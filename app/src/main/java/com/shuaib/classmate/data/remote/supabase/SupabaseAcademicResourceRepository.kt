@@ -74,6 +74,7 @@ internal class SupabaseAcademicResourceRepository {
                     id = offering.id,
                     name = course.name,
                     code = course.code,
+                    teacherName = course.teacherName.orEmpty(),
                     type = if (course.kind.equals("lab", true)) "lab" else "regular",
                     batchId = batchRoute,
                     semesterId = semesterRoute
@@ -96,10 +97,12 @@ internal class SupabaseAcademicResourceRepository {
         semesterRoute: String,
         name: String,
         code: String,
+        teacherName: String,
         type: String
     ): Course {
         check(isConfigured) { "Supabase is not configured." }
         require(code.isNotBlank()) { "A course code is required for the Supabase catalogue." }
+        require(teacherName.isNotBlank()) { "A teacher name is required." }
         require(type in setOf("regular", "lab")) { "Choose a theory or lab course." }
         val client = clientProvider.client
         client.postgrest.rpc("bootstrap_firebase_profile")
@@ -126,6 +129,7 @@ internal class SupabaseAcademicResourceRepository {
                         departmentId = department.id,
                         code = code.trim().uppercase(),
                         name = name.trim(),
+                        teacherName = teacherName.trim(),
                         kind = if (type == "lab") "lab" else "theory"
                     )
                 ) { select() }.decodeSingle<CourseRow>()
@@ -133,6 +137,11 @@ internal class SupabaseAcademicResourceRepository {
         }
         if (!courseRow.name.equals(name.trim(), true)) {
             throw IOException("Course code ${courseRow.code} already belongs to ${courseRow.name}.")
+        }
+        if (existingCourse != null && !courseRow.teacherName.equals(teacherName.trim(), true)) {
+            client.from("courses").update({ set("teacher_name", teacherName.trim()) }) {
+                filter { eq("id", courseRow.id) }
+            }
         }
 
         val batchSemesters = client.from("batch_semesters").select().decodeList<BatchSemesterRow>()
@@ -158,6 +167,7 @@ internal class SupabaseAcademicResourceRepository {
             id = offering.id,
             name = courseRow.name,
             code = courseRow.code,
+            teacherName = teacherName.trim(),
             type = if (courseRow.kind == "lab") "lab" else "regular",
             batchId = batchRoute,
             semesterId = semesterRoute
@@ -390,6 +400,7 @@ internal class SupabaseAcademicResourceRepository {
         @SerialName("department_id") val departmentId: String,
         val code: String,
         val name: String,
+        @SerialName("teacher_name") val teacherName: String,
         val kind: String
     )
 

@@ -56,7 +56,8 @@ data class CourseInfo(
     val departmentId: String,
     val code: String,
     val name: String,
-    val kind: CourseKind
+    val kind: CourseKind,
+    val teacherName: String?
 )
 
 data class CourseOfferingInfo(

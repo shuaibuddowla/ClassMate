@@ -37,6 +37,7 @@ object CourseRepository {
         semesterId: String,
         name: String,
         code: String,
+        teacherName: String,
         type: String,
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
@@ -47,6 +48,7 @@ object CourseRepository {
             semesterId,
             name,
             code,
+            teacherName,
             normalizedType,
             onSuccess = { addedCourse ->
                 val key = key(batchId, semesterId)
