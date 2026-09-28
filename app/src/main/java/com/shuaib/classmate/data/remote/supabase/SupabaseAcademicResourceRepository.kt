@@ -148,8 +148,12 @@ internal class SupabaseAcademicResourceRepository {
             client.postgrest.rpc("create_v2_course_offering", parameters = buildJsonObject {
                 put("target_batch_semester", batchSemester.id)
                 put("target_course", courseRow.id)
-            }).decodeSingle<CourseOfferingRow>()
-        }.getOrElse { throw IOException("Supabase rejected the course offering: ${it.message}", it) }
+            }).decodeList<CourseOfferingRow>().firstOrNull()
+        }.getOrNull() ?: client.from("course_offerings").select().decodeList<CourseOfferingRow>()
+            .firstOrNull {
+                it.batchSemesterId == batchSemester.id && it.courseId == courseRow.id && it.sectionId == null
+            }
+            ?: throw IOException("Supabase did not return the saved course offering.")
         return Course(
             id = offering.id,
             name = courseRow.name,
