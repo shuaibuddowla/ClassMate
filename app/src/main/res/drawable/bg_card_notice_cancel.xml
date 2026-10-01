@@ -8,7 +8,7 @@
         android:top="0dp"
         android:bottom="0dp">
         <shape>
-            <solid android:color="#0DDC2626"/> <!-- 5% opacity red -->
+            <solid android:color="#05DC2626"/>
             <corners android:radius="20dp"/>
         </shape>
     </item>
@@ -32,11 +32,11 @@
         android:top="1dp"
         android:bottom="2dp">
         <shape>
-            <solid android:color="#0DDC2626"/> <!-- 5% red background tint -->
+            <solid android:color="#04DC2626"/>
             <corners android:radius="20dp"/>
             <stroke
                 android:width="1dp"
-                android:color="#26DC2626"/> <!-- 15% opacity red -->
+                android:color="#25DC2626"/>
         </shape>
     </item>
 </layer-list>

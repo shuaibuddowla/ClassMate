@@ -68,9 +68,9 @@ class PdfAdapter(
                 onItemClick?.invoke(pdf)
             }
 
-            btnDelete.isVisible = isAdmin
+            btnDelete.isVisible = com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)
             btnDelete.setOnClickListener {
-                onDeleteClick?.invoke(pdf)
+                if (com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) onDeleteClick?.invoke(pdf)
             }
 
             val isFavorite = favoritePdfIds.contains(pdf.id)
@@ -88,6 +88,8 @@ class PdfAdapter(
     }
 
     override fun getItemCount(): Int = pdfs.size
+
+    fun removeItem(id: String) = updateList(pdfs.filterNot { it.id == id })
 
     fun updateList(newList: List<PdfFile>, newFavorites: Set<String>? = null) {
         val old = pdfs

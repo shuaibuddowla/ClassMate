@@ -3,7 +3,7 @@ package com.shuaib.classmate.utils
 import com.shuaib.classmate.BuildConfig
 
 object AppConstants {
-    // Public client configuration. Service credentials live in Cloudflare Worker secrets.
+    // Public client configuration. Push delivery credentials live in Supabase Edge Function secrets.
     val BACKEND_BASE_URL: String = BuildConfig.BACKEND_BASE_URL.trimEnd('/')
     val ONESIGNAL_APP_ID: String = BuildConfig.ONESIGNAL_APP_ID
 

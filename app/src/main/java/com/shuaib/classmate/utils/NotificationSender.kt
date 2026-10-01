@@ -6,6 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.network.BackendApiClient
+import com.shuaib.classmate.BuildConfig
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -242,9 +243,15 @@ object NotificationSender {
     }
 
     private fun postNotification(body: String): Int {
+        val supabaseUrl = BuildConfig.SUPABASE_URL.trim().trimEnd('/')
+        val publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY.trim()
+        if (!supabaseUrl.startsWith("https://") || publishableKey.isBlank()) {
+            throw java.io.IOException("Supabase push endpoint is not configured.")
+        }
         val request = BackendApiClient.authenticated(
             Request.Builder()
-                .url(BackendApiClient.url("/v1/notifications"))
+                .url("$supabaseUrl/functions/v1/send-notification")
+                .header("apikey", publishableKey)
                 .post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
         )
         return client.newCall(request).execute().use { response -> response.code }
@@ -329,7 +336,7 @@ object NotificationSender {
         onFailure: (String) -> Unit = {}
     ) = sendToBatch(
         batchId = batchId,
-        title = "Class Cancelled",
+        title = "$subject Class Cancelled",
         message = "$subject class cancelled for $whenText",
         type = "cancellation",
         extraData = mutableMapOf("subject" to subject, "day" to day).apply {

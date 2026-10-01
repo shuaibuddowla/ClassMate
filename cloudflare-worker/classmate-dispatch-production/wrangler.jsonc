@@ -1,0 +1,12 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "classmate-production-notification-dispatch",
+  "main": "../classmate-dispatch-staging/src/index.ts",
+  "compatibility_date": "2026-09-30",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["*/1 * * * *"] },
+  "vars": {
+    "CLASSMATE_SUPABASE_URL": "https://cbskpifgbdbgdmnnxfrh.supabase.co"
+  }
+}

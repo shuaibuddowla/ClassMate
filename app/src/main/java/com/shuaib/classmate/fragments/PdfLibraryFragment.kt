@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -26,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -41,6 +43,7 @@ import com.shuaib.classmate.databinding.DialogOfflineDownloadsBinding
 import com.shuaib.classmate.databinding.DialogPdfOptionsBinding
 import com.shuaib.classmate.databinding.FragmentPdfLibraryBinding
 import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.storage.LibraryDownloadManager
 import com.shuaib.classmate.storage.LibraryUrlOpener
 import com.shuaib.classmate.utils.NetworkMonitor
@@ -68,6 +71,7 @@ class PdfLibraryFragment : Fragment() {
     private lateinit var recentAdapter: RecentPdfAdapter
     private var offlinePdfs = emptyList<PdfFile>()
     private var allSubjects = emptyList<Subject>()
+    private var allCourses = emptyList<Course>()
     private var regularSubjects = emptyList<Subject>()
     private var labSubjects = emptyList<Subject>()
     private var otherSubjects = emptyList<Subject>()
@@ -118,6 +122,14 @@ class PdfLibraryFragment : Fragment() {
                 }
             }
         }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    delay(10000)
+                    loadLibraryData(showSpinner = false)
+                }
+            }
+        }
 
         if (ArchiveLibraryRepository.usesSupabaseCatalog) {
             viewLifecycleOwner.lifecycleScope.launch {
@@ -158,6 +170,7 @@ class PdfLibraryFragment : Fragment() {
         val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
         if (batchId.isBlank() || semesterId.isBlank()) return
         courseListener = CourseRepository.listen(batchId, semesterId, { courses ->
+            allCourses = courses
             allSubjects = courses.map { it.toSubject() }
             regularSubjects = allSubjects.filter { it.type == "regular" }
             labSubjects = allSubjects.filter { it.type == "lab" }
@@ -186,9 +199,12 @@ class PdfLibraryFragment : Fragment() {
             (activity as? MainActivity)?.openChildDestination(R.id.nav_pdf, R.id.fragment_question_bank)
         }
 
-        regularAdapter = SubjectAdapter(regularSubjects, pdfCounts) { subject -> navigateToPdfs(subject) }
-        labAdapter = SubjectAdapter(labSubjects, pdfCounts) { subject -> navigateToPdfs(subject) }
-        otherAdapter = SubjectAdapter(otherSubjects, pdfCounts) { subject -> navigateToPdfs(subject) }
+        regularAdapter = SubjectAdapter(regularSubjects, pdfCounts,
+            { subject -> navigateToPdfs(subject) }, { subject -> showCourseActions(subject) }, { subject -> canManageCourse(subject) })
+        labAdapter = SubjectAdapter(labSubjects, pdfCounts,
+            { subject -> navigateToPdfs(subject) }, { subject -> showCourseActions(subject) }, { subject -> canManageCourse(subject) })
+        otherAdapter = SubjectAdapter(otherSubjects, pdfCounts,
+            { subject -> navigateToPdfs(subject) }, { subject -> showCourseActions(subject) }, { subject -> canManageCourse(subject) })
 
         binding.rvRegular.apply {
             layoutManager = LinearLayoutManager(context)
@@ -221,6 +237,7 @@ class PdfLibraryFragment : Fragment() {
         binding.tvViewAll.applyClickAnimation {
             (activity as? MainActivity)?.openChildDestination(R.id.nav_pdf, R.id.fragment_library_all_files)
         }
+        setupArchiveSection()
         updateLibraryView()
         selectCourseCategory("regular")
     }
@@ -234,14 +251,14 @@ class PdfLibraryFragment : Fragment() {
         }
     }
 
-    private fun loadLibraryData() {
+    private fun loadLibraryData(showSpinner: Boolean = true) {
         if (_binding == null) return
         if (ArchiveLibraryRepository.usesSupabaseCatalog &&
             !com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
             binding.swipeRefresh.isRefreshing = false
             return
         }
-        binding.swipeRefresh.isRefreshing = true
+        if (showSpinner) binding.swipeRefresh.isRefreshing = true
 
         fetchFavoritePdfIds()
 
@@ -249,6 +266,10 @@ class PdfLibraryFragment : Fragment() {
         val activeSem = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
 
         ArchiveLibraryRepository.load(batchId, activeSem, { courses, resources ->
+                if (_binding == null ||
+                    batchId != com.shuaib.classmate.utils.AppContextManager.getBatchId() ||
+                    activeSem != com.shuaib.classmate.utils.AppContextManager.getSemesterId()) return@load
+                allCourses = courses
                 allSubjects = courses.map { it.toSubject() }
                 regularSubjects = allSubjects.filter { it.type == "regular" }
                 labSubjects = allSubjects.filter { it.type == "lab" }
@@ -289,7 +310,7 @@ class PdfLibraryFragment : Fragment() {
         val weekAgo = System.currentTimeMillis() - (7L * 24L * 60L * 60L * 1000L)
         recentPdfs = filteredPdfs.filter {
             ((it.timestamp ?: it.createdAt)?.toDate()?.time ?: 0L) >= weekAgo
-        }.take(3)
+        }.sortedByDescending { (it.timestamp ?: it.createdAt)?.toDate()?.time ?: 0L }.take(2)
         recentAdapter.updateList(recentPdfs, isAdmin, favoritePdfIds)
         binding.rvRecent.isVisible = recentPdfs.isNotEmpty()
         binding.tvRecentEmpty.isVisible = recentPdfs.isEmpty()
@@ -517,9 +538,37 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun showPdfOptions(pdf: PdfFile) {
-        PdfDialogHelper.showPdfOptions(requireActivity(), requireContext(), pdf) {
-            refreshOfflineSection()
+        PdfDialogHelper.showPdfOptions(requireActivity(), requireContext(), pdf,
+            onOfflineStatusChanged = { refreshOfflineSection() },
+            onManage = { showResourceActions(it) })
+    }
+
+    private fun showResourceActions(pdf: PdfFile) {
+        if (!pdf.canManage || pdf.provider != "archive") return
+        AlertDialog.Builder(requireContext()).setTitle(pdf.title)
+            .setItems(arrayOf("Edit file details", "Delete file permanently")) { _, selected ->
+                if (selected == 0) showEditResource(pdf) else showDeleteConfirmation(pdf)
+            }.show()
+    }
+
+    private fun showEditResource(pdf: PdfFile) {
+        val context = requireContext()
+        val field = EditText(context).apply {
+            hint = "File title"
+            setText(pdf.title)
+            setPadding(dp(20), dp(12), dp(20), dp(12))
         }
+        AlertDialog.Builder(context).setTitle("Edit file title").setView(field)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val newTitle = field.text.toString().trim()
+                if (newTitle.isBlank()) return@setPositiveButton
+                ArchiveLibraryRepository.editResource(pdf, newTitle,
+                    pdf.materialType.ifBlank { "Other" }, {
+                        allPdfs = allPdfs.map { if (it.id == pdf.id) it.copy(title = newTitle) else it }
+                        updateLibraryView()
+                    }, { error -> Toast.makeText(context, error.message, Toast.LENGTH_LONG).show() })
+            }.show()
     }
 
     private fun showDeleteCacheConfirmation(pdf: PdfFile) {
@@ -812,6 +861,7 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun showDeleteConfirmation(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Material")
             .setMessage("Are you sure you want to delete \"${pdf.title}\"?")
@@ -821,12 +871,130 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun deletePdf(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         ArchiveLibraryRepository.deleteResource(pdf.id, {
             Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
+            allPdfs = allPdfs.filterNot { it.id == pdf.id }
+            updateLibraryView()
             loadLibraryData()
         }, { error ->
             Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_LONG).show()
         }, provider = pdf.provider)
+    }
+
+    private fun courseFor(subject: Subject): Course? = allCourses.firstOrNull {
+        it.name == subject.name && it.code == subject.code
+    }
+
+    private fun canManageCourse(subject: Subject): Boolean = courseFor(subject)?.canManage == true
+
+    private fun showCourseActions(subject: Subject) {
+        val course = courseFor(subject)?.takeIf { it.canManage } ?: return
+        AlertDialog.Builder(requireContext())
+            .setTitle(course.name)
+            .setItems(arrayOf("Edit course", "Delete course permanently")) { _, selected ->
+                if (selected == 0) showEditCourse(course) else confirmDeleteCourse(course)
+            }.show()
+    }
+
+    private fun showEditCourse(course: Course) {
+        val context = requireContext()
+        val fields = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        val name = EditText(context).apply { hint = "Course name"; setText(course.name) }
+        val code = EditText(context).apply { hint = "Course code"; setText(course.code) }
+        fields.addView(name)
+        fields.addView(code)
+        AlertDialog.Builder(context).setTitle("Edit course").setView(fields)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = name.text.toString().trim()
+                if (newName.isBlank()) return@setPositiveButton
+                ArchiveLibraryRepository.editCourse(course, newName, code.text.toString().trim(), course.type,
+                    { updated ->
+                        allCourses = allCourses.map { if (it.id == course.id) updated else it }
+                        loadLibraryData()
+                        CourseRepository.refresh(course.batchId, course.semesterId)
+                    }, { error -> Toast.makeText(context, error.message, Toast.LENGTH_LONG).show() })
+            }.show()
+    }
+
+    private fun confirmDeleteCourse(course: Course) {
+        AlertDialog.Builder(requireContext()).setTitle("Delete course permanently?")
+            .setMessage("${course.name} will disappear from ClassMate and CSE Archive. Files must be deleted first; they will not be erased silently.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete") { _, _ ->
+                ArchiveLibraryRepository.deleteCourse(course, {
+                    allCourses = allCourses.filterNot { it.id == course.id }
+                    allSubjects = allCourses.map { it.toSubject() }
+                    regularSubjects = allSubjects.filter { it.type == "regular" }
+                    labSubjects = allSubjects.filter { it.type == "lab" }
+                    otherSubjects = allSubjects.filter { it.type == "syllabus" }
+                    updateLibraryView()
+                    CourseRepository.refresh(course.batchId, course.semesterId)
+                }, { error -> Toast.makeText(context, error.message, Toast.LENGTH_LONG).show() })
+            }.show()
+    }
+
+    private fun setupArchiveSection() {
+        val parent = binding.btnLibrarySearch.parent as? LinearLayout ?: return
+        val archiveLink = TextView(requireContext()).apply {
+            text = "CSE Archive   ·   Browse all batches  ›"
+            textSize = 14f
+            setTextColor(android.graphics.Color.parseColor("#2F45F0"))
+            background = ContextCompat.getDrawable(context, R.drawable.bg_library_row)
+            setPadding(dp(16), dp(13), dp(16), dp(13))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showArchiveBatches() }
+        }
+        parent.addView(archiveLink, parent.indexOfChild(binding.btnLibrarySearch) + 1)
+    }
+
+    private fun showArchiveBatches() {
+        val context = requireContext()
+        ArchiveLibraryRepository.loadBatches({ batches ->
+            if (!isAdded) return@loadBatches
+            if (batches.isEmpty()) {
+                Toast.makeText(context, "No archive batches available yet", Toast.LENGTH_SHORT).show()
+                return@loadBatches
+            }
+            AlertDialog.Builder(context).setTitle("CSE Archive · Batches")
+                .setItems(batches.map { it.name.ifBlank { it.id } }.toTypedArray()) { _, index ->
+                    showArchiveSemesters(batches[index])
+                }.show()
+        }, { error -> Toast.makeText(context, "Could not load batches: ${error.message}", Toast.LENGTH_LONG).show() })
+    }
+
+    private fun showArchiveSemesters(batch: ArchiveLibraryRepository.ArchiveBatch) {
+        val labels = (1..8).map { "Semester $it" }.toTypedArray()
+        AlertDialog.Builder(requireContext()).setTitle(batch.name.ifBlank { batch.id })
+            .setItems(labels) { _, index -> showArchiveCourses(batch, index + 1) }.show()
+    }
+
+    private fun showArchiveCourses(batch: ArchiveLibraryRepository.ArchiveBatch, semester: Int) {
+        val context = requireContext()
+        ArchiveLibraryRepository.load(batch.id, semester.toString(), { courses, files ->
+            if (!isAdded) return@load
+            val labels = courses.map { "${it.name}  ·  ${files.count { file -> file.subject == it.name }} files" }
+            if (labels.isEmpty()) {
+                Toast.makeText(context, "No courses for this semester", Toast.LENGTH_SHORT).show()
+                return@load
+            }
+            AlertDialog.Builder(context).setTitle("${batch.name.ifBlank { batch.id }} · Semester $semester")
+                .setItems(labels.toTypedArray()) { _, index ->
+                    val course = courses[index]
+                    val materials = files.filter { it.subject == course.name }
+                    if (materials.isEmpty()) Toast.makeText(context, "No files shared yet", Toast.LENGTH_SHORT).show()
+                    else AlertDialog.Builder(context).setTitle(course.name)
+                        .setItems(materials.map { it.title }.toTypedArray()) { _, fileIndex ->
+                            LibraryUrlOpener.open(context, materials[fileIndex])
+                        }.show()
+                }.show()
+        }, { error -> Toast.makeText(context, "Could not load archive: ${error.message}", Toast.LENGTH_LONG).show() })
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

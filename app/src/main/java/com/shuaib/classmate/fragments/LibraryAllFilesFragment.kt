@@ -154,6 +154,7 @@ class LibraryAllFilesFragment : Fragment() {
     }
 
     private fun showDeleteConfirmation(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Material")
             .setMessage("Are you sure you want to delete \"${pdf.title}\"?")
@@ -163,8 +164,10 @@ class LibraryAllFilesFragment : Fragment() {
     }
 
     private fun deletePdf(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         ArchiveLibraryRepository.deleteResource(pdf.id, {
                 Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
+                pdfAdapter.removeItem(pdf.id)
                 loadAllFiles()
             }, { e ->
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()

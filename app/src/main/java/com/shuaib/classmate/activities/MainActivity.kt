@@ -59,7 +59,6 @@ import com.shuaib.classmate.utils.NoticeReadTracker
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.WidgetUpdater
-import com.shuaib.classmate.utils.AppUpdateManager
 import com.shuaib.classmate.workers.TimetableResetWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -664,32 +663,6 @@ class MainActivity : AppCompatActivity() {
             com.shuaib.classmate.services.AutoMuteScheduler.scheduleAlarms(this)
         }, BACKGROUND_WORK_DELAY_MS)
 
-        startupHandler.postDelayed({
-            if (isFinishing || isDestroyed) return@postDelayed
-            checkAppUpdateSilently()
-        }, BACKGROUND_WORK_DELAY_MS + 1500L)
-    }
-
-    private fun checkAppUpdateSilently() {
-        val prefs = getSharedPreferences("app_update_prefs", MODE_PRIVATE)
-        val lastCheck = prefs.getLong("last_check_time", 0L)
-        val currentTime = System.currentTimeMillis()
-
-        // Debounce update check to once every 24 hours (86,400,000 ms), unless mock mode is enabled
-        if (currentTime - lastCheck >= 86400000L || AppUpdateManager.isMockEnabled) {
-            prefs.edit().putLong("last_check_time", currentTime).apply()
-
-            lifecycleScope.launch {
-                try {
-                    val updateInfo = AppUpdateManager.checkLatestRelease()
-                    if (AppUpdateManager.isUpdateAvailable(updateInfo.latestVersionName)) {
-                        AppUpdateManager.showUpdateDialog(this@MainActivity, updateInfo, lifecycleScope)
-                    }
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Silent update check failed: ${e.message}")
-                }
-            }
-        }
     }
 
     private fun listenForUnreadNotices() {

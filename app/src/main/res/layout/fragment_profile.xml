@@ -1150,6 +1150,44 @@
                     android:background="@color/cm_border"
                     android:layout_marginHorizontal="16dp"/>
 
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchAutoUpdates"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Automatic App Updates"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="14sp"
+                    android:checked="true" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="8dp"
+                    android:text="Automatically download and install new ClassMate versions."
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="12sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchWifiOnlyUpdates"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Download using Wi-Fi only"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="14sp"
+                    android:checked="true" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp"/>
+
                 <!-- Check for Updates -->
                 <LinearLayout
                     android:id="@+id/layoutCheckUpdates"

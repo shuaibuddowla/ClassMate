@@ -18,7 +18,8 @@ data class RoutineSlot(
     val endsAt: String,
     val room: String?,
     val classKind: String,
-    val teacherName: String = ""
+    val teacherName: String = "",
+    val createdBy: String = ""
 )
 
 data class ClassChange(

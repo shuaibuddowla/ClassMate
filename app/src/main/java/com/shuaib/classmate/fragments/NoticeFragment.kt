@@ -12,8 +12,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.util.Log
-import android.widget.ProgressBar
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
@@ -73,9 +71,6 @@ class NoticeFragment : Fragment() {
 
     private var isAdmin = false
     private var currentUserId = ""
-    private var currentUserName = ""
-    private var currentUserStudentId = ""
-    private val readNoticeCache = mutableSetOf<String>()
     private var selectedFilter = NoticeFilter.ALL
     private var lastFilter: NoticeFilter? = null
     private var searchQuery = ""
@@ -89,10 +84,6 @@ class NoticeFragment : Fragment() {
     private var currentRenderedItems: List<Any> = emptyList()
     private var todayReminderShown = false
 
-    private var isSummaryCollapsed = true
-    private var isAiSummaryHiddenByScroll = false
-    private var todayNoticesToSummarize: List<Notice> = emptyList()
-    private var lastProcessedHash: String? = null
     private var statusBarHeight = 0
     private var totalScrollY = 0
 
@@ -124,16 +115,6 @@ class NoticeFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
         currentUserId = auth.currentUser?.uid.orEmpty()
-        if (currentUserId.isNotBlank()) {
-            db.collection("users").document(currentUserId).get()
-                .addOnSuccessListener { doc ->
-                    if (doc.exists()) {
-                        currentUserName = doc.getString("name") ?: ""
-                        currentUserStudentId = doc.getString("studentId") ?: ""
-                    }
-                }
-        }
-
         val noticeIdArg = arguments?.getString("noticeId")
         if (!noticeIdArg.isNullOrBlank()) {
             com.shuaib.classmate.utils.NotificationRouter.pendingNoticeId = noticeIdArg
@@ -142,13 +123,11 @@ class NoticeFragment : Fragment() {
         setupRecyclerView()
         setupTopBar()
         setupSearch()
-        setupAiSummaryCard()
-
         ViewCompat.setOnApplyWindowInsetsListener(binding.noticeHeaderPanel) { _, insets ->
             val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
             this.statusBarHeight = statusBarHeight
             adjustHeaderOnScroll(totalScrollY)
-            updateAiSummaryUiState()
+            updateFeedInsets()
             insets
         }
 
@@ -175,6 +154,7 @@ class NoticeFragment : Fragment() {
         noticeAdapter = NoticeAdapter(
             currentUserId = currentUserId,
             isAdminProvider = { isAdmin },
+            canManageNotice = { notice -> canManageNotice(notice) },
             onNoticeClick = { /* Handled inline via expansion toggle */ },
             onLikeClick = { notice -> toggleNoticeLike(notice) },
             onCommentClick = { notice -> showCommentsBottomSheet(notice.id) },
@@ -184,9 +164,7 @@ class NoticeFragment : Fragment() {
             onCopyClick = { notice -> copyNoticeToClipboard(notice) },
             onPollVote = { pollId, option -> castVote(pollId, option) },
             onPollMultiVote = { poll, option -> toggleMultiVote(poll, option) },
-            onPollDelete = { pollId -> deletePoll(pollId) },
-            onNoticeViewed = { notice -> markNoticeAsRead(notice) },
-            onReadReceiptsClick = { notice -> showReadReceipts(notice) }
+            onPollDelete = { pollId -> deletePoll(pollId) }
         )
         binding.rvNotices.apply {
             layoutManager = LinearLayoutManager(requireContext())
@@ -202,13 +180,6 @@ class NoticeFragment : Fragment() {
                     }
                     adjustHeaderOnScroll(totalScrollY)
 
-                    if (!recyclerView.canScrollVertically(-1)) {
-                        setAiSummaryHiddenByScroll(false)
-                    } else if (dy > 12) {
-                        setAiSummaryHiddenByScroll(true)
-                    } else if (dy < -12) {
-                        setAiSummaryHiddenByScroll(false)
-                    }
                 }
             })
         }
@@ -218,6 +189,7 @@ class NoticeFragment : Fragment() {
         binding.btnPostNotice.applyClickAnimation { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
         binding.btnEmptyPost.applyClickAnimation { startActivity(Intent(requireContext(), PostNoticeActivity::class.java)) }
         binding.btnEmptyReset.applyClickAnimation { resetFiltersAndSearch() }
+        binding.btnLoadOlder.applyClickAnimation { noticeViewModel.loadOlderNotices() }
     }
 
     private fun resetFiltersAndSearch() {
@@ -300,7 +272,6 @@ class NoticeFragment : Fragment() {
 
                         fetchEngagementState(notices.map { it.id }.filter { it.isNotBlank() }.toSet())
                         renderFeed()
-                        processAiSummary(notices)
 
                         // Show today's notices reminder banner (once per session)
                         if (!todayReminderShown) {
@@ -326,6 +297,14 @@ class NoticeFragment : Fragment() {
                         if (!refreshing) {
                             binding.swipeRefresh.isRefreshing = false
                         }
+                    }
+                }
+                launch {
+                    noticeViewModel.isLoadingOlder.collect { loading ->
+                        if (_binding == null) return@collect
+                        binding.progressOlder.isVisible = loading
+                        binding.btnLoadOlder.isEnabled = !loading
+                        binding.btnLoadOlder.text = if (loading) "Loading previous notices…" else "Load previous notices"
                     }
                 }
                 launch {
@@ -788,7 +767,7 @@ class NoticeFragment : Fragment() {
     }
 
     private fun showNoticeActionsDialog(notice: Notice) {
-        if (isAdmin) {
+        if (canManageNotice(notice)) {
             AlertDialog.Builder(requireContext(), R.style.Theme_ClassMate_Dialog)
                 .setTitle("Notice Actions")
                 .setItems(arrayOf("Edit", "Delete")) { _, which ->
@@ -804,6 +783,15 @@ class NoticeFragment : Fragment() {
                     }
                 }
                 .show()
+        }
+    }
+
+    private fun canManageNotice(notice: Notice): Boolean {
+        val context = AppContextManager.appContextFlow.value
+        return if (UUID_PATTERN.matches(notice.id)) {
+            (context.profileId.isNotBlank() && notice.createdBy == context.profileId) || context.isAdmin()
+        } else {
+            (currentUserId.isNotBlank() && notice.createdBy == currentUserId) || isAdmin
         }
     }
 
@@ -825,9 +813,25 @@ class NoticeFragment : Fragment() {
     }
 
     private fun deleteNotice(notice: Notice) {
-        db.collection("notices").document(notice.id)
+        if (!canManageNotice(notice)) return
+        if (UUID_PATTERN.matches(notice.id)) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                runCatching { NoticeRepository.getInstance(requireContext()).deleteSupabaseNotice(notice.id) }
+                    .onSuccess {
+                        allNotices = allNotices.filterNot { it.id == notice.id }
+                        renderFeed()
+                        Toast.makeText(requireContext(), "Notice deleted", Toast.LENGTH_SHORT).show()
+                    }.onFailure {
+                        Toast.makeText(requireContext(), "Delete failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
+            return
+        }
+        NoticeRepository.getInstance(requireContext()).getNoticesCollection(notice.batchId.ifBlank { AppContextManager.getBatchId() }).document(notice.id)
             .update(mapOf("isDeleted" to true, "updatedAt" to FieldValue.serverTimestamp()))
             .addOnSuccessListener {
+                allNotices = allNotices.filterNot { it.id == notice.id }
+                renderFeed()
                 Toast.makeText(requireContext(), "Notice deleted", Toast.LENGTH_SHORT).show()
                 fetchData()
             }
@@ -974,154 +978,20 @@ class NoticeFragment : Fragment() {
         return error?.message ?: "Unknown error"
     }
 
-    private fun setupAiSummaryCard() {
+    private fun updateFeedInsets() {
         if (_binding == null) return
-        val card = binding.aiSummaryCard
-        
-        // Make the entire card background clickable for a premium "one-click" experience
-        card.cardAiSummary.setOnClickListener {
-            toggleAiSummaryExpansion()
-        }
-        card.layoutAiHeader.setOnClickListener {
-            toggleAiSummaryExpansion()
-        }
-        card.btnAiDismiss.setOnClickListener {
-            dismissAiSummary()
-        }
-        card.btnAiRetry.setOnClickListener {
-            generateAiSummary()
-        }
-        updateAiSummaryUiState()
-    }
-
-    private fun toggleAiSummaryExpansion() {
-        if (_binding == null) return
-        isSummaryCollapsed = !isSummaryCollapsed
-        
-        // Premium layout transitions for card height expansion/collapse
-        val card = binding.aiSummaryCard.cardAiSummary
-        val parent = card.parent as? ViewGroup
-        if (parent != null) {
-            androidx.transition.TransitionManager.beginDelayedTransition(parent)
-        }
-        
-        updateAiSummaryUiState()
-        if (!isSummaryCollapsed) {
-            val hash = getTodayNoticesHash()
-            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-            val cached = prefs.getString("summary_$hash", null)
-            if (cached.isNullOrBlank()) {
-                generateAiSummary()
-            }
-        }
-    }
-
-    private fun dismissAiSummary() {
-        val hash = getTodayNoticesHash()
-        if (hash.isNotEmpty()) {
-            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("dismissed_$hash", true).apply()
-        }
-        updateAiSummaryUiState()
-    }
-
-    private fun getTodayNoticesHash(): String {
-        if (todayNoticesToSummarize.isEmpty()) return ""
-        val latestTimestamp = todayNoticesToSummarize.maxOfOrNull { itemTimestampMillis(it) } ?: 0L
-        return "${todayNoticesToSummarize.size}_$latestTimestamp"
-    }
-
-    private fun generateAiSummary() {
-        if (todayNoticesToSummarize.isEmpty()) return
-        val hash = getTodayNoticesHash()
-        if (hash.isEmpty()) return
-        val context = context ?: return
-        
-        val card = binding.aiSummaryCard
-        card.layoutAiLoading.visibility = View.VISIBLE
-        card.layoutAiError.visibility = View.GONE
-        card.tvAiSummaryText.visibility = View.GONE
-        
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val concatenatedText = todayNoticesToSummarize.joinToString("\n\n") { notice ->
-                    "Title: ${notice.title}\nContent: ${notice.body}"
-                }
-                val result = com.shuaib.classmate.services.AIService.summarizeNotice(
-                    title = "Today's Updates",
-                    content = concatenatedText,
-                    type = "General",
-                    subject = "Notice Feed Summary"
-                )
-                if (_binding == null) return@launch
-                if (result.isSuccess) {
-                    val summary = result.getOrThrow()
-                    val prefs = context.getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-                    prefs.edit().putString("summary_$hash", summary).apply()
-                    updateAiSummaryUiState()
-                } else {
-                    val exception = result.exceptionOrNull()
-                    val errorMsg = exception?.message ?: "Failed to generate summary."
-                    showAiSummaryError(errorMsg)
-                }
-            } catch (e: Exception) {
-                if (_binding == null) return@launch
-                showAiSummaryError(e.message ?: "Unknown error occurred.")
-            }
-        }
-    }
-
-    private fun showAiSummaryError(errorMsg: String) {
-        if (_binding == null) return
-        val card = binding.aiSummaryCard
-        card.layoutAiLoading.visibility = View.GONE
-        card.layoutAiError.visibility = View.VISIBLE
-        card.tvAiErrorMsg.text = errorMsg
-        card.tvAiSummaryText.visibility = View.GONE
-    }
-
-    private fun processAiSummary(notices: List<Notice>) {
-        val today = notices.filter { NoticeUi.isToday(itemTimestampMillis(it)) }
-        todayNoticesToSummarize = today
-        updateAiSummaryUiState()
-    }
-
-    private fun updateAiSummaryUiState() {
-        if (_binding == null) return
-        val card = binding.aiSummaryCard
-        val hash = getTodayNoticesHash()
-        
-        // Reset error/loading state if hash changes so we don't get stuck in a stale error state
-        if (hash.isNotEmpty() && hash != lastProcessedHash) {
-            lastProcessedHash = hash
-            card.layoutAiLoading.visibility = View.GONE
-            card.layoutAiError.visibility = View.GONE
-            card.tvAiSummaryText.visibility = View.VISIBLE
-        }
-
-        val isCardVisible = todayNoticesToSummarize.isNotEmpty() && run {
-            val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-            !prefs.getBoolean("dismissed_$hash", false)
-        }
-
-        // Dynamically adjust RecyclerView top padding to avoid empty space when card is hidden/dismissed
         val density = resources.displayMetrics.density
-        val topPadding = if (isCardVisible) (128 * density).toInt() else (72 * density).toInt()
         binding.rvNotices.setPadding(
             binding.rvNotices.paddingLeft,
-            topPadding + statusBarHeight,
+            (72 * density).toInt() + statusBarHeight,
             binding.rvNotices.paddingRight,
             binding.rvNotices.paddingBottom
         )
-
-        // Dynamically adjust reminder banner topMargin to float below the transparent status bar + header
         val bannerParams = binding.layoutReminderBanner.layoutParams as? ViewGroup.MarginLayoutParams
         if (bannerParams != null) {
             bannerParams.topMargin = (72 * density).toInt() + statusBarHeight
             binding.layoutReminderBanner.layoutParams = bannerParams
         }
-
-        // Dynamically adjust shimmer and empty state top padding
         binding.shimmerView.setPadding(
             binding.shimmerView.paddingLeft,
             (72 * density).toInt() + statusBarHeight,
@@ -1134,94 +1004,6 @@ class NoticeFragment : Fragment() {
             binding.emptyNoticeState.paddingRight,
             binding.emptyNoticeState.paddingBottom
         )
-
-        if (!isCardVisible) {
-            card.cardAiSummary.visibility = View.GONE
-            return
-        }
-
-        card.cardAiSummary.visibility = View.VISIBLE
-        
-        // Dynamically adjust AI summary card topMargin to float below the transparent status bar + header
-        val params = card.cardAiSummary.layoutParams as? ViewGroup.MarginLayoutParams
-        if (params != null) {
-            params.topMargin = (72 * density).toInt() + statusBarHeight
-            card.cardAiSummary.layoutParams = params
-        }
-        
-        // Restore correct translation and alpha based on scroll state
-        if (isAiSummaryHiddenByScroll) {
-            card.cardAiSummary.alpha = 0f
-            card.cardAiSummary.post {
-                val topMargin = (card.cardAiSummary.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0
-                card.cardAiSummary.translationY = -(card.cardAiSummary.height + topMargin).toFloat()
-            }
-        } else {
-            card.cardAiSummary.alpha = 1f
-            card.cardAiSummary.translationY = 0f
-        }
-
-        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-
-        if (isSummaryCollapsed) {
-            card.layoutAiContent.visibility = View.GONE
-            card.ivAiChevron.rotation = 0f
-            card.btnAiActionText.text = "Expand"
-            card.btnAiActionText.visibility = View.VISIBLE
-        } else {
-            card.layoutAiContent.visibility = View.VISIBLE
-            card.ivAiChevron.rotation = 90f
-            card.btnAiActionText.text = "Collapse"
-            card.btnAiActionText.visibility = View.VISIBLE
-            val cachedSummary = prefs.getString("summary_$hash", null)
-            if (cachedSummary != null) {
-                card.layoutAiLoading.visibility = View.GONE
-                card.layoutAiError.visibility = View.GONE
-                card.tvAiSummaryText.visibility = View.VISIBLE
-                val context = context
-                if (context != null) {
-                    val formatted = com.shuaib.classmate.notices.NoticeTextFormatter.format(context, cachedSummary)
-                    val spannable = android.text.SpannableStringBuilder(formatted)
-                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
-                    card.tvAiSummaryText.text = spannable
-                    card.tvAiSummaryText.movementMethod = android.text.method.LinkMovementMethod.getInstance()
-                } else {
-                    val spannable = android.text.SpannableStringBuilder(cachedSummary)
-                    android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
-                    card.tvAiSummaryText.text = spannable
-                    card.tvAiSummaryText.movementMethod = android.text.method.LinkMovementMethod.getInstance()
-                }
-            } else {
-                if (card.layoutAiLoading.visibility != View.VISIBLE && card.layoutAiError.visibility != View.VISIBLE) {
-                    card.layoutAiLoading.visibility = View.GONE
-                    card.layoutAiError.visibility = View.GONE
-                    card.tvAiSummaryText.visibility = View.VISIBLE
-                    generateAiSummary()
-                }
-            }
-        }
-    }
-
-    private fun setAiSummaryHiddenByScroll(hidden: Boolean) {
-        if (_binding == null || isAiSummaryHiddenByScroll == hidden) return
-        
-        val card = binding.aiSummaryCard.cardAiSummary
-        if (todayNoticesToSummarize.isEmpty()) return
-        val hash = getTodayNoticesHash()
-        val prefs = requireContext().getSharedPreferences("ai_summary_prefs", Context.MODE_PRIVATE)
-        val isDismissed = prefs.getBoolean("dismissed_$hash", false)
-        if (isDismissed) return
-
-        isAiSummaryHiddenByScroll = hidden
-
-        val topMargin = (card.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0
-        val offset = if (hidden) -(card.height + topMargin).toFloat() else 0f
-        
-        card.animate()
-            .translationY(offset)
-            .alpha(if (hidden) 0f else 1f)
-            .setDuration(220)
-            .setInterpolator(android.view.animation.DecelerateInterpolator())
     }
 
     private fun adjustHeaderOnScroll(scrollOffset: Int) {
@@ -1287,108 +1069,4 @@ class NoticeFragment : Fragment() {
         )
     }
 
-    private fun markNoticeAsRead(notice: Notice) {
-        if (notice.id.isBlank() || currentUserId.isBlank()) return
-        if (readNoticeCache.contains(notice.id)) return
-
-        val context = context ?: return
-        val prefs = context.getSharedPreferences("classmate_reads", Context.MODE_PRIVATE)
-        val readSet = prefs.getStringSet("read_notices", emptySet()) ?: emptySet()
-        if (readSet.contains(notice.id)) {
-            readNoticeCache.add(notice.id)
-            return
-        }
-
-        readNoticeCache.add(notice.id)
-        val newReadSet = readSet.toMutableSet()
-        newReadSet.add(notice.id)
-        prefs.edit().putStringSet("read_notices", newReadSet).apply()
-
-        val receiptRef = db.collection("notices").document(notice.id)
-            .collection("read_receipts").document(currentUserId)
-
-        val receiptData = hashMapOf(
-            "userId" to currentUserId,
-            "userName" to currentUserName.ifBlank { "Student" },
-            "studentId" to currentUserStudentId.ifBlank { "N/A" },
-            "readAt" to com.google.firebase.Timestamp.now()
-        )
-
-        val noticeRef = db.collection("notices").document(notice.id)
-
-        db.runBatch { batch ->
-            batch.set(receiptRef, receiptData)
-            batch.update(noticeRef, "readCount", FieldValue.increment(1))
-        }.addOnFailureListener { e ->
-            Log.e("NoticeFragment", "Failed to log read receipt", e)
-        }
-    }
-
-    private fun showReadReceipts(notice: Notice) {
-        val context = context ?: return
-        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(context)
-        val dialogView = layoutInflater.inflate(R.layout.dialog_read_receipts, null)
-        dialog.setContentView(dialogView)
-
-        val tvTitle = dialogView.findViewById<TextView>(R.id.tvTitle)
-        val pbLoading = dialogView.findViewById<ProgressBar>(R.id.pbLoading)
-        val tvEmpty = dialogView.findViewById<TextView>(R.id.tvEmpty)
-        val rvReaders = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvReaders)
-
-        tvTitle.text = "Read Receipts (${notice.readCount})"
-        rvReaders.layoutManager = LinearLayoutManager(context)
-
-        db.collection("notices").document(notice.id)
-            .collection("read_receipts")
-            .orderBy("readAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                pbLoading.visibility = View.GONE
-                val documents = snapshot.documents
-                if (documents.isEmpty()) {
-                    tvEmpty.visibility = View.VISIBLE
-                } else {
-                    rvReaders.visibility = View.VISIBLE
-                    rvReaders.adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<ReaderViewHolder>() {
-                        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReaderViewHolder {
-                            val v = layoutInflater.inflate(R.layout.item_read_receipt, parent, false)
-                            return ReaderViewHolder(v)
-                        }
-
-                        override fun onBindViewHolder(holder: ReaderViewHolder, position: Int) {
-                            val doc = documents[position]
-                            val name = doc.getString("userName").orEmpty()
-                            val studentId = doc.getString("studentId").orEmpty()
-                            val readAt = doc.getTimestamp("readAt")
-
-                            holder.tvName.text = name
-                            holder.tvInfo.text = if (studentId.isNotBlank() && studentId != "N/A") "ID: $studentId" else "Student"
-                            
-                            if (readAt != null) {
-                                val sdf = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
-                                holder.tvTime.text = sdf.format(readAt.toDate())
-                            } else {
-                                holder.tvTime.text = "Just now"
-                            }
-                        }
-
-                        override fun getItemCount(): Int = documents.size
-                    }
-                }
-            }
-            .addOnFailureListener { e ->
-                pbLoading.visibility = View.GONE
-                tvEmpty.text = "Failed to load read receipts."
-                tvEmpty.visibility = View.VISIBLE
-                Log.e("NoticeFragment", "Failed to fetch read receipts", e)
-            }
-
-        dialog.show()
-    }
-}
-
-class ReaderViewHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
-    val tvName: TextView = view.findViewById(R.id.tvReaderName)
-    val tvInfo: TextView = view.findViewById(R.id.tvReaderInfo)
-    val tvTime: TextView = view.findViewById(R.id.tvReadTime)
 }

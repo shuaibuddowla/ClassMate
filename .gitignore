@@ -24,6 +24,11 @@ skills-lock.json
 .cxx
 local.properties
 supabase/bootstrap.local.sql
+supabase/bootstrap_classmate.local.sql
+supabase/.classmate-secrets.local.env
+supabase/.classmate-staging.local.env
+supabase/.staging-workdir/
+supabase/.production-config-workdir/
 supabase/.temp/
 keystore.properties
 *.jks

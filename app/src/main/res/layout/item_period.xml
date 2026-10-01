@@ -139,7 +139,8 @@
                     android:layout_width="26dp"
                     android:layout_height="26dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_subject_other" />
+                    android:src="@drawable/ic_subject_other"
+                    app:tint="@color/cm_primary_light" />
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -202,7 +203,7 @@
                     android:layout_width="12dp"
                     android:layout_height="12dp"
                     android:layout_marginEnd="4dp"
-                    android:src="@drawable/ic_pin_outline"
+                    android:src="@drawable/ic_room_door"
                     app:tint="@color/cm_text_disabled" />
 
                 <TextView

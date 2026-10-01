@@ -16,6 +16,7 @@ interface Env {
   ARCHIVE_INTEGRATION_SECRET: string;
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
 }
 
 interface AuthContext {
@@ -60,6 +61,16 @@ export default {
     }
 
     try {
+      if (url.pathname === "/internal/archive-sync" && request.method === "POST") {
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        if (!integrationAuthorized && !serviceAuthorized) {
+          throw new HttpError(403, "Archive sync access denied");
+        }
+        return json(await syncArchiveCatalog(env, url.searchParams.get("dryRun") !== "1"));
+      }
       const auth = await authenticate(request, env);
 
       if (url.pathname === "/v1/ai/gemini" && request.method === "POST") {
@@ -102,7 +113,40 @@ export default {
       return cors(json({error: message}, status));
     }
   },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(syncArchiveCatalog(env, true).then(() => undefined));
+  },
 } satisfies ExportedHandler<Env>;
+
+async function syncArchiveCatalog(env: Env, apply: boolean): Promise<unknown> {
+  if (!env.ARCHIVE_INTEGRATION_SECRET || !env.SUPABASE_SERVICE_ROLE_KEY ||
+      !env.ARCHIVE_API_URL || !env.SUPABASE_URL) {
+    throw new HttpError(503, "Archive reconciliation is not configured");
+  }
+  const source = await fetch(`${env.ARCHIVE_API_URL.replace(/\/$/, "")}/sync/catalog`, {
+    headers: {"X-ClassMate-Integration": env.ARCHIVE_INTEGRATION_SECRET},
+  });
+  if (!source.ok) throw new HttpError(502, `Archive catalogue unavailable (${source.status})`);
+  const snapshot = await source.json<{
+    batches?: Array<{id: string}>;
+    courses?: Array<{id: string}>;
+  }>();
+  if (!Array.isArray(snapshot.batches) || !snapshot.batches.length ||
+      !Array.isArray(snapshot.courses)) {
+    throw new HttpError(502, "Archive returned an incomplete catalogue");
+  }
+  const target = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/sync_archive_catalog`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({snapshot, apply_changes: apply}),
+  });
+  if (!target.ok) throw new HttpError(502, `Supabase reconciliation failed (${target.status})`);
+  return target.json();
+}
 
 async function authenticate(request: Request, env: Env): Promise<AuthContext> {
   const header = request.headers.get("Authorization") ?? "";
@@ -211,21 +255,22 @@ async function proxyArchive(
   }
   const relativePath = url.pathname.slice("/v1/archive".length);
   const readAllowed = request.method === "GET" &&
-    (/^\/(archive|resources|search)$/.test(relativePath) ||
+    (/^\/(archive|public|resources|search)$/.test(relativePath) ||
       /^\/(resource|download)\/[A-Za-z0-9_-]+$/.test(relativePath));
   const courseCreate = request.method === "POST" && relativePath === "/courses";
+  const courseManage = request.method === "POST" &&
+    /^\/courses\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
   const onboarding = request.method === "POST" && relativePath === "/onboarding";
   const uploadMutation = request.method === "POST" &&
     (relativePath === "/uploads" || /^\/uploads\/[A-Za-z0-9_-]+\/(complete|cancel)$/.test(relativePath));
   const resourceAdmin = request.method === "POST" &&
     /^\/resources\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
-  if (!readAllowed && !courseCreate && !onboarding && !uploadMutation && !resourceAdmin) {
+  if (!readAllowed && !courseCreate && !courseManage && !onboarding && !uploadMutation && !resourceAdmin) {
     throw new HttpError(404, "Archive endpoint not found");
   }
 
   const context = targetContext(request);
-  const action = courseCreate ? "course_create" : uploadMutation ? "upload" :
-    resourceAdmin ? "resource_admin" : "read";
+  const action = uploadMutation ? "upload" : "read";
   if (!await canAccessV2ArchiveBatch(env, auth, context.batchId, action)) {
     throw new HttpError(403, "Your Supabase role does not allow this Archive action for the selected batch");
   }
@@ -240,6 +285,11 @@ async function proxyArchive(
   headers.set("X-ClassMate-Name", encodeURIComponent(String(auth.claims.name ?? "ClassMate user")));
   headers.set("X-ClassMate-Batch", context.batchId);
   headers.set("X-ClassMate-Semester", context.semesterId);
+  if (courseManage || resourceAdmin) {
+    headers.set("X-ClassMate-Can-Manage", String(
+      await canAccessV2ArchiveBatch(env, auth, context.batchId, "resource_manage"),
+    ));
+  }
   const response = await fetch(endpoint, {
     method: request.method,
     headers,
@@ -327,7 +377,8 @@ async function sendNotification(request: Request, env: Env, auth: AuthContext): 
     const batchId = String(data.batchId ?? "").trim().toLowerCase();
     const context = targetContext(request);
     if (batchId !== context.batchId) throw new HttpError(400, "Notification batch does not match request context");
-    const v2Authorized = type === "notice" && await canSendV2Notification(env, auth, batchId);
+    const v2Authorized = ["notice", "cancellation", "substitute", "resource"].includes(type) &&
+      await canSendV2Notification(env, auth, batchId);
     let permitted = v2Authorized;
     if (!permitted) {
       const access = await loadUserAccess(env, auth);

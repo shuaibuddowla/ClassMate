@@ -702,7 +702,8 @@ service cloud.firestore {
 
     match /semesters/{semesterId}/timetable/{day}/periods/{periodId} {
       allow read: if isLoggedIn();
-      allow create, delete: if canEditTimetable();
+      allow create: if canEditTimetable();
+      allow delete: if canEditTimetable() || (isLoggedIn() && resource.data.createdBy == request.auth.uid);
       allow update: if canEditTimetable() || validClassCancelPeriodUpdate();
     }
 
@@ -760,7 +761,8 @@ service cloud.firestore {
 
     match /timetable/{day}/periods/{periodId} {
       allow read: if isLoggedIn();
-      allow create, delete: if canEditTimetable();
+      allow create: if canEditTimetable();
+      allow delete: if canEditTimetable() || (isLoggedIn() && resource.data.createdBy == request.auth.uid);
       allow update: if canEditTimetable() || validClassCancelPeriodUpdate();
     }
 

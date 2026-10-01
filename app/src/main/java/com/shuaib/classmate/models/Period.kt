@@ -21,6 +21,7 @@ data class Period(
     val room: String? = null,
     val scheduleChange: String? = null,
     val classKind: String = "class",
-    val courseOfferingId: String = ""
+    val courseOfferingId: String = "",
+    val createdBy: String = ""
     // Format: "2026-04-11" (yyyy-MM-dd)
 )

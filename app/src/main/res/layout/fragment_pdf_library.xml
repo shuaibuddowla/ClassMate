@@ -160,6 +160,15 @@
                             android:textColor="#12152A"
                             android:textSize="18sp"
                             android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvViewAll"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:padding="6dp"
+                            android:text="All files  ›"
+                            android:textColor="#52627D"
+                            android:textSize="12sp" />
                     </LinearLayout>
 
                     <TextView
@@ -167,10 +176,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_library_panel_html"
-                        android:gravity="center"
-                        android:padding="28dp"
-                        android:text="No matching files yet"
+                        android:paddingVertical="12dp"
+                        android:text="Nothing new this week"
                         android:textColor="#565C75"
                         android:textSize="14sp"
                         android:visibility="gone" />
@@ -180,31 +187,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_library_panel_html"
                         android:clipToPadding="false"
                         android:nestedScrollingEnabled="false"
                         android:orientation="vertical"
                         android:saveEnabled="false"
                         tools:listitem="@layout/item_recent_pdf" />
-
-                    <TextView
-                        android:id="@+id/tvViewAll"
-                        android:layout_width="112dp"
-                        android:layout_height="44dp"
-                        android:layout_gravity="end"
-                        android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_library_see_all_capsule"
-                        android:drawableEnd="@drawable/ic_library_see_all_arrow"
-                        android:drawablePadding="4dp"
-                        android:elevation="3dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:gravity="center"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="11dp"
-                        android:text="See all"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
 
                     <LinearLayout
                         android:id="@+id/coursesHeader"
@@ -225,19 +212,28 @@
                         <TextView android:id="@+id/tvLibrarySummary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#565C75" android:textSize="12sp" />
                     </LinearLayout>
 
-                    <LinearLayout
+                    <FrameLayout
                         android:id="@+id/libraryCategoryToggle"
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:layout_marginTop="10dp"
                         android:layout_marginBottom="10dp"
                         android:background="@drawable/bg_library_segment_html"
-                        android:orientation="horizontal"
                         android:padding="4dp">
-                        <TextView android:id="@+id/btnCategoryRegular" style="@style/LibrarySegment.Selected" android:text="Theory" />
-                        <TextView android:id="@+id/btnCategoryLab" style="@style/LibrarySegment" android:text="Labs" />
-                        <TextView android:id="@+id/btnCategorySyllabus" style="@style/LibrarySegment" android:text="Syllabus" />
-                    </LinearLayout>
+                        <View
+                            android:id="@+id/libraryCategoryIndicator"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_library_segment_selected_html" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="horizontal">
+                            <TextView android:id="@+id/btnCategoryRegular" style="@style/LibrarySegment" android:text="Theory" />
+                            <TextView android:id="@+id/btnCategoryLab" style="@style/LibrarySegment" android:text="Labs" />
+                            <TextView android:id="@+id/btnCategorySyllabus" style="@style/LibrarySegment" android:text="Syllabus" />
+                        </LinearLayout>
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/tvNoSubjectResults"

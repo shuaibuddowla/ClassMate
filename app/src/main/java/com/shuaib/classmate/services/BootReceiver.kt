@@ -5,6 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.shuaib.classmate.utils.AppPreferences
+import com.shuaib.classmate.BuildConfig
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
 
@@ -14,11 +19,23 @@ class BootReceiver : BroadcastReceiver() {
 
         if (action == Intent.ACTION_BOOT_COMPLETED || action == "android.intent.action.QUICKBOOT_POWERON") {
             val prefs = AppPreferences(context)
-            if (prefs.isAutoMuteEnabled()) {
-                Log.d(TAG, "Auto-mute is enabled. Rescheduling mute/unmute alarms after boot.")
+            if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+                    val pending = goAsync()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            ClassMateAuthApi.attach(context.applicationContext)
+                            if (ClassMateAuthApi.restoreSession()) {
+                                val profile = ClassMateAuthApi.initializeProfile()
+                                if (prefs.isAutoMuteEnabled() && profile.optString("role") == "student")
+                                    ClassMateAutoMuteScheduler.schedule(context, profile.optString("batch_id"))
+                                if (prefs.isNotificationsEnabled())
+                                    ClassMateNoticeReminderScheduler.restore(context, profile.getString("id"))
+                            }
+                        } catch (e: Exception) { Log.e(TAG, "Could not restore Supabase alarms", e) }
+                        finally { pending.finish() }
+                    }
+            } else if (prefs.isAutoMuteEnabled()) {
                 AutoMuteScheduler.scheduleAlarms(context)
-            } else {
-                Log.d(TAG, "Auto-mute is disabled. No alarms rescheduled after boot.")
             }
 
             if (prefs.isShakeToTorchEnabled()) {

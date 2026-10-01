@@ -5,7 +5,7 @@
     <color name="cm_bg_secondary">#E2E8F0</color>
     <color name="cm_surface">#FFFFFF</color>
     <color name="cm_surface_elevated">#FFFFFF</color>
-    <color name="cm_surface_glass">#F1F5F9E6</color>
+    <color name="cm_surface_glass">#F7FAFF</color>
     <color name="cm_card">#FFFFFF</color>
     <color name="cm_card_alt">#E2E8F0</color>
 
@@ -48,7 +48,22 @@
     <color name="cm_notice_class_test_bg">#EEF2FF</color>
     <color name="cm_notice_class_test_text">#4338CA</color>
     <color name="cm_notice_cancel_bg">#FEE2E2</color>
+    <color name="cm_period_cancel_bg">#FFF3F3</color>
     <color name="cm_notice_cancel_text">#B91C1C</color>
+    <color name="cm_notice_general_start">#F8F5FF</color>
+    <color name="cm_notice_general_end">#EEE9FC</color>
+    <color name="cm_notice_cancel_start">#F4F8FF</color>
+    <color name="cm_notice_cancel_end">#EAF2FF</color>
+    <color name="cm_notice_resource_start">#F2FCF9</color>
+    <color name="cm_notice_resource_end">#E4F8F2</color>
+    <color name="cm_notice_premium_general">#8757E7</color>
+    <color name="cm_notice_premium_cancel">#2379EB</color>
+    <color name="cm_notice_premium_resource">#12A981</color>
+    <color name="cm_notice_premium_stroke">#DDE5F1</color>
+    <color name="cm_notice_summary">#F8FAFF</color>
+    <color name="cm_notice_action">#EFFFFFFF</color>
+    <color name="cm_notice_attachment">#F8FFFD</color>
+    <color name="cm_notice_like">#F0446E</color>
 
     <color name="cm_file_pdf">#DC2626</color>
     <color name="cm_file_doc">#2563EB</color>

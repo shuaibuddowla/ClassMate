@@ -30,7 +30,10 @@
 
     <ImageView android:id="@+id/btnFavorite" android:layout_width="42dp" android:layout_height="42dp" android:background="?attr/selectableItemBackgroundBorderless" android:padding="11dp" android:src="@drawable/ic_star_outline" app:tint="#565C75" />
     <TextView android:id="@+id/tvLabTag" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-    <ImageView android:id="@+id/btnDelete" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <ImageView android:id="@+id/btnDelete" android:layout_width="38dp" android:layout_height="38dp"
+        android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="Delete file"
+        android:padding="10dp" android:src="@drawable/ic_delete" app:tint="@color/cm_error"
+        android:visibility="gone" />
     <TextView android:id="@+id/btnDownloadView" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
     <ProgressBar android:id="@+id/progressDownload" style="?android:attr/progressBarStyleHorizontal" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
 </LinearLayout>

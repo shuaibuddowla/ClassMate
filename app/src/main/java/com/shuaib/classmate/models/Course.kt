@@ -14,6 +14,7 @@ data class Course(
     val batchId: String = "",
     val semesterId: String = "",
     val createdBy: String = "",
+    val canManage: Boolean = false,
     val createdAt: Timestamp? = null
 ) {
     fun toSubject(): Subject = Subject(name, code, type)

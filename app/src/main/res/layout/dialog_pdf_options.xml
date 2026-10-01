@@ -159,4 +159,17 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/btnManageResource"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_library_row"
+        android:text="Manage file  ·  Edit or delete"
+        android:textColor="@color/cm_primary"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
 </LinearLayout>

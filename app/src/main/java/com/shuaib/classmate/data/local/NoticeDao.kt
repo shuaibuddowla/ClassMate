@@ -10,6 +10,9 @@ interface NoticeDao {
     @Query("SELECT * FROM notices WHERE isDeleted = 0 AND batchId = :batchId ORDER BY isPinned DESC, timestampMillis DESC LIMIT :limit")
     fun observeNotices(batchId: String, limit: Int = 80): Flow<List<NoticeEntity>>
 
+    @Query("SELECT * FROM notices WHERE isDeleted = 0 AND batchId = :batchId AND timestampMillis >= :sinceMillis ORDER BY isPinned DESC, timestampMillis DESC LIMIT :limit")
+    fun observeNoticesSince(batchId: String, sinceMillis: Long, limit: Int = 80): Flow<List<NoticeEntity>>
+
     @Query("SELECT * FROM notices WHERE id = :noticeId AND isDeleted = 0 LIMIT 1")
     fun observeNotice(noticeId: String): Flow<NoticeEntity?>
 

@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 
 data class AppContextState(
     val uid: String = "",
+    val profileId: String = "",
     val batchId: String = "",
     val semesterId: String = "",
     val role: String = "student",
@@ -118,7 +119,7 @@ object AppContextManager {
 
         val current = _stateFlow.value
         if (current.uid != uid) {
-            updateState(current.copy(uid = uid))
+            updateState(current.copy(uid = uid, profileId = "", v2SessionActive = false, v2GlobalAdmin = false))
             prefs?.edit()?.putString(KEY_UID, uid)?.apply()
         }
 
@@ -189,6 +190,7 @@ object AppContextManager {
         val updatedBatch = legacyBatch ?: current.batchId
         val updated = current.copy(
             role = role,
+            profileId = profile.id,
             v2SessionActive = true,
             v2GlobalAdmin = isGlobalAdmin,
             batchId = updatedBatch,

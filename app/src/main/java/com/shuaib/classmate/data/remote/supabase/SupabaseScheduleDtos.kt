@@ -11,7 +11,8 @@ internal data class RoutineSlotRow(
     @SerialName("starts_at") val startsAt: String,
     @SerialName("ends_at") val endsAt: String,
     val room: String? = null,
-    @SerialName("class_kind") val classKind: String
+    @SerialName("class_kind") val classKind: String,
+    @SerialName("created_by") val createdBy: String = ""
 )
 
 @Serializable

@@ -29,6 +29,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class NoticeRepository private constructor(context: Context) {
     private val appContext = context.applicationContext
@@ -43,8 +47,15 @@ class NoticeRepository private constructor(context: Context) {
         return db.collection("batches").document(norm).collection("notices")
     }
 
-    fun observeNotices(batchId: String = AppContextManager.getBatchId()): Flow<List<Notice>> {
-        return noticeDao.observeNotices(AppContextManager.normalizeBatch(batchId)).map { entities ->
+    fun observeNotices(batchId: String = AppContextManager.getBatchId(), limit: Int = 80): Flow<List<Notice>> {
+        return noticeDao.observeNotices(AppContextManager.normalizeBatch(batchId), limit).map { entities ->
+            entities.map { it.toNotice() }
+        }
+    }
+
+    fun observeCurrentWeekNotices(batchId: String = AppContextManager.getBatchId()): Flow<List<Notice>> {
+        val startMillis = currentWeekStart().toEpochMilli()
+        return noticeDao.observeNoticesSince(AppContextManager.normalizeBatch(batchId), startMillis).map { entities ->
             entities.map { it.toNotice() }
         }
     }
@@ -56,8 +67,9 @@ class NoticeRepository private constructor(context: Context) {
     fun startRealtimeSync(scope: CoroutineScope, batchId: String = AppContextManager.getBatchId()): ListenerRegistration {
         val normBatch = AppContextManager.normalizeBatch(batchId)
         return getNoticesCollection(normBatch)
+            .whereGreaterThanOrEqualTo("timestamp", com.google.firebase.Timestamp(java.util.Date.from(currentWeekStart())))
             .orderBy("timestamp", Query.Direction.DESCENDING)
-            .limit(100)
+            .limit(60)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
                 
@@ -118,7 +130,9 @@ class NoticeRepository private constructor(context: Context) {
         try {
             val normBatch = AppContextManager.normalizeBatch(batchId)
             val snapshot = getNoticesCollection(normBatch)
-                .limit(80)
+                .whereGreaterThanOrEqualTo("timestamp", com.google.firebase.Timestamp(java.util.Date.from(currentWeekStart())))
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(60)
                 .get(source)
                 .await()
             val parsedNotices = snapshot.documents.map { doc ->
@@ -144,11 +158,38 @@ class NoticeRepository private constructor(context: Context) {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             if (!supabaseFeed.isConfigured) return@withContext
             val normBatch = AppContextManager.normalizeBatch(batchId)
-            val notices = supabaseFeed.load(normBatch)
+            val notices = supabaseFeed.load(normBatch, since = currentWeekStart(), limit = 60)
             if (notices.isNotEmpty()) {
                 noticeDao.upsertAll(notices.map { NoticeEntity.fromNotice(it) })
                 WidgetUpdater.refresh(appContext, syncTodayTimetable = false)
             }
+        }
+
+    suspend fun syncOlderNotices(
+        batchId: String = AppContextManager.getBatchId(),
+        before: Instant = currentWeekStart()
+    ): Instant? =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val normBatch = AppContextManager.normalizeBatch(batchId)
+            val loaded = mutableListOf<Notice>()
+            if (supabaseFeed.isConfigured) {
+                val notices = supabaseFeed.load(normBatch, before = before, limit = 40)
+                loaded += notices
+                if (notices.isNotEmpty()) noticeDao.upsertAll(notices.map { NoticeEntity.fromNotice(it) })
+            }
+            runCatching {
+                val snapshot = getNoticesCollection(normBatch)
+                    .whereLessThan("timestamp", com.google.firebase.Timestamp(java.util.Date.from(before)))
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .limit(40)
+                    .get(Source.SERVER)
+                    .await()
+                val notices = snapshot.documents.map { NoticeUi.parseNotice(it).copy(batchId = normBatch) }
+                    .filterNot { it.isDeleted }
+                loaded += notices
+                if (notices.isNotEmpty()) noticeDao.upsertAll(notices.map { NoticeEntity.fromNotice(it) })
+            }
+            loaded.mapNotNull { it.timestamp?.toDate()?.toInstant() }.minOrNull()
         }
 
     suspend fun loadSupabaseEngagement(noticeIds: Set<String>): Map<String, NoticeEngagement> =
@@ -163,8 +204,36 @@ class NoticeRepository private constructor(context: Context) {
     suspend fun setSupabaseGlobalPin(noticeId: String, pinned: Boolean) =
         supabaseFeed.setGlobalPin(noticeId, pinned)
 
+    suspend fun deleteSupabaseNotice(noticeId: String) {
+        supabaseFeed.deleteNotice(noticeId)
+        noticeDao.markDeleted(noticeId)
+    }
+
     suspend fun publishSupabaseBatchNotice(batchCode: String, title: String, body: String) =
         supabaseFeed.publishBatchNotice(batchCode, title, body)
+
+    suspend fun updateSupabaseNotice(noticeId: String, title: String, body: String) =
+        supabaseFeed.updateNotice(noticeId, title, body)
+
+    suspend fun publishSupabaseResourceNotice(
+        batchCode: String,
+        title: String,
+        body: String,
+        resourceId: String,
+        resourceTitle: String,
+        subject: String,
+        provider: String = "archive"
+    ) = supabaseFeed.publishResourceNotice(batchCode, title, body, resourceId, resourceTitle, subject, provider)
+
+    suspend fun uploadSupabaseNoticeImage(
+        context: Context,
+        noticeId: String,
+        uri: android.net.Uri,
+        fileName: String,
+        mimeType: String,
+        sizeBytes: Long,
+        onProgress: (Int) -> Unit = {}
+    ) = supabaseFeed.uploadNoticeImage(context, noticeId, uri, fileName, mimeType, sizeBytes, onProgress)
 
     suspend fun publishSupabaseClassCancellation(
         batchCode: String, offeringId: String, date: String, title: String, body: String
@@ -198,5 +267,11 @@ class NoticeRepository private constructor(context: Context) {
                 instance ?: NoticeRepository(context.applicationContext).also { instance = it }
             }
         }
+
+        fun currentWeekStart(zoneId: ZoneId = ZoneId.systemDefault()): Instant =
+            LocalDate.now(zoneId)
+                .with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.SATURDAY))
+                .atStartOfDay(zoneId)
+                .toInstant()
     }
 }

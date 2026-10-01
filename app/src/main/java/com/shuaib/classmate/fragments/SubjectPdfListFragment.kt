@@ -305,6 +305,7 @@ class SubjectPdfListFragment : Fragment() {
     }
 
     private fun showDeleteConfirmation(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Resource")
             .setMessage("Are you sure you want to delete '${pdf.title}'?")
@@ -316,11 +317,14 @@ class SubjectPdfListFragment : Fragment() {
     }
 
     private fun deletePdf(pdf: PdfFile) {
+        if (!com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) return
         binding.progressBar.visibility = View.VISIBLE
         ArchiveLibraryRepository.deleteResource(pdf.id, {
                 if (_binding == null) return@deleteResource
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
+                allResources = allResources.filterNot { it.id == pdf.id }
+                applyResourceFilter()
                 fetchPdfs()
             }, {
                 if (_binding == null) return@deleteResource

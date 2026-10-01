@@ -11,12 +11,15 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.ListenerRegistration
@@ -27,6 +30,7 @@ import com.shuaib.classmate.databinding.DialogAddPeriodBinding
 import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.repositories.TimetableRepository
+import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.utils.SemesterManager
 import com.shuaib.classmate.utils.CoursePicker
@@ -37,7 +41,9 @@ import com.shuaib.classmate.data.remote.supabase.SupabaseScheduleRepository
 import com.shuaib.classmate.data.remote.supabase.CourseOfferingOption
 import com.shuaib.classmate.domain.auth.SessionRepository
 import com.shuaib.classmate.utils.AppContextManager
+import com.shuaib.classmate.utils.NotificationSender
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.util.Calendar
@@ -97,6 +103,19 @@ class TimetableManagementActivity : AppCompatActivity() {
             }.onFailure { error ->
                 binding.fabAddPeriod.isEnabled = false
                 Toast.makeText(this@TimetableManagementActivity, "V2 schedule setup is unavailable: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+        if (usingSupabase) lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    delay(10000)
+                    val batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
+                    v2ScheduleRepository.manageableOfferings(batchId, SemesterManager.getActiveSemester())
+                        .onSuccess { options ->
+                            offeringOptions = options
+                            fetchTimetable(currentDay)
+                        }
+                }
             }
         }
     }
@@ -227,7 +246,14 @@ class TimetableManagementActivity : AppCompatActivity() {
             override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean = false
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
+                if (position !in periodList.indices) return
                 val period = periodList[position]
+                val context = AppContextManager.appContextFlow.value
+                if (usingSupabase && period.createdBy != context.profileId && !context.isAdmin()) {
+                    periodAdapter.notifyItemChanged(position)
+                    Toast.makeText(this@TimetableManagementActivity, "Only the owner can delete this period", Toast.LENGTH_SHORT).show()
+                    return
+                }
                 showDeleteConfirmation(period, position)
             }
         }
@@ -237,9 +263,10 @@ class TimetableManagementActivity : AppCompatActivity() {
     private fun showDeleteConfirmation(period: Period, position: Int) {
         MaterialAlertDialogBuilder(this)
             .setTitle("Delete Period")
-            .setMessage("Are you sure you want to delete ${period.subject}?")
+            .setMessage("Permanently delete ${period.subject} from the timetable? This cannot be undone.")
             .setPositiveButton("Delete") { _, _ -> deletePeriod(period) }
             .setNegativeButton("Cancel") { _, _ -> periodAdapter.notifyItemChanged(position) }
+            .setOnCancelListener { periodAdapter.notifyItemChanged(position) }
             .show()
     }
 
@@ -288,6 +315,46 @@ class TimetableManagementActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 lifecycleScope.launch {
+                    if (kind == "cancelled") {
+                        val targetDate = dateForDay(currentDay).toString()
+                        val batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
+                        val title = "${period.subject} Class Cancelled"
+                        val body = buildString {
+                            append("${period.subject} class has been cancelled for $targetDate.")
+                            if (value.isNotBlank()) append("\n\nReason: $value")
+                        }
+                        runCatching {
+                            NoticeRepository.getInstance(this@TimetableManagementActivity)
+                                .publishSupabaseClassCancellation(
+                                    batchId, period.courseOfferingId, targetDate, title, body
+                                )
+                        }.onSuccess { noticeId ->
+                            runCatching {
+                                NoticeRepository.getInstance(this@TimetableManagementActivity)
+                                    .syncFromSupabase(batchId)
+                            }
+                            NotificationSender.sendCancellationAlert(
+                                subject = period.subject,
+                                whenText = targetDate,
+                                noticeId = noticeId,
+                                day = currentDay,
+                                batchId = batchId,
+                                onFailure = { error ->
+                                    Toast.makeText(
+                                        this@TimetableManagementActivity,
+                                        "Cancellation saved, but push failed: $error",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            )
+                            Toast.makeText(this@TimetableManagementActivity, "Cancellation notice published", Toast.LENGTH_SHORT).show()
+                            fetchTimetable(currentDay)
+                            refreshWidgetAfterTimetableChange(currentDay)
+                        }.onFailure { error ->
+                            Toast.makeText(this@TimetableManagementActivity, "Could not cancel class: ${error.message}", Toast.LENGTH_LONG).show()
+                        }
+                        return@launch
+                    }
                     v2ScheduleRepository.createClassChange(
                         routineSlotId = period.id,
                         effectiveDate = dateForDay(currentDay).toString(),
@@ -555,10 +622,13 @@ class TimetableManagementActivity : AppCompatActivity() {
             return
         }
         val collection = TimetableRepository.getInstance(this).getPeriodsCollection(currentDay)
+        val savedPeriod = if (isEdit) period else period.copy(
+            createdBy = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        )
         val task = if (isEdit) {
-            collection.document(period.id).set(period)
+            collection.document(period.id).set(savedPeriod)
         } else {
-            collection.add(period)
+            collection.add(savedPeriod)
         }
 
         task.addOnSuccessListener {
@@ -589,9 +659,13 @@ class TimetableManagementActivity : AppCompatActivity() {
 
     private fun deletePeriod(period: Period) {
         if (usingSupabase) {
+            val context = AppContextManager.appContextFlow.value
+            if (period.createdBy != context.profileId && !context.isAdmin()) return
             lifecycleScope.launch {
                 v2ScheduleRepository.deleteRoutine(period.id).onSuccess {
                     Toast.makeText(this@TimetableManagementActivity, "Period deleted", Toast.LENGTH_SHORT).show()
+                    periodList.removeAll { it.id == period.id }
+                    renderPeriods(currentDay)
                     fetchTimetable(currentDay)
                     refreshWidgetAfterTimetableChange(currentDay)
                 }.onFailure { error ->

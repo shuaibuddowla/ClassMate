@@ -35,7 +35,6 @@ import com.shuaib.classmate.utils.DateHelper
 import com.shuaib.classmate.utils.NotificationSender
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.CoursePicker
-import com.shuaib.classmate.utils.TelegramUploader
 import com.shuaib.classmate.utils.WidgetUpdater
 import com.shuaib.classmate.models.AcademicCalendarException
 import com.shuaib.classmate.repositories.AcademicCalendarRepository
@@ -71,38 +70,30 @@ class PostNoticeActivity : AppCompatActivity() {
     private var aiPolishedNotice: com.shuaib.classmate.models.AiNoticeDraft? = null
 
     // Attachment fields
-    private var selectedPdfUri: Uri? = null
     private var selectedImageUri: Uri? = null
     private var attachmentType = "none"
     private var attachmentFileName = ""
     private var uploadedAttachmentUrl = ""
-
-    // File pickers
-    private val pdfPicker = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            selectedPdfUri = it
-            selectedImageUri = null
-            val name = getFileName(it) ?: "document.pdf"
-            binding.pdfPreview.isVisible = true
-            binding.imagePreview.isVisible = false
-            binding.attachmentPreview.isVisible = true
-            binding.tvPdfName.text = name
-            attachmentType = "pdf"
-            attachmentFileName = name
-        }
-    }
+    private var selectedImageMimeType = ""
+    private var selectedImageSize = 0L
 
     private val imagePicker = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
+            val mimeType = contentResolver.getType(it).orEmpty().lowercase()
+            val size = getFileSize(it)
+            if (mimeType !in setOf("image/jpeg", "image/png", "image/webp")) {
+                Toast.makeText(this, "Only JPG, PNG, or WebP images are supported.", Toast.LENGTH_LONG).show()
+                return@let
+            }
+            if (size !in 1..MAX_NOTICE_IMAGE_BYTES) {
+                Toast.makeText(this, "Choose an image smaller than 10 MB.", Toast.LENGTH_LONG).show()
+                return@let
+            }
             selectedImageUri = it
-            selectedPdfUri = null
             val name = getFileName(it) ?: "image.jpg"
             binding.imagePreview.isVisible = true
-            binding.pdfPreview.isVisible = false
             binding.attachmentPreview.isVisible = true
             binding.tvImageName.text = name
             Glide.with(this)
@@ -111,6 +102,8 @@ class PostNoticeActivity : AppCompatActivity() {
                 .into(binding.ivAttachmentPreview)
             attachmentType = "image"
             attachmentFileName = name
+            selectedImageMimeType = mimeType
+            selectedImageSize = size
         }
     }
 
@@ -198,31 +191,26 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
-        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
-        db.collection("batches")
-            .document(targetBatchId)
-            .collection("notices")
-            .document(noticeId)
-            .update(
-                mapOf(
-                    "title" to titleText,
-                    "body" to bodyText,
-                    "content" to bodyText,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                    "editedAt" to FieldValue.serverTimestamp()
-                )
-            )
-            .addOnSuccessListener {
-                WidgetUpdater.refresh(this)
+        lifecycleScope.launch {
+            runCatching {
+                NoticeRepository.getInstance(this@PostNoticeActivity)
+                    .updateSupabaseNotice(noticeId, titleText, bodyText)
+            }.onSuccess {
+                runCatching {
+                    NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(
+                        com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
+                    )
+                }
+                WidgetUpdater.refresh(this@PostNoticeActivity)
                 binding.progressBar.isVisible = false
-                Toast.makeText(this, "Notice updated", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PostNoticeActivity, "Notice updated", Toast.LENGTH_SHORT).show()
                 finish()
-            }
-            .addOnFailureListener { e ->
+            }.onFailure { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "Update failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@PostNoticeActivity, "Update failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        }
     }
 
     private fun setupTypeSelector() {
@@ -351,20 +339,14 @@ class PostNoticeActivity : AppCompatActivity() {
     }
 
     private fun setupAttachmentButtons() {
-        binding.btnAttachPdf.setOnClickListener {
-            pdfPicker.launch("application/pdf")
-        }
         binding.btnAttachImage.setOnClickListener {
             imagePicker.launch("image/*")
-        }
-        binding.btnRemovePdf.setOnClickListener {
-            selectedPdfUri = null
-            attachmentType = "none"
-            binding.attachmentPreview.isVisible = false
         }
         binding.btnRemoveImage.setOnClickListener {
             selectedImageUri = null
             attachmentType = "none"
+            selectedImageMimeType = ""
+            selectedImageSize = 0L
             binding.attachmentPreview.isVisible = false
         }
     }
@@ -425,10 +407,14 @@ class PostNoticeActivity : AppCompatActivity() {
             return
         }
 
-        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+        if (v2ScheduleRepository.isConfigured) {
+            if (!com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+                Toast.makeText(this, "Supabase session is not ready. Please sign in again and retry.", Toast.LENGTH_LONG).show()
+                return
+            }
             publishSupabaseCancellationNotice(
                 subject, targetDate, targetDay, whenText,
-                result.title ?: "Class Cancelled", result.body ?: "$subject class has been cancelled for $whenText"
+                "$subject Class Cancelled", result.body ?: "$subject class has been cancelled for $whenText"
             )
             return
         }
@@ -441,7 +427,7 @@ class PostNoticeActivity : AppCompatActivity() {
 
         val noticeData = hashMapOf(
             "batchId" to targetBatchId,
-            "title" to (result.title ?: "Class Cancelled"),
+            "title" to "$subject Class Cancelled",
             "body" to (result.body ?: ""),
             "content" to (result.body ?: ""),
             "type" to "notice",
@@ -493,43 +479,16 @@ class PostNoticeActivity : AppCompatActivity() {
             return
         }
 
-        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive && attachmentType != "none") {
-            Toast.makeText(this, "Notice attachments are coming in the next V2 update. Remove the attachment to post this notice.", Toast.LENGTH_LONG).show()
-            return
-        }
-
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
         // If there's an attachment, upload first
         when (attachmentType) {
-            "pdf" -> {
-                binding.attachmentProgress.isVisible = true
-                binding.tvAttachmentProgress.text = "Uploading PDF to Telegram..."
-
-                TelegramUploader.uploadPdf(
-                    context = this,
-                    fileUri = selectedPdfUri!!,
-                    title = titleText,
-                    subject = "Notice Attachment",
-                    uploadedBy = userName,
-                    onProgress = { msg ->
-                        binding.tvAttachmentProgress.text = msg
-                    },
-                    onSuccess = { telegramUrl, _ ->
-                        binding.attachmentProgress.isVisible = false
-                        uploadedAttachmentUrl = telegramUrl
-                        saveNoticeToFirestore(titleText, bodyText)
-                    },
-                    onFailure = { error ->
-                        binding.progressBar.isVisible = false
-                        binding.btnPublish.isEnabled = true
-                        binding.attachmentProgress.isVisible = false
-                        Toast.makeText(this, "PDF upload failed: $error", Toast.LENGTH_LONG).show()
-                    }
-                )
-            }
             "image" -> {
+                if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+                    saveNoticeToFirestore(titleText, bodyText)
+                    return
+                }
                 binding.attachmentProgress.isVisible = true
                 binding.tvAttachmentProgress.text = "Uploading image..."
 
@@ -558,25 +517,39 @@ class PostNoticeActivity : AppCompatActivity() {
 
     private fun saveNoticeToFirestore(title: String, body: String) {
         if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
-            if (attachmentType != "none") {
-                binding.progressBar.isVisible = false
-                binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "V2 notice attachments are not available yet.", Toast.LENGTH_LONG).show()
-                return
-            }
             val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
             binding.progressBar.isVisible = true
             binding.btnPublish.isEnabled = false
             lifecycleScope.launch {
                 runCatching {
-                    NoticeRepository.getInstance(this@PostNoticeActivity)
-                        .publishSupabaseBatchNotice(targetBatchId, title, body)
-                }.onSuccess {
+                    val repository = NoticeRepository.getInstance(this@PostNoticeActivity)
+                    val noticeId = repository.publishSupabaseBatchNotice(targetBatchId, title, body)
+                    val imageUri = selectedImageUri
+                    if (attachmentType == "image" && imageUri != null) {
+                        runOnUiThread {
+                            binding.attachmentProgress.isVisible = true
+                            binding.tvAttachmentProgress.text = "Uploading image…"
+                        }
+                        repository.uploadSupabaseNoticeImage(
+                            this@PostNoticeActivity,
+                            noticeId,
+                            imageUri,
+                            attachmentFileName,
+                            selectedImageMimeType,
+                            selectedImageSize
+                        ) { progress ->
+                            runOnUiThread { binding.tvAttachmentProgress.text = "Uploading image… $progress%" }
+                        }
+                    }
+                    noticeId
+                }.onSuccess { noticeId ->
+                    binding.attachmentProgress.isVisible = false
                     runCatching { NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(targetBatchId) }
                     WidgetUpdater.refresh(this@PostNoticeActivity)
                     NotificationSender.sendNoticeAlert(
                         title = title,
                         body = body,
+                        noticeId = noticeId,
                         batchId = targetBatchId,
                         onSuccess = {
                             Toast.makeText(this@PostNoticeActivity, "✅ Notice posted and notification sent!", Toast.LENGTH_SHORT).show()
@@ -673,10 +646,14 @@ class PostNoticeActivity : AppCompatActivity() {
         val targetDate = if (isToday) DateHelper.today() else DateHelper.tomorrow()
         val whenText = if (isToday) "today" else "tomorrow"
 
-        if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+        if (v2ScheduleRepository.isConfigured) {
+            if (!com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
+                Toast.makeText(this, "Supabase session is not ready. Please sign in again and retry.", Toast.LENGTH_LONG).show()
+                return
+            }
             publishSupabaseCancellationNotice(
                 selectedSubject, targetDate, targetDayString, whenText,
-                "Class Cancelled", "$selectedSubject class has been cancelled for $whenText"
+                "$selectedSubject Class Cancelled", "$selectedSubject class has been cancelled for $whenText"
             )
             return
         }
@@ -689,7 +666,7 @@ class PostNoticeActivity : AppCompatActivity() {
 
         val noticeData = hashMapOf(
             "batchId" to targetBatchId,
-            "title" to "Class Cancelled",
+            "title" to "$selectedSubject Class Cancelled",
             "body" to "$selectedSubject class has been cancelled for $whenText",
             "content" to "$selectedSubject class has been cancelled for $whenText",
             "type" to "notice",
@@ -742,6 +719,12 @@ class PostNoticeActivity : AppCompatActivity() {
         title: String,
         body: String
     ) {
+        if (!v2ScheduleRepository.isConfigured ||
+            !com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive
+        ) {
+            Toast.makeText(this, "Supabase session is not ready. Please sign in again and retry.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (runCatching { java.time.LocalDate.parse(targetDate) }.isFailure) {
             Toast.makeText(this, "Choose a valid class date.", Toast.LENGTH_LONG).show()
             return
@@ -764,7 +747,7 @@ class PostNoticeActivity : AppCompatActivity() {
             runCatching {
                 NoticeRepository.getInstance(this@PostNoticeActivity)
                     .publishSupabaseClassCancellation(batchId, selected.id, targetDate, title, body)
-            }.onSuccess {
+            }.onSuccess { noticeId ->
                 runCatching { NoticeRepository.getInstance(this@PostNoticeActivity).syncFromSupabase(batchId) }
                 if (targetDate == DateHelper.today() || targetDate == DateHelper.tomorrow()) {
                     val weekday = java.time.LocalDate.parse(targetDate).dayOfWeek.value % 7
@@ -787,6 +770,7 @@ class PostNoticeActivity : AppCompatActivity() {
                 NotificationSender.sendCancellationAlert(
                     subject = selected.name,
                     whenText = whenText,
+                    noticeId = noticeId,
                     day = targetDay,
                     batchId = batchId,
                     onSuccess = {
@@ -976,6 +960,12 @@ class PostNoticeActivity : AppCompatActivity() {
         }
         return name
     }
+
+    private fun getFileSize(uri: Uri): Long =
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val sizeColumn = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (sizeColumn >= 0 && cursor.moveToFirst()) cursor.getLong(sizeColumn) else 0L
+        } ?: 0L
 
     private fun attachmentPayload(): List<Map<String, Any>> {
         if (attachmentType == "none" || uploadedAttachmentUrl.isBlank()) return emptyList()
@@ -1190,5 +1180,9 @@ class PostNoticeActivity : AppCompatActivity() {
                 Toast.makeText(this@PostNoticeActivity, "Calendar Exception failed: $errorMsg", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private companion object {
+        const val MAX_NOTICE_IMAGE_BYTES = 10L * 1024L * 1024L
     }
 }

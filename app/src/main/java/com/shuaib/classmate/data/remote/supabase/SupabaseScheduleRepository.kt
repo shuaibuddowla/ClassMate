@@ -9,6 +9,7 @@ import com.shuaib.classmate.domain.schedule.RoutineSlot
 import com.shuaib.classmate.domain.schedule.ScheduleRepository
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
@@ -78,12 +79,10 @@ class SupabaseScheduleRepository @Inject constructor(
         }) { filter { eq("id", id) } }
     }
 
-    suspend fun deleteRoutine(id: String): Result<Unit> = runCatching {
-        val session = sessionRepository.refresh().getOrThrow()
-        clientProvider.client.from("routine_slots").update({
-            set("deleted_at", Instant.now().toString())
-            set("deleted_by", session.id)
-        }) { filter { eq("id", id) } }
+    override suspend fun deleteRoutine(id: String): Result<Unit> = runCatching {
+        clientProvider.client.postgrest.rpc("archive_routine_slot", parameters = buildJsonObject {
+            put("target_slot", id)
+        })
     }
 
     suspend fun createBus(
@@ -249,6 +248,7 @@ class SupabaseScheduleRepository @Inject constructor(
                         endsAt = row.endsAt,
                         room = row.room,
                         classKind = row.classKind,
+                        createdBy = row.createdBy,
                         teacherName = teacherNames[row.courseOfferingId].orEmpty()
                             .ifBlank { course.teacherName.orEmpty() }
                     )

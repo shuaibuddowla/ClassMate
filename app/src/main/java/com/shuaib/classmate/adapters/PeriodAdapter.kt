@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ItemPeriodBinding
 import com.shuaib.classmate.models.Period
-import com.shuaib.classmate.utils.SubjectVisuals
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.animateSpringScale
 import java.time.Duration
@@ -56,8 +55,7 @@ class PeriodAdapter(
         b.root.scaleX = 1f
         b.root.scaleY = 1f
 
-        val visual = SubjectVisuals.forSubject(period.subject)
-        val accent = visual.startColor
+        val accent = ContextCompat.getColor(context, R.color.cm_primary_light)
         val isLabSession = period.classKind.equals("lab", true) ||
             period.subject.trim().endsWith("lab", ignoreCase = true) || period.subject.trim().endsWith("labs", ignoreCase = true)
 
@@ -71,7 +69,7 @@ class PeriodAdapter(
         b.tvDuration.text = durationLabel(period)
         b.tvTypeBadge.typeface = Typeface.DEFAULT_BOLD
 
-        b.ivSubjectIcon.setImageResource(visual.iconRes)
+        b.ivSubjectIcon.setImageResource(R.drawable.ic_subject_other)
         b.ivSubjectIcon.imageTintList = ColorStateList.valueOf(accent)
         b.layoutSubjectIcon.background = rounded(context, 12f, ColorUtils.setAlphaComponent(accent, 34))
         b.layoutStartClock.background = rounded(context, 50f, ColorUtils.setAlphaComponent(accent, 28))
@@ -86,6 +84,11 @@ class PeriodAdapter(
         b.tvSubstituteMsg.isVisible = false
         b.layoutDuration.isVisible = true
         b.vCancelledDivider.isVisible = false
+        b.layoutStartClock.isVisible = true
+        b.vTimeLine.isVisible = true
+        b.vEndDot.isVisible = true
+        b.tvEndTime.isVisible = true
+        b.layoutSubjectIcon.isVisible = true
 
         val isLive = isViewingToday && !isPausedByCalendarException && !period.isCancelled && checkIsLive(period)
         if (isLive) {
@@ -120,6 +123,7 @@ class PeriodAdapter(
                     b.tvTypeBadge.setTextColor(ThemeColors.error(context))
                     b.layoutDuration.isVisible = false
                     b.vCancelledDivider.isVisible = true
+                    b.tvSubstituteMsg.isVisible = false
                 }
 
                 period.isSubstitute -> {
@@ -152,9 +156,6 @@ class PeriodAdapter(
             b.tvSubstituteMsg.isVisible = true
             b.tvSubstituteMsg.text = period.scheduleChange
             b.tvTypeBadge.text = "CHANGED"
-        } else if (period.isCancelled && !period.scheduleChange.isNullOrBlank()) {
-            b.tvSubstituteMsg.isVisible = true
-            b.tvSubstituteMsg.text = period.scheduleChange
         }
 
         b.root.setOnClickListener {

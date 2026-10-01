@@ -51,6 +51,18 @@ class TimetableViewModel @Inject constructor(
         }
     }
 
+    suspend fun deletePeriod(day: String, periodId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val semester = AppContextManager.getSemesterId()
+        val batch = AppContextManager.getBatchId()
+        if (sessionRepository.isConfigured) {
+            scheduleRepository.deleteRoutine(periodId).onSuccess {
+                repository.deleteCachedPeriod("v2-$batch", semester, day, periodId)
+            }
+        } else {
+            runCatching { repository.deleteFirestorePeriod(day, semester, batch, periodId) }
+        }
+    }
+
     fun refreshAll(
         semester: String = AppContextManager.getSemesterId(),
         batch: String = AppContextManager.getBatchId()

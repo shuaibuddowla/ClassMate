@@ -48,15 +48,10 @@ import com.shuaib.classmate.notices.NoticeEngagement
 import com.shuaib.classmate.notices.NoticeTextFormatter
 import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.chat.AvatarUtils
-import com.shuaib.classmate.services.AIService
 import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.applyClickAnimation
 import java.util.Date
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 data class NoticeGroupHeader(
     val key: String,
@@ -69,6 +64,7 @@ data class NoticeGroupHeader(
 class NoticeAdapter(
     private val currentUserId: String = "",
     private val isAdminProvider: () -> Boolean = { false },
+    private val canManageNotice: (Notice) -> Boolean = { isAdminProvider() },
     private val onNoticeClick: (Notice) -> Unit = {},
     private val onLikeClick: (Notice) -> Unit = {},
     private val onCommentClick: (Notice) -> Unit = {},
@@ -79,9 +75,7 @@ class NoticeAdapter(
     private val onPollVote: (pollId: String, option: String) -> Unit = { _, _ -> },
     private val onPollMultiVote: (poll: Poll, option: String) -> Unit = { _, _ -> },
     private val onPollDelete: (pollId: String) -> Unit = { _ -> },
-    private val onGroupToggle: (NoticeGroupHeader) -> Unit = {},
-    private val onNoticeViewed: (Notice) -> Unit = {},
-    private val onReadReceiptsClick: (Notice) -> Unit = {}
+    private val onGroupToggle: (NoticeGroupHeader) -> Unit = {}
 ) : ListAdapter<Any, RecyclerView.ViewHolder>(DiffCallback) {
 
     private var engagementByNoticeId: Map<String, NoticeEngagement> = emptyMap()
@@ -89,13 +83,9 @@ class NoticeAdapter(
     private var highlightedNoticeId: String? = null
     private val expandedNoticeIds = mutableSetOf<String>()
     private val animatedNoticeIds = mutableSetOf<String>()
-    private val aiSummaryCache = mutableMapOf<String, String>()
-    private val aiSummaryVisibleIds = mutableSetOf<String>()
-    private val aiSummaryLoadingIds = mutableSetOf<String>()
     private val authorAvatarCache = mutableMapOf<String, String?>()
     private val authorNameCache = mutableMapOf<String, String?>()
     private val libraryPdfCache = mutableMapOf<String, PdfFile?>()
-    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     init {
         setHasStableIds(true)
@@ -393,12 +383,12 @@ class NoticeAdapter(
                         binding.tvFileExtension.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, iconColor))
                         
                         val sizeStr = formatBytes(pdfFile.sizeBytes)
-                        binding.tvFileSize.text = if (sizeStr.isNotBlank()) "Tap to open · $sizeStr" else "Tap to open attachment"
+                        binding.tvFileSize.text = if (sizeStr.isNotBlank()) "Course material · $sizeStr · Tap to open" else "Course material · Tap to open"
                         
                         val openAction = View.OnClickListener {
                             val activity = itemView.context as? android.app.Activity
                             if (activity != null) {
-                                com.shuaib.classmate.utils.PdfDialogHelper.showPdfOptions(activity, itemView.context, pdfFile)
+                                com.shuaib.classmate.storage.LibraryUrlOpener.open(itemView.context, pdfFile)
                             } else {
                                 val fileUrl = pdfFile.downloadUrl.ifBlank { pdfFile.driveUrl }
                                 if (fileUrl.isNotBlank()) {
@@ -443,7 +433,6 @@ class NoticeAdapter(
 
             val noticeText = normalizedNoticeText(notice)
             bindPreview(binding.tvPreview, notice, noticeText, accent)
-            bindCardAiSummary(notice, noticeText)
             binding.tvMeta.text = "${NoticeUi.formatDate(notice.createdAt)} · ${NoticeUi.formatTime(notice.createdAt)}"
 
             val priorityLabel = NoticeUi.priorityLabel(notice)
@@ -458,18 +447,9 @@ class NoticeAdapter(
 
             bindPinState(notice, cardFill)
             val isAdmin = isAdminProvider()
-            binding.btnOptions.isVisible = isAdmin
-            binding.btnReadReceipts.isVisible = isAdmin
-            if (isAdmin) {
-                binding.tvReadCount.text = notice.readCount.toString()
-                binding.btnReadReceipts.setOnClickListener {
-                    HapticHelper.lightPop(it)
-                    it.animateSpringScale(1.1f)
-                    onReadReceiptsClick(notice)
-                }
-            }
+            binding.btnOptions.isVisible = canManageNotice(notice)
 
-            if (isAdmin) {
+            if (canManageNotice(notice)) {
                 binding.btnOptions.setOnClickListener {
                     HapticHelper.mediumThud(it)
                     it.animateSpringScale(1.15f)
@@ -520,7 +500,6 @@ class NoticeAdapter(
                 onPinClick(notice)
             }
 
-            onNoticeViewed(notice)
 
             binding.cardRoot.animate().cancel()
             val isPartialUpdate = payloads.isNotEmpty()
@@ -768,117 +747,6 @@ class NoticeAdapter(
                 highlightSearchText(text, searchQuery, ThemeColors.primarySoft(context))
             } else {
                 text
-            }
-        }
-
-        private fun bindCardAiSummary(notice: Notice, fullText: String) {
-            binding.btnCardAiSummary.isVisible = true
-
-            val summary = aiSummaryCache[notice.id]
-            val isLoading = notice.id in aiSummaryLoadingIds
-            val isVisible = notice.id in aiSummaryVisibleIds && !summary.isNullOrBlank()
-
-            binding.aiSummaryContainer.isVisible = isVisible
-            binding.tvCardAiSummary.isVisible = isVisible
-
-            val formatted = summary
-                ?.takeIf { it.isNotBlank() }
-                ?.let { NoticeTextFormatter.format(itemView.context, it) }
-            if (formatted != null) {
-                val spannable = SpannableStringBuilder(formatted)
-                android.text.util.Linkify.addLinks(spannable, android.text.util.Linkify.WEB_URLS)
-                binding.tvCardAiSummary.text = spannable
-                binding.tvCardAiSummary.movementMethod = LinkMovementMethodWithBubble.getInstance()
-            } else {
-                binding.tvCardAiSummary.text = ""
-                binding.tvCardAiSummary.movementMethod = null
-            }
-
-            binding.pbCardAiSummary.isVisible = isLoading
-            binding.btnCardAiSummary.isEnabled = !isLoading
-
-            val type = notice.displayType
-            val accent = NoticeUi.accent(itemView.context, type)
-            if (isLoading) {
-                binding.pbCardAiSummary.indeterminateTintList = ColorStateList.valueOf(accent)
-            }
-
-            val rawText = when {
-                isLoading -> "✨ ..."
-                isVisible -> "✨ Hide"
-                else -> "✨ AI"
-            }
-            val ssb = SpannableStringBuilder(rawText)
-            val spaceIndex = rawText.indexOf(' ')
-            if (spaceIndex != -1) {
-                ssb.setSpan(
-                    ForegroundColorSpan(accent),
-                    spaceIndex + 1,
-                    rawText.length,
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-            } else {
-                ssb.setSpan(
-                    ForegroundColorSpan(accent),
-                    0,
-                    rawText.length,
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-            }
-            binding.tvCardAiSummaryAction.text = ssb
-            binding.tvCardAiSummaryAction.setTextColor(ThemeColors.textMuted(itemView.context))
-
-            val badgeBg = NoticeUi.badgeBackground(itemView.context, type)
-            if (isVisible) {
-                binding.btnCardAiSummary.background = pill(
-                    ColorUtils.setAlphaComponent(accent, 45),
-                    accent,
-                    13
-                )
-            } else {
-                binding.btnCardAiSummary.background = pill(
-                    badgeBg,
-                    ColorUtils.setAlphaComponent(accent, 76),
-                    13
-                )
-            }
-
-            binding.btnCardAiSummary.setOnClickListener {
-                HapticHelper.lightPop(it)
-                it.animateSpringScale(0.95f)
-                when {
-                    isLoading -> return@setOnClickListener
-                    summary != null && isVisible -> {
-                        aiSummaryVisibleIds.remove(notice.id)
-                        notifyCurrentNotice(notice.id)
-                    }
-                    summary != null -> {
-                        aiSummaryVisibleIds.add(notice.id)
-                        notifyCurrentNotice(notice.id)
-                    }
-                    else -> generateCardSummary(notice)
-                }
-            }
-        }
-
-        private fun generateCardSummary(notice: Notice) {
-            aiSummaryLoadingIds.add(notice.id)
-            aiSummaryVisibleIds.add(notice.id)
-            notifyCurrentNotice(notice.id)
-            adapterScope.launch {
-                val result = AIService.summarizeNotice(
-                    notice.title, notice.content, notice.displayType, notice.subject.ifBlank { null }
-                )
-                val summary = result.getOrNull()
-                aiSummaryLoadingIds.remove(notice.id)
-                if (summary.isNullOrBlank()) {
-                    aiSummaryVisibleIds.remove(notice.id)
-                    Toast.makeText(itemView.context, "AI summary unavailable. Try again.", Toast.LENGTH_SHORT).show()
-                } else {
-                    aiSummaryCache[notice.id] = summary
-                    aiSummaryVisibleIds.add(notice.id)
-                }
-                notifyCurrentNotice(notice.id)
             }
         }
 

@@ -63,8 +63,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import java.io.File
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
-import com.shuaib.classmate.utils.AppUpdateManager
-import com.shuaib.classmate.utils.AppUpdateInfo
+import com.shuaib.classmate.update.UpdateActionActivity
+import com.shuaib.classmate.update.UpdateCoordinator
 import com.shuaib.classmate.notices.NoticeTextFormatter
 import com.shuaib.classmate.databinding.DialogAppUpdateBinding
 import kotlinx.coroutines.Job
@@ -231,35 +231,21 @@ class ProfileFragment : Fragment() {
         binding.tvAppVersion.text = currentVersion
         
         binding.layoutCheckUpdates.setOnClickListener {
-            checkUpdatesManually()
+            startActivity(Intent(requireContext(), UpdateActionActivity::class.java)
+                .setAction(UpdateActionActivity.ACTION_RETRY))
         }
-    }
-
-    private fun checkUpdatesManually() {
-        binding.pbCheckUpdates.visibility = View.VISIBLE
-        binding.ivCheckUpdatesChevron.visibility = View.GONE
-        binding.layoutCheckUpdates.isClickable = false
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val updateInfo = AppUpdateManager.checkLatestRelease()
-                val isAvailable = AppUpdateManager.isUpdateAvailable(updateInfo.latestVersionName)
-                
-                binding.pbCheckUpdates.visibility = View.GONE
-                binding.ivCheckUpdatesChevron.visibility = View.VISIBLE
-                binding.layoutCheckUpdates.isClickable = true
-
-                if (isAvailable) {
-                    AppUpdateManager.showUpdateDialog(requireContext(), updateInfo, viewLifecycleOwner.lifecycleScope)
-                } else {
-                    Toast.makeText(requireContext(), "ClassMate is up to date!", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                binding.pbCheckUpdates.visibility = View.GONE
-                binding.ivCheckUpdatesChevron.visibility = View.VISIBLE
-                binding.layoutCheckUpdates.isClickable = true
-                Toast.makeText(requireContext(), "Failed to check for updates: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-            }
+        val prefs = AppPreferences(requireContext())
+        binding.switchAutoUpdates.isChecked = prefs.isAutoUpdateEnabled()
+        binding.switchAutoUpdates.setOnCheckedChangeListener { _, checked ->
+            prefs.setAutoUpdateEnabled(checked)
+            UpdateCoordinator.schedule(requireContext())
+            if (checked) UpdateCoordinator.enqueueForegroundCheck(requireContext())
+        }
+        binding.switchWifiOnlyUpdates.isChecked = prefs.isWifiOnlyUpdates()
+        binding.switchWifiOnlyUpdates.setOnCheckedChangeListener { _, checked ->
+            prefs.setWifiOnlyUpdates(checked)
+            UpdateCoordinator.schedule(requireContext())
+            if (!checked) UpdateCoordinator.enqueueForegroundCheck(requireContext())
         }
     }
 
@@ -442,7 +428,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupSavedResources() {
-        subjectAdapter = SubjectAdapter(emptyList()) { subject ->
+        subjectAdapter = SubjectAdapter(emptyList(), onItemClick = { subject ->
             (activity as? MainActivity)?.openChildDestination(
                 R.id.nav_pdf,
                 R.id.fragment_subject_pdf_list,
@@ -450,7 +436,7 @@ class ProfileFragment : Fragment() {
                     putString("subjectName", subject.name)
                 }
             )
-        }
+        })
         binding.rvSavedResources.apply {
             layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
             adapter = subjectAdapter

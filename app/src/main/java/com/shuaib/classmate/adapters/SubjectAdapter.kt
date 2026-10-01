@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import androidx.core.view.isVisible
 import com.shuaib.classmate.databinding.ItemSubjectCardBinding
 import com.shuaib.classmate.utils.Subject
 import com.shuaib.classmate.utils.SubjectVisuals
@@ -12,7 +13,9 @@ import com.shuaib.classmate.utils.applyClickAnimation
 class SubjectAdapter(
     private var subjects: List<Subject>,
     private var pdfCounts: Map<String, Int> = emptyMap(),
-    private val onItemClick: (Subject) -> Unit
+    private val onItemClick: (Subject) -> Unit,
+    private val onItemLongClick: ((Subject) -> Unit)? = null,
+    private val canManage: (Subject) -> Boolean = { false }
 ) : RecyclerView.Adapter<SubjectAdapter.SubjectViewHolder>() {
 
     inner class SubjectViewHolder(val binding: ItemSubjectCardBinding) :
@@ -39,9 +42,15 @@ class SubjectAdapter(
                 else -> "$count files"
             }
             tvPdfCount.text = fileText
+            btnManageCourse.isVisible = canManage(subject)
+            btnManageCourse.setOnClickListener { onItemLongClick?.invoke(subject) }
 
             root.applyClickAnimation {
                 onItemClick(subject)
+            }
+            root.setOnLongClickListener {
+                if (canManage(subject)) onItemLongClick?.invoke(subject)
+                canManage(subject) && onItemLongClick != null
             }
         }
     }

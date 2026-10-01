@@ -18,7 +18,8 @@ object PdfDialogHelper {
         activity: Activity,
         context: Context,
         pdf: PdfFile,
-        onOfflineStatusChanged: (() -> Unit)? = null
+        onOfflineStatusChanged: (() -> Unit)? = null,
+        onManage: ((PdfFile) -> Unit)? = null
     ) {
         val isDownloaded = LibraryDownloadManager.isDownloaded(context, pdf.id)
         if (isDownloaded) {
@@ -54,6 +55,11 @@ object PdfDialogHelper {
         sheet.btnDownload.isVisible = showDownload
         sheet.tvDownloadLabel.text = "Make Available Offline"
         sheet.btnDeleteCache.isVisible = false // Bypassed for offline copies anyway
+        sheet.btnManageResource.isVisible = onManage != null && pdf.provider == "archive" && pdf.canManage
+        sheet.btnManageResource.setOnClickListener {
+            dialog.dismiss()
+            onManage?.invoke(pdf)
+        }
 
         val visuals = FileVisuals.getVisuals(pdf)
         sheet.iconContainer.background = ContextCompat.getDrawable(context, visuals.backgroundRes)

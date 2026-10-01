@@ -41,9 +41,6 @@ object ArchiveLibraryRepository {
         onSuccess: (List<Course>, List<PdfFile>) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
-        val useV2Catalog = usesSupabaseCatalog
-        val v2 = if (useV2Catalog) runBlocking { v2Resources.load(batchId, semesterId) } else null
-
         val archiveResult = runCatching {
             val batch = archiveBatch(batchId)
             val semester = semesterNumber(semesterId)
@@ -63,20 +60,7 @@ object ArchiveLibraryRepository {
                 .map { it.toPdfFile(semesterId, categories[it.courseId]) }
             courses to resources
         }
-        // In V2, Supabase owns the academic course catalogue. Archive remains
-        // an additional source only for already-published legacy resources.
-        val data = if (useV2Catalog && v2 != null) {
-            val legacyResources = archiveResult.getOrNull()?.second.orEmpty()
-            val archiveCourses = archiveResult.getOrNull()?.first.orEmpty()
-            val mirroredCourses = v2.first.map { course ->
-                val archiveCourse = archiveCourses.firstOrNull {
-                    (course.code.isNotBlank() && it.code.equals(course.code, true)) ||
-                        it.name.equals(course.name, true)
-                }
-                course.copy(archiveId = archiveCourse?.id.orEmpty())
-            }
-            mirroredCourses to (v2.second + legacyResources).distinctBy { "${it.provider}:${it.id}" }
-        } else archiveResult.getOrThrow()
+        val data = archiveResult.getOrThrow()
         mainHandler.post { onSuccess(data.first, data.second) }
     }
 
@@ -90,11 +74,6 @@ object ArchiveLibraryRepository {
         onSuccess: (Course) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
-        if (usesSupabaseCatalog) {
-            val course = runBlocking { v2Resources.addCourse(batchId, semesterId, name, code, teacherName, type) }
-            mainHandler.post { onSuccess(course) }
-            return@runAsync
-        }
         val payload = mapOf(
             "batchId" to archiveBatch(batchId),
             "semesterNumber" to semesterNumber(semesterId),
@@ -109,8 +88,47 @@ object ArchiveLibraryRepository {
                 .post(gson.toJson(payload).toRequestBody(JSON))
         )
         val course = gson.fromJson(executeJson(request).get("course"), ArchiveCourse::class.java)
-        mainHandler.post { onSuccess(course.toCourse(semesterId)) }
+        // The Archive publishes first; its server reconciliation revives or
+        // creates the Supabase offering. This best-effort call fills in the
+        // timetable teacher without making a failed mirror hide the new course.
+        val academicCourse = if (usesSupabaseCatalog && type != "syllabus")
+            runCatching { runBlocking { v2Resources.addCourse(batchId, semesterId, name, code, teacherName, type) } }.getOrNull()
+        else null
+        mainHandler.post { onSuccess(course.toCourse(semesterId).copy(
+            teacherName = academicCourse?.teacherName.orEmpty()
+        )) }
     }
+
+    data class ArchiveBatch(val id: String = "", val name: String = "")
+
+    fun loadBatches(onSuccess: (List<ArchiveBatch>) -> Unit, onFailure: (Exception) -> Unit) =
+        runAsync(onFailure) {
+            val request = BackendApiClient.authenticated(
+                Request.Builder().url(BackendApiClient.url("v1/archive/public"))
+            )
+            val batches = gson.fromJson(executeJson(request).getAsJsonArray("batches"), Array<ArchiveBatch>::class.java)
+                .orEmpty().toList()
+            mainHandler.post { onSuccess(batches) }
+        }
+
+    fun editCourse(course: Course, name: String, code: String, type: String,
+                   onSuccess: (Course) -> Unit, onFailure: (Exception) -> Unit) = runAsync(onFailure) {
+        val request = BackendApiClient.authenticated(Request.Builder()
+            .url(BackendApiClient.url("v1/archive/courses/${course.archiveId.ifBlank { course.id }}/edit"))
+            .post(gson.toJson(mapOf("courseName" to name, "courseCode" to code, "category" to type))
+                .toRequestBody(JSON)))
+        val result = gson.fromJson(executeJson(request).get("course"), ArchiveCourse::class.java)
+        mainHandler.post { onSuccess(result.toCourse(course.semesterId)) }
+    }
+
+    fun deleteCourse(course: Course, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) =
+        runAsync(onFailure) {
+            val request = BackendApiClient.authenticated(Request.Builder()
+                .url(BackendApiClient.url("v1/archive/courses/${course.archiveId.ifBlank { course.id }}/delete"))
+                .post("{}".toRequestBody(JSON)))
+            executeJson(request)
+            mainHandler.post(onSuccess)
+        }
 
     fun deleteResource(id: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit, provider: String = "archive") =
         runAsync(onFailure) {
@@ -128,12 +146,37 @@ object ArchiveLibraryRepository {
             mainHandler.post(onSuccess)
         }
 
+    fun editResource(pdf: PdfFile, title: String, materialType: String,
+                     onSuccess: () -> Unit, onFailure: (Exception) -> Unit) = runAsync(onFailure) {
+        val payload = JsonObject().apply {
+            addProperty("title", title)
+            addProperty("materialType", materialType)
+            if (pdf.archiveYear == null) add("year", com.google.gson.JsonNull.INSTANCE)
+            else addProperty("year", pdf.archiveYear)
+            add("tags", gson.toJsonTree(pdf.archiveTags))
+        }
+        val request = BackendApiClient.authenticated(Request.Builder()
+            .url(BackendApiClient.url("v1/archive/resources/${pdf.id}/edit"))
+            .post(gson.toJson(payload).toRequestBody(JSON)))
+        executeJson(request)
+        mainHandler.post(onSuccess)
+    }
+
     fun loadResource(
         id: String,
         semesterId: String,
         onSuccess: (PdfFile) -> Unit,
         onFailure: (Exception) -> Unit
     ) = runAsync(onFailure) {
+        if (usesSupabaseCatalog && id.matches(Regex("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))) {
+            val resource = runBlocking {
+                v2Resources.load(AppContextManager.getBatchId(), semesterId).second.firstOrNull { it.id == id }
+            }
+            if (resource != null) {
+                mainHandler.post { onSuccess(resource) }
+                return@runAsync
+            }
+        }
         val request = BackendApiClient.authenticated(
             Request.Builder().url(BackendApiClient.url("v1/archive/resource/$id"))
         )
@@ -278,7 +321,9 @@ object ArchiveLibraryRepository {
         val semesterNumber: Int = 0,
         val courseName: String = "",
         val courseCode: String = "",
-        val category: String = "regular"
+        val category: String = "regular",
+        val createdBy: String = "",
+        val canManage: Boolean = false
     ) {
         fun toCourse(semesterId: String) = Course(
             id = id,
@@ -287,7 +332,9 @@ object ArchiveLibraryRepository {
             code = courseCode,
             type = category.ifBlank { if (courseName.contains("lab", true)) "lab" else "regular" },
             batchId = batchId,
-            semesterId = semesterId
+            semesterId = semesterId,
+            createdBy = createdBy,
+            canManage = canManage
         )
     }
 
@@ -298,7 +345,12 @@ object ArchiveLibraryRepository {
         val courseName: String = "",
         val courseCode: String = "",
         val materialType: String = "",
+        val year: Int? = null,
+        val tags: List<String> = emptyList(),
         val uploaderName: String = "",
+        @com.google.gson.annotations.SerializedName(value = "uploadedBy", alternate = ["uploaderId", "uploaderUid", "uploadedByUid"])
+        val uploaderId: String = "",
+        val canManage: Boolean = false,
         val fileName: String = "",
         val fileSize: Long = 0,
         val mimeType: String = "application/octet-stream",
@@ -316,10 +368,15 @@ object ArchiveLibraryRepository {
                 title = title,
                 subject = courseName,
                 uploadedBy = uploaderName,
+                uploaderId = uploaderId,
+                canManage = canManage,
                 fileId = id,
                 timestamp = timestamp(createdAt),
                 courseCode = courseCode,
                 courseType = type,
+                materialType = materialType,
+                archiveYear = year,
+                archiveTags = tags,
                 fileType = extension.ifBlank { "other" },
                 mimeType = mimeType,
                 sizeBytes = fileSize,

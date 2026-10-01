@@ -70,7 +70,7 @@ class RecentPdfAdapter(
             }
 
             root.setOnLongClickListener {
-                if (isAdmin) {
+                if (com.shuaib.classmate.utils.LibraryPermissions.canDelete(pdf)) {
                     it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     onDeleteClick?.invoke(pdf)
                     true

@@ -34,6 +34,10 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun checkUserStatus() {
+        if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            navigate(ClassMateAuthActivity::class.java)
+            return
+        }
         val auth = FirebaseAuth.getInstance()
         val prefs = AppPreferences(this)
         val currentUser = auth.currentUser

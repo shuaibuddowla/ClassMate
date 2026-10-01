@@ -365,6 +365,7 @@ internal class SupabaseAcademicResourceRepository {
         description = description,
         subject = course.name,
         uploadedBy = "ClassMate user",
+        uploaderId = uploaderId,
         fileId = id,
         timestamp = createdAt.toTimestamp(),
         createdAt = createdAt.toTimestamp(),

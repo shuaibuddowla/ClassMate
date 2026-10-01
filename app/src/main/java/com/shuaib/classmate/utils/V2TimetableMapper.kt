@@ -6,7 +6,12 @@ import com.shuaib.classmate.models.Period
 
 /** Convert a V2 day into the same periods used by the timetable and widget cache. */
 fun DailySchedule.toTimetablePeriods(): List<Period> {
-    val changes = classChanges.groupBy { it.routineSlotId }.mapValues { (_, entries) ->
+    // The schedule is date-specific. Ignore stale/mis-scoped changes defensively
+    // so a previous day's cancellation can never tint today's recurring slot.
+    val changes = classChanges
+        .filter { it.effectiveDate == effectiveDate }
+        .groupBy { it.routineSlotId }
+        .mapValues { (_, entries) ->
         entries.firstOrNull { it.kind == ClassChangeKind.CANCELLED } ?: entries.last()
     }
     return routine.map { slot ->
@@ -32,7 +37,8 @@ fun DailySchedule.toTimetablePeriods(): List<Period> {
             room = change?.newRoom ?: slot.room,
             scheduleChange = note,
             classKind = slot.classKind,
-            courseOfferingId = slot.courseOfferingId
+            courseOfferingId = slot.courseOfferingId,
+            createdBy = slot.createdBy
         )
     }
 }

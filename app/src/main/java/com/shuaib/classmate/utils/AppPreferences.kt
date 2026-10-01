@@ -10,6 +10,21 @@ class AppPreferences(context: Context) {
         Context.MODE_PRIVATE
     )
 
+    fun isAutoUpdateEnabled(): Boolean = prefs.getBoolean("auto_update_enabled", true)
+    fun setAutoUpdateEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_update_enabled", enabled).apply()
+    fun isWifiOnlyUpdates(): Boolean = prefs.getBoolean("wifi_only_updates", true)
+    fun setWifiOnlyUpdates(enabled: Boolean) = prefs.edit().putBoolean("wifi_only_updates", enabled).apply()
+    fun lastUpdateCheckTimestamp(): Long = prefs.getLong("last_update_check_timestamp", 0L)
+    fun setLastUpdateCheckTimestamp(value: Long) = prefs.edit().putLong("last_update_check_timestamp", value).apply()
+    fun lastDownloadedVersionCode(): Long = prefs.getLong("last_downloaded_version_code", 0L)
+    fun setLastDownloadedVersionCode(value: Long) = prefs.edit().putLong("last_downloaded_version_code", value).apply()
+    fun updateInstallStartedAt(): Long = prefs.getLong("update_install_started_at", 0L)
+    fun setUpdateInstallStartedAt(value: Long) = prefs.edit().putLong("update_install_started_at", value).apply()
+    fun pendingMandatoryVersionCode(): Long = prefs.getLong("mandatory_update_version_code", 0L)
+    fun setPendingMandatoryVersionCode(value: Long) = prefs.edit().putLong("mandatory_update_version_code", value).apply()
+    fun needsInstallerConfirmation(): Boolean = prefs.getBoolean("needs_installer_confirmation", false)
+    fun setNeedsInstallerConfirmation(value: Boolean) = prefs.edit().putBoolean("needs_installer_confirmation", value).apply()
+
     fun isOnboardingComplete(): Boolean =
         prefs.getBoolean("onboarding_complete", false)
 

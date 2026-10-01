@@ -23,6 +23,29 @@ fun getLocalProperty(name: String): String {
 
 val firebaseRoleBridgeUrl = getLocalProperty("FIREBASE_ROLE_BRIDGE_URL")
     .ifBlank { "https://classmate-auth-bridge.vercel.app/api/firebase-role" }
+val classmateTarget = providers.gradleProperty("classmateTarget").orNull
+    ?: if (providers.gradleProperty("classmateStaging").orNull == "true") "staging" else "production"
+require(classmateTarget in setOf("legacy", "staging", "production")) {
+    "classmateTarget must be legacy, staging, or production"
+}
+val classmateUrl = if (classmateTarget == "staging")
+    getLocalProperty("CLASSMATE_STAGING_URL") else getLocalProperty("SUPABASE_URL")
+val classmateKey = if (classmateTarget == "staging")
+    getLocalProperty("CLASSMATE_STAGING_PUBLISHABLE_KEY") else getLocalProperty("SUPABASE_PUBLISHABLE_KEY")
+val updateBaseUrl = getLocalProperty("UPDATE_BASE_URL")
+    .ifBlank { "https://github.com/shuaibuddowla/ClassMate/releases/latest/download" }
+    .removeSuffix("/")
+val releaseKeystore = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val releaseStorePassword = System.getenv("CLASSMATE_STORE_PASSWORD")
+    ?.takeIf { it.isNotBlank() } ?: releaseKeystore.getProperty("storePassword")
+val releaseKeyPassword = System.getenv("CLASSMATE_KEY_PASSWORD")
+    ?.takeIf { it.isNotBlank() } ?: releaseKeystore.getProperty("keyPassword")
+val releaseSigningReady = !releaseKeystore.getProperty("storeFile").isNullOrBlank() &&
+    !releaseKeystore.getProperty("keyAlias").isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() && !releaseKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.shuaib.classmate"
@@ -32,13 +55,18 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.1.5"
+        versionCode = 7
+        versionName = "1.1.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"${getLocalProperty("BACKEND_BASE_URL")}\"")
         buildConfigField("String", "SUPABASE_URL", "\"${getLocalProperty("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${getLocalProperty("SUPABASE_PUBLISHABLE_KEY")}\"")
+        buildConfigField("boolean", "CLASSMATE_AUTH_ENABLED", (classmateTarget != "legacy").toString())
+        buildConfigField("String", "CLASSMATE_ENV", "\"$classmateTarget\"")
+        buildConfigField("String", "CLASSMATE_URL", "\"$classmateUrl\"")
+        buildConfigField("String", "CLASSMATE_PUBLISHABLE_KEY", "\"$classmateKey\"")
+        buildConfigField("String", "UPDATE_BASE_URL", "\"$updateBaseUrl\"")
         buildConfigField("String", "FIREBASE_ROLE_BRIDGE_URL", "\"$firebaseRoleBridgeUrl\"")
         buildConfigField("String", "ONESIGNAL_APP_ID", "\"${getLocalProperty("ONESIGNAL_APP_ID")}\"")
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
@@ -46,8 +74,20 @@ android {
         buildConfigField("String", "GROQ_MODEL", "\"llama-3.3-70b-versatile\"")
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("classmateRelease") {
+                storeFile = rootProject.file(releaseKeystore.getProperty("storeFile"))
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeystore.getProperty("keyAlias")
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("classmateRelease")
             isMinifyEnabled = false
             isCrunchPngs = false
             proguardFiles(

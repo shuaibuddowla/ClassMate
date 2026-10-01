@@ -12,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -19,9 +20,18 @@ import kotlinx.coroutines.launch
 class NoticeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NoticeRepository.getInstance(application)
     private var realtimeListener: ListenerRegistration? = null
+    private val _showOlder = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val _historyLimit = kotlinx.coroutines.flow.MutableStateFlow(80)
+    private var olderBefore = NoticeRepository.currentWeekStart()
+    private val _isLoadingOlder = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isLoadingOlder: StateFlow<Boolean> = _isLoadingOlder
 
-    val notices: StateFlow<List<Notice>> = AppContextManager.activeBatchFlow
-        .flatMapLatest { batch -> repository.observeNotices(batch) }
+    val notices: StateFlow<List<Notice>> = combine(
+        AppContextManager.activeBatchFlow, _showOlder, _historyLimit
+    ) { batch, showOlder, historyLimit -> Triple(batch, showOlder, historyLimit) }
+    .flatMapLatest { (batch, showOlder, historyLimit) ->
+        if (showOlder) repository.observeNotices(batch, historyLimit) else repository.observeCurrentWeekNotices(batch)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _isRefreshing = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -56,6 +66,22 @@ class NoticeViewModel(application: Application) : AndroidViewModel(application) 
                 e.printStackTrace()
             } finally {
                 _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun loadOlderNotices() {
+        if (_isLoadingOlder.value) return
+        val batch = AppContextManager.getBatchId()
+        viewModelScope.launch {
+            _isLoadingOlder.value = true
+            try {
+                val oldest = repository.syncOlderNotices(batch, olderBefore)
+                if (oldest != null && oldest.isBefore(olderBefore)) olderBefore = oldest
+                _historyLimit.value += 40
+                _showOlder.value = true
+            } finally {
+                _isLoadingOlder.value = false
             }
         }
     }

@@ -11,6 +11,32 @@ import org.junit.Test
 
 class V2TimetableMapperTest {
     @Test
+    fun previousDaysCancellationDoesNotCancelTodaysRecurringSlot() {
+        val slot = RoutineSlot(
+            id = "slot-1", courseOfferingId = "offering-1", courseCode = "CSE2103",
+            courseName = "DSA", sectionCode = null, weekday = 1,
+            startsAt = "14:21:00", endsAt = "17:21:00", room = "338",
+            classKind = "class"
+        )
+        val yesterdayCancellation = ClassChange(
+            id = "change-yesterday", routineSlotId = slot.id, noticeId = "notice-1",
+            effectiveDate = "2026-09-28", kind = ClassChangeKind.CANCELLED,
+            previousRoom = null, newRoom = null, previousStartsAt = null,
+            previousEndsAt = null, newStartsAt = null, newEndsAt = null,
+            reason = "Cancelled yesterday"
+        )
+
+        val period = DailySchedule(
+            weekday = 2, effectiveDate = "2026-09-29", routine = listOf(slot),
+            classChanges = listOf(yesterdayCancellation), busDepartures = emptyList()
+        ).toTimetablePeriods().single()
+
+        assertTrue(!period.isCancelled)
+        assertEquals("", period.cancelDate)
+        assertEquals(null, period.scheduleChange)
+    }
+
+    @Test
     fun cancellationWinsOverAnotherChangeAndKeepsCourseDetails() {
         val slot = RoutineSlot(
             id = "slot-1", courseOfferingId = "offering-1", courseCode = "CSE2103",

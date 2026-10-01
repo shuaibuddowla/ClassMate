@@ -23,8 +23,7 @@ import com.shuaib.classmate.utils.NotificationSender
 import com.shuaib.classmate.utils.SemesterManager
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.repositories.ArchiveLibraryRepository
-import com.shuaib.classmate.data.remote.supabase.SupabaseClientProvider
-import com.shuaib.classmate.data.remote.supabase.SupabaseNoticeFeed
+import com.shuaib.classmate.repositories.NoticeRepository
 import com.shuaib.classmate.utils.CoursePicker
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.TelegramUploader
@@ -167,14 +166,14 @@ class PdfUploadActivity : AppCompatActivity() {
             onSuccess = { resourceId ->
                 setUploading(false)
                 Toast.makeText(this, "Uploaded to the ClassMate Library", Toast.LENGTH_SHORT).show()
-                publishV2ResourceNotice(input.title, input.subject, input.description) { finish() }
+                publishV2ResourceNotice(input.title, input.subject, resourceId, input.description) { finish() }
             },
             onFailure = { error -> handleUploadError(error.message ?: "Archive upload failed") },
             description = input.description
         )
     }
 
-    private fun publishV2ResourceNotice(title: String, subject: String, description: String, onComplete: () -> Unit) {
+    private fun publishV2ResourceNotice(title: String, subject: String, resourceId: String, description: String, onComplete: () -> Unit) {
         val batchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
             .ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
         val noticeTitle = "📚 Resource: $title"
@@ -187,7 +186,9 @@ class PdfUploadActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             val result = runCatching {
-                SupabaseNoticeFeed(SupabaseClientProvider(auth)).publishBatchNotice(batchId, noticeTitle, body)
+                NoticeRepository.getInstance(this@PdfUploadActivity).publishSupabaseResourceNotice(
+                    batchId, noticeTitle, body, resourceId, title, subject, "archive"
+                )
             }
             result.onSuccess {
                 NotificationSender.sendNoticeAlert(

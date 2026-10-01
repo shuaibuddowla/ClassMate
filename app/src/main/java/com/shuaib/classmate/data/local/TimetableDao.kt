@@ -23,6 +23,9 @@ interface TimetableDao {
     @Query("DELETE FROM timetable_periods WHERE batchId = :batchId AND semesterId = :semesterId AND day = :day")
     suspend fun clearDay(batchId: String, semesterId: String, day: String)
 
+    @Query("DELETE FROM timetable_periods WHERE batchId = :batchId AND semesterId = :semesterId AND day = :day AND id = :periodId")
+    suspend fun deletePeriod(batchId: String, semesterId: String, day: String, periodId: String)
+
     @Query("DELETE FROM timetable_periods WHERE batchId = :batchId AND semesterId = :semesterId")
     suspend fun clearSemester(batchId: String, semesterId: String)
 

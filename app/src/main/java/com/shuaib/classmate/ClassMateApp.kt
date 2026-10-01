@@ -4,10 +4,12 @@
 package com.shuaib.classmate
 
 import android.app.Application
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -39,6 +41,9 @@ import com.shuaib.classmate.utils.AppPreferences
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.Obfuscator
 import com.shuaib.classmate.workers.OfflineSyncWorker
+import com.shuaib.classmate.update.UpdateActionActivity
+import com.shuaib.classmate.update.UpdateCoordinator
+import com.shuaib.classmate.update.UpdateNotifications
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,6 +56,38 @@ class ClassMateApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        UpdateNotifications.createChannel(this)
+        if (AppPreferences(this).pendingMandatoryVersionCode() <= BuildConfig.VERSION_CODE)
+            AppPreferences(this).setPendingMandatoryVersionCode(0)
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            private var started = 0
+            override fun onActivityStarted(activity: Activity) { started++; isVisible = true }
+            override fun onActivityStopped(activity: Activity) { started = (started - 1).coerceAtLeast(0); isVisible = started > 0 }
+            override fun onActivityResumed(activity: Activity) {
+                if (activity is UpdateActionActivity) return
+                val updatePrefs = AppPreferences(activity)
+                val mandatoryCode = updatePrefs.pendingMandatoryVersionCode()
+                if (updatePrefs.needsInstallerConfirmation()) {
+                    updatePrefs.setNeedsInstallerConfirmation(false)
+                    activity.startActivity(Intent(activity, UpdateActionActivity::class.java)
+                        .setAction(UpdateActionActivity.ACTION_RETRY))
+                } else if (mandatoryCode > BuildConfig.VERSION_CODE) {
+                    activity.startActivity(Intent(activity, UpdateActionActivity::class.java)
+                        .setAction(UpdateActionActivity.ACTION_MANDATORY))
+                } else runCatching { UpdateCoordinator.enqueueForegroundCheck(activity) }
+                    .onFailure { Log.e("ClassMateUpdate", "Could not queue update check", it) }
+            }
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
+        runCatching { UpdateCoordinator.schedule(this) }
+            .onFailure { Log.e("ClassMateUpdate", "Could not schedule updates", it) }
+        if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            createNotificationChannels()
+            return
+        }
         NoticeTextFormatter.init(this)
         com.shuaib.classmate.utils.SemesterManager.init(this)
         FirestoreManager.enableOfflinePersistence()
@@ -294,6 +331,8 @@ class ClassMateApp : Application() {
     }
 
     companion object {
+        @Volatile var isVisible = false
+            private set
         private const val APP_STARTUP_DEFER_MS = 2500L
         private const val ONESIGNAL_SYNC_PREFS = "onesignal_sync"
         private const val KEY_LAST_ONESIGNAL_PLAYER_ID = "last_player_id"

@@ -46,9 +46,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.Duration
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -81,6 +84,16 @@ class TimetableFragment : Fragment() {
     private var hasResumedOnce = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val showLoadingRunnable = Runnable { showLoadingState() }
+    private val midnightRefreshRunnable = Runnable {
+        if (_binding != null && isViewingRoutine) {
+            // Rebuild the date strip and select today's schedule so yesterday's
+            // date-scoped cancellation is no longer shown after midnight.
+            setupDaySelector()
+            val today = days[getTodayIndex()]
+            timetableViewModel.refreshDay(today)
+        }
+        scheduleMidnightRefresh()
+    }
 
     private val days = listOf(
         "saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"
@@ -126,6 +139,20 @@ class TimetableFragment : Fragment() {
         }
         if (timetableViewModel.isV2Configured) {
             viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    while (true) {
+                        delay(10000)
+                        val state = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
+                        if (state.v2SessionActive && state.batchId.isNotBlank()) {
+                            timetableViewModel.refreshDay(
+                                selectedDayFlow.value.ifBlank { days[getTodayIndex()] },
+                                state.semesterId, state.batchId
+                            )
+                        }
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
                 var lastRoute = ""
                 com.shuaib.classmate.utils.AppContextManager.appContextFlow.collect { state ->
                     val route = "${state.batchId}:${state.semesterId}"
@@ -144,6 +171,7 @@ class TimetableFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        resetExpiredSelectedDay()
 
         if (timetableViewModel.isV2Configured && hasResumedOnce) {
             val state = com.shuaib.classmate.utils.AppContextManager.appContextFlow.value
@@ -235,7 +263,7 @@ class TimetableFragment : Fragment() {
         loadTimetable(days[todayIndex])
 
         val weekDates = getWeekDates()
-        val margin = (6 * resources.displayMetrics.density).toInt()
+        val margin = (4 * resources.displayMetrics.density).toInt()
         val inflater = LayoutInflater.from(requireContext())
 
         // If today is Thursday (5) or Friday (6), start the display array from today index
@@ -507,7 +535,7 @@ class TimetableFragment : Fragment() {
                         )
                     },
                     onPeriodLongClick = { period ->
-                        if (isAdmin) showDeleteDialog(period)
+                        if (canDeletePeriod(period)) showDeleteDialog(period)
                     }
                 )
                 binding.rvPeriods.adapter = periodAdapter
@@ -834,21 +862,39 @@ class TimetableFragment : Fragment() {
 
     private fun showDeleteDialog(period: Period) {
         if (!isAdded) return
-        if (timetableViewModel.isV2Configured) {
-            startActivity(Intent(context, com.shuaib.classmate.activities.TimetableManagementActivity::class.java))
-            return
-        }
         AlertDialog.Builder(requireContext())
             .setTitle("Delete Period")
-            .setMessage("Are you sure you want to delete this period?")
+            .setMessage("Permanently delete ${period.subject} from the timetable? This cannot be undone.")
             .setPositiveButton("Delete") { _, _ ->
-                if (selectedDayFlow.value.isNotBlank()) {
-                    db.collection("timetable").document(selectedDayFlow.value)
-                        .collection("periods").document(period.id).delete()
+                val day = selectedDayFlow.value
+                if (day.isNotBlank()) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        timetableViewModel.deletePeriod(day, period.id)
+                            .onSuccess {
+                                Toast.makeText(requireContext(), "Period deleted", Toast.LENGTH_SHORT).show()
+                            }
+                            .onFailure { error ->
+                                Toast.makeText(
+                                    requireContext(),
+                                    "Could not delete period: ${error.message ?: "Not authorized"}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun canDeletePeriod(period: Period): Boolean {
+        if (isAdmin) return true
+        val ownerId = if (timetableViewModel.isV2Configured) {
+            com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.profileId
+        } else {
+            auth.currentUser?.uid.orEmpty()
+        }
+        return ownerId.isNotBlank() && period.createdBy == ownerId
     }
 
     private fun checkAdminAccess() {
@@ -859,7 +905,7 @@ class TimetableFragment : Fragment() {
                 com.shuaib.classmate.utils.AppContextManager.appContextFlow.collect { state ->
                     if (_binding == null) return@collect
                     isAdmin = state.v2SessionActive &&
-                        state.canManageBatch(state.batchId)
+                        (state.isAdmin() || state.role in setOf("teacher", "cr"))
                     binding.btnAddPeriod.isVisible = isAdmin
                 }
             }
@@ -883,6 +929,7 @@ class TimetableFragment : Fragment() {
             
             (activity as? MainActivity)?.isViewingRoutineInTimetable = true
             binding.tvAddPeriod.text = "Add Period"
+            resetExpiredSelectedDay()
             
             // Remove bus listener since we are viewing the routine
             busScheduleRegistration?.remove()
@@ -945,6 +992,40 @@ class TimetableFragment : Fragment() {
                 }
                 Toast.makeText(context, "Could not load bus schedule: ${v2Schedules.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        resetExpiredSelectedDay()
+        scheduleMidnightRefresh()
+    }
+
+    override fun onStop() {
+        handler.removeCallbacks(midnightRefreshRunnable)
+        super.onStop()
+    }
+
+    private fun scheduleMidnightRefresh() {
+        handler.removeCallbacks(midnightRefreshRunnable)
+        val now = LocalDateTime.now()
+        val nextMidnight = LocalDate.now().plusDays(1).atStartOfDay().plusSeconds(1)
+        val delayMillis = Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1_000L)
+        handler.postDelayed(midnightRefreshRunnable, delayMillis)
+    }
+
+    private fun resetExpiredSelectedDay() {
+        if (_binding == null || !isViewingRoutine) return
+        val selectedDay = selectedDayFlow.value
+        if (selectedDay.isBlank()) return
+        val selectedDate = getDateForSelectedDay(selectedDay)
+        val today = LocalDate.now()
+        if (selectedDate.isBefore(today)) {
+            // The screen may have been backgrounded at midnight, so its
+            // midnight callback never ran. Do not keep rendering yesterday's
+            // cached cancellation when returning to the app.
+            setupDaySelector()
+            timetableViewModel.refreshDay(days[getTodayIndex()])
         }
     }
 

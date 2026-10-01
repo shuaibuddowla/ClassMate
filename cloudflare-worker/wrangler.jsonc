@@ -3,6 +3,7 @@
   "name": "classmate-secure-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-19",
+  "triggers": { "crons": ["*/1 * * * *"] },
   "vars": {
     "FIREBASE_PROJECT_ID": "classmate-a016a",
     "ARCHIVE_API_URL": "https://mbstu-cse-archive.vercel.app/api",

@@ -15,13 +15,25 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
+import com.shuaib.classmate.activities.ClassMateAuthActivity
 import com.shuaib.classmate.activities.MainActivity
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import kotlinx.coroutines.launch
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         Log.d("FCM", "From: ${remoteMessage.from}")
+
+        if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            if (GoogleSignIn.getLastSignedInAccount(this) == null) return
+            val kind = remoteMessage.data["kind"] ?: "update"
+            sendNotification("ClassMate update", "New $kind available", kind)
+            return
+        }
 
         // Check if user is logged in
         if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
@@ -48,7 +60,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     private fun sendNotification(title: String, messageBody: String, type: String) {
         // Intent to open MainActivity
-        val intent = Intent(this, MainActivity::class.java).apply {
+        val target = if (BuildConfig.CLASSMATE_AUTH_ENABLED) ClassMateAuthActivity::class.java
+            else MainActivity::class.java
+        val intent = Intent(this, target).apply {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("OPEN_TAB", "notices")
         }
@@ -77,6 +91,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
-        Log.d("FCM", "Refreshed token: $token")
+        if (BuildConfig.CLASSMATE_AUTH_ENABLED && ClassMateAuthApi.accessToken != null) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                runCatching { ClassMateAuthApi.registerDeviceToken(token) }
+                    .onFailure { Log.w("FCM", "Staging token registration failed", it) }
+            }
+        }
     }
 }

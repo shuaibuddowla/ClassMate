@@ -111,7 +111,8 @@ class TimetableRepository private constructor(private val context: Context) {
                 endTime = doc.getString("endTime") ?: "",
                 cancelDate = doc.getString("cancelDate") ?: "",
                 substituteTeacher = doc.getString("substituteTeacher") ?: "",
-                substituteDate = doc.getString("substituteDate") ?: ""
+                substituteDate = doc.getString("substituteDate") ?: "",
+                createdBy = doc.getString("createdBy") ?: ""
             )
         }
         val entities = periods.map { TimetableEntity.fromPeriod(normalizedBatch, normalizedSem, normalizedDay, it) }
@@ -120,6 +121,25 @@ class TimetableRepository private constructor(private val context: Context) {
             return
         }
         timetableDao.replaceDay(normalizedBatch, normalizedSem, normalizedDay, entities)
+    }
+
+    suspend fun deleteCachedPeriod(batchId: String, semesterId: String, day: String, periodId: String) {
+        timetableDao.deletePeriod(
+            batchId.lowercase(),
+            SemesterManager.normalizeSemester(semesterId),
+            day.lowercase(),
+            periodId
+        )
+    }
+
+    suspend fun deleteFirestorePeriod(
+        day: String,
+        semester: String = AppContextManager.getSemesterId(),
+        batch: String = AppContextManager.getBatchId(),
+        periodId: String
+    ) {
+        getPeriodsCollection(day, semester, batch).document(periodId).delete().await()
+        deleteCachedPeriod(batch, semester, day, periodId)
     }
 
     suspend fun syncAllFromFirestore(
