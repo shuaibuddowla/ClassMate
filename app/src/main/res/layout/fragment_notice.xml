@@ -23,11 +23,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingHorizontal="10dp"
-                android:paddingTop="96dp"
-                android:paddingBottom="106dp"
+                android:paddingHorizontal="14dp"
+                android:layout_marginTop="88dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="100dp"
                 android:scrollbars="vertical"
-                android:layoutAnimation="@anim/layout_animation_library_list"
+                android:overScrollMode="never"
                 tools:listitem="@layout/item_notice_modern" />
 
             <!-- Today's Notices Reminder Banner -->
@@ -82,8 +83,8 @@
                 android:id="@+id/shimmerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingHorizontal="10dp"
-                android:paddingTop="96dp"
+                android:paddingHorizontal="14dp"
+                android:paddingTop="88dp"
                 android:visibility="gone"
                 app:shimmer_auto_start="true"
                 app:shimmer_base_alpha="0.4"
@@ -110,7 +111,7 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:paddingHorizontal="24dp"
-                android:paddingTop="96dp"
+                android:paddingTop="88dp"
                 android:visibility="gone">
 
                 <LinearLayout
@@ -168,7 +169,7 @@
                         android:paddingVertical="8dp"
                         android:text="@string/notice_empty_reset"
                         android:textColor="@color/cm_primary"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:visibility="gone" />
 
@@ -226,9 +227,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingStart="22dp"
+                android:paddingStart="18dp"
                 android:paddingTop="14dp"
-                android:paddingEnd="20dp"
+                android:paddingEnd="18dp"
                 android:paddingBottom="6dp"
                 android:background="@android:color/transparent"
                 android:layout_gravity="top"
@@ -258,7 +259,7 @@
                             android:maxLines="1"
                             android:text="@string/nav_notices"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="34sp"
+                            android:textSize="28sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -319,8 +320,8 @@
 
                     <FrameLayout
                         android:id="@+id/btnSearch"
-                        android:layout_width="46dp"
-                        android:layout_height="46dp"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
                         android:layout_marginStart="6dp"
                         android:background="@drawable/bg_library_icon_button"
                         android:clickable="true"
@@ -338,16 +339,16 @@
                     <TextView
                         android:id="@+id/btnPostNotice"
                         android:layout_width="wrap_content"
-                        android:layout_height="46dp"
+                        android:layout_height="44dp"
                         android:layout_marginStart="8dp"
                         android:background="@drawable/bg_notice_action_pill"
                         android:backgroundTint="@color/cm_primary"
                         android:gravity="center"
-                        android:minWidth="88dp"
+                        android:minWidth="76dp"
                         android:paddingHorizontal="15dp"
                         android:text="+ Post"
                         android:textColor="@color/cm_on_primary"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:visibility="gone"
                         tools:visibility="visible" />

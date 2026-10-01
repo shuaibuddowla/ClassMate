@@ -120,9 +120,20 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun bindFloatingNavigation(tab: Int, root: View) {
+        var navigationTravel = 0
+        val threshold = (16 * activity.resources.displayMetrics.density).toInt()
         fun react(delta: Int, atTop: Boolean) {
-            if (atTop || delta < -6) setNavigationShown(true)
-            else if (delta > 6) setNavigationShown(false)
+            if (atTop) {
+                navigationTravel = 0
+                setNavigationShown(true)
+                return
+            }
+            if (delta == 0) return
+            navigationTravel = if ((navigationTravel >= 0 && delta > 0) ||
+                (navigationTravel <= 0 && delta < 0))
+                (navigationTravel + delta).coerceIn(-threshold * 2, threshold * 2) else delta
+            if (navigationTravel >= threshold) setNavigationShown(false)
+            if (navigationTravel <= -threshold) setNavigationShown(true)
         }
         when (tab) {
             R.id.nav_notices -> root.v<RecyclerView>(R.id.rvNotices)
@@ -135,9 +146,9 @@ internal class ClassMateAcademicScreensSupabase(
                         } else if (dy != 0) {
                             noticeScrollTravel = if ((noticeScrollTravel >= 0 && dy > 0) ||
                                 (noticeScrollTravel <= 0 && dy < 0))
-                                (noticeScrollTravel + dy).coerceIn(-40, 40) else dy
-                            if (noticeScrollTravel >= 18) setNoticeHeaderCollapsed(root, true)
-                            if (noticeScrollTravel <= -18) setNoticeHeaderCollapsed(root, false)
+                                (noticeScrollTravel + dy).coerceIn(-threshold * 2, threshold * 2) else dy
+                            if (noticeScrollTravel >= threshold) setNoticeHeaderCollapsed(root, true)
+                            if (noticeScrollTravel <= -threshold) setNoticeHeaderCollapsed(root, false)
                         }
                         markVisibleNoticesRead(root, recyclerView)
                     }
@@ -159,8 +170,8 @@ internal class ClassMateAcademicScreensSupabase(
         title.pivotX = 0f
         title.pivotY = 0f
         title.animate().cancel()
-        title.animate().scaleX(if (collapsed) 0.75f else 1f)
-            .scaleY(if (collapsed) 0.75f else 1f)
+        title.animate().scaleX(if (collapsed) 0.86f else 1f)
+            .scaleY(if (collapsed) 0.86f else 1f)
             .translationY(if (collapsed) 3f * density else 0f)
             .setDuration(180).start()
         val subtitle = root.v<View>(R.id.tvNoticeSubtitle)
@@ -393,6 +404,19 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun setupNotices(root: View) {
+        val feed = root.v<RecyclerView>(R.id.rvNotices)
+        feed.itemAnimator = null
+        val header = root.v<View>(R.id.noticeHeaderPanel)
+        fun fitFeedBelowHeader() {
+            val params = feed.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            val top = header.bottom + (8 * activity.resources.displayMetrics.density).toInt()
+            if (params.topMargin != top) {
+                params.topMargin = top
+                feed.layoutParams = params
+            }
+        }
+        header.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitFeedBelowHeader() }
+        header.post { if (root.isAttachedToWindow) fitFeedBelowHeader() }
         root.v<View>(R.id.shimmerView).visibility = View.GONE
         root.v<View>(R.id.layoutReminderBanner).visibility = View.GONE
         root.v<View>(R.id.btnLoadOlder).visibility = View.GONE
@@ -404,13 +428,22 @@ internal class ClassMateAcademicScreensSupabase(
         }
         root.v<View>(R.id.btnSearch).setOnClickListener {
             root.v<View>(R.id.headerTitleBlock).visibility = View.GONE
+            root.v<View>(R.id.btnSearch).visibility = View.GONE
             root.v<View>(R.id.searchContainer).visibility = View.VISIBLE
-            root.v<EditText>(R.id.etNoticeSearch).requestFocus()
+            val input = root.v<EditText>(R.id.etNoticeSearch)
+            input.requestFocus()
+            input.post {
+                (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as
+                    android.view.inputmethod.InputMethodManager).showSoftInput(input, 0)
+            }
         }
         root.v<View>(R.id.btnCloseSearch).setOnClickListener {
             root.v<EditText>(R.id.etNoticeSearch).text.clear()
             root.v<View>(R.id.searchContainer).visibility = View.GONE
             root.v<View>(R.id.headerTitleBlock).visibility = View.VISIBLE
+            root.v<View>(R.id.btnSearch).visibility = View.VISIBLE
+            (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as
+                android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(root.windowToken, 0)
             renderNoticeFeed(root)
         }
         root.v<EditText>(R.id.etNoticeSearch).addTextChangedListener(object : android.text.TextWatcher {
@@ -508,10 +541,14 @@ internal class ClassMateAcademicScreensSupabase(
                 }
                 card.v<View>(R.id.noticeCardSurface).setBackgroundResource(background)
                 card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).setImageResource(icon)
+                card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).imageTintList =
+                    android.content.res.ColorStateList.valueOf(activity.getColor(accent))
                 card.v<View>(R.id.noticeAccent).backgroundTintList =
                     android.content.res.ColorStateList.valueOf(activity.getColor(accent))
                 text(card, R.id.tvTitle, item.optString("title"))
                 text(card, R.id.tvPreview, item.optString("body"))
+                card.v<View>(R.id.tvPreview).visibility =
+                    if (item.optString("body").isBlank()) View.GONE else View.VISIBLE
                 text(card, R.id.tvMeta, noticeDate(item.optString("published_at")))
                 text(card, R.id.tvLikeCount, state?.optLong("like_count")?.toString() ?: "0")
                 text(card, R.id.tvCommentCount, state?.optLong("comment_count")?.toString() ?: "0")
