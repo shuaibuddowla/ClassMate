@@ -10,7 +10,7 @@ The first production APK and **every update** must use the same production signi
 
 The earlier USB-installed APK is debug signed. Android cannot install a `key0`-signed release on top of that debug build. Plan a one-time uninstall/reinstall for that phone after verifying any local-only data is backed up. Subsequent `key0`-signed releases can update in place.
 
-The APK at `release/app-release.apk` was built **before** GitHub update configuration was added. It is useful for checking the certificate, but should not be published as the updatable baseline. Build a fresh signed APK from the current source after the updater tests pass.
+ClassMate 1.1.6 (version code 7) is the published GitHub update baseline. For the next release, use a higher version code and a new version name, then build a fresh APK from that source with the same `key0` signing identity. Never reuse an old APK or published version tag.
 
 ## Source URL
 
@@ -47,6 +47,8 @@ Only HTTPS GitHub release URLs matching the configured repository and metadata v
    The script requires GitHub CLI (`gh`) authentication, checks package/version/certificate/hash, refuses an existing tag or equal/older published version code, creates a draft `v<versionName>` release, uploads `classmate-<versionName>.apk`, uploads `update.json`, verifies asset sizes and the available GitHub digest, then publishes it as latest. A failure after draft creation leaves the draft unpublished for inspection. `-Mandatory -MinSupportedVersionCode <code>` marks a version as required.
 
 Do not publish a release built from stale or uncommitted code. Do not replace an already published APK or tag. Keep release assets immutable when available.
+
+If Android Studio puts the signed APK in `release/app-release.apk`, pass that path to both commands instead. For example, the release after 1.1.6 could be `versionCode = 8` and `versionName = "1.1.7"`; use a distinct version name if that Git tag already exists. The script generates and uploads `update.json` automatically.
 
 Example `update.json`:
 
