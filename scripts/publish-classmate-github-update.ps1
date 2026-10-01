@@ -142,8 +142,11 @@ try {
     & gh release upload $tag $jsonFile --repo $repo
     if ($LASTEXITCODE -ne 0) { throw 'Could not upload update.json. The release remains a draft.' }
 
-    $release = (& gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json)
-    if ($LASTEXITCODE -ne 0 -or -not $release.draft) { throw 'Draft release verification failed.' }
+    $release = (& gh release view $tag --repo $repo --json assets,isDraft,tagName,targetCommitish | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $release.isDraft -or
+        $release.tagName -ne $tag -or $release.targetCommitish -ne $localHead) {
+        throw 'Draft release verification failed.'
+    }
     $apkAsset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
     $jsonAsset = $release.assets | Where-Object { $_.name -eq 'update.json' } | Select-Object -First 1
     if (-not $apkAsset -or -not $jsonAsset -or [long]$apkAsset.size -ne $fileSize -or
