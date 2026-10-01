@@ -103,6 +103,10 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'GitHub CLI (gh
 $tag = "v$versionName"
 $existing = & gh release view $tag --repo $repo --json tagName 2>$null
 if ($LASTEXITCODE -eq 0) { throw "GitHub release $tag already exists; refusing to overwrite it." }
+$existingTag = & gh api "repos/$repo/git/refs/tags/$tag" --jq '.ref' 2>$null
+if ($LASTEXITCODE -eq 0 -and $existingTag) {
+    throw "Git tag $tag already exists; increment the app version before publishing."
+}
 
 $latestMetadataUrl = "$releaseBase/latest/download/update.json"
 try {
