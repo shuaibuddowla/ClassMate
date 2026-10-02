@@ -120,33 +120,11 @@
             android:layout_height="56dp"
             android:background="@color/cm_divider" />
 
-        <!-- Subject Icon Container -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/layoutSubjectIcon"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_period_icon_tile">
-                <ImageView
-                    android:id="@+id/ivSubjectIcon"
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_subject_other"
-                    app:tint="@color/cm_primary_light" />
-            </FrameLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- Main Content -->
         <LinearLayout
             android:id="@+id/layoutContent"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -154,13 +132,14 @@
             android:paddingTop="12dp"
             android:paddingBottom="12dp">
 
-            <TextView
+            <com.shuaib.classmate.ui.ClassMateCourseTitleView
                 android:id="@+id/tvSubject"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:lineSpacingMultiplier="1.05"
-                android:maxLines="2"
+                android:includeFontPadding="false"
+                android:breakStrategy="high_quality"
+                android:hyphenationFrequency="normal"
+                android:lineSpacingMultiplier="1.10"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="14.5sp"
                 android:textStyle="bold" />

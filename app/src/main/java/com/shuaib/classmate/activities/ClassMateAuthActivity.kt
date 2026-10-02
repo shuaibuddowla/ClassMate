@@ -759,9 +759,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         "${course.optString("course_type").replaceFirstChar { it.uppercase() }}  •  Tap for options") {
                         val canEditContent = profile?.optString("role") != "teacher" ||
                             offering.optString("id") in assignedIds
-                        val options = if (canEditContent)
-                            arrayOf("View course files", "Edit timetable", "Remove from batch")
-                        else arrayOf("View course files", "Remove from batch")
+                        val options = (if (canEditContent)
+                            listOf("View course files", "Edit timetable", "Remove from batch")
+                        else listOf("View course files", "Remove from batch")).toMutableList().apply {
+                            if (profile?.optString("role") == "admin") add(1, "Edit course details")
+                        }.toTypedArray()
                         AlertDialog.Builder(this@ClassMateAuthActivity)
                             .setTitle("$code · $title")
                             .setItems(options) { _, item ->
@@ -772,6 +774,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                                         .putExtra("course_name", title)
                                         .putExtra("batch_id", requestedBatch).putExtra("profile_id", userId)
                                         .putExtra("can_manage", canEditContent).putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
+                                    "Edit course details" -> showEditCourseDialog(course)
                                     "Edit timetable" -> openPeriodEditor()
                                     "Remove from batch" -> confirmRemoveBatchCourse(
                                         offering.optString("id"), "$code · $title")
@@ -780,6 +783,43 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     }
                 }
             }.onFailure { loading.text = "Could not load courses: ${it.message}" }
+        }
+    }
+
+    private fun showEditCourseDialog(course: JSONObject) {
+        if(profile?.optString("role") != "admin") return
+        val form=ClassMateFormUi(this)
+        form.label("Changes apply everywhere this course is used.")
+        val code=form.field("Course code").apply { setText(course.optString("course_code")); inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS; filters=arrayOf(android.text.InputFilter.LengthFilter(30)) }
+        val name=form.field("Course name").apply { setText(course.optString("course_title")); filters=arrayOf(android.text.InputFilter.LengthFilter(200)) }
+        val error=form.status()
+        val dialog=com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Edit course details")
+            .setView(form.scroll).setNegativeButton("Cancel",null).setPositiveButton("Save changes",null).create()
+        dialog.show()
+        var saving=false
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if(saving) return@setOnClickListener
+            val newCode=code.text.toString().trim().uppercase(java.util.Locale.ROOT)
+            val newName=name.text.toString().trim()
+            if(newCode.length !in 2..30) { code.error="Enter a course code (2–30 characters)"; return@setOnClickListener }
+            if(newName.length !in 2..200) { name.error="Enter a course name (2–200 characters)"; return@setOnClickListener }
+            if(!ClassMateAcademicCache.online(this)) { error.visibility=View.VISIBLE; error.text="Connect to save course details."; return@setOnClickListener }
+            saving=true; code.isEnabled=false; name.isEnabled=false; dialog.setCancelable(false)
+            dialog.getButton(-1).isEnabled=false; dialog.getButton(-2).isEnabled=false
+            error.visibility=View.VISIBLE; error.text="Saving…"
+            lifecycleScope.launch {
+                try {
+                    val result=ClassMateAuthApi.rpc("edit_course",JSONObject().put("target_course",course.getString("id")).put("target_code",newCode).put("target_title",newName))
+                    val updated=result.getJSONObject("course")
+                    val ids=result.getJSONArray("offering_ids")
+                    ClassMateAcademicCache.renameCourse(this@ClassMateAuthActivity,(0 until ids.length()).map { ids.getString(it) }.toSet(),updated.getString("course_title"),updated.getString("course_code"))
+                    academicScreens.invalidateLibrary()
+                    dialog.dismiss()
+                    if(homeShown && selectedTab==R.id.nav_manage) renderHomeTab(selectedTab)
+                    Toast.makeText(this@ClassMateAuthActivity,"Course updated",Toast.LENGTH_SHORT).show()
+                } catch(e:Exception) { error.text=e.message ?: "Could not save. Your changes are still here." }
+                finally { saving=false; code.isEnabled=true; name.isEnabled=true; dialog.setCancelable(true); dialog.getButton(-1).isEnabled=true; dialog.getButton(-2).isEnabled=true }
+            }
         }
     }
 

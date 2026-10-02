@@ -69,9 +69,6 @@ class PeriodAdapter(
         b.tvDuration.text = durationLabel(period)
         b.tvTypeBadge.typeface = Typeface.DEFAULT_BOLD
 
-        b.ivSubjectIcon.setImageResource(R.drawable.ic_subject_other)
-        b.ivSubjectIcon.imageTintList = ColorStateList.valueOf(accent)
-        b.layoutSubjectIcon.background = rounded(context, 12f, ColorUtils.setAlphaComponent(accent, 34))
         b.layoutStartClock.background = rounded(context, 50f, ColorUtils.setAlphaComponent(accent, 28))
         b.vStatusIndicator.backgroundTintList = ColorStateList.valueOf(accent)
         b.vEndDot.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 120))
@@ -88,7 +85,6 @@ class PeriodAdapter(
         b.vTimeLine.isVisible = true
         b.vEndDot.isVisible = true
         b.tvEndTime.isVisible = true
-        b.layoutSubjectIcon.isVisible = true
 
         val isLive = isViewingToday && !isPausedByCalendarException && !period.isCancelled && checkIsLive(period)
         if (isLive) {

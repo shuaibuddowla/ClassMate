@@ -96,7 +96,6 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
             val room=slot.optString("room").takeUnless { it == "null" }.orEmpty(); text(R.id.tvRoom,room); card.findViewById<View>(R.id.layoutRoomInfo).visibility=if(room.isBlank()) View.GONE else View.VISIBLE
             text(R.id.tvTypeBadge,slot.optString("type").takeUnless { it.isBlank() || it=="null" }?.uppercase() ?: if(offering?.type=="lab") "LAB" else "CLASS")
             text(R.id.tvDuration,"${Duration.between(from,to).toMinutes()} min")
-            card.findViewById<ImageView>(R.id.ivSubjectIcon).setColorFilter(getColor(R.color.cm_primary_light))
             card.setOnClickListener { if(offerings.any { it.id==id }) openPeriod(slot) else Toast.makeText(this,if(loading) "Loading courses…" else if(!ClassMateAcademicCache.online(this)) "Connect to edit periods." else "You can edit only your assigned courses.",Toast.LENGTH_SHORT).show() }
             slotList.addView(card)
         }

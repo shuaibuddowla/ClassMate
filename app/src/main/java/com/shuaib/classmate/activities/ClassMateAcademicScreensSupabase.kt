@@ -408,8 +408,6 @@ internal class ClassMateAcademicScreensSupabase(
                         LocalTime.parse(item.getString("end_time"))).toMinutes()
                 }.getOrDefault(0)
                 text(card, R.id.tvDuration, "$minutes min")
-                card.v<android.widget.ImageView>(R.id.ivSubjectIcon)
-                    .setColorFilter(activity.getColor(R.color.cm_primary_light))
                 if (item.optString("semester_course_id") in editableCourses) {
                     card.setOnLongClickListener { onAddPeriod(item, day); true }
                     card.setOnClickListener { onAddPeriod(item, day) }

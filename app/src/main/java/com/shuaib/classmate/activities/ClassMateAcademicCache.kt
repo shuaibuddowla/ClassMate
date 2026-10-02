@@ -21,6 +21,27 @@ internal object ClassMateAcademicCache {
         prefs(context).edit().putString("$user:$batch:$kind", data.toString()).apply()
     }
     fun home(context: Context): JSONObject? = read(context, "identity", "home", "profile")
+    fun renameCourse(context: Context, offeringIds: Set<String>, title: String, code: String) {
+        val storage = prefs(context)
+        val edit = storage.edit()
+        storage.all.forEach { (key, value) ->
+            if (!key.endsWith(":routine")) return@forEach
+            val data = runCatching { JSONObject(value as? String ?: return@forEach) }.getOrNull() ?: return@forEach
+            var changed = false
+            data.optJSONObject("names")?.let { names ->
+                offeringIds.forEach { id -> if (names.has(id)) { names.put(id, title); changed = true } }
+            }
+            data.optJSONArray("details")?.let { details ->
+                for (i in 0 until details.length()) details.optJSONObject(i)?.let { row ->
+                    if (row.optString("semester_course_id") in offeringIds) {
+                        row.put("course_title", title).put("course_code", code); changed = true
+                    }
+                }
+            }
+            if (changed) edit.putString(key, data.put("saved_at", 0L).toString())
+        }
+        edit.apply()
+    }
     fun saveHome(context: Context, profile: JSONObject, batch: String, label: String) {
         if (profile.optString("verification_status") == "active" && batch.isNotBlank())
             save(context, "identity", "home", "profile", JSONObject().put("profile", profile).put("batch", batch).put("label", label))
