@@ -440,10 +440,18 @@ internal class ClassMateAcademicScreensSupabase(
         feed.itemAnimator = null
         val header = root.v<View>(R.id.noticeHeaderPanel)
         fun fitFeedBelowHeader() {
+            // Reserve a real viewport below the header. Changing RecyclerView padding
+            // after cached items have laid out can leave their saved offset behind it.
+            if (header.height == 0) return
             val params = feed.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val top = header.bottom + (8 * activity.resources.displayMetrics.density).toInt()
-            if (params.topMargin != 0) { params.topMargin = 0; feed.layoutParams = params }
-            if (feed.paddingTop != top) feed.setPadding(feed.paddingLeft, top, feed.paddingRight, feed.paddingBottom)
+            if (params.topMargin != top) { params.topMargin = top; feed.layoutParams = params }
+            listOf(R.id.shimmerView, R.id.emptyNoticeState).forEach { id ->
+                val overlay = root.v<View>(id)
+                val overlayParams = overlay.layoutParams as android.view.ViewGroup.MarginLayoutParams
+                if (overlayParams.topMargin != top) { overlayParams.topMargin = top; overlay.layoutParams = overlayParams }
+                overlay.setPadding(overlay.paddingLeft, feed.paddingTop, overlay.paddingRight, overlay.paddingBottom)
+            }
         }
         header.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitFeedBelowHeader() }
         header.post { if (root.isAttachedToWindow) fitFeedBelowHeader() }

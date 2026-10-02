@@ -437,6 +437,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }.start()
         } }
         nav.setOnItemSelectedListener { item ->
+            if (item.itemId != selectedTab) {
+                nav.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            }
             if(!swipeSelection && tabAnimating) {
                 swipeHost.animate().cancel(); swipeHost.alpha=1f; swipeHost.translationX=0f; tabAnimating=false
             }
