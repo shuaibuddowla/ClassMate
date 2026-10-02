@@ -439,18 +439,26 @@ internal class ClassMateAcademicScreensSupabase(
         val feed = root.v<RecyclerView>(R.id.rvNotices)
         feed.itemAnimator = null
         val header = root.v<View>(R.id.noticeHeaderPanel)
+        var headerPositioned = false
         fun fitFeedBelowHeader() {
-            // Reserve a real viewport below the header. Changing RecyclerView padding
-            // after cached items have laid out can leave their saved offset behind it.
+            // Full-screen feed: padding sets its starting position without making
+            // opaque header/footer bands. Anchor the first layout after measuring
+            // the header so cached cards cannot retain the earlier padding offset.
             if (header.height == 0) return
             val params = feed.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val top = header.bottom + (8 * activity.resources.displayMetrics.density).toInt()
-            if (params.topMargin != top) { params.topMargin = top; feed.layoutParams = params }
+            val atTop = !headerPositioned || !feed.canScrollVertically(-1)
+            if (params.topMargin != 0) { params.topMargin = 0; feed.layoutParams = params }
+            if (feed.paddingTop != top) {
+                feed.setPadding(feed.paddingLeft, top, feed.paddingRight, feed.paddingBottom)
+                if (atTop) (feed.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(0, 0)
+            }
+            headerPositioned = true
             listOf(R.id.shimmerView, R.id.emptyNoticeState).forEach { id ->
                 val overlay = root.v<View>(id)
                 val overlayParams = overlay.layoutParams as android.view.ViewGroup.MarginLayoutParams
-                if (overlayParams.topMargin != top) { overlayParams.topMargin = top; overlay.layoutParams = overlayParams }
-                overlay.setPadding(overlay.paddingLeft, feed.paddingTop, overlay.paddingRight, overlay.paddingBottom)
+                if (overlayParams.topMargin != 0) { overlayParams.topMargin = 0; overlay.layoutParams = overlayParams }
+                overlay.setPadding(overlay.paddingLeft, top, overlay.paddingRight, overlay.paddingBottom)
             }
         }
         header.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitFeedBelowHeader() }
