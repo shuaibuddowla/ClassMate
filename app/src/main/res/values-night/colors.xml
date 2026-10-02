@@ -111,4 +111,6 @@
     <color name="colorPrimary">#3B82F6</color>
     <color name="colorPrimaryDark">#020817</color>
     <color name="colorAccent">#FBBF24</color>
+    <color name="cm_search_highlight">#FFE08A</color>
+    <color name="cm_search_highlight_text">#302400</color>
 </resources>

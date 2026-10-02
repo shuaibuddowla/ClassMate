@@ -18,7 +18,7 @@
                     android:layout_weight="1" android:layout_marginStart="10dp" android:layout_marginEnd="8dp"
                     android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
                     android:maxLines="3" android:ellipsize="end" android:textColor="@color/cm_text_primary"
-                    android:textSize="17sp" android:textStyle="bold" />
+                    android:textSize="18sp" android:textStyle="bold" />
                 <ImageView android:id="@+id/ivNoticeIllustration" android:layout_width="36dp"
                     android:layout_height="36dp" android:alpha="0.65" android:importantForAccessibility="no"
                     android:scaleType="fitCenter" android:src="@drawable/ic_notice_megaphone_art" />
@@ -28,9 +28,9 @@
                     android:src="@drawable/ic_more_vert" app:tint="@color/cm_text_secondary" android:visibility="gone" />
             </LinearLayout>
             <TextView android:id="@+id/tvPreview" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="6dp" android:layout_marginEnd="4dp" android:includeFontPadding="false"
-                android:lineSpacingExtra="3dp" android:maxLines="5" android:ellipsize="end"
-                android:textColor="@color/cm_text_secondary" android:textSize="14sp" />
+                android:layout_marginTop="8dp" android:layout_marginEnd="4dp" android:includeFontPadding="false"
+                android:lineSpacingExtra="3dp" android:maxLines="3" android:ellipsize="end"
+                android:textColor="@color/cm_text_primary" android:textSize="15sp" />
             <TextView android:id="@+id/tvMeta" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="12dp" android:layout_marginBottom="10dp" android:includeFontPadding="false"
                 android:drawableStart="@drawable/ic_notice_date_small" android:drawablePadding="6dp"
@@ -81,15 +81,15 @@
             </com.google.android.material.card.MaterialCardView>
             <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:layout_marginTop="4dp" android:background="@color/cm_notice_premium_stroke" android:alpha="0.6" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="44dp"
+            <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
                 android:gravity="center_vertical" android:orientation="horizontal">
-                <FrameLayout android:id="@+id/btnReminder" android:layout_width="44dp" android:layout_height="44dp"
+                <FrameLayout android:id="@+id/btnReminder" android:layout_width="44dp" android:layout_height="48dp"
                     android:foreground="?attr/selectableItemBackgroundBorderless" android:clickable="true"
                     android:focusable="true" android:contentDescription="Set notice reminder">
                     <ImageView android:id="@+id/ivReminderIcon" android:layout_width="20dp" android:layout_height="20dp"
                         android:layout_gravity="center" android:src="@drawable/ic_notice_reminder_outline" app:tint="@color/cm_text_secondary" />
                 </FrameLayout>
-                <LinearLayout android:id="@+id/btnReadReceipts" android:layout_width="0dp" android:layout_height="44dp"
+                <LinearLayout android:id="@+id/btnReadReceipts" android:layout_width="0dp" android:layout_height="48dp"
                     android:layout_weight="1" android:clickable="true" android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless" android:gravity="center_vertical" android:orientation="horizontal">
                     <FrameLayout android:id="@+id/seenAvatars" android:layout_width="24dp" android:layout_height="20dp"
@@ -98,10 +98,10 @@
                             android:layout_width="20dp" android:layout_height="20dp"
                             android:layout_gravity="start|center_vertical" android:contentDescription="Your view" />
                     </FrameLayout>
-                    <TextView android:id="@+id/tvReadCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:ellipsize="end" android:maxLines="1" android:textColor="@color/cm_text_secondary" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvReadCount" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                        android:ellipsize="end" android:maxLines="1" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
                 </LinearLayout>
-                <LinearLayout android:id="@+id/btnLike" android:layout_width="wrap_content" android:layout_height="44dp"
+                <LinearLayout android:id="@+id/btnLike" android:layout_width="wrap_content" android:layout_height="48dp"
                     android:foreground="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true"
                     android:contentDescription="Like notice" android:gravity="center_vertical" android:minWidth="48dp"
                     android:orientation="horizontal" android:paddingHorizontal="6dp">
@@ -110,7 +110,7 @@
                     <TextView android:id="@+id/tvLikeCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:layout_marginStart="5dp" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
                 </LinearLayout>
-                <LinearLayout android:id="@+id/btnComment" android:layout_width="wrap_content" android:layout_height="44dp"
+                <LinearLayout android:id="@+id/btnComment" android:layout_width="wrap_content" android:layout_height="48dp"
                     android:foreground="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true"
                     android:contentDescription="Open comments" android:gravity="center_vertical" android:minWidth="48dp"
                     android:orientation="horizontal" android:paddingHorizontal="6dp">

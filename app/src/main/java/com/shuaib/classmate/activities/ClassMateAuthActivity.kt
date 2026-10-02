@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -34,7 +33,6 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.ui.GlassBottomNavView
 import com.shuaib.classmate.utils.AppPreferences
-import com.shuaib.classmate.services.ClassMateAutoMuteScheduler
 import com.google.android.material.card.MaterialCardView
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -53,14 +51,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private lateinit var academicScreens: ClassMateAcademicScreensSupabase
     private var profile: JSONObject? = null
     private var userId: String = ""
-    private var uploadBatch: String = ""
-    private var uploadCourse: String? = null
-    private var uploadCategory: String = "notes"
-    private var uploadSelectedUri: Uri? = null
-    private var uploadPickerLabel: TextView? = null
     private var askedNotificationPermission = false
     private var homeShown = false
     private var revealAfterAuth = false
+    private var welcomeStep = 0
+    private var welcomeDialog: AlertDialog? = null
+    private var tabAnimating = false
     private var authBusy = false
     private var welcomeUi: ClassMateWelcomeUi? = null
     private var selectedTab = R.id.nav_timetable
@@ -71,8 +67,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private val periodEditorLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK && homeShown && selectedTab == R.id.nav_timetable)
-            renderHomeTab(selectedTab)
+        if (result.resultCode == RESULT_OK) {
+            ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
+            if (homeShown) renderHomeTab(selectedTab)
+        }
     }
 
     private fun openPeriodEditor(slot: JSONObject? = null, selectedDayOverride: Int? = null) {
@@ -93,23 +91,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        AppPreferences(this).setNotificationsEnabled(granted)
+        if (granted) registerFcmToken()
         if (!granted) status.text = "Notifications are off. Allow them in Android settings to receive class updates."
-    }
-
-    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@registerForActivityResult
-        uploadSelectedUri = uri
-        val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME),
-            null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        } ?: "Selected file"
-        uploadPickerLabel?.text = "Selected: $name"
     }
 
     private val courseFilesLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()) {
         if (homeShown && selectedTab == R.id.nav_pdf) {
             academicScreens.invalidateLibrary()
+            ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
             renderHomeTab(selectedTab)
         }
     }
@@ -136,13 +127,36 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ClassMateAuthApi.attach(applicationContext)
+        if (!ClassMateAuthApi.hasSavedSession()) delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         super.onCreate(savedInstanceState)
+        welcomeStep = savedInstanceState?.getInt("welcome_step") ?: 0
         selectedBatchId = savedInstanceState?.getString("selected_batch_id").orEmpty()
         selectedBatchLabel = savedInstanceState?.getString("selected_batch_label").orEmpty()
         selectedTab = savedInstanceState?.getInt("selected_tab") ?: selectedTab
         revealAfterAuth = savedInstanceState?.getBoolean("identity_reveal") ?: false
         ClassMateAuthApi.attach(applicationContext)
         if (intent.getStringExtra("OPEN_TAB") == "notices") selectedTab = R.id.nav_notices
+        val cachedHome = if (ClassMateAuthApi.hasSavedSession()) ClassMateAcademicCache.home(this) else null
+        if (cachedHome != null) {
+            profile = cachedHome.optJSONObject("profile")
+            userId = profile?.optString("id").orEmpty()
+            selectedBatchId = cachedHome.optString("batch"); selectedBatchLabel = cachedHome.optString("label")
+            if (profile?.optString("verification_status") == "active" && userId.isNotBlank() && selectedBatchId.isNotBlank()) {
+                // Render the last synced home first; revalidate the session in the background.
+                status = TextView(this); profileView = TextView(this); resultView = TextView(this); actions = LinearLayout(this)
+                showHome(); renderHomeTab(selectedTab)
+                if (ClassMateAcademicCache.online(this)) {
+                    reconnecting = true
+                    lifecycleScope.launch {
+                        try { loadProfile() }
+                        catch (_: Exception) { if (!ClassMateAuthApi.hasSavedSession()) signOut() }
+                        finally { reconnecting = false }
+                    }
+                }
+                return
+            }
+        }
         showSignInScreen()
         if (!ClassMateAuthApi.configured) {
             status.text = "Supabase URL or public client key is missing from this build."
@@ -168,7 +182,32 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
     }
 
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+    private var reconnecting = false
+    override fun onStart() {
+        super.onStart()
+        val manager = getSystemService(android.net.ConnectivityManager::class.java)
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                runOnUiThread {
+                    if (homeShown && !reconnecting && ClassMateAuthApi.accessToken == null) {
+                        reconnecting = true
+                        lifecycleScope.launch { try { loadProfile() } catch (_: Exception) { if (!ClassMateAuthApi.hasSavedSession()) signOut() } finally { reconnecting = false } }
+                    }
+                }
+            }
+        }
+        networkCallback = callback
+        manager.registerDefaultNetworkCallback(callback)
+    }
+    override fun onStop() {
+        networkCallback?.let { getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(it) }
+        networkCallback = null
+        super.onStop()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("welcome_step", welcomeStep)
         outState.putString("selected_batch_id", selectedBatchId)
         outState.putString("selected_batch_label", selectedBatchLabel)
         outState.putInt("selected_tab", selectedTab)
@@ -178,27 +217,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private fun showSignInScreen() {
         homeShown = false
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         val ui = ClassMateWelcomeUi(this)
-        welcomeUi = ui
-        content = ui.content
+        welcomeUi = ui; content = ui.content
         ui.orbit()
-        ui.text("MADE FOR MBSTU", 11f)
-        ui.title("Your campus,\none place.")
-        ui.text("Your classes, notices and course library, ready when you are.")
-        val card = ui.panel()
-        ui.text("Join with your edumail", 21f, android.graphics.Color.WHITE, card)
-            .setTypeface(null, Typeface.BOLD)
-        ui.text("Use your @mbstu.ac.bd Google account. ClassMate matches your university identity to your academic profile.", 14f, parent = card)
-        ui.action("Continue with Google  →", parent = card) { signIn() }
-        ui.text("New here? Your profile is created on your first sign-in. Already a member? The same button opens your account.", 12f, parent = card)
-        status = ui.text(if (BuildConfig.CLASSMATE_ENV == "staging") "Staging test build" else "Ready when you are.", 13f, parent = card)
-        status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        ui.text("ONE ACCOUNT. YOUR SPACE.", 11f)
-        ui.text("Students and CRs see their batch. Teachers reach their assigned courses. Admins manage the campus.", 14f)
-        profileView = ui.text("").apply { visibility = View.GONE }
-        resultView = ui.text("").apply { visibility = View.GONE }
-        actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(actions)
+        ui.title("Welcome to\nClassMate.")
+        ui.text("Sign in with your @mbstu.ac.bd university email.")
+        ui.action("Continue with Google") { signIn() }
+        status = ui.text("",13f).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
+        profileView = ui.text("").apply { visibility=View.GONE }; resultView = ui.text("").apply { visibility=View.GONE }
+        actions = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(actions)
         ui.animateEntrance()
     }
 
@@ -215,7 +243,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private fun signOut() {
-        if (ClassMateAuthApi.accessToken == null) return
+        welcomeDialog?.dismiss(); welcomeDialog=null; welcomeStep=0; revealAfterAuth=false
+        if (ClassMateAuthApi.accessToken == null || !ClassMateAcademicCache.online(this)) {
+            ClassMateAuthApi.signOut(); homeShown = false; profile = null; userId = ""; selectedBatchId = ""; selectedBatchLabel = ""; authBusy = false
+            googleClient().signOut(); showSignInScreen(); return
+        }
         status.text = "Signing out…"
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             lifecycleScope.launch {
@@ -224,6 +256,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         ClassMateAuthApi.unregisterDeviceToken(task.result)
                 }
                 ClassMateAuthApi.signOut()
+                homeShown = false
                 profile = null
                 userId = ""
                 selectedBatchId = ""
@@ -261,16 +294,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
         authBusy = false
         profile = loaded
+        ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
         if (loaded.optString("verification_status") == "active") {
-            if (revealAfterAuth) {
-                showIdentityReveal(loaded)
-                return
-            }
             val role = loaded.optString("role")
             if (role == "admin" || role == "teacher") {
                 if (selectedBatchId.isBlank()) {
                     showBatchPicker()
+                    return
                 } else {
                     if (!homeShown) showHome()
                     renderHomeTab(selectedTab)
@@ -283,11 +314,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }
             if (AppPreferences(this).isNotificationsEnabled())
                 runCatching { com.shuaib.classmate.services.ClassMateNoticeReminderScheduler.restore(this, userId) }
-            registerFcmToken()
-            requestNotificationPermissionIfNeeded()
-            if (role == "student" && AppPreferences(this).isAutoMuteEnabled())
-                runCatching { ClassMateAutoMuteScheduler.schedule(this, selectedBatchId) }
+            ClassMateAuthApi.saveNotificationIdentity(loaded)
+            if (revealAfterAuth || welcomeStep > 0) {
+                if (welcomeStep == 0) welcomeStep = 1
+                showIdentityReveal(loaded)
+            } else registerFcmToken()
+
         } else {
+            ClassMateAcademicCache.clear(this)
             showProfilePending(loaded)
             renderActions(loaded)
         }
@@ -321,74 +355,34 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private suspend fun showIdentityReveal(loaded: JSONObject) {
-        val departmentId = loaded.optString("department_id").takeUnless { it == "null" || it.isBlank() }
-        val batchId = loaded.optString("batch_id").takeUnless { it == "null" || it.isBlank() }
-        val department = departmentId?.let { id -> runCatching {
-            ClassMateAuthApi.rows("departments", "select=name,code&id=eq.$id&limit=1")
-                .optJSONObject(0)
+        if (welcomeDialog?.isShowing == true || !homeShown || welcomeStep == 0) return
+        val batch = selectedBatchId.takeIf { it.isNotBlank() }?.let { id -> runCatching {
+            ClassMateAuthApi.rows("batches", "select=batch_number,academic_session,department_id&id=eq.$id&limit=1").optJSONObject(0)
         }.getOrNull() }
-        val batch = batchId?.let { id -> runCatching {
-            ClassMateAuthApi.rows("batches", "select=batch_number,academic_session&id=eq.$id&limit=1")
-                .optJSONObject(0)
+        val departmentId = batch?.optString("department_id") ?: loaded.optString("department_id")
+        val department = departmentId.takeUnless { it.isBlank() || it == "null" }?.let { id -> runCatching {
+            ClassMateAuthApi.rows("departments", "select=name,code&id=eq.$id&limit=1").optJSONObject(0)
         }.getOrNull() }
-        val role = loaded.optString("role")
-        val staff = role == "admin" || role == "teacher"
-        val cr = loaded.optBoolean("is_cr")
-        val ui = ClassMateWelcomeUi(this)
-        welcomeUi = ui
-        content = ui.content
-        homeShown = false
-        ui.orbit(true)
-        ui.text("PROFILE VERIFIED  ·  FROM YOUR EDUMAIL", 11f)
-        val firstName = loaded.optString("full_name").substringBefore(' ').ifBlank { "ClassMate" }
-        ui.title("You’re all set,\n$firstName.")
-        ui.text(when {
-            role == "admin" -> "ClassMate recognized your owner account. Your campus workspace is ready."
-            role == "teacher" -> "ClassMate recognized your teaching account and its department scope."
-            cr -> "ClassMate found your batch and CR assignment. Your class is ready."
-            else -> "ClassMate found your department, session, student ID and batch."
-        })
-        val card = ui.panel()
-        ui.field(card, "Verified edumail", loaded.optString("email"))
-        ui.text(when {
-            role == "admin" -> "GLOBAL ADMIN ACCESS"
-            role == "teacher" -> "TEACHER ACCESS"
-            cr -> "CLASS REPRESENTATIVE ACCESS"
-            else -> "STUDENT ACCESS"
-        }, 11f, parent = card)
-        if (role == "admin") {
-            ui.fieldPair(card, "Role", "Campus owner", "Scope", "All departments")
-        } else if (role == "teacher") {
-            ui.field(card, "Department", department?.optString("name") ?: "Assigned department")
-            ui.field(card, "Teaching scope", "Assigned batches and courses")
+        fun showStep() {
+            if (isFinishing || !homeShown || welcomeStep == 0 || welcomeDialog?.isShowing == true) return
+            val permission = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
+            welcomeDialog = ClassMateWelcomeDialogs.show(this,welcomeStep,loaded,batch,department,
+                permission && androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() && AppPreferences(this).isNotificationsEnabled(),
+                continueFlow = { welcomeDialog=null; welcomeStep++; window.decorView.post { showStep() } },
+                enable = {
+                    welcomeDialog=null; welcomeStep=0; revealAfterAuth=false
+                    AppPreferences(this).setNotificationsEnabled(true)
+                    if(Build.VERSION.SDK_INT >= 33 && !permission) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else { registerFcmToken(); if(!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName)) }
+                },
+                skip = { welcomeDialog=null; welcomeStep=0; revealAfterAuth=false; AppPreferences(this).setNotificationsEnabled(false) }
+            )
         }
-        if (!staff) {
-            ui.fieldPair(card, "Student ID", loaded.optString("student_id").takeUnless { it == "null" || it.isBlank() } ?: "Not assigned",
-                "Session", loaded.optString("academic_session").takeUnless { it == "null" || it.isBlank() } ?: "Not assigned")
-            ui.fieldPair(card, "Department", department?.optString("code")?.uppercase() ?: "See profile",
-                "Batch", batch?.let { "Batch ${it.optInt("batch_number")}" } ?: "See profile")
-            selectedBatchId = batchId.orEmpty()
-            selectedBatchLabel = batch?.let { "${department?.optString("code")?.uppercase().orEmpty()} Batch ${it.optInt("batch_number")} · Session ${it.optInt("academic_session")}" }.orEmpty()
-        }
-        ui.text(when { role == "admin" -> "Manage departments, verify members and open any running batch."
-            role == "teacher" -> "Your assigned batches, teaching schedule and course resources are waiting."
-            cr -> "Your CR tools are ready: share notices and help keep your batch organized."
-            else -> "Your timetable, class updates and course library, together." }, 14f)
-        status = ui.text("✓  Verified by ClassMate", 13f)
-        profileView = ui.text("").apply { visibility = View.GONE }
-        resultView = ui.text("").apply { visibility = View.GONE }
-        actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(actions)
-        ui.action(if (staff) "Choose your batch  →" else "Continue to my batch  →") {
-            revealAfterAuth = false
-            if (staff) showBatchPicker()
-            else runAction("Opening your batch") { loadProfile() }
-        }
-        ui.action("Use another edumail", false) { signOut() }
-        ui.animateEntrance(reveal = true)
+        window.decorView.post { showStep() }
     }
 
     private fun showHome() {
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
         welcomeUi = null
         setContentView(R.layout.activity_classmate_home)
         window.statusBarColor = getColor(R.color.cm_bg)
@@ -400,17 +394,20 @@ class ClassMateAuthActivity : AppCompatActivity() {
             isAppearanceLightNavigationBars = lightTheme
         }
         homeShown = true
+        ClassMateAcademicCache.saveHome(this, profile ?: JSONObject(), selectedBatchId, selectedBatchLabel)
         homeHost = findViewById(R.id.classmate_home_content)
         content = homeHost
         academicScreens = ClassMateAcademicScreensSupabase(
             this, lifecycleScope, { selectedBatchId }, { selectedBatchLabel },
             { profile ?: JSONObject() },
-            { showNoticeForm() }, { showUploadForm() }, { signOut() },
+            { showNoticeForm() }, { showUploadForm() }, { file -> openFileEditor(file) }, { signOut() },
             { showBatchPicker() }, { slot, day -> openPeriodEditor(slot, day) },
+            { bus -> showBusScheduleDialog(bus) },
             { courseId, courseName, canManage ->
                 courseFilesLauncher.launch(Intent(this, ClassMateCourseFilesActivity::class.java)
                     .putExtra("course_id", courseId).putExtra("course_name", courseName)
-                    .putExtra("batch_id", selectedBatchId).putExtra("can_manage", canManage))
+                    .putExtra("batch_id", selectedBatchId).putExtra("profile_id", userId).putExtra("can_manage", canManage)
+                    .putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
             }
         )
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
@@ -418,7 +415,31 @@ class ClassMateAuthActivity : AppCompatActivity() {
             profile?.optString("role") in setOf("admin", "teacher") ||
                 profile?.optBoolean("is_cr") == true
         nav.selectedItemId = selectedTab
+        val swipeHost = homeHost as com.shuaib.classmate.ui.ClassMateSwipeTabsHost
+        fun destination(direction: Int): Int? {
+            val tabs=(0 until nav.menu.size()).map { nav.menu.getItem(it) }.filter { it.isVisible }
+            return tabs.getOrNull(tabs.indexOfFirst { it.itemId==selectedTab }+direction)?.itemId
+        }
+        var swipeSelection = false
+        swipeHost.canSwipe = { direction -> !tabAnimating && destination(direction)!=null }
+        swipeHost.onSwipe = { direction -> destination(direction)?.let { next ->
+            if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                nav.selectedItemId=next
+                return@let
+            }
+            tabAnimating=true
+            swipeHost.animate().translationX(-direction*24f*resources.displayMetrics.density).alpha(0f).setDuration(90).withEndAction {
+                swipeSelection=true
+                nav.selectedItemId=next
+                swipeSelection=false
+                swipeHost.translationX=direction*24f*resources.displayMetrics.density
+                swipeHost.animate().translationX(0f).alpha(1f).setDuration(160).withEndAction { tabAnimating=false }.start()
+            }.start()
+        } }
         nav.setOnItemSelectedListener { item ->
+            if(!swipeSelection && tabAnimating) {
+                swipeHost.animate().cancel(); swipeHost.alpha=1f; swipeHost.translationX=0f; tabAnimating=false
+            }
             selectedTab = item.itemId
             renderHomeTab(selectedTab)
             true
@@ -433,9 +454,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ui.orbit(true)
         ui.text(if (profile?.optString("role") == "teacher") "TEACHER WORKSPACE" else "ADMIN WORKSPACE", 11f)
         ui.title("Choose your\nclassroom.")
-        ui.text(if (profile?.optString("role") == "teacher")
-            "Open one of your assigned batches to see its schedule, share updates and manage course resources."
-            else "Open a running batch to manage its academic space and support its members.")
+        ui.text("Choose a running batch.")
         status = ui.text("Finding your batches…")
         status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         profileView = ui.text("").apply { visibility = View.GONE }
@@ -480,7 +499,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         selectedBatchId = id
                         selectedBatchLabel = label
                         selectedTab = R.id.nav_timetable
-                        revealAfterAuth = false
                         runAction("Opening batch") { loadProfile() }
                     }
                     count++
@@ -749,8 +767,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
                                         ClassMateCourseFilesActivity::class.java)
                                         .putExtra("course_id", offering.optString("id"))
                                         .putExtra("course_name", title)
-                                        .putExtra("batch_id", requestedBatch)
-                                        .putExtra("can_manage", canEditContent))
+                                        .putExtra("batch_id", requestedBatch).putExtra("profile_id", userId)
+                                        .putExtra("can_manage", canEditContent).putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
                                     "Edit timetable" -> openPeriodEditor()
                                     "Remove from batch" -> confirmRemoveBatchCourse(
                                         offering.optString("id"), "$code · $title")
@@ -843,6 +861,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 .put("target_title", title).put("target_type", type)
                 .put("target_credit", credit ?: JSONObject.NULL))
             academicScreens.invalidateLibrary()
+            ClassMateAcademicCache.invalidateSchedules(this, userId, batch)
             if (selectedBatchId == batch && selectedTab == R.id.nav_manage)
                 renderHomeTab(R.id.nav_manage)
         }
@@ -855,6 +874,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 ClassMateAuthApi.rpcText("remove_batch_course",
                     JSONObject().put("target_offering", offeringId))
                 academicScreens.invalidateLibrary()
+                ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
                 if (selectedTab == R.id.nav_manage) renderHomeTab(R.id.nav_manage)
             } }.setNegativeButton("Cancel", null).show()
     }
@@ -969,10 +989,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
+    }
+
     private fun registerFcmToken() {
-        if (!AppPreferences(this).isNotificationsEnabled()) return
+        if (!AppPreferences(this).isNotificationsEnabled() || !androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            if (token.isNotBlank() && ClassMateAuthApi.accessToken != null) {
+            if (token.isNotBlank() && ClassMateAuthApi.hasSavedSession()) {
                 lifecycleScope.launch {
                     runCatching { ClassMateAuthApi.registerDeviceToken(token) }
                         .onFailure { status.text = "FCM registration: ${it.message}" }
@@ -1289,151 +1315,26 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
     }
 
-    private fun showNoticeForm() {
-        chooseBatch { batchId ->
-            AlertDialog.Builder(this).setTitle("What would you like to post?")
-                .setItems(arrayOf("Normal notice", "Class cancellation")) { _, kind ->
-                    if (kind == 0) {
-                        val compose: (String?) -> Unit = { courseId ->
-                            form("Normal notice", listOf("Title", "Body")) { values ->
-                                if (values[0].isBlank()) {
-                                    android.widget.Toast.makeText(this, "Enter a title",
-                                        android.widget.Toast.LENGTH_SHORT).show()
-                                } else runAction("Posting notice") {
-                                    ClassMateAuthApi.rpc("post_notice", JSONObject()
-                                        .put("target_batch", batchId)
-                                        .put("target_course", courseId ?: JSONObject.NULL)
-                                        .put("notice_title", values[0]).put("notice_body", values[1]))
-                                    selectedTab = R.id.nav_notices
-                                    renderHomeTab(selectedTab)
-                                }
-                            }
-                        }
-                        if (profile?.optString("role") == "teacher")
-                            chooseActiveCourse(batchId) { compose(it) }
-                        else compose(null)
-                    } else chooseActiveCourse(batchId) { courseId ->
-                        AlertDialog.Builder(this).setTitle("When is this class cancelled?")
-                            .setItems(arrayOf("Today", "Tomorrow")) { _, dateChoice ->
-                                val date = LocalDate.now().plusDays(dateChoice.toLong())
-                                runAction("Posting class cancellation") {
-                                    ClassMateAuthApi.rpc("post_cancellation_notice", JSONObject()
-                                        .put("target_batch", batchId)
-                                        .put("target_course", courseId)
-                                        .put("change_date", date.toString()))
-                                    selectedTab = R.id.nav_notices
-                                    renderHomeTab(selectedTab)
-                                }
-                            }.show()
-                    }
-                }.show()
+    private val publishLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && homeShown) {
+            academicScreens.invalidateLibrary()
+            ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
+            renderHomeTab(selectedTab)
         }
     }
-
-    private fun showUploadForm() {
-        chooseBatch { batchId ->
-            val categories = arrayOf("Notes", "Slides", "Questions", "Syllabus", "Other")
-            AlertDialog.Builder(this).setTitle("File category")
-                .setItems(categories) { _, index ->
-                    uploadBatch = batchId
-                    uploadCategory = categories[index].lowercase()
-                    runAction("Loading subjects") {
-                        val semesters = ClassMateAuthApi.rows("semesters",
-                            "select=id&batch_id=eq.$batchId&status=eq.active&limit=1")
-                        val semester = semesters.optJSONObject(0)?.optString("id")
-                            ?: error("This batch has no active semester")
-                        val offerings = ClassMateAuthApi.rows("semester_courses",
-                            "select=id,course_id&semester_id=eq.$semester")
-                        val courses = ClassMateAuthApi.rows("courses",
-                            "select=id,course_code,course_title")
-                        val names = (0 until courses.length()).associate { i ->
-                            val course = courses.getJSONObject(i)
-                            course.getString("id") to
-                                "${course.getString("course_code")} · ${course.getString("course_title")}" 
-                        }
-                        val assigned = if (profile?.optString("role") == "teacher") {
-                            val rows = ClassMateAuthApi.rows("teacher_course_assignments",
-                                "select=semester_course_id&teacher_id=eq.$userId&active=eq.true")
-                            (0 until rows.length()).map {
-                                rows.getJSONObject(it).getString("semester_course_id") }.toSet()
-                        } else null
-                        val options = (0 until offerings.length()).map { offerings.getJSONObject(it) }
-                            .filter { assigned == null || it.getString("id") in assigned }
-                            .map { it.getString("id") to
-                                (names[it.getString("course_id")] ?: "Course") }
-                        if (options.isEmpty()) error("No active subject is available")
-                        showUploadDetailsDialog(options)
-                    }
-                }.show()
-        }
+    private fun openPublishPage(upload: Boolean) = chooseBatch { batchId ->
+        publishLauncher.launch(Intent(this, ClassMatePublishActivity::class.java)
+            .putExtra("batch_id", batchId).putExtra("batch_label", selectedBatchLabel)
+            .putExtra("role", profile?.optString("role")).putExtra("profile_id", userId)
+            .putExtra("upload", upload))
     }
-
-    private fun showUploadDetailsDialog(options: List<Pair<String, String>>) {
-        uploadSelectedUri = null
-        val padding = (18 * resources.displayMetrics.density).toInt()
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, 0, padding, 0)
-        }
-        panel.addView(TextView(this).apply {
-            text = "Subject"
-            setTextColor(getColor(R.color.cm_text_primary))
-        })
-        val subject = Spinner(this).apply {
-            adapter = ArrayAdapter(this@ClassMateAuthActivity,
-                android.R.layout.simple_spinner_dropdown_item, options.map { it.second })
-        }
-        panel.addView(subject)
-        val fileName = EditText(this).apply {
-            hint = "File name"
-            setSingleLine(true)
-        }
-        panel.addView(fileName)
-        val picker = TextView(this).apply {
-            text = "Choose file"
-            setTextColor(getColor(R.color.cm_primary))
-            textSize = 15f
-            setPadding(0, padding, 0, padding)
-            setOnClickListener { filePicker.launch(arrayOf("*/*")) }
-        }
-        uploadPickerLabel = picker
-        panel.addView(picker)
-        val dialog = AlertDialog.Builder(this).setTitle("Upload ${uploadCategory.replaceFirstChar {
-            it.uppercase() }}")
-            .setView(panel).setPositiveButton("Upload", null)
-            .setNegativeButton("Cancel", null).create()
-        dialog.setOnDismissListener { uploadPickerLabel = null; uploadSelectedUri = null }
-        dialog.setOnShowListener {
-            val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            button.setOnClickListener {
-                val uri = uploadSelectedUri
-                val title = fileName.text.toString().trim()
-                when {
-                    title.isBlank() -> fileName.error = "Enter a file name"
-                    uri == null -> Toast.makeText(this, "Choose a file", Toast.LENGTH_SHORT).show()
-                    else -> {
-                        button.isEnabled = false
-                        uploadCourse = options[subject.selectedItemPosition].first
-                        runAction("Uploading protected file") {
-                            try {
-                                val size = contentResolver.query(uri,
-                                    arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                                    if (cursor.moveToFirst()) cursor.getLong(0) else null
-                                } ?: error("Could not read file size")
-                                val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-                                ClassMateAuthApi.uploadResource(contentResolver, uri,
-                                    uploadBatch, uploadCourse, title, mime, size, uploadCategory)
-                                dialog.dismiss()
-                                academicScreens.invalidateLibrary()
-                                if (homeShown && selectedTab == R.id.nav_pdf) renderHomeTab(selectedTab)
-                            } finally { button.isEnabled = true }
-                        }
-                    }
-                }
-            }
-        }
-        dialog.show()
+    private fun openFileEditor(file: JSONObject) {
+        publishLauncher.launch(Intent(this, ClassMatePublishActivity::class.java)
+            .putExtra("batch_id", selectedBatchId).putExtra("batch_label", selectedBatchLabel).putExtra("role", profile?.optString("role"))
+            .putExtra("profile_id", userId).putExtra("upload", true).putExtra("resource", file.toString()))
     }
+    private fun showNoticeForm() = openPublishPage(false)
+    private fun showUploadForm() = openPublishPage(true)
 
     private fun showClassChangeForm() {
         chooseBatch { batchId -> chooseActiveCourse(batchId) { courseId ->
@@ -1737,86 +1638,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }.show()
     }
 
+    private val busEditorLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
+            if (homeShown) renderHomeTab(selectedTab)
+        }
+    }
     private fun showBusScheduleDialog(existing: JSONObject?) {
-        val d = resources.displayMetrics.density
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((22*d).toInt(), (8*d).toInt(), (22*d).toInt(), (8*d).toInt())
-        }
-        fun field(label: String, value: String): EditText {
-            panel.addView(TextView(this).apply {
-                text = label; textSize = 12f; setTypeface(null, Typeface.BOLD)
-                setTextColor(getColor(R.color.cm_text_secondary))
-                setPadding(0, (10*d).toInt(), 0, 0)
-            })
-            return EditText(this).also {
-                it.hint = label
-                it.setText(value)
-                it.isSingleLine = true
-                panel.addView(it)
-            }
-        }
-        val route = field("Route name", existing?.optString("route_name").orEmpty())
-        val departure = field("Departure time (HH:MM)",
-            existing?.optString("departure_time")?.take(5).orEmpty())
-        val origin = field("From", existing?.optString("origin").orEmpty())
-        val destination = field("To", existing?.optString("destination").orEmpty())
-        val notes = field("Notes (optional)", existing?.optString("notes").orEmpty())
-        panel.addView(TextView(this).apply {
-            text = "Runs on"; textSize = 13f; setTypeface(null, Typeface.BOLD)
-            setPadding(0, (15*d).toInt(), 0, 0)
-        })
-        val oldDays = existing?.optJSONArray("weekdays")
-        val dayChecks = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
-            .mapIndexed { index, name ->
-                android.widget.CheckBox(this).apply {
-                    text = name
-                    isChecked = oldDays == null || (0 until oldDays.length()).any {
-                        oldDays.optInt(it) == index }
-                    panel.addView(this)
-                }
-            }
-        val activeSwitch = androidx.appcompat.widget.SwitchCompat(this).apply {
-            text = "Route is active"
-            isChecked = existing?.optBoolean("active") ?: true
-            panel.addView(this)
-        }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(if (existing == null) "Add bus route" else "Edit bus route")
-            .setView(ScrollView(this).apply { addView(panel) })
-            .setPositiveButton("Save route", null).setNegativeButton("Cancel", null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val time = departure.text.toString().trim()
-                when {
-                    route.text.isBlank() -> route.error = "Enter a route name"
-                    !time.matches(Regex("^([01]\\d|2[0-3]):[0-5]\\d$")) ->
-                        departure.error = "Use 24-hour HH:MM"
-                    origin.text.isBlank() -> origin.error = "Enter the starting point"
-                    destination.text.isBlank() -> destination.error = "Enter the destination"
-                    dayChecks.none { it.isChecked } ->
-                        Toast.makeText(this, "Select at least one day", Toast.LENGTH_SHORT).show()
-                    else -> {
-                        val weekdays = JSONArray()
-                        dayChecks.forEachIndexed { index, check -> if (check.isChecked) weekdays.put(index) }
-                        dialog.dismiss()
-                        runAction("Saving bus schedule") {
-                            ClassMateAuthApi.rpc("save_bus_schedule", JSONObject()
-                                .put("target_id", existing?.optString("id") ?: JSONObject.NULL)
-                                .put("target_route", route.text.toString().trim())
-                                .put("target_departure", time)
-                                .put("target_origin", origin.text.toString().trim())
-                                .put("target_destination", destination.text.toString().trim())
-                                .put("target_weekdays", weekdays)
-                                .put("target_notes", notes.text.toString().trim())
-                                .put("target_active", activeSwitch.isChecked))
-                            resultView.text = "Bus schedule saved."
-                        }
-                    }
-                }
-            }
-        }
-        dialog.show()
+        busEditorLauncher.launch(Intent(this, ClassMateBusEditorActivity::class.java).putExtra("profile_id", userId).putExtra("batch_id", selectedBatchId).apply { existing?.let { putExtra("bus", it.toString()) } })
     }
 
     private fun pickRow(table: String, query: String, title: String,

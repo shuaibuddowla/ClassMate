@@ -15,7 +15,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.ClassMateAuthActivity
@@ -29,9 +28,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         Log.d("FCM", "From: ${remoteMessage.from}")
 
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
-            if (GoogleSignIn.getLastSignedInAccount(this) == null) return
+            ClassMateAuthApi.attach(applicationContext)
+            if (!ClassMateAuthApi.hasSavedSession() || !com.shuaib.classmate.utils.AppPreferences(this).isNotificationsEnabled()) return
+            val identity = ClassMateAuthApi.notificationIdentity() ?: return
+            val expectedProject = android.net.Uri.parse(BuildConfig.CLASSMATE_URL).host?.substringBefore('.')
+            if (remoteMessage.data["project_ref"] != expectedProject || remoteMessage.data["recipient_id"] != identity.optString("id")) return
+            if (identity.optString("verification_status") != "active") return
+            if (identity.optString("role") == "student" && remoteMessage.data["batch_id"] != identity.optString("batch_id")) return
             val kind = remoteMessage.data["kind"] ?: "update"
-            sendNotification("ClassMate update", "New $kind available", kind)
+            sendNotification(remoteMessage.data["title"] ?: "ClassMate update", remoteMessage.data["body"] ?: "New $kind available", remoteMessage.data["record_id"] ?: kind)
             return
         }
 
@@ -59,6 +64,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun sendNotification(title: String, messageBody: String, type: String) {
+        if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         // Intent to open MainActivity
         val target = if (BuildConfig.CLASSMATE_AUTH_ENABLED) ClassMateAuthActivity::class.java
             else MainActivity::class.java
@@ -68,7 +75,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, type.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -84,17 +91,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .setSound(defaultSoundUri)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(messageBody))
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(System.currentTimeMillis().toInt(), notificationBuilder.build())
+        notificationManager.notify(type.hashCode(), notificationBuilder.build())
     }
 
     override fun onNewToken(token: String) {
-        if (BuildConfig.CLASSMATE_AUTH_ENABLED && ClassMateAuthApi.accessToken != null) {
+        ClassMateAuthApi.attach(applicationContext)
+        if (BuildConfig.CLASSMATE_AUTH_ENABLED && ClassMateAuthApi.hasSavedSession() &&
+            com.shuaib.classmate.utils.AppPreferences(this).isNotificationsEnabled() && androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 runCatching { ClassMateAuthApi.registerDeviceToken(token) }
-                    .onFailure { Log.w("FCM", "Staging token registration failed", it) }
+                    .onFailure { Log.w("FCM", "Device token registration failed") }
             }
         }
     }

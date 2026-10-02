@@ -6,3 +6,6 @@ project_id = "classmate-a016a"
 
 [functions.send-notification]
 verify_jwt = false
+
+[functions.dispatch-classmate-notifications]
+verify_jwt = false

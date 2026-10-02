@@ -1,15 +1,10 @@
 package com.shuaib.classmate.activities
 
 import android.content.Intent
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.shuaib.classmate.services.ClassMateAutoMuteScheduler
+import androidx.core.view.doOnAttach
 import com.shuaib.classmate.services.ClassMateNoticeReminderScheduler
 import java.time.Instant
 import java.time.ZonedDateTime
-import com.shuaib.classmate.services.ShakeToTorchService
 import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
@@ -54,9 +49,11 @@ internal class ClassMateAcademicScreensSupabase(
     private val profile: () -> JSONObject,
     private val onPostNotice: () -> Unit,
     private val onUpload: () -> Unit,
+    private val onEditFile: (JSONObject) -> Unit,
     private val onSignOut: () -> Unit,
     private val onSwitchBatch: () -> Unit,
     private val onAddPeriod: (JSONObject?, Int) -> Unit,
+    private val onAddBus: (JSONObject?) -> Unit,
     private val onOpenCourse: (String, String, Boolean) -> Unit,
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
@@ -71,6 +68,7 @@ internal class ClassMateAcademicScreensSupabase(
     private val noticeStates = mutableMapOf<String, JSONObject>()
     private val noticeAuthors = mutableMapOf<String, JSONObject>()
     private val noticeReadCounts = mutableMapOf<String, JSONObject>()
+    private val noticeReaderPreviews = mutableMapOf<String, List<JSONObject>>()
     private val noticeReadSent = mutableSetOf<String>()
     private var noticeVisibleIds = emptyList<String>()
     private var noticeHeaderOffset = 0
@@ -79,6 +77,7 @@ internal class ClassMateAcademicScreensSupabase(
         GoogleSignIn.getLastSignedInAccount(activity)?.photoUrl?.toString()
             ?.takeIf { it.startsWith("https://") }
     }
+    private var readerDialog: AlertDialog? = null
     private var libraryCategory = "theory"
     private var libraryFilter = "All"
     private data class LibrarySnapshot(
@@ -89,6 +88,7 @@ internal class ClassMateAcademicScreensSupabase(
         val favoriteIds: MutableSet<String>,
     )
     private var librarySnapshot: LibrarySnapshot? = null
+    private var libraryLoadingRoot: View? = null
     fun invalidateLibrary() { librarySnapshot = null }
     private val inflater get() = LayoutInflater.from(activity)
     private val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
@@ -103,20 +103,24 @@ internal class ClassMateAcademicScreensSupabase(
             R.id.nav_timetable -> R.layout.fragment_timetable
             R.id.nav_notices -> R.layout.fragment_notice
             R.id.nav_pdf -> R.layout.fragment_pdf_library
-            else -> R.layout.fragment_profile
+            else -> R.layout.classmate_profile
         }
         val root = inflater.inflate(layout, host, false)
         host.addView(root, LinearLayout.LayoutParams(-1, -1))
-        when (tab) {
-            R.id.nav_timetable -> setupTimetable(root)
-            R.id.nav_notices -> setupNotices(root)
-            R.id.nav_pdf -> setupLibrary(root)
-            else -> setupProfile(root)
-        }
         navShown = true
         noticeHeaderCollapsed = false
         noticeScrollTravel = 0
-        bindFloatingNavigation(tab, root)
+        // Cold offline loads contain no suspending network call. Wait for attachment
+        // so visibility guards do not discard the cached result before the first draw.
+        root.doOnAttach {
+            when (tab) {
+                R.id.nav_timetable -> setupTimetable(root)
+                R.id.nav_notices -> setupNotices(root)
+                R.id.nav_pdf -> setupLibrary(root)
+                else -> setupProfile(root)
+            }
+            bindFloatingNavigation(tab, root)
+        }
     }
 
     private fun bindFloatingNavigation(tab: Int, root: View) {
@@ -234,12 +238,14 @@ internal class ClassMateAcademicScreensSupabase(
     private fun setupTimetable(root: View) {
         val name = profile().optString("full_name").substringBefore(' ').ifBlank { "Student" }
         text(root, R.id.tvUserName, name)
-        text(root, R.id.tvGreeting, when (LocalTime.now().hour) {
-            in 5..11 -> "Good Morning,"
-            in 12..16 -> "Good Afternoon,"
-            in 17..20 -> "Good Evening,"
-            else -> "Good Night,"
-        })
+        val hour = LocalTime.now().hour
+        val greetings = when (hour) {
+            in 0..4 -> listOf("Up late?", "A little planning for tomorrow?", "Your campus, even after hours.")
+            in 5..11 -> listOf("Ready for a fresh start?", "Welcome back.", "What’s on your schedule?")
+            in 12..17 -> listOf("Let’s plan the rest of your day.", "Your next class, at a glance.", "Ready for what’s next?")
+            else -> listOf("Time to wrap up your day.", "A quick look at tomorrow?", "Welcome back.")
+        }
+        text(root, R.id.tvGreeting, greetings[LocalDate.now().dayOfYear % greetings.size])
         root.v<View>(R.id.heroNextClass).visibility = View.GONE
         root.v<View>(R.id.calendarExceptionBanner).visibility = View.GONE
         root.v<View>(R.id.countdownSection).visibility = View.GONE
@@ -272,15 +278,32 @@ internal class ClassMateAcademicScreensSupabase(
             bus.setBackgroundResource(if (busMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             routine.setTextColor(activity.getColor(if (busMode) R.color.cm_text_secondary else android.R.color.white))
             bus.setTextColor(activity.getColor(if (busMode) android.R.color.white else R.color.cm_text_secondary))
+            val timetable = com.shuaib.classmate.databinding.FragmentTimetableBinding.bind(root)
+            timetable.tvAddPeriod.text = if (busMode) "Add Bus" else "Add Period"
+            timetable.btnAddPeriod.apply {
+                val canEdit = if (busMode) canEditBus()
+                    else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
+                visibility = if (canEdit) View.VISIBLE else View.GONE
+                setOnClickListener { if (busMode) onAddBus(null) else onAddPeriod(null, selectedDay) }
+            }
             loadTimetable(root)
         }
         routine.setOnClickListener { busMode = false; updateToggle() }
         bus.setOnClickListener { busMode = true; updateToggle() }
-        root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root) }
+        root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
     }
 
-    private fun loadTimetable(root: View): Unit = launch(root) {
+    private fun canEditBus(): Boolean {
+        val account = profile()
+        return account.optString("role") == "admin" || (account.optBoolean("is_cr") &&
+            account.optString("verification_status") == "active" &&
+            (account.isNull("cr_valid_until") || runCatching {
+                Instant.parse(account.optString("cr_valid_until")).isAfter(Instant.now())
+            }.getOrDefault(false)))
+    }
+
+    private fun loadTimetable(root: View, force: Boolean = false): Unit = launch(root) {
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
         val shimmer = root.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
         val day = selectedDay
@@ -288,59 +311,57 @@ internal class ClassMateAcademicScreensSupabase(
         val selectedBatch = batchId()
         val requestedBusMode = busMode
         val request = ++timetableRequest
+        val cacheKind = if (requestedBusMode) "bus" else "routine"
+        val accountId = profile().optString("id")
+        var snapshot = ClassMateAcademicCache.read(activity, accountId, selectedBatch, cacheKind)
+        val hadSnapshot = snapshot != null
         var completed = false
-        shimmer.visibility = View.VISIBLE
-        shimmer.startShimmer()
-        root.v<View>(R.id.rvPeriods).visibility = View.GONE
-        root.v<View>(R.id.emptyState).visibility = View.GONE
-        root.v<View>(R.id.scheduleHeader).visibility = View.GONE
+        if (snapshot == null) {
+            shimmer.visibility = View.VISIBLE; shimmer.startShimmer()
+            root.v<View>(R.id.rvPeriods).visibility = View.GONE
+            root.v<View>(R.id.emptyState).visibility = View.GONE
+        }
         try {
-            val entries: List<JSONObject>
-            val names: Map<String, String>
-            var details = emptyMap<String, JSONObject>()
-            var editableCourses = emptySet<String>()
-            if (requestedBusMode) {
-                names = emptyMap()
-                entries = rows(ClassMateAuthApi.rows("bus_schedules",
-                    "select=id,route_name,departure_time,origin,destination,weekdays&active=eq.true&order=departure_time"))
-                    .filter { item ->
-                        val weekdays = item.optJSONArray("weekdays")
-                        weekdays == null || (0 until weekdays.length()).any { weekdays.optInt(it) == day }
+            if (snapshot == null && !ClassMateAcademicCache.online(activity)) error("No saved schedule yet. Connect once to sync this batch.")
+            if (snapshot == null || (force && ClassMateAcademicCache.online(activity))) {
+                if (requestedBusMode) {
+                    val buses = ClassMateAuthApi.rows("bus_schedules", "select=id,route_name,departure_time,origin,destination,weekdays,notes,active&active=eq.true&order=departure_time")
+                    snapshot = JSONObject().put("entries", buses).put("saved_at", System.currentTimeMillis())
+                } else {
+                    val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
+                    val offerings = if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))
+                    val ids = offerings.map { it.getString("id") }
+                    val bundle = coroutineScope {
+                        val courses = async { rows(ClassMateAuthApi.rows("courses", "select=id,course_title")).associateBy { it.getString("id") } }
+                        val routines = async { if (ids.isEmpty()) JSONArray() else ClassMateAuthApi.rows("routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.(${ids.joinToString(",")})&order=start_time") }
+                        val teachers = async { if (ids.isEmpty()) JSONArray() else JSONArray(ClassMateAuthApi.rpcText("timetable_details", JSONObject().put("target_batch", selectedBatch).put("target_date", LocalDate.now().toString()).put("target_course_ids", JSONArray(ids)))) }
+                        val changes = async { ClassMateAuthApi.rows("class_changes", "select=semester_course_id,effective_date&batch_id=eq.$selectedBatch&kind=eq.cancelled&effective_date=gte.${LocalDate.now()}&effective_date=lte.${LocalDate.now().plusDays(7)}") }
+                        val assigned = async { when {
+                            profile().optString("role") == "admin" || profile().optBoolean("is_cr") -> ids
+                            profile().optString("role") == "teacher" -> rows(ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.$accountId&active=eq.true")).map { it.getString("semester_course_id") }
+                            else -> emptyList()
+                        } }
+                        val names = JSONObject(); val catalog = courses.await()
+                        offerings.forEach { names.put(it.getString("id"), catalog[it.getString("course_id")]?.optString("course_title") ?: "Course") }
+                        JSONObject().put("entries", routines.await()).put("names", names).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("saved_at", System.currentTimeMillis())
                     }
-            } else {
-                val semesters = ClassMateAuthApi.rows("semesters",
-                    "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1")
-                val semesterId = semesters.optJSONObject(0)?.optString("id")
-                val offerings = if (semesterId == null) emptyList() else rows(
-                    ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semesterId"))
-                val courseIds = offerings.map { it.getString("id") }
-                editableCourses = when {
-                    profile().optString("role") == "admin" || profile().optBoolean("is_cr") ->
-                        courseIds.toSet()
-                    profile().optString("role") == "teacher" -> {
-                        val assigned = ClassMateAuthApi.rows("teacher_course_assignments",
-                            "select=semester_course_id&teacher_id=eq.${profile().optString("id")}&active=eq.true")
-                        rows(assigned).map { it.getString("semester_course_id") }.toSet()
-                    }
-                    else -> emptySet()
+                    snapshot = bundle
                 }
-                val courses = rows(ClassMateAuthApi.rows("courses", "select=id,course_code,course_title"))
-                    .associateBy { it.getString("id") }
-                names = offerings.associate { offering ->
-                    val course = courses[offering.getString("course_id")]
-                    offering.getString("id") to (course?.optString("course_title") ?: "Course")
-                }
-                entries = if (courseIds.isEmpty()) emptyList() else rows(ClassMateAuthApi.rows(
-                    "routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type" +
-                        "&semester_course_id=in.(${courseIds.joinToString(",")})&day_of_week=eq.$day&order=start_time"))
-                if (courseIds.isNotEmpty()) {
-                    details = rows(JSONArray(ClassMateAuthApi.rpcText("timetable_details", JSONObject()
-                        .put("target_batch", selectedBatch)
-                        .put("target_date", effectiveDate.toString())
-                        .put("target_course_ids", JSONArray(courseIds)))))
-                        .associateBy { it.getString("semester_course_id") }
-                }
+                ClassMateAcademicCache.save(activity, accountId, selectedBatch, cacheKind, snapshot!!)
             }
+            val data = snapshot!!
+            val allEntries = rows(data.optJSONArray("entries") ?: JSONArray())
+            val entries = allEntries.filter { item -> if (requestedBusMode) {
+                val weekdays = item.optJSONArray("weekdays")
+                weekdays == null || (0 until weekdays.length()).any { weekdays.optInt(it) == day }
+            } else item.optInt("day_of_week") == day }
+            val nameJson = data.optJSONObject("names") ?: JSONObject()
+            val names = nameJson.keys().asSequence().associateWith { nameJson.optString(it) }
+            val cancellations = rows(data.optJSONArray("changes") ?: JSONArray()).filter { it.optString("effective_date") == effectiveDate.toString() }.map { it.optString("semester_course_id") }.toSet()
+            val details = rows(data.optJSONArray("details") ?: JSONArray()).associate { detail ->
+                detail.getString("semester_course_id") to JSONObject(detail.toString()).put("cancelled", detail.getString("semester_course_id") in cancellations)
+            }
+            val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
             if (!active(root) || request != timetableRequest || day != selectedDay ||
                 requestedBusMode != busMode || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
@@ -352,6 +373,11 @@ internal class ClassMateAcademicScreensSupabase(
                 text(card, R.id.tvBusName, item.optString("route_name"))
                 text(card, R.id.tvRoute, "${item.optString("origin")} → ${item.optString("destination")}")
                 text(card, R.id.tvDepartureTime, hour(item.optString("departure_time")))
+                if (canEditBus()) {
+                    card.setOnClickListener { onAddBus(item) }
+                    card.setOnLongClickListener { onAddBus(item); true }
+                    card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
+                }
             } else recycler(root, R.id.rvPeriods, R.layout.item_period, entries) { card, item ->
                 val courseId = item.optString("semester_course_id")
                 val detail = details[courseId]
@@ -359,13 +385,14 @@ internal class ClassMateAcademicScreensSupabase(
                 text(card, R.id.tvSubject, names[courseId] ?: "Class")
                 text(card, R.id.tvStartTime, hour(item.optString("start_time")))
                 text(card, R.id.tvEndTime, hour(item.optString("end_time")))
-                val teacherName = detail?.optString("teacher_name").orEmpty()
+                val teacherName = detail?.optString("teacher_name").orEmpty().trim().takeUnless { it.equals("null", true) }.orEmpty()
                 text(card, R.id.tvTeacher, teacherName)
                 card.v<View>(R.id.layoutTeacherInfo).visibility =
                     if (teacherName.isBlank()) View.GONE else View.VISIBLE
-                text(card, R.id.tvRoom, item.optString("room"))
+                val room = item.optString("room").takeUnless { it == "null" }.orEmpty()
+                text(card, R.id.tvRoom, room)
                 card.v<View>(R.id.layoutRoomInfo).visibility =
-                    if (item.optString("room").isBlank()) View.GONE else View.VISIBLE
+                    if (room.isBlank()) View.GONE else View.VISIBLE
                 text(card, R.id.tvTypeBadge,
                     if (cancelled) "CANCELLED" else item.optString("type").uppercase())
                 if (cancelled) {
@@ -389,15 +416,20 @@ internal class ClassMateAcademicScreensSupabase(
                 }
             }
             completed = true
+            if (!force && ClassMateAcademicCache.online(activity) && System.currentTimeMillis() - data.optLong("saved_at") > 60_000)
+                root.post { if (active(root) && day == selectedDay && requestedBusMode == busMode) loadTimetable(root, true) }
+        } catch (e: Exception) {
+            if (!hadSnapshot) throw e
+            // A failed background sync never replaces the visible, last-synced schedule.
         } finally {
             refresh.isRefreshing = false
             if (request == timetableRequest && root.isAttachedToWindow) {
                 shimmer.stopShimmer()
                 shimmer.visibility = View.GONE
-                if (!completed) {
+                if (!completed && !hadSnapshot) {
                     root.v<View>(R.id.emptyState).visibility = View.VISIBLE
                     text(root, R.id.tvNoClassesTitle, "Could not load schedule")
-                    text(root, R.id.tvNoClassesSubtitle, "Pull to try again")
+                    text(root, R.id.tvNoClassesSubtitle, "Connect and pull to sync this batch")
                 }
             }
         }
@@ -410,10 +442,8 @@ internal class ClassMateAcademicScreensSupabase(
         fun fitFeedBelowHeader() {
             val params = feed.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val top = header.bottom + (8 * activity.resources.displayMetrics.density).toInt()
-            if (params.topMargin != top) {
-                params.topMargin = top
-                feed.layoutParams = params
-            }
+            if (params.topMargin != 0) { params.topMargin = 0; feed.layoutParams = params }
+            if (feed.paddingTop != top) feed.setPadding(feed.paddingLeft, top, feed.paddingRight, feed.paddingBottom)
         }
         header.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fitFeedBelowHeader() }
         header.post { if (root.isAttachedToWindow) fitFeedBelowHeader() }
@@ -454,13 +484,15 @@ internal class ClassMateAcademicScreensSupabase(
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadNotices(root) }
+        if (noticeBatch != batchId() || noticeFeed.isEmpty()) restoreNoticeCache()
         if (noticeBatch == batchId() && noticeFeed.isNotEmpty()) renderNoticeFeed(root)
-        loadNotices(root)
+        if (ClassMateAcademicCache.online(activity)) loadNotices(root)
     }
 
     private fun loadNotices(root: View): Unit = launch(root) {
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
         val selectedBatch = batchId()
+        if (!ClassMateAcademicCache.online(activity)) { refresh.isRefreshing = false; renderNoticeFeed(root); return@launch }
         val request = ++noticeRequest
         val shimmer = root.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
         if (noticeFeed.isEmpty() || noticeBatch != selectedBatch) {
@@ -474,11 +506,12 @@ internal class ClassMateAcademicScreensSupabase(
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
             noticeBatch = selectedBatch
             noticeFeed = visible
+            saveNoticeCache()
             renderNoticeFeed(root)
             shimmer.stopShimmer()
             shimmer.visibility = View.GONE
-            val (engagement, authors, reads) = if (visible.isEmpty())
-                Triple(emptyList<JSONObject>(), emptyList(), emptyList())
+            val (engagement, authors, reads, previews) = if (visible.isEmpty())
+                listOf(emptyList<JSONObject>(), emptyList(), emptyList(), emptyList())
             else coroutineScope {
                 val ids = JSONArray(visible.map { it.getString("id") })
                 val reactions = async { rows(JSONArray(ClassMateAuthApi.rpcText(
@@ -487,16 +520,22 @@ internal class ClassMateAcademicScreensSupabase(
                     "notice_author_details", JSONObject().put("target_ids", ids)))) }
                 val readInfo = async { rows(JSONArray(ClassMateAuthApi.rpcText(
                     "notice_read_counts", JSONObject().put("target_ids", ids)))) }
-                Triple(reactions.await(), authorInfo.await(), readInfo.await())
+                val previews = async { rows(JSONArray(ClassMateAuthApi.rpcText(
+                    "notice_reader_previews", JSONObject().put("target_ids", ids)))) }
+                listOf(reactions.await(), authorInfo.await(), readInfo.await(), previews.await())
             }
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
+            previews.groupBy { it.getString("notice_id") }.forEach { (id, readers) -> noticeReaderPreviews[id] = readers }
             engagement.forEach { noticeStates[it.getString("notice_id")] = it }
             authors.forEach { noticeAuthors[it.getString("notice_id")] = it }
             reads.forEach {
                 noticeReadCounts[it.getString("notice_id")] = it
                 if (it.optBoolean("read_by_me")) noticeReadSent.add(it.getString("notice_id"))
             }
+            saveNoticeCache()
             renderNoticeFeed(root)
+        } catch (e: Exception) {
+            if (noticeFeed.isEmpty()) throw e
         } finally {
             refresh.isRefreshing = false
             if (request == noticeRequest && root.isAttachedToWindow) {
@@ -506,10 +545,27 @@ internal class ClassMateAcademicScreensSupabase(
         }
     }
 
+    private fun saveNoticeCache() {
+        fun mapJson(map: Map<String, JSONObject>) = JSONObject().apply { map.forEach { (id, value) -> put(id, value) } }
+        val previews = JSONObject().apply { noticeReaderPreviews.forEach { (id, value) -> put(id, JSONArray(value)) } }
+        ClassMateAcademicCache.save(activity, profile().optString("id"), batchId(), "notices", JSONObject()
+            .put("feed", JSONArray(noticeFeed)).put("states", mapJson(noticeStates)).put("authors", mapJson(noticeAuthors))
+            .put("reads", mapJson(noticeReadCounts)).put("previews", previews))
+    }
+    private fun restoreNoticeCache() {
+        noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear()
+        noticeBatch = batchId()
+        val data = ClassMateAcademicCache.read(activity, profile().optString("id"), batchId(), "notices") ?: return
+        noticeBatch = batchId(); noticeFeed = rows(data.optJSONArray("feed") ?: JSONArray())
+        fun restore(name: String, map: MutableMap<String, JSONObject>) { val json = data.optJSONObject(name) ?: return; json.keys().forEach { id -> json.optJSONObject(id)?.let { map[id] = it } } }
+        restore("states", noticeStates); restore("authors", noticeAuthors); restore("reads", noticeReadCounts)
+        data.optJSONObject("previews")?.let { json -> json.keys().forEach { id -> noticeReaderPreviews[id] = rows(json.optJSONArray(id) ?: JSONArray()) } }
+    }
+
     private fun renderNoticeFeed(root: View) {
         if (!root.isAttachedToWindow) return
         val search = root.v<EditText>(R.id.etNoticeSearch).text.toString().trim()
-        text(root, R.id.tvNoticeSubtitle, "${noticeFeed.size} updates · Pull to refresh")
+        text(root, R.id.tvNoticeSubtitle, "${noticeFeed.size} updates · ${if (ClassMateAcademicCache.online(activity)) "Pull to refresh" else "Offline · Last synced"}")
         val filtered = noticeFeed.filter { search.isBlank() ||
             it.optString("title").contains(search, true) || it.optString("body").contains(search, true) }
             .sortedWith(compareByDescending<JSONObject> {
@@ -542,11 +598,11 @@ internal class ClassMateAcademicScreensSupabase(
                 card.v<View>(R.id.noticeCardSurface).setBackgroundResource(background)
                 card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).setImageResource(icon)
                 card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).imageTintList =
-                    android.content.res.ColorStateList.valueOf(activity.getColor(accent))
+                    if (resourceNotice) null else android.content.res.ColorStateList.valueOf(activity.getColor(accent))
                 card.v<View>(R.id.noticeAccent).backgroundTintList =
                     android.content.res.ColorStateList.valueOf(activity.getColor(accent))
-                text(card, R.id.tvTitle, item.optString("title"))
-                text(card, R.id.tvPreview, item.optString("body"))
+                card.v<TextView>(R.id.tvTitle).text = ClassMateNoticeText.styled(card.v(R.id.tvTitle), title, search)
+                ClassMateNoticeText.bind(card.v(R.id.tvPreview), item.optString("body"), search) { showNoticeContent(item, search) }
                 card.v<View>(R.id.tvPreview).visibility =
                     if (item.optString("body").isBlank()) View.GONE else View.VISIBLE
                 text(card, R.id.tvMeta, noticeDate(item.optString("published_at")))
@@ -601,8 +657,7 @@ internal class ClassMateAcademicScreensSupabase(
                 setReminderAppearance(card, reminderPending)
                 card.v<View>(R.id.btnReminder).setOnClickListener { showReminderOptions(root, card, item) }
                 card.v<View>(R.id.cardRoot).setOnClickListener {
-                    AlertDialog.Builder(activity).setTitle(item.optString("title"))
-                        .setMessage(item.optString("body")).setPositiveButton("Close", null).show()
+                    showNoticeContent(item, search)
                 }
             }
         list.adapter = if (filtered.isEmpty()) noticeCards else ConcatAdapter(
@@ -632,15 +687,49 @@ internal class ClassMateAcademicScreensSupabase(
             .withZone(ZoneId.systemDefault()).format(Instant.parse(value))
     }.getOrElse { value.replace('T', ' ').take(16) }
 
-    private fun seenLabel(count: Long) = "$count seen"
+    private fun compactCount(count: Long): String = when {
+        count >= 1_000_000 -> "${java.text.DecimalFormat("0.#").format(count / 1_000_000.0)}m"
+        count >= 1_000 -> "${java.text.DecimalFormat("0.#").format(count / 1_000.0)}k"
+        else -> count.toString()
+    }
+    private fun seenLabel(count: Long) = "${compactCount(count)} seen"
+
+    private fun showNoticeContent(item: JSONObject, query: String = "") {
+        val form = ClassMateFormUi(activity)
+        form.label(item.optString("body")).apply {
+            textSize = 16f
+            text = ClassMateNoticeText.styled(this, item.optString("body"), query)
+            movementMethod = android.text.method.LinkMovementMethod.getInstance()
+            setLinkTextColor(activity.getColor(R.color.cm_primary))
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+            .setBackground(noticeDialogSurface()).setTitle(item.optString("title")).setView(form.scroll)
+            .setNegativeButton("Close", null).setPositiveButton("Copy notice", null).create().also { dialog ->
+                dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ClassMate notice", item.optString("title") + "\n\n" + item.optString("body")))
+                    if (android.os.Build.VERSION.SDK_INT < 33) Toast.makeText(activity, "Notice copied", Toast.LENGTH_SHORT).show()
+                } }; dialog.show()
+            }
+    }
 
     private fun bindSeenAvatar(card: View, noticeId: String) {
-        val showOwnPhoto = noticeReadCounts[noticeId]?.optBoolean("read_by_me") == true &&
-            ownGoogleAvatar != null
-        card.v<View>(R.id.seenAvatars).visibility = if (showOwnPhoto) View.VISIBLE else View.GONE
-        if (showOwnPhoto) {
-            com.bumptech.glide.Glide.with(card).load(ownGoogleAvatar)
-                .into(card.v<android.widget.ImageView>(R.id.ivSeenMeAvatar))
+        val group = card.v<android.widget.FrameLayout>(R.id.seenAvatars)
+        group.removeAllViews()
+        val readers = noticeReaderPreviews[noticeId].orEmpty().take(if (activity.resources.configuration.screenWidthDp < 360) 3 else 4)
+        group.visibility = if (readers.isEmpty()) View.GONE else View.VISIBLE
+        fun dp(n: Int) = (n * activity.resources.displayMetrics.density).toInt()
+        group.layoutParams = group.layoutParams.apply { width = dp(22 + (readers.size - 1).coerceAtLeast(0) * 14); height = dp(22) }
+        readers.forEachIndexed { index, reader ->
+            val image = de.hdodenhof.circleimageview.CircleImageView(activity).apply {
+                borderWidth = dp(1); borderColor = activity.getColor(R.color.cm_surface)
+                contentDescription = reader.optString("reader_name")
+                setImageResource(R.drawable.ic_default_avatar)
+            }
+            group.addView(image, android.widget.FrameLayout.LayoutParams(dp(22), dp(22)).apply { marginStart = dp(index * 14) })
+            reader.optString("avatar_url").takeIf { it.startsWith("https://") }?.let {
+                com.bumptech.glide.Glide.with(card).load(it).placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(image)
+            }
         }
     }
 
@@ -656,6 +745,7 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun markVisibleNoticesRead(root: View, list: RecyclerView) {
+        if (!ClassMateAcademicCache.online(activity)) return
         val manager = list.layoutManager as? LinearLayoutManager ?: return
         val first = manager.findFirstVisibleItemPosition().coerceAtLeast(noticeHeaderOffset)
         val last = manager.findLastVisibleItemPosition().coerceAtMost(
@@ -675,12 +765,17 @@ internal class ClassMateAcademicScreensSupabase(
                     .put("target_ids", JSONArray(newIds)))
             }.onSuccess {
                 newIds.forEach { id ->
+                    val previews = noticeReaderPreviews[id].orEmpty()
+                    if (previews.none { it.optString("profile_id") == profile().optString("id") })
+                        noticeReaderPreviews[id] = (listOf(JSONObject().put("profile_id", profile().optString("id"))
+                            .put("reader_name", profile().optString("full_name")).put("avatar_url", ownGoogleAvatar ?: "")) + previews).take(4)
                     val count = noticeReadCounts.getOrPut(id) { JSONObject() }
                     if (!count.optBoolean("read_by_me")) {
                         count.put("read_by_me", true)
                         count.put("read_count", count.optLong("read_count") + 1)
                     }
                 }
+                saveNoticeCache()
                 for (position in first..last) {
                     val id = noticeVisibleIds.getOrNull(position - noticeHeaderOffset)
                     val view = manager.findViewByPosition(position)
@@ -695,25 +790,58 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun showNoticeReadReceipts(root: View, notice: JSONObject) {
-        val count = noticeReadCounts[notice.optString("id")]?.optLong("read_count") ?: 0
-        if (profile().optString("role") != "admin" &&
-            notice.optString("author_id") != profile().optString("id")) {
-            Toast.makeText(activity, "$count readers", Toast.LENGTH_SHORT).show()
-            return
+        if (readerDialog?.isShowing == true) return
+        fun dp(n: Int) = (n * activity.resources.displayMetrics.density).toInt()
+        val form = ClassMateFormUi(activity)
+        val status = form.label("Loading readers…")
+        val list = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        form.panel.addView(list)
+        val background = com.google.android.material.shape.MaterialShapeDrawable(
+            com.google.android.material.shape.ShapeAppearanceModel.builder().setAllCornerSizes(dp(24).toFloat()).build()).apply {
+            fillColor = android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface))
         }
-        launch(root) {
-            val readers = rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers", JSONObject()
-                .put("target_notice", notice.getString("id")))))
-            if (!root.isAttachedToWindow) return@launch
-            AlertDialog.Builder(activity).setTitle("Read by ${readers.size}")
-                .setMessage(readers.joinToString("\n") {
-                    "${it.optString("reader_name")} · ${it.optString("read_at").take(16).replace('T', ' ')}"
-                }.ifBlank { "No one has read this notice yet" })
-                .setPositiveButton("Close", null).show()
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+            .setBackground(background).setTitle("Seen by")
+            .setView(form.scroll).setPositiveButton("Close", null).setNeutralButton("Refresh", null).create()
+        readerDialog = dialog
+        fun load() {
+            status.visibility = View.VISIBLE; status.text = "Loading readers…"
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = false
+            scope.launch {
+                try {
+                    val readers = rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers", JSONObject().put("target_notice", notice.getString("id")))))
+                    if (!dialog.isShowing || activity.isFinishing) return@launch
+                    list.removeAllViews(); dialog.setTitle("Seen by ${readers.size}")
+                    status.visibility = if (readers.isEmpty()) View.VISIBLE else View.GONE
+                    status.text = "No one has read this notice yet"
+                    form.scroll.layoutParams = form.scroll.layoutParams.apply {
+                        height = minOf(dp(48 + maxOf(1, readers.size) * 56), (activity.resources.displayMetrics.heightPixels * 0.48f).toInt())
+                    }
+                    readers.forEach { reader ->
+                        val row = LinearLayout(activity).apply { gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(0, dp(10), 0, dp(10)) }
+                        val avatar = de.hdodenhof.circleimageview.CircleImageView(activity).apply { setImageResource(R.drawable.ic_default_avatar) }
+                        row.addView(avatar, LinearLayout.LayoutParams(dp(36), dp(36)))
+                        val labels = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
+                        labels.addView(TextView(activity).apply { text = reader.optString("reader_name"); textSize = 14f; setTextColor(activity.getColor(R.color.cm_text_primary)) })
+                        labels.addView(TextView(activity).apply { text = noticeDate(reader.optString("read_at")); textSize = 12f; setTextColor(activity.getColor(R.color.cm_text_secondary)) })
+                        row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f)); list.addView(row)
+                        reader.optString("avatar_url").takeIf { it.startsWith("https://") }?.let { com.bumptech.glide.Glide.with(activity).load(it).placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar) }
+                    }
+                } catch (e: Exception) { if (dialog.isShowing) { status.visibility = View.VISIBLE; status.text = "Could not load readers. Tap Refresh to retry." } }
+                finally { if (dialog.isShowing) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = true }
+            }
         }
+        dialog.setOnDismissListener { readerDialog = null }
+        dialog.setOnShowListener {
+            form.scroll.layoutParams = form.scroll.layoutParams.apply { height = (activity.resources.displayMetrics.heightPixels * 0.48f).toInt() }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { load() }
+            load()
+        }
+        dialog.show()
     }
 
     private fun setNoticeReaction(root: View, card: View, noticeId: String) {
+        if (!ClassMateAcademicCache.online(activity)) { Toast.makeText(activity, "Connect to update reactions", Toast.LENGTH_SHORT).show(); return }
         if (!noticeBusy.add(noticeId)) return
         val state = noticeStates.getOrPut(noticeId) { JSONObject() }
         val ownKey = "is_liked"
@@ -722,7 +850,7 @@ internal class ClassMateAcademicScreensSupabase(
         val oldCount = state.optLong("like_count")
         state.put(ownKey, enabled)
         state.put("like_count", (oldCount + if (enabled) 1 else -1).coerceAtLeast(0))
-        text(card, R.id.tvLikeCount, state.optLong("like_count").toString())
+        text(card, R.id.tvLikeCount, compactCount(state.optLong("like_count")))
         card.v<android.widget.ImageView>(R.id.ivLikeIcon).setImageResource(
             if (enabled) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
         card.v<android.widget.ImageView>(R.id.ivLikeIcon).imageTintList =
@@ -736,6 +864,7 @@ internal class ClassMateAcademicScreensSupabase(
                 state.optString("reminder_at").takeIf { it.isNotBlank() && it != "null" }
                     ?.let { row.put("reminder_at", it) }
                 ClassMateAuthApi.upsert("notice_reactions", row)
+                saveNoticeCache()
             }.onFailure {
                     state.put(ownKey, wasEnabled)
                     state.put("like_count", oldCount)
@@ -746,33 +875,24 @@ internal class ClassMateAcademicScreensSupabase(
         }
     }
 
+    private fun noticeDialogSurface() = com.google.android.material.shape.MaterialShapeDrawable(
+        com.google.android.material.shape.ShapeAppearanceModel.builder().setAllCornerSizes(24f * activity.resources.displayMetrics.density).build()
+    ).apply { fillColor = android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) }
+
     private fun showNoticeActions(root: View, notice: JSONObject) {
-        AlertDialog.Builder(activity).setTitle(notice.optString("title"))
-            .setItems(arrayOf("Edit notice", "Delete notice")) { _, option ->
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setBackground(noticeDialogSurface()).setTitle("Manage notice")
+            .setItems(arrayOf("Edit title and message", "Delete notice")) { _, option ->
                 if (option == 0) editNotice(root, notice) else deleteNotice(root, notice)
             }.show()
     }
 
     private fun editNotice(root: View, notice: JSONObject) {
-        val panel = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val p = (18 * resources.displayMetrics.density).toInt()
-            setPadding(p, 0, p, 0)
-        }
-        val titleField = EditText(activity).apply {
-            hint = "Title"
-            setSingleLine(true)
-            setText(notice.optString("title"))
-        }
-        val bodyField = EditText(activity).apply {
-            hint = "Notice"
-            minLines = 3
-            setText(notice.optString("body"))
-        }
-        panel.addView(titleField)
-        panel.addView(bodyField)
-        AlertDialog.Builder(activity).setTitle("Edit notice").setView(panel)
-            .setPositiveButton("Save", null).setNegativeButton("Cancel", null)
+        val form = ClassMateFormUi(activity)
+        val titleField = form.field("Notice title").apply { setText(notice.optString("title")) }
+        val bodyField = form.field("Message · links supported", true).apply { setText(notice.optString("body")) }
+        val status = form.status()
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setBackground(noticeDialogSurface()).setTitle("Edit notice").setView(form.scroll)
+            .setPositiveButton("Save changes", null).setNegativeButton("Cancel", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -781,15 +901,21 @@ internal class ClassMateAcademicScreensSupabase(
                             titleField.error = "Enter a title"
                             return@setOnClickListener
                         }
-                        dialog.dismiss()
+                        val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                        save.isEnabled = false
                         launch(root) {
+                            try {
                             val updated = ClassMateAuthApi.rpc("edit_notice", JSONObject()
                                 .put("target_id", notice.getString("id"))
                                 .put("target_title", title)
                                 .put("target_body", bodyField.text.toString().trim()))
                             val index = noticeFeed.indexOfFirst { it.optString("id") == notice.optString("id") }
                             if (index >= 0) noticeFeed = noticeFeed.toMutableList().apply { set(index, updated) }
+                            saveNoticeCache()
                             renderNoticeFeed(root)
+                            dialog.dismiss()
+                            } catch (e: Exception) { status.visibility = View.VISIBLE; status.text = e.message ?: "Could not save. Try again." }
+                            finally { save.isEnabled = true }
                         }
                     }
                 }
@@ -798,7 +924,7 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun deleteNotice(root: View, notice: JSONObject) {
-        AlertDialog.Builder(activity).setTitle("Delete notice?")
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setBackground(noticeDialogSurface()).setTitle("Delete notice?")
             .setMessage("This notice and its comments will be removed.")
             .setPositiveButton("Delete") { _, _ ->
                 launch(root) {
@@ -806,6 +932,7 @@ internal class ClassMateAcademicScreensSupabase(
                     ClassMateAuthApi.rpcText("delete_notice", JSONObject().put("target_id", id))
                     noticeFeed = noticeFeed.filterNot { it.optString("id") == id }
                     noticeStates.remove(id)
+                    saveNoticeCache()
                     ClassMateNoticeReminderScheduler.schedule(activity, id,
                         notice.optString("title"), null)
                     renderNoticeFeed(root)
@@ -864,6 +991,7 @@ internal class ClassMateAcademicScreensSupabase(
                         notice.optString("title"), at)
                     if (active(root)) {
                         state.put("reminder_at", at?.toString() ?: JSONObject.NULL)
+                        saveNoticeCache()
                         setReminderAppearance(card, at != null)
                         Toast.makeText(activity, if (at == null) "Reminder cleared" else "Reminder set",
                             Toast.LENGTH_SHORT).show()
@@ -880,6 +1008,11 @@ internal class ClassMateAcademicScreensSupabase(
         }
         root.v<View>(R.id.btnLibrarySearch).setOnClickListener { searchLibrary(root) }
         root.v<View>(R.id.tvViewAll).setOnClickListener { showAllFiles() }
+        root.v<EditText>(R.id.etLibrarySearch).addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { loadLibrary(root) }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
         listOf("All" to R.id.chipAll, "Notes" to R.id.chipNotes,
             "Slides" to R.id.chipSlides, "Questions" to R.id.chipQuestions,
             "Starred" to R.id.chipStarred).forEach { (value, id) ->
@@ -914,7 +1047,7 @@ internal class ClassMateAcademicScreensSupabase(
                 setBackgroundResource(if (libraryFilter == name)
                     R.drawable.bg_library_chip_html_selected else R.drawable.bg_library_chip_html)
                 setTextColor(activity.getColor(if (libraryFilter == name)
-                    android.R.color.white else R.color.cm_text_primary))
+                    R.color.cm_text_inverse else R.color.cm_text_primary))
             }
         }
     }
@@ -934,11 +1067,13 @@ internal class ClassMateAcademicScreensSupabase(
         listOf("theory" to R.id.btnCategoryRegular, "lab" to R.id.btnCategoryLab,
             "other" to R.id.btnCategorySyllabus).forEach { (value, id) ->
             root.v<TextView>(id).setTextColor(activity.getColor(
-                if (libraryCategory == value) R.color.cm_text_primary else R.color.cm_text_disabled))
+                if (libraryCategory == value) R.color.cm_text_inverse else R.color.cm_text_secondary))
         }
     }
 
     private fun loadLibrary(root: View): Unit = launch(root) {
+        if (librarySnapshot == null && libraryLoadingRoot === root) return@launch
+        if (librarySnapshot == null) libraryLoadingRoot = root
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
         val selectedBatch = batchId()
         try {
@@ -970,7 +1105,10 @@ internal class ClassMateAcademicScreensSupabase(
             if (!active(root) || selectedBatch != batchId()) return@launch
             val selectedFilter = libraryFilter
             val selectedCategory = libraryCategory
-            val visibleFiles = files.filter { file -> when (selectedFilter) {
+            val query = root.v<EditText>(R.id.etLibrarySearch).text.toString().trim()
+            val courseNames = offerings.associate { it.optString("id") to courses[it.optString("course_id")]?.optString("course_title").orEmpty() }
+            val visibleFiles = files.filter { file ->
+                (query.isBlank() || file.optString("title").contains(query, true) || courseNames[file.optString("semester_course_id")].orEmpty().contains(query, true)) && when (selectedFilter) {
                 "All" -> true
                 "Starred" -> file.optString("id") in favoriteIds
                 else -> file.optString("category") == selectedFilter.lowercase()
@@ -979,12 +1117,14 @@ internal class ClassMateAcademicScreensSupabase(
             text(root, R.id.tvLibrarySubtitle,
                 "${files.size} ${if (files.size == 1) "file" else "files"} this semester")
             root.v<View>(R.id.tvRecentEmpty).visibility = if (visibleFiles.isEmpty()) View.VISIBLE else View.GONE
-            recycler(root, R.id.rvRecent, R.layout.item_recent_pdf, visibleFiles.take(3)) { card, file ->
+            recycler(root, R.id.rvRecent, R.layout.item_recent_pdf, if (query.isBlank()) visibleFiles.take(3) else visibleFiles) { card, file ->
                 bindLibraryFile(root, card, file, favoriteIds)
             }
             val selected = offerings.mapNotNull { offering ->
                 courses[offering.optString("course_id")]?.let { course -> offering to course }
-            }.filter { it.second.optString("course_type") == selectedCategory }
+            }.filter { it.second.optString("course_type") == selectedCategory && (query.isBlank() ||
+                it.second.optString("course_title").contains(query, true) || it.second.optString("course_code").contains(query, true) ||
+                visibleFiles.any { file -> file.optString("semester_course_id") == it.first.optString("id") }) }
             val items = selected.map { pair -> JSONObject(pair.second.toString())
                 .put("offering_id", pair.first.getString("id")) }
             val syllabusFiles = visibleFiles.filter { it.optString("category") == "syllabus" }
@@ -1009,7 +1149,7 @@ internal class ClassMateAcademicScreensSupabase(
                 return@launch
             }
             recycler(root, listId, R.layout.item_subject_card, items) { card, course ->
-                text(card, R.id.tvSubjectName, course.optString("course_title"))
+                card.v<TextView>(R.id.tvSubjectName).text = ClassMateNoticeText.styled(card.v(R.id.tvSubjectName), course.optString("course_title"), query)
                 text(card, R.id.tvSubjectCode, course.optString("course_code"))
                 val count = visibleFiles.count { it.optString("semester_course_id") == course.optString("offering_id") }
                 text(card, R.id.tvPdfCount, if (count == 0) "No files" else "$count files")
@@ -1019,12 +1159,12 @@ internal class ClassMateAcademicScreensSupabase(
                             profile().optBoolean("is_cr"))
                 }
             }
-        } finally { refresh.isRefreshing = false }
+        } finally { refresh.isRefreshing = false; if (libraryLoadingRoot === root) libraryLoadingRoot = null }
     }
 
     private fun bindLibraryFile(root: View, card: View, file: JSONObject, favorites: Set<String>) {
         val fileId = file.getString("id")
-        text(card, R.id.tvTitle, file.optString("title"))
+        card.v<TextView>(R.id.tvTitle).text = ClassMateNoticeText.styled(card.v(R.id.tvTitle), file.optString("title"), root.v<EditText>(R.id.etLibrarySearch).text.toString().trim())
         text(card, R.id.tvSubject, file.optString("category").replaceFirstChar { it.uppercase() })
         text(card, R.id.tvFileMeta, "${file.optLong("size_bytes") / 1024} KB")
         card.v<android.widget.ImageView>(R.id.btnFavorite).apply {
@@ -1045,32 +1185,43 @@ internal class ClassMateAcademicScreensSupabase(
             profile().optBoolean("is_cr")
         card.v<View>(R.id.btnDelete).apply {
             visibility = if (canDelete) View.VISIBLE else View.GONE
+            contentDescription = "Manage file"
+            (this as android.widget.ImageView).setImageResource(R.drawable.ic_more_vert)
             setOnClickListener {
+                val canEdit = profile().optString("role") == "admin" || profile().optBoolean("is_cr")
+                fun confirmDelete() {
                 AlertDialog.Builder(activity).setTitle("Permanently delete ${file.optString("title")}?")
                     .setMessage("This removes the protected file, library entry, and linked notice. This cannot be undone.")
                     .setPositiveButton("Delete permanently") { _, _ -> launch(root) {
                         ClassMateAuthApi.deleteResource(fileId)
+                        ClassMateAcademicCache.removeResourceNotice(activity, profile().optString("id"), batchId(), fileId)
+                        noticeFeed = noticeFeed.filterNot { it.optString("resource_id") == fileId }
                         librarySnapshot?.let { snapshot ->
                             librarySnapshot = snapshot.copy(files = snapshot.files.filterNot {
                                 it.optString("id") == fileId })
                         }
                         if (active(root)) loadLibrary(root)
                     } }.setNegativeButton("Cancel", null).show()
+                }
+                if (canEdit) com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                    .setTitle("Manage file").setItems(arrayOf("Edit file details", "Delete permanently")) { _, option ->
+                        if(option == 0) onEditFile(file) else confirmDelete()
+                    }.show()
+                else confirmDelete()
             }
         }
         card.setOnClickListener { openFile(file) }
     }
 
     private fun searchLibrary(root: View) {
-        val field = EditText(activity).apply { hint = "Search notes, slides, past questions" }
-        AlertDialog.Builder(activity).setTitle("Search library").setView(field)
-            .setPositiveButton("Search") { _, _ ->
-                val query = field.text.toString().trim()
-                chooseFile(librarySnapshot?.files.orEmpty().filter {
-                    it.optString("title").contains(query, true) })
-            }.setNegativeButton("Cancel", null).show()
+        val search = root.v<EditText>(R.id.etLibrarySearch)
+        search.requestFocus()
+        (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+            .showSoftInput(search, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
     }
-    private fun showAllFiles() = chooseFile(librarySnapshot?.files.orEmpty())
+    private fun showAllFiles() {
+        onOpenCourse("", "Recently shared files", profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr"))
+    }
     private fun chooseFile(files: List<JSONObject>) {
         if (files.isEmpty()) { Toast.makeText(activity, "No files", Toast.LENGTH_SHORT).show(); return }
         AlertDialog.Builder(activity).setTitle("Files")
@@ -1092,16 +1243,20 @@ internal class ClassMateAcademicScreensSupabase(
         text(root, R.id.tvProfileName, account.optString("full_name").ifBlank { "ClassMate user" })
         text(root, R.id.tvRoleBadge, if (account.optString("role") == "admin") "ADMIN"
             else account.optString("role").uppercase())
-        root.v<TextView>(R.id.tvRoleBadge).setBackgroundResource(R.drawable.bg_role_badge)
-        text(root, R.id.tvUserSubInfo, listOf(account.optString("student_id").takeUnless { it == "null" },
-            account.optString("email")).filterNotNull().joinToString(" · "))
-        listOf(R.id.cardSeeFriends, R.id.savedResourcesTagSection, R.id.adminSection,
-            R.id.fabEditPhoto, R.id.cardAiSettings, R.id.layoutAddWidget)
-            .forEach { root.v<View>(it).visibility = View.GONE }
+        root.v<TextView>(R.id.tvRoleBadge).setBackgroundResource(R.drawable.bg_profile_role)
+        text(root, R.id.tvUserSubInfo, account.optString("email"))
+        text(root, R.id.tvProfileAcademic, listOf(account.optString("student_id").takeUnless { it.isBlank() || it == "null" }, batchLabel().takeIf { it.isNotBlank() }).filterNotNull().joinToString(" · "))
+        if (account.optBoolean("is_cr")) text(root, R.id.tvRoleBadge, "CLASS REPRESENTATIVE")
+        root.v<View>(R.id.btnSwitchBatch).apply {
+            visibility = if (account.optString("role") in setOf("admin", "teacher")) View.VISIBLE else View.GONE
+            setOnClickListener { onSwitchBatch() }
+        }
         root.v<View>(R.id.layoutDeleteOfflineCache).setOnClickListener {
             AlertDialog.Builder(activity).setTitle("Clear offline cache")
                 .setMessage("Remove temporary downloads from this device?")
                 .setPositiveButton("Clear") { _, _ ->
+                    ClassMateAcademicCache.clear(activity)
+                    noticeFeed = emptyList(); noticeBatch = ""; noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear()
                     activity.cacheDir.listFiles()?.forEach { file -> file.deleteRecursively() }
                     Toast.makeText(activity, "Offline cache cleared", Toast.LENGTH_SHORT).show()
                 }.setNegativeButton("Cancel", null).show()
@@ -1146,28 +1301,6 @@ internal class ClassMateAcademicScreensSupabase(
                 }
             }
         }
-        root.v<SwitchCompat>(R.id.switchAutoMute).apply {
-            isChecked = prefs.isAutoMuteEnabled()
-            setOnCheckedChangeListener { _, checked ->
-                prefs.setAutoMuteEnabled(checked)
-                if (checked) scope.launch { runCatching { ClassMateAutoMuteScheduler.schedule(activity, batchId()) }
-                    .onFailure { Toast.makeText(activity, it.message ?: "Auto-mute setup failed", Toast.LENGTH_LONG).show() } }
-                else ClassMateAutoMuteScheduler.cancel(activity)
-            }
-        }
-        root.v<SwitchCompat>(R.id.switchShakeToTorch).apply {
-            isChecked = prefs.isShakeToTorchEnabled()
-            setOnCheckedChangeListener { _, checked ->
-                if (checked && ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED) {
-                    isChecked = false
-                    ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.CAMERA), 4011)
-                    return@setOnCheckedChangeListener
-                }
-                prefs.setShakeToTorchEnabled(checked)
-                if (checked) ShakeToTorchService.start(activity) else ShakeToTorchService.stop(activity)
-            }
-        }
         root.v<View>(R.id.btnLogout).setOnClickListener { onSignOut() }
         root.v<View>(R.id.cardPersonalInfo).setOnClickListener { showProfileDetails(root) }
     }
@@ -1204,4 +1337,3 @@ internal class ClassMateAcademicScreensSupabase(
             }.show()
     }
 }
-

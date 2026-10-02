@@ -1,292 +1,181 @@
 package com.shuaib.classmate.activities
 
-import android.app.TimePickerDialog
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Spinner
-import android.widget.ArrayAdapter
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.*
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.Duration
 import java.time.format.DateTimeFormatter
 
-/** A batch-scoped routine editor. Supabase RPCs enforce owner, CR, and teacher authority. */
-class ClassMatePeriodEditorActivity : AppCompatActivity() {
-    private data class Offering(val id: String, val title: String)
-
+/** The same day pills and period cards as the timetable; writes stay server-authorized. */
+class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
+    private data class Offering(val id: String, val title: String, val name: String, val type: String)
     private val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
     private val offerings = mutableListOf<Offering>()
+    private val catalog = mutableMapOf<String,Offering>()
     private val slots = mutableListOf<JSONObject>()
+    private val teachers = mutableMapOf<String,String>()
     private lateinit var dayRow: LinearLayout
     private lateinit var slotList: LinearLayout
-    private lateinit var startButton: TextView
-    private lateinit var endButton: TextView
-    private lateinit var message: TextView
+    private lateinit var add: MaterialButton
+    private lateinit var count: TextView
     private var day = LocalDate.now().dayOfWeek.value % 7
-    private var start = LocalTime.of(9, 0)
-    private var end = LocalTime.of(9, 45)
     private var batchId = ""
     private var role = ""
     private var profileId = ""
-    private var changed = false
-
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        ClassMateAuthApi.attach(applicationContext)
-        batchId = intent.getStringExtra("batch_id").orEmpty()
-        role = intent.getStringExtra("role").orEmpty()
-        profileId = intent.getStringExtra("profile_id").orEmpty()
-        if (batchId.isBlank()) { finish(); return }
-        day = intent.getIntExtra("day", day).coerceIn(0, 6)
-        start = parseTime(intent.getStringExtra("start")) ?: start
-        end = parseTime(intent.getStringExtra("end")) ?: end
-
-        val page = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(10))
-            setBackgroundColor(getColor(R.color.cm_background))
-        }
-        setContentView(page)
-        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        page.addView(top)
-        val back = label("‹", 30f).apply {
-            setPadding(dp(4), 0, dp(14), 0)
-            setOnClickListener { finish() }
-        }
-        top.addView(back)
-        top.addView(label("Edit timetable", 23f).apply { setTypeface(null, 1) })
-        page.addView(label(intent.getStringExtra("batch_label") ?: "Running batch", 13f).apply {
-            setTextColor(getColor(R.color.cm_text_disabled))
-            setPadding(dp(4), 0, 0, dp(14))
-        })
-
-        dayRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        page.addView(dayRow)
-        page.addView(label("Time for a new period", 15f).apply {
-            setTypeface(null, 1)
-            setPadding(dp(4), dp(22), 0, dp(7))
-        })
-        val times = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        startButton = action("From 09:00").also { times.addView(it, LinearLayout.LayoutParams(0, dp(48), 1f)) }
-        endButton = action("To 09:45").also { times.addView(it, LinearLayout.LayoutParams(0, dp(48), 1f)) }
-        page.addView(times)
-        startButton.setOnClickListener { chooseTime(start) { start = it; updateTimeLabels() } }
-        endButton.setOnClickListener { chooseTime(end) { end = it; updateTimeLabels() } }
-        updateTimeLabels()
-        val add = action("＋  Add period").apply {
-            setTextColor(getColor(R.color.cm_primary))
-            setTypeface(null, 1)
-            setOnClickListener { showCourseRoomDialog(null) }
-        }
-        page.addView(add, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(14) })
-        message = label("Loading courses and periods…", 14f).apply {
-            setPadding(dp(4), dp(16), 0, dp(8))
-        }
-        page.addView(message)
-        val scroll = ScrollView(this)
-        page.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        slotList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(slotList)
-        renderDays()
-        load()
+    private var loading = false
+    private var editor: androidx.appcompat.app.AlertDialog? = null
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state); ClassMateAuthApi.attach(applicationContext)
+        batchId=intent.getStringExtra("batch_id").orEmpty(); role=intent.getStringExtra("role").orEmpty(); profileId=intent.getStringExtra("profile_id").orEmpty()
+        if(batchId.isBlank()) { finish(); return }
+        day=(state?.getInt("day") ?: intent.getIntExtra("day",day)).coerceIn(0,6)
+        page("Edit timetable"); save.visibility=View.GONE
+        form.panel.setPadding(0,dp(8),0,dp(16))
+        val root=form.scroll.parent as LinearLayout
+        val header=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(14),0,dp(14),dp(12)) }
+        val top=LinearLayout(this).apply { gravity=android.view.Gravity.CENTER_VERTICAL }
+        top.addView(TextView(this).apply { text=intent.getStringExtra("batch_label").orEmpty(); textSize=13f; maxLines=2; setTextColor(getColor(R.color.cm_text_secondary)) },LinearLayout.LayoutParams(0,-2,1f))
+        add=MaterialButton(this).apply { text="+ Add period"; isAllCaps=false; cornerRadius=dp(20); isEnabled=false; setOnClickListener { openPeriod(null) } }
+        top.addView(add); header.addView(top)
+        dayRow=LinearLayout(this); header.addView(dayRow,LinearLayout.LayoutParams(-1,dp(64)).apply { topMargin=dp(10) })
+        root.addView(header,1)
+        count=form.label("").apply { setPadding(dp(24),dp(10),dp(24),dp(10)) }
+        status=form.status().apply { setPadding(dp(24),0,dp(24),dp(8)) }
+        slotList=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; form.panel.addView(slotList)
+        readCache(); renderDays(); renderSlots(); load()
     }
-
-    private fun label(value: String, size: Float) = TextView(this).apply {
-        text = value
-        textSize = size
-        setTextColor(getColor(R.color.cm_text_primary))
-        gravity = Gravity.CENTER_VERTICAL
+    override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); out.putInt("day",day) }
+    private fun time(value:String):LocalTime = runCatching { LocalTime.parse(value.take(5)) }.getOrDefault(LocalTime.of(9,0))
+    private fun readCache() {
+        val snapshot=ClassMateAcademicCache.read(this,profileId,batchId,"routine") ?: return
+        val names=snapshot.optJSONObject("names") ?: JSONObject()
+        names.keys().forEach { id -> catalog[id]=Offering(id,names.optString(id),names.optString(id),"class") }
+        val entries=snapshot.optJSONArray("entries")
+        for(i in 0 until (entries?.length() ?: 0)) entries?.optJSONObject(i)?.let { slots.add(it) }
+        val details=snapshot.optJSONArray("details")
+        for(i in 0 until (details?.length() ?: 0)) details?.optJSONObject(i)?.let { teachers[it.optString("semester_course_id")]=it.optString("teacher_name").takeUnless { name -> name.equals("null",true) }.orEmpty() }
     }
-
-    private fun action(value: String) = label(value, 14f).apply {
-        gravity = Gravity.CENTER
-        setBackgroundResource(R.drawable.bg_day_card_unselected)
-        isClickable = true
-        isFocusable = true
-    }
-
     private fun renderDays() {
         dayRow.removeAllViews()
-        days.forEachIndexed { index, name ->
-            val card = layoutInflater.inflate(R.layout.item_day_card, dayRow, false)
-            card.findViewById<TextView>(R.id.tvDayShort).text = name.take(3)
-            card.findViewById<TextView>(R.id.tvDayDate).text = LocalDate.now().minusDays(
-                (LocalDate.now().dayOfWeek.value % 7 - index).toLong()).dayOfMonth.toString()
-            if (index == day) {
-                card.setBackgroundResource(R.drawable.bg_day_card_selected)
-                card.findViewById<TextView>(R.id.tvDayShort).setTextColor(getColor(android.R.color.white))
-                card.findViewById<TextView>(R.id.tvDayDate).setTextColor(getColor(android.R.color.white))
-                card.findViewById<View>(R.id.vDayIndicator).visibility = View.VISIBLE
-            }
-            card.setOnClickListener { day = index; renderDays(); renderSlots() }
-            dayRow.addView(card)
+        (0..6).forEach { offset ->
+            val date=LocalDate.now().plusDays(offset.toLong())
+            val index=date.dayOfWeek.value%7
+            val name=days[index]
+            val pill=layoutInflater.inflate(R.layout.item_day_card,dayRow,false)
+            (pill.layoutParams as LinearLayout.LayoutParams).apply { width=0; weight=1f; height=dp(48); marginStart=dp(4); marginEnd=dp(4) }
+            pill.findViewById<TextView>(R.id.tvDayShort).apply { text=name.take(3); setTextColor(getColor(if(index==day) R.color.cm_text_inverse else R.color.cm_text_secondary)) }
+            pill.findViewById<TextView>(R.id.tvDayDate).apply { text=date.dayOfMonth.toString(); setTextColor(getColor(if(index==day) R.color.cm_text_inverse else R.color.cm_text_primary)) }
+            pill.setBackgroundResource(if(index==day) R.drawable.bg_day_card_selected else R.drawable.bg_day_card_unselected)
+            pill.findViewById<View>(R.id.vDayIndicator).visibility=if(index==day) View.VISIBLE else View.INVISIBLE
+            pill.contentDescription=name; pill.setOnClickListener { day=index; renderDays(); renderSlots() }; dayRow.addView(pill)
         }
     }
-
-    private fun updateTimeLabels() {
-        startButton.text = "From ${start.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
-        endButton.text = "To ${end.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
-    }
-
-    private fun chooseTime(current: LocalTime, onChosen: (LocalTime) -> Unit) {
-        TimePickerDialog(this, { _, hour, minute -> onChosen(LocalTime.of(hour, minute)) },
-            current.hour, current.minute, false).show()
-    }
-
-    private fun parseTime(value: String?): LocalTime? = runCatching {
-        value?.take(5)?.let(LocalTime::parse)
-    }.getOrNull()
-
-    private fun load() = lifecycleScope.launch {
-        runCatching {
-            val semesters = ClassMateAuthApi.rows("semesters",
-                "select=id,status&batch_id=eq.$batchId&status=in.(active,not_started)&order=semester_number.desc")
-            val semester = (0 until semesters.length()).map { semesters.getJSONObject(it) }
-                .firstOrNull { it.optString("status") == "active" }
-                ?: semesters.optJSONObject(0) ?: error("No current semester in this batch")
-            val semesterId = semester.getString("id")
-            val rows = ClassMateAuthApi.rows("semester_courses",
-                "select=id,course_id&semester_id=eq.$semesterId")
-            val courses = ClassMateAuthApi.rows("courses", "select=id,course_code,course_title")
-            val names = (0 until courses.length()).associate { index ->
-                courses.getJSONObject(index).let {
-                    it.getString("id") to "${it.optString("course_code")} · ${it.optString("course_title")}" }
-            }
-            val allowed = if (role == "teacher") {
-                val assignment = ClassMateAuthApi.rows("teacher_course_assignments",
-                    "select=semester_course_id&teacher_id=eq.$profileId&active=eq.true")
-                (0 until assignment.length()).map {
-                    assignment.getJSONObject(it).getString("semester_course_id") }.toSet()
-            } else null
-            offerings.clear()
-            (0 until rows.length()).forEach { index ->
-                val item = rows.getJSONObject(index)
-                val id = item.getString("id")
-                if (allowed == null || id in allowed) offerings += Offering(id,
-                    names[item.optString("course_id")] ?: "Course")
-            }
-            slots.clear()
-            if (rows.length() > 0) {
-                val ids = (0 until rows.length()).map { rows.getJSONObject(it).getString("id") }
-                val routine = ClassMateAuthApi.rows("routine_slots",
-                    "select=id,semester_course_id,day_of_week,start_time,end_time,room" +
-                        "&semester_course_id=in.(${ids.joinToString(",")})&order=start_time")
-                (0 until routine.length()).forEach { slots += routine.getJSONObject(it) }
-            }
-        }.onSuccess {
-            message.text = if (offerings.isEmpty()) "No courses you can edit in this semester."
-                else "${days[day]}'s periods · tap a period to edit"
-            renderSlots()
-            intent.getStringExtra("edit_id")?.let { id ->
-                slots.firstOrNull { it.optString("id") == id }?.let(::editSlot)
-                intent.removeExtra("edit_id")
-            }
-        }.onFailure { message.text = it.message ?: "Could not load timetable" }
-    }
-
     private fun renderSlots() {
-        if (!::slotList.isInitialized) return
         slotList.removeAllViews()
-        val selected = slots.filter { it.optInt("day_of_week") == day }
-        selected.forEach { slot ->
-            val title = offerings.firstOrNull { it.id == slot.optString("semester_course_id") }?.title
-                ?: "Course"
-            val line = action("${slot.optString("start_time").take(5)}–${slot.optString("end_time").take(5)}  $title\n${slot.optString("room")}").apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-                setOnClickListener { editSlot(slot) }
-            }
-            slotList.addView(line, LinearLayout.LayoutParams(-1, dp(74)).apply {
-                bottomMargin = dp(8)
-            })
+        val entries=slots.filter { it.optInt("day_of_week")==day }.sortedBy { it.optString("start_time") }
+        count.text="${days[day].uppercase()}'S SCHEDULE · ${entries.size} classes"
+        if(entries.isEmpty()) slotList.addView(TextView(this).apply { text="No periods on ${days[day]}."; gravity=android.view.Gravity.CENTER; setPadding(dp(24),dp(40),dp(24),dp(40)); setTextColor(getColor(R.color.cm_text_secondary)) })
+        entries.forEach { slot ->
+            val id=slot.optString("semester_course_id"); val offering=catalog[id]
+            val card=layoutInflater.inflate(R.layout.item_period,slotList,false)
+            fun text(viewId:Int,value:String) { card.findViewById<TextView>(viewId).text=value }
+            val from=time(slot.optString("start_time")); val to=time(slot.optString("end_time")); val format=DateTimeFormatter.ofPattern("hh:mm a")
+            text(R.id.tvSubject,offering?.name ?: "Class"); text(R.id.tvStartTime,from.format(format)); text(R.id.tvEndTime,to.format(format))
+            val teacher=teachers[id].orEmpty(); text(R.id.tvTeacher,teacher); card.findViewById<View>(R.id.layoutTeacherInfo).visibility=if(teacher.isBlank()) View.GONE else View.VISIBLE
+            val room=slot.optString("room").takeUnless { it == "null" }.orEmpty(); text(R.id.tvRoom,room); card.findViewById<View>(R.id.layoutRoomInfo).visibility=if(room.isBlank()) View.GONE else View.VISIBLE
+            text(R.id.tvTypeBadge,slot.optString("type").takeUnless { it.isBlank() || it=="null" }?.uppercase() ?: if(offering?.type=="lab") "LAB" else "CLASS")
+            text(R.id.tvDuration,"${Duration.between(from,to).toMinutes()} min")
+            card.findViewById<ImageView>(R.id.ivSubjectIcon).setColorFilter(getColor(R.color.cm_primary_light))
+            card.setOnClickListener { if(offerings.any { it.id==id }) openPeriod(slot) else Toast.makeText(this,if(loading) "Loading courses…" else if(!ClassMateAcademicCache.online(this)) "Connect to edit periods." else "You can edit only your assigned courses.",Toast.LENGTH_SHORT).show() }
+            slotList.addView(card)
         }
-        if (selected.isEmpty()) slotList.addView(label("No periods on ${days[day]}.", 14f))
     }
-
-    private fun editSlot(slot: JSONObject) {
-        day = slot.optInt("day_of_week")
-        start = parseTime(slot.optString("start_time")) ?: start
-        end = parseTime(slot.optString("end_time")) ?: end
-        renderDays()
-        updateTimeLabels()
-        val options = arrayOf("Edit period", "Delete period")
-        AlertDialog.Builder(this).setTitle("Period options").setItems(options) { _, which ->
-            if (which == 0) showCourseRoomDialog(slot) else confirmDelete(slot)
-        }.show()
+    private fun load() {
+        if(loading) return
+        loading=true
+        lifecycleScope.launch {
+            runCatching {
+                val semesters=ClassMateAuthApi.rows("semesters","select=id,status&batch_id=eq.$batchId&status=in.(active,not_started)&order=semester_number.desc")
+                val semester=(0 until semesters.length()).map { semesters.getJSONObject(it) }.firstOrNull { it.optString("status")=="active" } ?: semesters.optJSONObject(0) ?: error("No current semester in this batch")
+                val rows=ClassMateAuthApi.rows("semester_courses","select=id,course_id&semester_id=eq.${semester.getString("id")}")
+                val courses=ClassMateAuthApi.rows("courses","select=id,course_code,course_title,course_type")
+                val names=(0 until courses.length()).associate { courses.getJSONObject(it).let { item -> item.getString("id") to item } }
+                val allowed=if(role=="teacher") ClassMateAuthApi.rows("teacher_course_assignments","select=semester_course_id&teacher_id=eq.$profileId&active=eq.true").let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("semester_course_id") }.toSet() } else null
+                val nextCatalog=mutableMapOf<String,Offering>()
+                for(i in 0 until rows.length()) {
+                    val item=rows.getJSONObject(i); val c=names[item.optString("course_id")] ?: continue
+                    val name=c.optString("course_title"); nextCatalog[item.getString("id")]=Offering(item.getString("id"),"${c.optString("course_code")} · $name",name,c.optString("course_type"))
+                }
+                val ids=nextCatalog.keys.joinToString(",")
+                val routine=if(ids.isEmpty()) org.json.JSONArray() else ClassMateAuthApi.rows("routine_slots","select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.($ids)&order=start_time")
+                val details=if(ids.isEmpty()) org.json.JSONArray() else org.json.JSONArray(ClassMateAuthApi.rpcText("timetable_details",JSONObject().put("target_batch",batchId).put("target_date",LocalDate.now().toString()).put("target_course_ids",org.json.JSONArray(nextCatalog.keys.toList()))))
+                catalog.clear(); catalog.putAll(nextCatalog); offerings.clear(); offerings.addAll(nextCatalog.values.filter { allowed==null || it.id in allowed })
+                slots.clear(); for(i in 0 until routine.length()) slots.add(routine.getJSONObject(i))
+                teachers.clear(); for(i in 0 until details.length()) details.getJSONObject(i).let { teachers[it.optString("semester_course_id")]=it.optString("teacher_name").takeUnless { name -> name.equals("null",true) }.orEmpty() }
+            }.onSuccess {
+                renderSlots(); add.isEnabled=offerings.isNotEmpty(); status.visibility=View.GONE
+                intent.getStringExtra("edit_id")?.let { id -> slots.firstOrNull { it.optString("id")==id }?.let(::openPeriod); intent.removeExtra("edit_id") }
+            }.onFailure { status.visibility=View.VISIBLE; status.text="${if(slots.isEmpty()) "Could not load timetable." else "Showing saved timetable."} Tap to retry."; status.setOnClickListener { load() } }
+            loading=false
+        }
     }
-
-    private fun showCourseRoomDialog(existing: JSONObject?) {
-        if (offerings.isEmpty()) { Toast.makeText(this, "No available courses", Toast.LENGTH_SHORT).show(); return }
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), 0)
-        }
-        panel.addView(label("Course", 13f))
-        val spinner = Spinner(this)
-        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item,
-            offerings.map { it.title })
-        spinner.setSelection(offerings.indexOfFirst {
-            it.id == existing?.optString("semester_course_id") }.coerceAtLeast(0))
-        panel.addView(spinner)
-        panel.addView(label("Room", 13f).apply { setPadding(0, dp(14), 0, 0) })
-        val room = EditText(this).apply {
-            hint = "Room or lab"
-            setSingleLine(true)
-            setText(existing?.optString("room").orEmpty())
-        }
-        panel.addView(room)
-        AlertDialog.Builder(this).setTitle(if (existing == null) "Add ${days[day]} period" else "Edit period")
-            .setView(panel).setPositiveButton("Save", null).setNegativeButton("Cancel", null)
-            .create().also { dialog ->
-                dialog.setOnShowListener {
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        if (start >= end) {
-                            Toast.makeText(this, "End time must be after start time", Toast.LENGTH_SHORT).show()
-                            return@setOnClickListener
-                        }
-                        dialog.dismiss()
-                        lifecycleScope.launch {
-                            runCatching {
-                                ClassMateAuthApi.rpc("save_routine_slot", JSONObject()
-                                    .put("target_id", existing?.optString("id") ?: JSONObject.NULL)
-                                    .put("target_semester_course", offerings[spinner.selectedItemPosition].id)
-                                    .put("target_day", day).put("target_start", start.toString())
-                                    .put("target_end", end.toString()).put("target_room", room.text.toString().trim()))
-                            }.onSuccess { changed = true; setResult(RESULT_OK); load() }
-                                .onFailure { Toast.makeText(this@ClassMatePeriodEditorActivity,
-                                    it.message ?: "Could not save period", Toast.LENGTH_LONG).show() }
-                        }
+    private fun openPeriod(slot: JSONObject?) {
+        if(busy || editor?.isShowing==true || offerings.isEmpty()) return
+        val dialogForm=ClassMateFormUi(this)
+        val box=TextInputLayout(this,null,com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply { hint="Course"; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_OUTLINE; setBoxCornerRadii(dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat()) }
+        val course=MaterialAutoCompleteTextView(box.context).apply { inputType=android.text.InputType.TYPE_NULL; setTextColor(getColor(R.color.cm_text_primary)); setAdapter(ArrayAdapter(this@ClassMatePeriodEditorActivity,android.R.layout.simple_dropdown_item_1line,offerings.map { it.title })) }
+        box.addView(course); dialogForm.panel.addView(box)
+        val selected=offerings.firstOrNull { it.id==slot?.optString("semester_course_id") } ?: offerings.first()
+        course.setText(selected.title,false)
+        val room=dialogForm.field("Room or lab").apply { setText(slot?.optString("room")?.takeUnless { it=="null" }.orEmpty()) }
+        var from=slot?.let { time(it.optString("start_time")) } ?: slots.filter { it.optInt("day_of_week")==day }.maxByOrNull { it.optString("end_time") }?.let { time(it.optString("end_time")) } ?: LocalTime.of(9,0)
+        var to=slot?.let { time(it.optString("end_time")) } ?: from.plusMinutes(45)
+        val times=LinearLayout(this)
+        times.addView(timeButton("From",{from},{from=it}),LinearLayout.LayoutParams(0,dp(56),1f).apply { marginEnd=dp(4) })
+        times.addView(timeButton("To",{to},{to=it}),LinearLayout.LayoutParams(0,dp(56),1f).apply { marginStart=dp(4) })
+        dialogForm.panel.addView(times); val error=dialogForm.status()
+        val builder=MaterialAlertDialogBuilder(this).setTitle(if(slot==null) "Add period · ${days[day]}" else "Edit period · ${days[day]}").setView(dialogForm.scroll).setNegativeButton("Cancel",null).setPositiveButton(if(slot==null) "Add period" else "Save",null)
+        if(slot!=null) builder.setNeutralButton("Delete",null)
+        val dialog=builder.create(); editor=dialog; dialog.show()
+        fun saveAction(deleting:Boolean) {
+            if(busy) return
+            val offering=offerings.firstOrNull { it.title==course.text.toString() }
+            if(!deleting && offering==null) { box.error="Select a course"; return }
+            if(!deleting && from>=to) { error.visibility=View.VISIBLE; error.text="End time must be after start time."; return }
+            if(!ClassMateAcademicCache.online(this)) { error.visibility=View.VISIBLE; error.text="Connect to save changes."; return }
+            busy=true; dialog.setCancelable(false)
+            listOf(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE,androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE,androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL).forEach { dialog.getButton(it)?.isEnabled=false }
+            error.visibility=View.VISIBLE; error.text=if(deleting) "Deleting…" else "Saving…"
+            lifecycleScope.launch {
+                try {
+                    if(deleting) {
+                        ClassMateAuthApi.rpcText("delete_routine_slot",JSONObject().put("target_id",slot!!.getString("id")))
+                        slots.removeAll { it.optString("id")==slot.optString("id") }
+                        ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",null,deletedId=slot.getString("id"))
+                    } else {
+                        val saved=ClassMateAuthApi.rpc("save_routine_slot",JSONObject().put("target_id",slot?.optString("id") ?: JSONObject.NULL).put("target_semester_course",offering!!.id).put("target_day",day).put("target_start",from.toString()).put("target_end",to.toString()).put("target_room",room.text.toString().trim()))
+                        slots.removeAll { it.optString("id")==saved.optString("id") }; slots.add(saved)
+                        ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",saved,courseName=offering.name)
                     }
-                }
-                dialog.show()
+                    setResult(RESULT_OK); renderSlots(); dialog.dismiss()
+                } catch(e:Exception) { error.text=e.message ?: "Could not save. Try again." }
+                finally { busy=false; dialog.setCancelable(true); listOf(-1,-2,-3).forEach { dialog.getButton(it)?.isEnabled=true } }
             }
-    }
-
-    private fun confirmDelete(slot: JSONObject) {
-        AlertDialog.Builder(this).setTitle("Delete this period?")
-            .setMessage("This removes the period from the batch timetable.")
-            .setPositiveButton("Delete") { _, _ ->
-                lifecycleScope.launch {
-                    runCatching { ClassMateAuthApi.rpcText("delete_routine_slot",
-                        JSONObject().put("target_id", slot.getString("id"))) }
-                        .onSuccess { changed = true; setResult(RESULT_OK); load() }
-                        .onFailure { Toast.makeText(this@ClassMatePeriodEditorActivity,
-                            it.message ?: "Could not delete period", Toast.LENGTH_LONG).show() }
-                }
-            }.setNegativeButton("Cancel", null).show()
+        }
+        dialog.getButton(-1).setOnClickListener { saveAction(false) }
+        if(slot!=null) dialog.getButton(-3).setOnClickListener {
+            MaterialAlertDialogBuilder(this).setTitle("Delete period?").setMessage("Remove this period from ${days[day]}'s timetable?").setNegativeButton("Cancel",null).setPositiveButton("Delete") { _,_ -> saveAction(true) }.show()
+        }
     }
 }

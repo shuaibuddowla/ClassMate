@@ -1,0 +1,77 @@
+<?xml version="1.0" ?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="@color/cm_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:paddingBottom="140dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Profile" android:textSize="32sp" android:textColor="@color/cm_text_primary" android:textStyle="bold" android:layout_marginTop="12dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Your account and preferences" android:textSize="14sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="6dp" android:layout_marginBottom="24dp"/>
+        <com.google.android.material.card.MaterialCardView android:id="@+id/cardPersonalInfo" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="24dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface" android:clickable="true" android:focusable="true">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:gravity="center_vertical" android:orientation="horizontal">
+                <de.hdodenhof.circleimageview.CircleImageView android:id="@+id/ivProfile" android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/ic_default_avatar" android:contentDescription="Your profile photo"/>
+                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:orientation="vertical">
+                    <TextView android:id="@+id/tvProfileName" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="17sp" android:textStyle="bold" android:textColor="@color/cm_text_primary"/>
+                    <TextView android:id="@+id/tvUserSubInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    <TextView android:id="@+id/tvRoleBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:paddingHorizontal="8dp" android:paddingVertical="4dp" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/cm_primary"/>
+                    <TextView android:id="@+id/tvProfileAcademic" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnSwitchBatch" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:text="Switch batch" app:cornerRadius="14dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="PREFERENCES" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <LinearLayout android:id="@+id/rowDark" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Dark appearance" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Use a darker, comfortable palette" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    </LinearLayout>
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchDarkMode" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Dark appearance"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/rowNotifications" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Push notifications" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Notices and academic updates" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    </LinearLayout>
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchNotifications" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Push notifications"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="APP UPDATES" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <LinearLayout android:id="@+id/rowAuto" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Automatic updates" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Check for new releases in the background" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    </LinearLayout>
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchAutoUpdates" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Automatic updates"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/rowWifi" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Download on Wi-Fi only" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Manage mobile data usage" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    </LinearLayout>
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchWifiOnlyUpdates" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Download on Wi-Fi only"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/layoutCheckUpdates" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Check for updates" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="" android:textSize="12sp" android:textColor="@color/cm_text_secondary" android:id="@+id/tvAppVersion"/>
+                    </LinearLayout>
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" android:importantForAccessibility="no"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="DEVICE STORAGE" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <LinearLayout android:id="@+id/layoutDeleteOfflineCache" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear temporary files" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Remove cached downloads from this device" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+                    </LinearLayout>
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" android:importantForAccessibility="no"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnLogout" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="24dp" android:text="Sign out" app:cornerRadius="14dp"/>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

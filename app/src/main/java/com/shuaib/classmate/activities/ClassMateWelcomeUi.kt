@@ -20,9 +20,9 @@ import com.google.android.material.button.MaterialButton
 
 /** The welcome flow shares one visual language, independent of the academic screens. */
 internal class ClassMateWelcomeUi(private val activity: Activity) {
-    private val ink = Color.rgb(240, 245, 255)
-    private val muted = Color.rgb(166, 183, 209)
-    private val accent = Color.rgb(112, 237, 209)
+    private val ink = activity.getColor(R.color.cm_text_primary)
+    private val muted = activity.getColor(R.color.cm_text_secondary)
+    private val accent = activity.getColor(R.color.cm_primary)
     private val density = activity.resources.displayMetrics.density
     fun dp(value: Int) = (value * density).toInt()
     val content = LinearLayout(activity).apply {
@@ -34,16 +34,15 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
     init {
         val scroll = ScrollView(activity).apply {
             isFillViewport = true
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(10, 18, 35), Color.rgb(20, 39, 61), Color.rgb(10, 23, 37)))
+            setBackgroundColor(activity.getColor(R.color.cm_background))
             addView(content)
         }
         activity.setContentView(scroll)
-        activity.window.statusBarColor = Color.rgb(10, 18, 35)
-        activity.window.navigationBarColor = Color.rgb(10, 23, 37)
+        activity.window.statusBarColor = activity.getColor(R.color.cm_background)
+        activity.window.navigationBarColor = activity.getColor(R.color.cm_background)
         androidx.core.view.WindowCompat.getInsetsController(activity.window, scroll).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+            val light = activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
+            isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
         }
         val brand = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -85,9 +84,9 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(18), dp(12), dp(18), dp(12))
         background = GradientDrawable().apply {
-            setColor(Color.rgb(24, 43, 63))
+            setColor(activity.getColor(R.color.cm_surface))
             cornerRadius = dp(24).toFloat()
-            setStroke(dp(1), Color.rgb(52, 76, 97))
+            setStroke(dp(1), activity.getColor(R.color.cm_border_glass))
         }
         content.addView(this, LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(16); bottomMargin = dp(12)
@@ -101,9 +100,9 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         it.isAllCaps = false
         it.textSize = 15f
         it.cornerRadius = dp(18)
-        it.setTextColor(if (primary) Color.rgb(10, 31, 40) else ink)
+        it.setTextColor(if (primary) activity.getColor(R.color.cm_on_primary) else ink)
         it.backgroundTintList = android.content.res.ColorStateList.valueOf(
-            if (primary) accent else Color.rgb(32, 51, 72))
+            if (primary) accent else activity.getColor(R.color.cm_primary_soft))
         it.setPadding(dp(16), dp(12), dp(16), dp(12))
         it.minHeight = dp(56)
         parent.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -132,7 +131,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
     }
 
     fun orbit(complete: Boolean = false) {
-        val height = if (complete) 150 else 178
+        val height = if (complete) 128 else 148
         val hero = FrameLayout(activity)
         hero.addView(OrbitView(activity, complete), FrameLayout.LayoutParams(-1, -1))
         hero.addView(ImageView(activity).apply {
@@ -140,8 +139,8 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = if (complete) "ClassMate profile verified" else "ClassMate app logo"
             elevation = dp(12).toFloat()
-        }, FrameLayout.LayoutParams(dp(if (complete) 110 else 126),
-            dp(if (complete) 110 else 126), Gravity.CENTER))
+        }, FrameLayout.LayoutParams(dp(if (complete) 92 else 100),
+            dp(if (complete) 92 else 100), Gravity.CENTER))
         if (complete) hero.addView(TextView(activity).apply {
             text = "✓"
             textSize = 17f
@@ -202,16 +201,16 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             val x = width / 2f; val y = height / 2f
             val r = 55 * resources.displayMetrics.density
             paint.style = Paint.Style.STROKE; paint.strokeWidth = resources.displayMetrics.density
-            paint.color = Color.rgb(49, 83, 103)
+            paint.color = context.getColor(R.color.cm_border_glass)
             canvas.drawCircle(x, y, r, paint)
             canvas.drawCircle(x, y, r * 1.28f, paint)
             canvas.save(); canvas.rotate(phase, x, y)
-            paint.color = Color.rgb(112, 237, 209); paint.style = Paint.Style.FILL
+            paint.color = context.getColor(R.color.cm_primary); paint.style = Paint.Style.FILL
             canvas.drawCircle(x + r, y, r * .07f, paint)
-            paint.color = Color.rgb(129, 164, 255)
+            paint.color = context.getColor(R.color.cm_primary_light)
             canvas.drawCircle(x - r * 1.28f, y, r * .06f, paint)
             canvas.restore()
-            paint.color = if (complete) Color.rgb(112, 237, 209) else Color.rgb(64, 102, 135)
+            paint.color = if (complete) context.getColor(R.color.cm_primary) else context.getColor(R.color.cm_border)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = resources.displayMetrics.density * 2
             canvas.drawCircle(x, y, r * .78f, paint)

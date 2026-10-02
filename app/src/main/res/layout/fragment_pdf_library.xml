@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F4FA">
+    android:background="@color/cm_background">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/headerLayout"
@@ -32,7 +32,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
                 android:text="Library"
-                android:textColor="#12152A"
+                android:textColor="@color/cm_text_primary"
                 android:textSize="29sp"
                 android:textStyle="bold" />
 
@@ -42,7 +42,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:text="0 files this semester"
-                android:textColor="#565C75"
+                android:textColor="@color/cm_text_secondary"
                 android:textSize="12.5sp" />
         </LinearLayout>
 
@@ -57,11 +57,11 @@
             android:minWidth="90dp"
             android:paddingHorizontal="14dp"
             android:text="Add file"
-            android:textColor="#2F45F0"
+            android:textColor="@color/cm_primary"
             android:textSize="13sp"
             android:textStyle="bold"
             android:visibility="gone"
-            app:drawableTint="#2F45F0"
+            app:drawableTint="@color/cm_primary"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -113,16 +113,14 @@
                             android:layout_height="20dp"
                             android:contentDescription="Search"
                             android:src="@drawable/ic_search_modern"
-                            app:tint="#565C75" />
+                            app:tint="@color/cm_text_secondary" />
 
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:layout_weight="1"
-                            android:text="Search notes, slides, past questions"
-                            android:textColor="#565C75"
-                            android:textSize="13sp" />
+                        <EditText android:id="@+id/etLibrarySearch"
+                            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+                            android:layout_marginStart="10dp" android:background="@android:color/transparent"
+                            android:hint="Search files and courses" android:singleLine="true" android:inputType="text"
+                            android:imeOptions="actionSearch" android:textColor="@color/cm_text_primary"
+                            android:textColorHint="@color/cm_text_secondary" android:textSize="14sp" />
                     </LinearLayout>
 
                     <HorizontalScrollView
@@ -157,7 +155,7 @@
                             android:layout_weight="1"
                             android:fontFamily="sans-serif-medium"
                             android:text="New this week"
-                            android:textColor="#12152A"
+                            android:textColor="@color/cm_text_primary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                         <TextView
@@ -167,7 +165,7 @@
                             android:background="?attr/selectableItemBackgroundBorderless"
                             android:padding="6dp"
                             android:text="All files  ›"
-                            android:textColor="#52627D"
+                            android:textColor="@color/cm_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -178,7 +176,7 @@
                         android:layout_marginTop="4dp"
                         android:paddingVertical="12dp"
                         android:text="Nothing new this week"
-                        android:textColor="#565C75"
+                        android:textColor="@color/cm_text_secondary"
                         android:textSize="14sp"
                         android:visibility="gone" />
 
@@ -206,10 +204,10 @@
                             android:layout_weight="1"
                             android:fontFamily="sans-serif-medium"
                             android:text="Courses"
-                            android:textColor="#12152A"
+                            android:textColor="@color/cm_text_primary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
-                        <TextView android:id="@+id/tvLibrarySummary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#565C75" android:textSize="12sp" />
+                        <TextView android:id="@+id/tvLibrarySummary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
                     </LinearLayout>
 
                     <FrameLayout
@@ -243,7 +241,7 @@
                         android:gravity="center"
                         android:padding="28dp"
                         android:text="No courses in this category yet"
-                        android:textColor="#565C75"
+                        android:textColor="@color/cm_text_secondary"
                         android:textSize="14sp"
                         android:visibility="gone" />
 
@@ -261,7 +259,7 @@
                         android:gravity="center"
                         android:paddingHorizontal="16dp"
                         android:text="See all"
-                        android:textColor="#2F45F0"
+                        android:textColor="@color/cm_primary"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         android:visibility="gone" />

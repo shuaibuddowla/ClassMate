@@ -84,7 +84,13 @@ class ClassMateApp : Application() {
         })
         runCatching { UpdateCoordinator.schedule(this) }
             .onFailure { Log.e("ClassMateUpdate", "Could not schedule updates", it) }
+        applyThemePreference(AppPreferences(this))
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            val prefs = AppPreferences(this)
+            prefs.setAutoMuteEnabled(false)
+            prefs.setShakeToTorchEnabled(false)
+            com.shuaib.classmate.services.ClassMateAutoMuteScheduler.cancel(this)
+            com.shuaib.classmate.services.ShakeToTorchService.stop(this)
             createNotificationChannels()
             return
         }
@@ -285,8 +291,8 @@ class ClassMateApp : Application() {
     }
 
     private fun applyThemePreference(prefs: AppPreferences) {
-        prefs.setDarkMode(false)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        // Respect the saved theme.
+        AppCompatDelegate.setDefaultNightMode(if (prefs.isDarkMode()) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO)
     }
 
     private fun syncNotificationPreference(prefs: AppPreferences) {

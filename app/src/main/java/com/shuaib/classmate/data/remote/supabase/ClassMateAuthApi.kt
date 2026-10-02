@@ -29,6 +29,7 @@ object ClassMateAuthApi {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val base = BuildConfig.CLASSMATE_URL.trimEnd('/')
     private val key = BuildConfig.CLASSMATE_PUBLISHABLE_KEY
+    private var appContext: Context? = null
     private var sessionStore: ClassMateSessionStore? = null
 
     @Volatile var accessToken: String? = null
@@ -41,8 +42,11 @@ object ClassMateAuthApi {
         base.startsWith("https://") && key.isNotBlank()
 
     fun attach(context: Context) {
+        appContext = context.applicationContext
         sessionStore = ClassMateSessionStore(context, BuildConfig.CLASSMATE_ENV)
     }
+
+    fun hasSavedSession(): Boolean = sessionStore?.load() != null
 
     suspend fun restoreSession(): Boolean = withContext(Dispatchers.IO) {
         val stored = sessionStore?.load() ?: return@withContext false
@@ -81,10 +85,10 @@ object ClassMateAuthApi {
     }
 
     private suspend fun refreshIfNeeded() {
-        if (accessToken == null || System.currentTimeMillis() < expiresAtMs - 60_000) return
+        if (accessToken != null && System.currentTimeMillis() < expiresAtMs - 60_000) return
         refreshMutex.withLock {
-            if (System.currentTimeMillis() < expiresAtMs - 60_000) return@withLock
-            val token = refreshToken ?: throw IOException("Session expired; sign in again")
+            if (accessToken != null && System.currentTimeMillis() < expiresAtMs - 60_000) return@withLock
+            val token = refreshToken ?: sessionStore?.load() ?: throw IOException("Session expired; sign in again")
             refreshSession(token)
         }
     }
@@ -172,11 +176,21 @@ object ClassMateAuthApi {
         finish.getString("resource_id")
     }
 
+    private fun notificationPrefs() = appContext?.getSharedPreferences("classmate_notification_identity_${BuildConfig.CLASSMATE_ENV}", Context.MODE_PRIVATE)
+    fun saveNotificationIdentity(profile: JSONObject) {
+        notificationPrefs()?.edit()?.putString("profile", profile.toString())?.apply()
+    }
+    fun notificationIdentity(): JSONObject? = runCatching {
+        notificationPrefs()?.getString("profile", null)?.let(::JSONObject)
+    }.getOrNull()
+
     fun signOut() {
         accessToken = null
         refreshToken = null
         expiresAtMs = 0
         sessionStore?.clear()
+        notificationPrefs()?.edit()?.clear()?.apply()
+        appContext?.let { com.shuaib.classmate.activities.ClassMateAcademicCache.clear(it) }
     }
 
     private suspend fun request(

@@ -164,5 +164,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release; check the draft in GitHub.' }
     Write-Host "Published $tag to $latestMetadataUrl"
 } finally {
-    Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    $cleanupPath = [IO.Path]::GetFullPath($tempDir)
+    $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $cleanupPath.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $cleanupPath) -notmatch '^classmate-release-[0-9a-f]{32}$') {
+        throw 'Refusing to clean up a path outside the release temporary directory.'
+    }
+    Remove-Item -LiteralPath $cleanupPath -Recurse -Force -ErrorAction SilentlyContinue
 }

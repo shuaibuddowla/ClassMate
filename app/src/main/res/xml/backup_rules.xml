@@ -1,13 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version='1.0' encoding='utf-8'?>
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="classmate_academic_cache_production.xml" />
+        <exclude domain="sharedpref" path="classmate_notification_identity_production.xml" />
+        <exclude domain="sharedpref" path="classmate_notification_identity_staging.xml" />
+    <exclude domain="sharedpref" path="classmate_academic_cache_staging.xml" />
 </full-backup-content>

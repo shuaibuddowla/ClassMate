@@ -26,6 +26,8 @@
     <application
         android:name=".ClassMateApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="ClassMate"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -34,6 +36,7 @@
         android:usesCleartextTraffic="true">
 
         <!-- Entry point of the app with Splash Theme -->
+        <activity android:name=".activities.ClassMateBusEditorActivity" android:exported="false" android:theme="@style/Theme.ClassMate.Publish" />
         <activity
             android:name=".activities.SplashActivity"
             android:exported="true"
@@ -59,6 +62,9 @@
             android:screenOrientation="portrait"
             tools:ignore="LockedOrientationActivity" />
 
+        <activity android:name=".activities.ClassMatePublishActivity"
+            android:theme="@style/Theme.ClassMate.Publish"
+            android:exported="false" android:screenOrientation="portrait" />
         <!-- Authentication Activities -->
         <activity
             android:name=".activities.ClassMateAuthActivity"
@@ -67,7 +73,7 @@
         <activity android:name=".update.UpdateActionActivity" android:exported="false" />
         <receiver android:name=".update.InstallResultReceiver" android:exported="false" />
         <activity
-            android:name=".activities.ClassMatePeriodEditorActivity"
+            android:name=".activities.ClassMatePeriodEditorActivity" android:theme="@style/Theme.ClassMate.Publish"
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity

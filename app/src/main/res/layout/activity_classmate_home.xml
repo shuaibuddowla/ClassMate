@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@color/cm_background">
 
-    <LinearLayout
+    <com.shuaib.classmate.ui.ClassMateSwipeTabsHost
         android:id="@+id/classmate_home_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -17,7 +17,7 @@
         android:elevation="5dp"
         android:paddingHorizontal="@dimen/bottom_nav_inner_horizontal_padding"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="80dp"
         android:layout_marginStart="@dimen/bottom_nav_horizontal_margin"
         android:layout_marginEnd="@dimen/bottom_nav_horizontal_margin"
         android:layout_marginBottom="@dimen/bottom_nav_bottom_margin"
@@ -27,8 +27,8 @@
         app:itemBackground="@drawable/bg_bottom_nav_item_ripple"
         app:itemHorizontalTranslationEnabled="false"
         app:itemIconSize="23dp"
-        app:itemPaddingBottom="6dp"
-        app:itemPaddingTop="8dp"
+        app:itemPaddingBottom="14dp"
+        app:itemPaddingTop="12dp"
         app:itemTextAppearanceActive="@style/App.BottomNavLabel.Active"
         app:itemTextAppearanceInactive="@style/App.BottomNavLabel.Inactive"
         app:itemIconTint="@color/bottom_nav_item_color"

@@ -23,7 +23,13 @@ import org.json.JSONObject
 /** Dedicated, locally sorted view of every active file in one semester course. */
 class ClassMateCourseFilesActivity : AppCompatActivity() {
     private val courseId by lazy { intent.getStringExtra("course_id").orEmpty() }
+    private val batchId by lazy { intent.getStringExtra("batch_id").orEmpty() }
+    private var search = ""
     private val courseName by lazy { intent.getStringExtra("course_name").orEmpty() }
+    private val canEdit by lazy { intent.getStringExtra("role") == "admin" || intent.getBooleanExtra("is_cr", false) }
+    private val editLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) { setResult(RESULT_OK); loadFiles() }
+    }
     private val canManage by lazy { intent.getBooleanExtra("can_manage", false) }
     private val files = mutableListOf<JSONObject>()
     private var filtered = emptyList<JSONObject>()
@@ -36,7 +42,8 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (courseId.isBlank()) { finish(); return }
+        ClassMateAuthApi.attach(applicationContext)
+        if (courseId.isBlank() && batchId.isBlank()) { finish(); return }
         val scale = resources.displayMetrics.density
         fun dp(value: Int) = (value * scale).toInt()
         val root = LinearLayout(this).apply {
@@ -44,22 +51,20 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             setBackgroundColor(getColor(R.color.cm_background))
             setPadding(dp(16), dp(18), dp(16), 0)
         }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val back = TextView(this).apply {
-            text = "‹"
-            textSize = 32f
-            setTextColor(getColor(R.color.cm_primary))
-            setPadding(dp(8), 0, dp(18), 0)
-            setOnClickListener { finish() }
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
+            isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
         }
-        header.addView(back)
-        header.addView(TextView(this).apply {
-            text = courseName
-            textSize = 22f
-            setTextColor(getColor(R.color.cm_text_primary))
-            setTypeface(null, android.graphics.Typeface.BOLD)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(header)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.ime())
+            view.setPadding(dp(16) + bars.left, bars.top, dp(16) + bars.right, bars.bottom); insets
+        }
+        root.addView(com.google.android.material.appbar.MaterialToolbar(this).apply {
+            title = courseName; setTitleTextColor(getColor(R.color.cm_text_primary))
+            setNavigationIcon(R.drawable.ic_chevron_left); navigationIcon?.setTint(getColor(R.color.cm_text_primary))
+            setNavigationOnClickListener { finish() }
+        })
         count = TextView(this).apply {
             text = "Loading files…"
             textSize = 13f
@@ -70,7 +75,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         filterButton = control("All categories") {
             val choices = arrayOf("All", "Notes", "Slides", "Questions", "Syllabus", "Other")
-            AlertDialog.Builder(this).setTitle("File category").setItems(choices) { _, which ->
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("File category").setItems(choices) { _, which ->
                 category = choices[which]
                 filterButton.text = category
                 showFiles()
@@ -78,7 +83,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
         }
         sortButton = control("Newest first") {
             val choices = arrayOf("Newest", "Oldest", "Name")
-            AlertDialog.Builder(this).setTitle("Sort files").setItems(choices) { _, which ->
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Sort files").setItems(choices) { _, which ->
                 sort = choices[which]
                 sortButton.text = when (sort) {
                     "Oldest" -> "Oldest first"; "Name" -> "Name A–Z"; else -> "Newest first"
@@ -91,6 +96,16 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             marginStart = dp(8)
         })
         root.addView(controls)
+        root.addView(android.widget.EditText(this).apply {
+            hint = "Search files"; setSingleLine(true); textSize = 14f
+            setTextColor(getColor(R.color.cm_text_primary)); setHintTextColor(getColor(R.color.cm_text_secondary))
+            setBackgroundResource(R.drawable.bg_library_search_html); setPadding(dp(16), 0, dp(16), 0)
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { search = s.toString(); if (::adapter.isInitialized) showFiles() }
+            })
+        }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(12) })
         adapter = FileAdapter()
         root.addView(RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@ClassMateCourseFilesActivity)
@@ -117,7 +132,8 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             var offset = 0
             do {
                 val page = ClassMateAuthApi.rows("file_metadata",
-                    "select=id,title,category,size_bytes,created_at&semester_course_id=eq.$courseId" +
+                    "select=id,title,category,size_bytes,created_at,semester_course_id,batch_id&" +
+                        (if (courseId.isBlank()) "batch_id=eq.$batchId" else "semester_course_id=eq.$courseId") +
                         "&status=eq.active&order=created_at.desc&limit=500&offset=$offset")
                 for (i in 0 until page.length()) loaded.add(page.getJSONObject(i))
                 offset += page.length()
@@ -134,8 +150,8 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
     }
 
     private fun showFiles() {
-        filtered = files.filter { category == "All" ||
-            it.optString("category").equals(category, true) }.let { items ->
+        filtered = files.filter { (category == "All" ||
+            it.optString("category").equals(category, true)) && (search.isBlank() || it.optString("title").contains(search, true)) }.let { items ->
             when (sort) {
                 "Oldest" -> items.sortedBy { it.optString("created_at") }
                 "Name" -> items.sortedBy { it.optString("title").lowercase() }
@@ -154,11 +170,12 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
     }
 
     private fun deleteFile(file: JSONObject) {
-        AlertDialog.Builder(this).setTitle("Permanently delete ${file.optString("title")}?")
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("Permanently delete ${file.optString("title")}?")
             .setMessage("This removes the protected file, library entry, and linked notice. This cannot be undone.")
             .setPositiveButton("Delete permanently") { _, _ -> lifecycleScope.launch {
                 runCatching { ClassMateAuthApi.deleteResource(file.getString("id")) }
                     .onSuccess {
+                        ClassMateAcademicCache.removeResourceNotice(this@ClassMateCourseFilesActivity, intent.getStringExtra("profile_id").orEmpty(), batchId, file.getString("id"))
                         files.removeAll { it.optString("id") == file.optString("id") }
                         showFiles()
                         setResult(RESULT_OK)
@@ -202,7 +219,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             })
             row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(TextView(this@ClassMateCourseFilesActivity).apply {
-                tag = "delete"; text = "Delete"; textSize = 13f
+                tag = "delete"; text = if (canEdit) "Manage" else "Delete"; textSize = 13f
                 setTextColor(getColor(R.color.cm_error))
                 setPadding((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt())
                 visibility = if (canManage) View.VISIBLE else View.GONE
@@ -213,11 +230,19 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
         override fun getItemCount() = filtered.size
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val file = filtered[position]
-            holder.title.text = file.optString("title")
+            holder.title.text = ClassMateNoticeText.styled(holder.title, file.optString("title"), search)
             holder.meta.text = "${file.optString("category").replaceFirstChar { it.uppercase() }}" +
                 " · ${file.optLong("size_bytes") / 1024} KB"
             holder.card.setOnClickListener { openFile(file) }
-            holder.delete.setOnClickListener { deleteFile(file) }
+            holder.delete.setOnClickListener {
+                if (canEdit) com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMateCourseFilesActivity)
+                    .setTitle("Manage file").setItems(arrayOf("Edit file details", "Delete permanently")) { _, choice ->
+                        if (choice == 1) deleteFile(file) else editLauncher.launch(Intent(this@ClassMateCourseFilesActivity, ClassMatePublishActivity::class.java)
+                            .putExtra("batch_id", batchId).putExtra("upload", true).putExtra("role", intent.getStringExtra("role"))
+                            .putExtra("resource", file.toString()))
+                    }.show()
+                else deleteFile(file)
+            }
         }
     }
 }

@@ -128,4 +128,6 @@
     <color name="colorPrimary">#2563EB</color>
     <color name="colorPrimaryDark">#1E40AF</color>
     <color name="colorAccent">#D97706</color>
+    <color name="cm_search_highlight">#FFE08A</color>
+    <color name="cm_search_highlight_text">#302400</color>
 </resources>

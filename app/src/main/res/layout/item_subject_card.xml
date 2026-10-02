@@ -15,11 +15,11 @@
     </FrameLayout>
 
     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
-        <TextView android:id="@+id/tvSubjectName" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:fontFamily="sans-serif-medium" android:maxLines="1" android:textColor="#12152A" android:textSize="14sp" android:textStyle="bold" tools:text="Digital Electronics" />
-        <TextView android:id="@+id/tvSubjectCode" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="#565C75" android:textSize="11sp" tools:text="CSE1205" />
+        <TextView android:id="@+id/tvSubjectName" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:fontFamily="sans-serif-medium" android:maxLines="1" android:textColor="@color/cm_text_primary" android:textSize="14sp" android:textStyle="bold" tools:text="Digital Electronics" />
+        <TextView android:id="@+id/tvSubjectCode" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/cm_text_secondary" android:textSize="11sp" tools:text="CSE1205" />
     </LinearLayout>
 
-    <TextView android:id="@+id/tvPdfCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:textColor="#565C75" android:textSize="11sp" tools:text="8 files" />
-    <ImageView android:id="@+id/btnManageCourse" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="4dp" android:padding="7dp" android:contentDescription="Manage course" android:src="@drawable/ic_more_vert" android:visibility="gone" app:tint="#565C75" />
-    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_marginStart="6dp" android:src="@drawable/ic_chevron_right" app:tint="#565C75" />
+    <TextView android:id="@+id/tvPdfCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:textColor="@color/cm_text_secondary" android:textSize="11sp" tools:text="8 files" />
+    <ImageView android:id="@+id/btnManageCourse" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="4dp" android:padding="7dp" android:contentDescription="Manage course" android:src="@drawable/ic_more_vert" android:visibility="gone" app:tint="@color/cm_text_secondary" />
+    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_marginStart="6dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" />
 </LinearLayout>
