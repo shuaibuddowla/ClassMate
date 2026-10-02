@@ -73,5 +73,25 @@ internal object ClassMateAcademicCache {
         for (i in 0 until feed.length()) feed.optJSONObject(i)?.let { if (it.optString("resource_id") != resource) updated.put(it) }
         save(context, user, batch, "notices", snapshot.put("feed", updated))
     }
+    fun removeCourse(context: Context, offeringIds: Set<String>) {
+        val storage=prefs(context)
+        val edit=storage.edit()
+        storage.all.forEach { (key,value) ->
+            if(!key.endsWith(":routine") && !key.endsWith(":notices")) return@forEach
+            val data=runCatching { JSONObject(value as? String ?: return@forEach) }.getOrNull() ?: return@forEach
+            listOf("entries","details","changes","feed").forEach { field ->
+                data.optJSONArray(field)?.let { old ->
+                    val kept=org.json.JSONArray()
+                    for(i in 0 until old.length()) old.optJSONObject(i)?.let { row ->
+                        if(row.optString("semester_course_id") !in offeringIds) kept.put(row)
+                    }
+                    data.put(field,kept)
+                }
+            }
+            data.optJSONObject("names")?.let { names -> offeringIds.forEach { names.remove(it) } }
+            edit.putString(key,data.put("saved_at",0L).toString())
+        }
+        edit.apply()
+    }
     fun clear(context: Context) { prefs(context).edit().clear().apply() }
 }

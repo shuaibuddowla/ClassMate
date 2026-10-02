@@ -13,7 +13,8 @@ import org.json.JSONObject
 
 internal object ClassMateWelcomeDialogs {
     fun show(activity: AppCompatActivity, step: Int, profile: JSONObject, batch: JSONObject?, department: JSONObject?, notificationsAllowed: Boolean,
-             continueFlow: () -> Unit, enable: () -> Unit, skip: () -> Unit): AlertDialog {
+             continueFlow: () -> Unit, enable: () -> Unit, skip: () -> Unit, onProfileUpdated: (JSONObject)->Unit): AlertDialog {
+        if(step==2) return ClassMateProfileDetailsDialog.show(activity,profile,true) { updated -> onProfileUpdated(updated); continueFlow() }
         val form = ClassMateFormUi(activity)
         val density = activity.resources.displayMetrics.density
         val surface = MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(24*density).build()).apply {
@@ -37,15 +38,6 @@ internal object ClassMateWelcomeDialogs {
                 field("Batch", batch?.let { "Batch ${it.optInt("batch_number")}" })
                 field("Session", (if (profile.optString("role") == "student") profile else batch)?.optString("academic_session"))
                 field("Role", if(profile.optBoolean("is_cr")) "Class representative" else profile.optString("role").replaceFirstChar { it.uppercase() })
-                builder.setPositiveButton("Continue") { _,_ -> continueFlow() }
-            }
-            2 -> {
-                builder.setTitle("Your batch, together")
-                field("Notices", "Batch updates and class alerts")
-                field("Timetable", "Your daily classes")
-                field("Bus schedules", "Routes and departure times")
-                field("Library", "Notes, slides and course files")
-                if(profile.optString("role") in setOf("admin","teacher") || profile.optBoolean("is_cr")) field("Manage", "Tools for your assigned role")
                 builder.setPositiveButton("Continue") { _,_ -> continueFlow() }
             }
             else -> {

@@ -103,7 +103,7 @@ object ClassMateAuthApi {
 
     suspend fun registerDeviceToken(token: String) {
         request("POST", "/rest/v1/rpc/register_device_token",
-            JSONObject().put("target_token", token), classmate = true)
+            JSONObject().put("target_token", token).put("target_version", BuildConfig.VERSION_CODE), classmate = true)
     }
 
     suspend fun unregisterDeviceToken(token: String) {
@@ -145,6 +145,17 @@ object ClassMateAuthApi {
         }
         if (JSONObject(response).optString("status") != "deleted")
             throw IOException("Permanent deletion was not confirmed")
+    }
+
+    suspend fun deleteGlobalCourse(courseId: String): JSONObject {
+        val args = JSONObject().put("target_course",courseId)
+        return try { rpc("delete_global_course",args) }
+        catch (first: IOException) {
+            if (first.message?.startsWith("400:") == true || first.message?.startsWith("401:") == true || first.message?.startsWith("403:") == true) throw first
+            // The RPC is idempotent: a lost response after deletion is safe to retry.
+            delay(250)
+            rpc("delete_global_course",args)
+        }
     }
 
     suspend fun uploadResource(

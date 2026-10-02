@@ -55,6 +55,7 @@ internal class ClassMateAcademicScreensSupabase(
     private val onAddPeriod: (JSONObject?, Int) -> Unit,
     private val onAddBus: (JSONObject?) -> Unit,
     private val onOpenCourse: (String, String, Boolean) -> Unit,
+    private val onEditProfile: () -> Unit,
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
@@ -90,6 +91,7 @@ internal class ClassMateAcademicScreensSupabase(
     private var librarySnapshot: LibrarySnapshot? = null
     private var libraryLoadingRoot: View? = null
     fun invalidateLibrary() { librarySnapshot = null }
+    fun invalidateNotices() { noticeRequest++; noticeFeed=emptyList(); noticeBatch="" }
     private val inflater get() = LayoutInflater.from(activity)
     private val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
     private fun selectedScheduleDate(): LocalDate {
@@ -1316,7 +1318,8 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
         root.v<View>(R.id.btnLogout).setOnClickListener { onSignOut() }
-        root.v<View>(R.id.cardPersonalInfo).setOnClickListener { showProfileDetails(root) }
+        root.v<View>(R.id.cardPersonalInfo).setOnClickListener { onEditProfile() }
+        root.v<View>(R.id.btnEditPersonal).setOnClickListener { onEditProfile() }
     }
 
     private fun showProfileDetails(root: View): Unit = launch(root) {

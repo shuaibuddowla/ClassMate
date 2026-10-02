@@ -58,6 +58,22 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private var welcomeDialog: AlertDialog? = null
     private var tabAnimating = false
     private var authBusy = false
+    private var profileValidated = false
+    private var pendingCallNumber: String? = null
+    private val callPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingCallNumber?.let { launchPhoneCall(it,granted) }
+        pendingCallNumber=null
+    }
+
+    private fun callFriend(phone: String) {
+        if(!phone.matches(Regex("\\+[1-9][0-9]{7,14}"))) return
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.CALL_PHONE)==PackageManager.PERMISSION_GRANTED) launchPhoneCall(phone,true)
+        else { pendingCallNumber=phone; callPermission.launch(Manifest.permission.CALL_PHONE) }
+    }
+    private fun launchPhoneCall(phone: String,allowed: Boolean) {
+        try { startActivity(Intent(if(allowed) Intent.ACTION_CALL else Intent.ACTION_DIAL,Uri.parse("tel:$phone"))) }
+        catch (_: Exception) { Toast.makeText(this,"Could not open your phone app",Toast.LENGTH_SHORT).show() }
+    }
     private var welcomeUi: ClassMateWelcomeUi? = null
     private var selectedTab = R.id.nav_timetable
     private var selectedBatchId = ""
@@ -131,6 +147,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         if (!ClassMateAuthApi.hasSavedSession()) delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         super.onCreate(savedInstanceState)
         welcomeStep = savedInstanceState?.getInt("welcome_step") ?: 0
+        pendingCallNumber=savedInstanceState?.getString("pending_call_number")
         selectedBatchId = savedInstanceState?.getString("selected_batch_id").orEmpty()
         selectedBatchLabel = savedInstanceState?.getString("selected_batch_label").orEmpty()
         selectedTab = savedInstanceState?.getInt("selected_tab") ?: selectedTab
@@ -143,6 +160,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             userId = profile?.optString("id").orEmpty()
             selectedBatchId = cachedHome.optString("batch"); selectedBatchLabel = cachedHome.optString("label")
             if (profile?.optString("verification_status") == "active" && userId.isNotBlank() && selectedBatchId.isNotBlank()) {
+                profile?.let { ClassMateAuthApi.saveNotificationIdentity(it) }
                 // Render the last synced home first; revalidate the session in the background.
                 status = TextView(this); profileView = TextView(this); resultView = TextView(this); actions = LinearLayout(this)
                 showHome(); renderHomeTab(selectedTab)
@@ -208,6 +226,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("welcome_step", welcomeStep)
+        outState.putString("pending_call_number",pendingCallNumber)
         outState.putString("selected_batch_id", selectedBatchId)
         outState.putString("selected_batch_label", selectedBatchLabel)
         outState.putInt("selected_tab", selectedTab)
@@ -243,6 +262,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private fun signOut() {
+        profileValidated=false
         welcomeDialog?.dismiss(); welcomeDialog=null; welcomeStep=0; revealAfterAuth=false
         if (ClassMateAuthApi.accessToken == null || !ClassMateAcademicCache.online(this)) {
             ClassMateAuthApi.signOut(); homeShown = false; profile = null; userId = ""; selectedBatchId = ""; selectedBatchLabel = ""; authBusy = false
@@ -294,6 +314,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
         authBusy = false
         profile = loaded
+        profileValidated = true
         ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
         if (loaded.optString("verification_status") == "active") {
@@ -318,7 +339,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if (revealAfterAuth || welcomeStep > 0) {
                 if (welcomeStep == 0) welcomeStep = 1
                 showIdentityReveal(loaded)
-            } else registerFcmToken()
+            } else { registerFcmToken(); maybeRemindProfile() }
 
         } else {
             ClassMateAcademicCache.clear(this)
@@ -375,10 +396,32 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     if(Build.VERSION.SDK_INT >= 33 && !permission) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                     else { registerFcmToken(); if(!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName)) }
                 },
-                skip = { welcomeDialog=null; welcomeStep=0; revealAfterAuth=false; AppPreferences(this).setNotificationsEnabled(false) }
+                skip = { welcomeDialog=null; welcomeStep=0; revealAfterAuth=false; AppPreferences(this).setNotificationsEnabled(false) },
+                onProfileUpdated = { updated -> updatePersonalProfile(updated) }
             )
         }
         window.decorView.post { showStep() }
+    }
+
+    private fun updatePersonalProfile(updated: JSONObject) {
+        if(updated.optString("id")!=userId) return
+        profile=updated
+        ClassMateAuthApi.saveNotificationIdentity(updated)
+        ClassMateAcademicCache.saveHome(this,updated,selectedBatchId,selectedBatchLabel)
+    }
+
+    private fun editPersonalProfile() {
+        val account=profile ?: return
+        ClassMateProfileDetailsDialog.show(this,account,false) { updated ->
+            updatePersonalProfile(updated)
+            if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
+        }
+    }
+
+    private fun maybeRemindProfile() {
+        val account=profile ?: return
+        if(!homeShown || !profileValidated || welcomeStep!=0 || welcomeDialog?.isShowing==true || !ClassMateAcademicCache.online(this) || !ClassMateProfileReminder.due(this,account)) return
+        welcomeDialog=ClassMateProfileDetailsDialog.show(this,account,true) { updated -> updatePersonalProfile(updated); welcomeDialog=null }
     }
 
     private fun showHome() {
@@ -408,12 +451,15 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     .putExtra("course_id", courseId).putExtra("course_name", courseName)
                     .putExtra("batch_id", selectedBatchId).putExtra("profile_id", userId).putExtra("can_manage", canManage)
                     .putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
-            }
+            },
+            { editPersonalProfile() }
         )
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
+        nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
         nav.menu.findItem(R.id.nav_manage).isVisible =
             profile?.optString("role") in setOf("admin", "teacher") ||
                 profile?.optBoolean("is_cr") == true
+        if(nav.menu.findItem(selectedTab)?.isVisible!=true) selectedTab=R.id.nav_timetable
         nav.selectedItemId = selectedTab
         val swipeHost = homeHost as com.shuaib.classmate.ui.ClassMateSwipeTabsHost
         fun destination(direction: Int): Int? {
@@ -528,6 +574,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
         if (tab != R.id.nav_manage) {
             content = homeHost
             homeHost.removeAllViews()
+            if(tab==R.id.nav_friends) {
+                ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) }).render(homeHost,selectedBatchLabel)
+                return
+            }
             academicScreens.render(tab, homeHost)
             return
         }
@@ -786,7 +836,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
     }
 
-    private fun showEditCourseDialog(course: JSONObject) {
+    private fun showEditCourseDialog(course: JSONObject, onSaved: (() -> Unit)? = null) {
         if(profile?.optString("role") != "admin") return
         val form=ClassMateFormUi(this)
         form.label("Changes apply everywhere this course is used.")
@@ -817,6 +867,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     dialog.dismiss()
                     if(homeShown && selectedTab==R.id.nav_manage) renderHomeTab(selectedTab)
                     Toast.makeText(this@ClassMateAuthActivity,"Course updated",Toast.LENGTH_SHORT).show()
+                    onSaved?.invoke()
                 } catch(e:Exception) { error.text=e.message ?: "Could not save. Your changes are still here." }
                 finally { saving=false; code.isEnabled=true; name.isEnabled=true; dialog.setCancelable(true); dialog.getButton(-1).isEnabled=true; dialog.getButton(-2).isEnabled=true }
             }
@@ -838,14 +889,75 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 ?: error("Batch is unavailable")
             val courses = ClassMateAuthApi.rows("courses",
                 "select=id,course_code,course_title,course_type,credit&department_id=eq.${batch.getString("department_id")}&order=course_code")
-            if (courses.length() == 0) error("No existing courses. Create a new one instead.")
-            val names = Array(courses.length()) { index -> courses.getJSONObject(index).let {
-                "${it.optString("course_code")} · ${it.optString("course_title")}" } }
-            AlertDialog.Builder(this@ClassMateAuthActivity).setTitle("Department courses")
-                .setItems(names) { _, index ->
-                    val c = courses.getJSONObject(index)
-                    saveBatchCourse(c.optString("course_code"), c.optString("course_title"),
-                        c.optString("course_type"), c.optDouble("credit").takeIf { !it.isNaN() })
+            val form=ClassMateFormUi(this@ClassMateAuthActivity)
+            form.label(if(courses.length()==0) "No courses in this catalog yet. Create a new course to get started." else "Shared department catalog · select a course to add it to this batch")
+            val dialog=com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMateAuthActivity)
+                .setTitle("Department courses").setView(form.scroll).setNegativeButton("Done",null)
+                .setPositiveButton("New course") { _,_ -> showNewBatchCourseDialog() }.create()
+            for(index in 0 until courses.length()) {
+                val course=courses.getJSONObject(index)
+                val row=LinearLayout(this@ClassMateAuthActivity).apply {
+                    gravity=android.view.Gravity.CENTER_VERTICAL
+                    setPadding(0,12,0,12)
+                }
+                val name=TextView(this@ClassMateAuthActivity).apply {
+                    text="${course.optString("course_code")} · ${course.optString("course_title")}"
+                    textSize=15f; setTextColor(getColor(R.color.cm_text_primary)); minHeight=(48*resources.displayMetrics.density).toInt()
+                    gravity=android.view.Gravity.CENTER_VERTICAL
+                    contentDescription="Add $text to this batch"
+                    setOnClickListener {
+                        dialog.dismiss()
+                        saveBatchCourse(course.optString("course_code"),course.optString("course_title"),course.optString("course_type"),course.optDouble("credit").takeIf { !it.isNaN() })
+                    }
+                }
+                row.addView(name,LinearLayout.LayoutParams(0,-2,1f))
+                if(profile?.optString("role")=="admin") {
+                    val menu=TextView(this@ClassMateAuthActivity).apply {
+                        text="⋮"; textSize=24f; gravity=android.view.Gravity.CENTER; setTextColor(getColor(R.color.cm_text_primary))
+                        contentDescription="Manage ${course.optString("course_title")}"
+                        setOnClickListener {
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMateAuthActivity)
+                                .setTitle(course.optString("course_title"))
+                                .setItems(arrayOf("Edit course details","Delete from all batches")) { _, action ->
+                                    dialog.dismiss()
+                                    if(action==0) showEditCourseDialog(course) { chooseExistingBatchCourse() }
+                                    else confirmGlobalCourseDeletion(course)
+                                }.show()
+                        }
+                    }
+                    row.addView(menu,LinearLayout.LayoutParams((48*resources.displayMetrics.density).toInt(),(48*resources.displayMetrics.density).toInt()))
+                }
+                form.panel.addView(row)
+            }
+            dialog.show()
+        }
+    }
+
+    private fun confirmGlobalCourseDeletion(course: JSONObject) {
+        if(profile?.optString("role")!="admin") return
+        runAction("Checking linked course data") {
+            val impact=ClassMateAuthApi.rpc("course_deletion_preview",JSONObject().put("target_course",course.getString("id")))
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMateAuthActivity)
+                .setTitle("Permanently delete this course?")
+                .setMessage("${course.optString("course_code")} · ${course.optString("course_title")}\n\nThis removes the course from ${impact.optInt("batches")} batches, ${impact.optInt("periods")} periods, ${impact.optInt("files")} files and ${impact.optInt("notices")} notices, plus teacher assignments and class changes. This cannot be undone.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Delete everywhere") { _,_ ->
+                    runAction("Deleting course everywhere") {
+                        val offeringIds=mutableSetOf<String>()
+                        var offset=0
+                        do {
+                            val chunk=ClassMateAuthApi.rows("semester_courses","select=id&course_id=eq.${course.getString("id")}&order=id&limit=1000&offset=$offset")
+                            for(i in 0 until chunk.length()) offeringIds.add(chunk.getJSONObject(i).getString("id"))
+                            offset+=chunk.length()
+                        } while(chunk.length()==1000)
+                        ClassMateAuthApi.deleteGlobalCourse(course.getString("id"))
+                        ClassMateAcademicCache.removeCourse(this@ClassMateAuthActivity,offeringIds)
+                        academicScreens.invalidateLibrary()
+                        academicScreens.invalidateNotices()
+                        if(homeShown && selectedTab==R.id.nav_manage) renderHomeTab(selectedTab)
+                        Toast.makeText(this@ClassMateAuthActivity,"Course and linked records deleted",Toast.LENGTH_LONG).show()
+                        chooseExistingBatchCourse()
+                    }
                 }.show()
         }
     }
@@ -1035,6 +1147,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
+        if(homeShown && welcomeStep==0 && !reconnecting) maybeRemindProfile()
     }
 
     private fun registerFcmToken() {

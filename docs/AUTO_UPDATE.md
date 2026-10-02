@@ -84,3 +84,14 @@ Example `update.json`:
 ## Disable a bad release
 
 Mark the release as not latest or unpublish it so `/releases/latest` returns the previous release. An already installed newer APK cannot be downgraded by this updater. Publish a corrected APK with a **higher** version code and the same signing identity. If a mandatory release is bad, restore a safe latest release promptly and verify the link from an external network.
+# Release push notifications
+
+The GitHub publishing script now queues an authenticated production push after publishing and verifying the release. Each version is queued once. Registered devices belonging to active users across batches receive the release alert. On version 1.1.15 and newer, tapping it opens the verified updater, and automatic checks start without waiting for the periodic timer. Wi-Fi preferences and Android installation permissions still apply.
+
+If GitHub publication succeeds but notification enqueueing fails, retry only the notification:
+
+```powershell
+.\scripts\notify-classmate-release.ps1 -VersionName '1.1.15' -VersionCode 16
+```
+
+Dispatch credentials come from the ignored production secrets file. Do not put them in GitHub, APK resources, or release metadata. Older clients may open Notices from the release alert; they need the 1.1.15 upgrade to support the update action. Android notification settings and force-stop restrictions still affect delivery.

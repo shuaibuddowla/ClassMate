@@ -135,6 +135,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         choices.addView(general); choices.addView(cancellation); form.panel.addView(choices)
         val title = form.field("Notice title")
         val message = form.field("Message · links supported", true)
+        val silentHint=form.label("Start with /silent to post without a push notification.")
         val (courseBox, course) = dropdown("Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
@@ -142,6 +143,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val cancelled = checked == cancellation.id
             (title.parent.parent as View).visibility = if (cancelled) View.GONE else View.VISIBLE
             (message.parent.parent as View).visibility = if (cancelled) View.GONE else View.VISIBLE
+            silentHint.visibility=if(cancelled) View.GONE else View.VISIBLE
             courseBox.visibility = if (cancelled) View.VISIBLE else View.GONE
             dateBox.visibility = courseBox.visibility
         }

@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.dispatch-classmate-notifications]
 verify_jwt = false
+
+[functions.publish-classmate-release]
+verify_jwt = false

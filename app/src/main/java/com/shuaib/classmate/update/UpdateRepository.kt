@@ -36,7 +36,7 @@ class UpdateRepository(private val context: Context) {
 
     suspend fun fetch(): UpdateMetadata = withContext(Dispatchers.IO) {
         if (!configured) throw PermanentUpdateException("Update server is not configured")
-        val request = Request.Builder().url("$base/update.json")
+        val request = Request.Builder().url("$base/update.json?check=${System.currentTimeMillis()}")
             .cacheControl(CacheControl.FORCE_NETWORK)
             .header("Accept", "application/json")
             .header("User-Agent", "ClassMate-Android-Updater")

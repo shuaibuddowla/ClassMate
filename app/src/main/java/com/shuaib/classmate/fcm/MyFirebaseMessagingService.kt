@@ -28,16 +28,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         Log.d("FCM", "From: ${remoteMessage.from}")
 
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
-            ClassMateAuthApi.attach(applicationContext)
-            if (!ClassMateAuthApi.hasSavedSession() || !com.shuaib.classmate.utils.AppPreferences(this).isNotificationsEnabled()) return
-            val identity = ClassMateAuthApi.notificationIdentity() ?: return
-            val expectedProject = android.net.Uri.parse(BuildConfig.CLASSMATE_URL).host?.substringBefore('.')
-            if (remoteMessage.data["project_ref"] != expectedProject || remoteMessage.data["recipient_id"] != identity.optString("id")) return
-            if (identity.optString("verification_status") != "active") return
-            if (identity.optString("role") == "student" && remoteMessage.data["batch_id"] != identity.optString("batch_id")) return
-            val kind = remoteMessage.data["kind"] ?: "update"
-            sendNotification(remoteMessage.data["title"] ?: "ClassMate update", remoteMessage.data["body"] ?: "New $kind available", remoteMessage.data["record_id"] ?: kind)
+            ClassMatePushWorker.enqueue(applicationContext, remoteMessage.data)
             return
+
         }
 
         // Check if user is logged in

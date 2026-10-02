@@ -10,6 +10,7 @@ class GlassBottomNavView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
 ) : BottomNavigationView(context, attrs, defStyleAttr) {
+    override fun getMaxItemCount(): Int = 6
     // Retained for existing callers; Material's selected indicator owns the active state.
     fun updateActiveTab(tabIndex: Int, totalTabs: Int) = Unit
 }

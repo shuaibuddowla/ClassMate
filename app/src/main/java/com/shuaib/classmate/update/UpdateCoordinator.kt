@@ -50,11 +50,15 @@ object UpdateCoordinator {
         manager.enqueueUniquePeriodicWork(PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, periodic)
     }
 
-    fun enqueueForegroundCheck(context: Context) {
+    fun enqueueReleaseCheck(context: Context) = enqueueCheck(context, fromRelease = true)
+
+    fun enqueueForegroundCheck(context: Context) = enqueueCheck(context, fromRelease = false)
+
+    private fun enqueueCheck(context: Context, fromRelease: Boolean) {
         val app = context.applicationContext
         val prefs = AppPreferences(app)
         if (!prefs.isAutoUpdateEnabled() || !UpdateRepository(app).configured) return
-        if (System.currentTimeMillis() - prefs.lastUpdateCheckTimestamp() < TimeUnit.HOURS.toMillis(1)) return
+        if (!fromRelease && System.currentTimeMillis() - prefs.lastUpdateCheckTimestamp() < TimeUnit.HOURS.toMillis(1)) return
         val constraints = Constraints.Builder().setRequiredNetworkType(
             if (prefs.isWifiOnlyUpdates()) NetworkType.UNMETERED else NetworkType.CONNECTED
         ).build()

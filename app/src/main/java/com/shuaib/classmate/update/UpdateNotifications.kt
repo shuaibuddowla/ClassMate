@@ -30,7 +30,7 @@ object UpdateNotifications {
     }
 
     fun show(context: Context, title: String, message: String, action: String? = null,
-             confirmation: Intent? = null, progress: Int? = null) {
+             confirmation: Intent? = null, progress: Int? = null, notificationId: Int = NOTIFICATION_ID) {
         if (!canNotify(context)) return
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
@@ -47,7 +47,7 @@ object UpdateNotifications {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             builder.setContentIntent(pending)
         }
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
+        NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }
 
     fun clear(context: Context) = NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)

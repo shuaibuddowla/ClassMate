@@ -41,7 +41,7 @@ $versionCode = [long]$Matches[2]
 $versionName = $Matches[3]
 if ($packageName -ne 'com.shuaib.classmate') { throw "Wrong APK package: $packageName" }
 if ($versionCode -le 0 -or $MinSupportedVersionCode -gt $versionCode) { throw 'Invalid release version policy.' }
-if ($versionName -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Version name is not safe for a release asset.' }
+if ($versionName -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a numeric major.minor.patch release version.' }
 
 $signing = (& $apksigner verify --verbose --print-certs $apk 2>&1 | Out-String)
 if ($LASTEXITCODE -ne 0) { throw "APK signature verification failed: $signing" }
@@ -88,7 +88,7 @@ if ($ValidateOnly) { return }
 
 Push-Location $repoRoot
 try {
-    if ((& git status --porcelain -- .gitignore app cloudflare-worker docs firestore.rules gradle package.json package-lock.json scripts/publish-classmate-github-update.ps1 supabase)) {
+    if ((& git status --porcelain -- .gitignore app cloudflare-worker docs firestore.rules gradle package.json package-lock.json scripts/publish-classmate-github-update.ps1 scripts/notify-classmate-release.ps1 supabase)) {
         throw 'Commit the release source before publishing.'
     }
     $branch = (& git branch --show-current).Trim()
@@ -163,6 +163,7 @@ try {
     & gh release edit $tag --repo $repo --draft=false --latest
     if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release; check the draft in GitHub.' }
     Write-Host "Published $tag to $latestMetadataUrl"
+    & (Join-Path $PSScriptRoot 'notify-classmate-release.ps1') -VersionName $versionName -VersionCode $versionCode
 } finally {
     $cleanupPath = [IO.Path]::GetFullPath($tempDir)
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
