@@ -59,10 +59,30 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private var welcomePreparing = false
     private val welcomeProgress by lazy { getSharedPreferences("classmate_welcome_${BuildConfig.CLASSMATE_ENV}", MODE_PRIVATE) }
 
-    private fun startWelcomeFlow() {
+    private fun profileComplete(account: JSONObject): Boolean =
+        !account.isNull("profile_completed_at") && account.optString("profile_completed_at").isNotBlank()
+
+    private fun notificationChannelDisabled(): Boolean = Build.VERSION.SDK_INT >= 26 &&
+        getSystemService(android.app.NotificationManager::class.java)
+            .getNotificationChannel("classmate_notifications")?.importance == android.app.NotificationManager.IMPORTANCE_NONE
+
+    private fun notificationsEnabled(): Boolean =
+        (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
+        androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() &&
+        !notificationChannelDisabled() && AppPreferences(this).isNotificationsEnabled()
+
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= 26 && notificationChannelDisabled()) {
+            Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, "classmate_notifications")
+        } else Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        startActivity(intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
+    }
+
+    private fun startWelcomeFlow(firstStep: Int = 1) {
         if(userId.isBlank()) return
-        welcomeProgress.edit().putInt(userId,1).apply()
-        welcomeStep=1; revealAfterAuth=true
+        welcomeProgress.edit().putInt(userId,firstStep).apply()
+        welcomeStep=firstStep; revealAfterAuth=firstStep>0
     }
 
     private fun restoreWelcomeProgress(id: String) {
@@ -73,8 +93,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private fun moveWelcomeStep(expected: Int,next: Int): Boolean {
         val current=welcomeProgress.getInt(userId,welcomeStep)
-        if(!ClassMateWelcomeProgress.canMove(current,expected) || isDestroyed || isFinishing) return false
-        // Persist before permissions or theme changes can recreate this activity.
+        if(!ClassMateWelcomeProgress.canMove(current,expected)) return false
+        // A successful save must advance even if theme changes destroyed this activity.
+        // showStep checks the lifecycle before displaying the next dialog.
         welcomeProgress.edit().putInt(userId,next).apply()
         welcomeStep=next; revealAfterAuth=next>0
         return true
@@ -159,7 +180,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         AppPreferences(this).setNotificationsEnabled(granted)
-        if (granted) registerFcmToken()
+        if (granted) {
+            registerFcmToken()
+            if (notificationChannelDisabled()) openNotificationSettings()
+        }
         if (!granted) status.text = "Notifications are off. Allow them in Android settings to receive class updates."
     }
 
@@ -182,7 +206,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
             runAction("Signing in") {
                 val auth = ClassMateAuthApi.signInWithGoogleIdToken(idToken)
                 userId = auth.getJSONObject("user").getString("id")
-                startWelcomeFlow()
+                // Check before initialization creates a profile. Device-local history
+                // cannot distinguish existing users signing in on a new phone.
+                val existing = ClassMateAuthApi.rows("profiles", "select=id,profile_completed_at&id=eq.$userId&limit=1").optJSONObject(0)
+                startWelcomeFlow(ClassMateWelcomeProgress.afterSignIn(existing==null,
+                    existing?.let { profileComplete(it) } ?: false, notificationsEnabled()))
                 loadProfile()
             }
         } catch (error: Exception) {
@@ -360,7 +388,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     loaded = ClassMateAuthApi.rpc("complete_student_onboarding",
                         JSONObject().put("selected_department", matches.single().getString("id")))
                     userId=loaded.getString("id")
-                    if(!welcomeProgress.contains(userId)) startWelcomeFlow()
                 }
             }
         }
@@ -370,6 +397,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
         restoreWelcomeProgress(userId)
+        val resumedStep=ClassMateWelcomeProgress.resume(welcomeStep,profileComplete(loaded),notificationsEnabled())
+        if(resumedStep!=welcomeStep) startWelcomeFlow(resumedStep)
         if (loaded.optString("verification_status") == "active") {
             val role = loaded.optString("role")
             if (role == "admin" || role == "teacher") {
@@ -392,7 +421,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if (revealAfterAuth || welcomeStep > 0) {
                 if (welcomeStep == 0) welcomeStep = 1
                 showIdentityReveal(loaded)
-            } else { registerFcmToken(); maybeRemindProfile() }
+            } else { registerFcmToken() }
 
         } else {
             ClassMateAcademicCache.clear(this)
@@ -444,11 +473,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
         } finally { welcomePreparing=false }
         fun showStep() {
             restoreWelcomeProgress(userId)
+            val resumedStep=ClassMateWelcomeProgress.resume(welcomeStep,profileComplete(profile ?: loaded),notificationsEnabled())
+            if(resumedStep!=welcomeStep) startWelcomeFlow(resumedStep)
             if (isDestroyed || isFinishing || !homeShown || welcomeStep==0 || welcomeDialog?.isShowing==true) return
             val shownStep=welcomeStep
             val permission=Build.VERSION.SDK_INT<33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
             welcomeDialog=ClassMateWelcomeDialogs.show(this,shownStep,profile ?: loaded,batch,department,
-                permission && androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() && AppPreferences(this).isNotificationsEnabled(),
+                notificationsEnabled(),
                 continueFlow={
                     if(moveWelcomeStep(shownStep,shownStep+1)) {
                         welcomeDialog=null
@@ -459,8 +490,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     if(moveWelcomeStep(shownStep,0)) {
                         welcomeDialog=null
                         AppPreferences(this).setNotificationsEnabled(true)
-                        if(Build.VERSION.SDK_INT>=33 && !permission) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        else { registerFcmToken(); if(!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName)) }
+                        if(Build.VERSION.SDK_INT>=33 && !permission) {
+                            val previouslyAsked=welcomeProgress.getBoolean("notification_permission_requested",false)
+                            if(previouslyAsked && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
+                            else {
+                                welcomeProgress.edit().putBoolean("notification_permission_requested",true).apply()
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        } else { registerFcmToken(); if(!notificationsEnabled()) openNotificationSettings() }
                     }
                 },
                 skip={ if(moveWelcomeStep(shownStep,0)) { welcomeDialog=null; AppPreferences(this).setNotificationsEnabled(false) } },
@@ -489,12 +526,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
             updatePersonalProfile(updated)
             if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
         }
-    }
-
-    private fun maybeRemindProfile() {
-        val account=profile ?: return
-        if(!homeShown || !profileValidated || welcomeStep!=0 || welcomeDialog?.isShowing==true || !ClassMateAcademicCache.online(this) || !ClassMateProfileReminder.due(this,account)) return
-        welcomeDialog=ClassMateProfileDetailsDialog.show(this,account,true) { updated -> updatePersonalProfile(updated); welcomeDialog=null }
     }
 
     private fun showHome() {
@@ -1202,8 +1233,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Profile setup belongs to explicit sign-in, never ordinary app resumes.
         if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
-        if(homeShown && welcomeStep==0 && !reconnecting) maybeRemindProfile()
     }
 
     private fun registerFcmToken() {
@@ -1241,7 +1272,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     runAction("Completing onboarding") {
                         ClassMateAuthApi.rpc("complete_student_onboarding",
                             JSONObject().put("selected_department", id))
-                        startWelcomeFlow()
                         loadProfile()
                     }
                 }.setNegativeButton("Cancel", null).show()
@@ -1975,4 +2005,3 @@ class ClassMateAuthActivity : AppCompatActivity() {
         parent.addView(card)
     }
 }
-
