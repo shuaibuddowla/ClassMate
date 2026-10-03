@@ -166,6 +166,18 @@
 
             </LinearLayout>
 
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/busDayOptions" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp" android:layout_marginBottom="8dp" android:visibility="gone"
+        app:singleSelection="true" app:selectionRequired="true">
+        <com.google.android.material.button.MaterialButton android:id="@+id/busOfficeOpen"
+            style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:text="Office open" android:textAllCaps="false" android:textSize="13sp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/busClosedDays"
+            style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:text="Closed / holidays" android:textAllCaps="false" android:textSize="13sp" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"

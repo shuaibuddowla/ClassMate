@@ -53,7 +53,7 @@ internal class ClassMateAcademicScreensSupabase(
     private val onSignOut: () -> Unit,
     private val onSwitchBatch: () -> Unit,
     private val onAddPeriod: (JSONObject?, Int) -> Unit,
-    private val onAddBus: (JSONObject?) -> Unit,
+    private val onAddBus: (JSONObject?, String) -> Unit,
     private val onOpenCourse: (String, String, Boolean) -> Unit,
     private val onEditProfile: () -> Unit,
     private val onManage: () -> Unit,
@@ -61,6 +61,8 @@ internal class ClassMateAcademicScreensSupabase(
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
+    private var busDayOverride: String? = null
+    private fun busDayKind()=busDayOverride ?: if(selectedDay in 5..6) "closed" else "office_open"
     private var timetableRequest = 0
     private var navShown = true
     private var noticeHeaderCollapsed = false
@@ -272,12 +274,20 @@ internal class ClassMateAcademicScreensSupabase(
                 card.v<TextView>(R.id.tvDayShort).setTextColor(android.graphics.Color.WHITE)
                 card.v<TextView>(R.id.tvDayDate).setTextColor(android.graphics.Color.WHITE)
             }
-            card.setOnClickListener { selectedDay = index; setupTimetable(root) }
+            card.setOnClickListener { selectedDay = index; busDayOverride=null; setupTimetable(root) }
             selector.addView(card)
         }
         val routine = root.v<TextView>(R.id.btnToggleRoutine)
         val bus = root.v<TextView>(R.id.btnToggleBus)
+        val busOptions=root.v<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.busDayOptions)
+        busOptions.clearOnButtonCheckedListeners()
+        busOptions.check(if(busDayKind()=="closed") R.id.busClosedDays else R.id.busOfficeOpen)
+        busOptions.addOnButtonCheckedListener { _,id,checked -> if(checked) {
+            busDayOverride=if(id==R.id.busClosedDays) "closed" else "office_open"
+            if(busMode) loadTimetable(root)
+        } }
         fun updateToggle() {
+            busOptions.visibility=if(busMode) View.VISIBLE else View.GONE
             routine.setBackgroundResource(if (busMode) android.R.color.transparent else R.drawable.bg_toggle_item_selected)
             bus.setBackgroundResource(if (busMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             routine.setTextColor(activity.getColor(if (busMode) R.color.cm_text_secondary else android.R.color.white))
@@ -288,7 +298,7 @@ internal class ClassMateAcademicScreensSupabase(
                 val canEdit = if (busMode) canEditBus()
                     else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
                 visibility = if (canEdit) View.VISIBLE else View.GONE
-                setOnClickListener { if (busMode) onAddBus(null) else onAddPeriod(null, selectedDay) }
+                setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
             }
             loadTimetable(root)
         }
@@ -314,6 +324,7 @@ internal class ClassMateAcademicScreensSupabase(
         val effectiveDate = selectedScheduleDate()
         val selectedBatch = batchId()
         val requestedBusMode = busMode
+        val requestedBusKind = busDayKind()
         val request = ++timetableRequest
         val cacheKind = if (requestedBusMode) "bus" else "routine"
         val accountId = profile().optString("id")
@@ -329,7 +340,7 @@ internal class ClassMateAcademicScreensSupabase(
             if (snapshot == null && !ClassMateAcademicCache.online(activity)) error("No saved schedule yet. Connect once to sync this batch.")
             if (snapshot == null || (force && ClassMateAcademicCache.online(activity))) {
                 if (requestedBusMode) {
-                    val buses = ClassMateAuthApi.rows("bus_schedules", "select=id,route_name,departure_time,origin,destination,weekdays,notes,active&active=eq.true&order=departure_time")
+                    val buses = ClassMateAuthApi.rows("bus_schedules", "select=id,route_name,departure_time,city_departure_time,schedule_kind,origin,destination,weekdays,notes,active&active=eq.true&order=departure_time")
                     snapshot = JSONObject().put("entries", buses).put("saved_at", System.currentTimeMillis())
                 } else {
                     val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
@@ -356,8 +367,11 @@ internal class ClassMateAcademicScreensSupabase(
             val data = snapshot!!
             val allEntries = rows(data.optJSONArray("entries") ?: JSONArray())
             val entries = allEntries.filter { item -> if (requestedBusMode) {
-                val weekdays = item.optJSONArray("weekdays")
-                weekdays == null || (0 until weekdays.length()).any { weekdays.optInt(it) == day }
+                val kind=item.optString("schedule_kind")
+                if(kind in setOf("office_open","closed")) kind==requestedBusKind else {
+                    val weekdays=item.optJSONArray("weekdays")
+                    weekdays==null || (0 until weekdays.length()).any { weekdays.optInt(it)==day }
+                }
             } else item.optInt("day_of_week") == day }
             val nameJson = data.optJSONObject("names") ?: JSONObject()
             val names = nameJson.keys().asSequence().associateWith { nameJson.optString(it) }
@@ -367,19 +381,22 @@ internal class ClassMateAcademicScreensSupabase(
             }
             val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
             if (!active(root) || request != timetableRequest || day != selectedDay ||
-                requestedBusMode != busMode || selectedBatch != batchId()) return@launch
+                requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
-            text(root, R.id.tvScheduleLabel, "${days[day].uppercase()}'S ${if (requestedBusMode) "BUS SCHEDULE" else "SCHEDULE"}")
+            text(root, R.id.tvScheduleLabel, if(requestedBusMode) "${if(requestedBusKind=="closed") "CLOSED / HOLIDAYS" else "OFFICE OPEN"} · BUS SCHEDULE" else "${days[day].uppercase()}'S SCHEDULE")
             text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) "buses" else "classes"}")
             root.v<View>(R.id.emptyState).visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             root.v<View>(R.id.rvPeriods).visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE
-            if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_bus_schedule, entries) { card, item ->
-                text(card, R.id.tvBusName, item.optString("route_name"))
-                text(card, R.id.tvRoute, "${item.optString("origin")} → ${item.optString("destination")}")
-                text(card, R.id.tvDepartureTime, hour(item.optString("departure_time")))
+            if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, entries) { card, item ->
+                val paired=item.optString("schedule_kind") in setOf("office_open","closed") && !item.isNull("city_departure_time")
+                text(card,R.id.tvBusScheduleName,if(paired) "Student bus departures" else item.optString("route_name"))
+                text(card,R.id.tvCampusDepartureLabel,if(paired) "Campus → City" else "${item.optString("origin")} → ${item.optString("destination")}")
+                text(card,R.id.tvCampusDeparture,hour(item.optString("departure_time")))
+                card.v<View>(R.id.cityDepartureColumn).visibility=if(paired) View.VISIBLE else View.GONE
+                if(paired) text(card,R.id.tvCityDeparture,hour(item.optString("city_departure_time")))
                 if (canEditBus()) {
-                    card.setOnClickListener { onAddBus(item) }
-                    card.setOnLongClickListener { onAddBus(item); true }
+                    card.setOnClickListener { onAddBus(item,requestedBusKind) }
+                    card.setOnLongClickListener { onAddBus(item,requestedBusKind); true }
                     card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
                 }
             } else recycler(root, R.id.rvPeriods, R.layout.item_period, entries) { card, item ->

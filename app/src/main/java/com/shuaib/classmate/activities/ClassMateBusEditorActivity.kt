@@ -2,61 +2,62 @@ package com.shuaib.classmate.activities
 
 import android.os.Bundle
 import android.widget.LinearLayout
-import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import org.json.JSONObject
-import org.json.JSONArray
 import java.time.LocalTime
 
+/** Pairs campus/city departures without vehicle descriptions or trip numbers. */
 class ClassMateBusEditorActivity : ClassMateScheduleEditor() {
     private var draft: (() -> JSONObject)? = null
     override fun onCreate(state: Bundle?) {
-        super.onCreate(state)
-        ClassMateAuthApi.attach(applicationContext)
-        val existing = intent.getStringExtra("bus")?.let { JSONObject(it) }
-        val initial = state?.getString("draft")?.let(::JSONObject) ?: existing
-        page(if (existing == null) "Add bus schedule" else "Edit bus schedule")
-        form.label("Set the route, departure time and operating days.")
-        val route = form.field("Route name").apply { setText(initial?.optString("route_name")) }
-        val origin = form.field("From").apply { setText(initial?.optString("origin")) }
-        val destination = form.field("To").apply { setText(initial?.optString("destination")) }
-        var time = runCatching { LocalTime.parse(initial?.optString("departure_time")) }.getOrNull() ?: LocalTime.of(8, 0)
-        form.panel.addView(timeButton("Departure", { time }, { time = it }), LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(16) })
-        form.label("Operating days")
-        val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
-        val old = initial?.optJSONArray("weekdays")
-        val checks = days.mapIndexed { index, day -> MaterialCheckBox(this).apply {
-            text = day; setTextColor(getColor(com.shuaib.classmate.R.color.cm_text_primary))
-            isChecked = old == null || (0 until old.length()).any { old.optInt(it) == index }
-            form.panel.addView(this)
-        } }
-        val notes = form.field("Notes (optional)", true).apply { setText(initial?.optString("notes")) }
-        val active = MaterialSwitch(this).apply { text = "Active route"; isChecked = initial?.optBoolean("active") ?: true; form.panel.addView(this) }
-        draft = {
-            val weekdays = JSONArray(); checks.forEachIndexed { i, c -> if(c.isChecked) weekdays.put(i) }
-            JSONObject().put("route_name", route.text.toString()).put("origin", origin.text.toString()).put("destination", destination.text.toString())
-                .put("departure_time", time.toString()).put("weekdays", weekdays).put("notes", notes.text.toString()).put("active", active.isChecked)
+        super.onCreate(state); ClassMateAuthApi.attach(applicationContext)
+        val existing=intent.getStringExtra("bus")?.let(::JSONObject)
+        val initial=state?.getString("draft")?.let(::JSONObject) ?: existing
+        page(if(existing==null) "Add bus schedule" else "Edit bus schedule")
+        form.label("Student bus departures")
+        val group=MaterialButtonToggleGroup(this).apply { isSingleSelection=true; isSelectionRequired=true }
+        val openId=android.view.View.generateViewId(); val closedId=android.view.View.generateViewId()
+        fun option(label: String,id: Int)=MaterialButton(this,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            this.id=id; text=label; isAllCaps=false; textSize=13f; maxLines=2; minimumHeight=dp(56)
         }
-        status = form.status(); save.text = "Save bus schedule"
+        group.addView(option("Office open",openId),LinearLayout.LayoutParams(0,-2,1f))
+        group.addView(option("Closed / holidays",closedId),LinearLayout.LayoutParams(0,-2,1f))
+        form.panel.addView(group)
+        val oldDays=initial?.optJSONArray("weekdays")
+        val closed=(initial?.optString("schedule_kind") ?: intent.getStringExtra("day_kind"))=="closed" ||
+            (initial?.optString("schedule_kind").orEmpty() in setOf("","legacy") && oldDays!=null && oldDays.length()>0 &&
+                (0 until oldDays.length()).all { oldDays.optInt(it) in 5..6 })
+        group.check(if(closed) closedId else openId)
+        fun parse(key: String,fallback: LocalTime)=runCatching { LocalTime.parse(initial?.optString(key)?.take(5)) }.getOrNull() ?: fallback
+        var campus=parse("departure_time",LocalTime.of(8,0))
+        var city=parse("city_departure_time",campus.plusMinutes(30))
+        form.label("Campus → City")
+        form.panel.addView(timeButton("Campus departure",{campus},{campus=it}),LinearLayout.LayoutParams(-1,dp(60)).apply { bottomMargin=dp(12) })
+        form.label("City → Campus")
+        form.panel.addView(timeButton("City departure",{city},{city=it}),LinearLayout.LayoutParams(-1,dp(60)))
+        val active=MaterialSwitch(this).apply {
+            text="Schedule enabled"; setTextColor(getColor(R.color.cm_text_primary)); isChecked=initial?.optBoolean("active") ?: true
+            visibility=if(existing==null) android.view.View.GONE else android.view.View.VISIBLE
+        }
+        form.panel.addView(active,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16) })
+        draft={ JSONObject().put("departure_time",campus.toString()).put("city_departure_time",city.toString())
+            .put("schedule_kind",if(group.checkedButtonId==closedId) "closed" else "office_open").put("active",active.isChecked) }
+        status=form.status(); save.text="Save schedule"
         save.setOnClickListener {
-            when {
-                route.text.isNullOrBlank() -> route.error = "Enter a route name"
-                origin.text.isNullOrBlank() -> origin.error = "Enter the starting point"
-                destination.text.isNullOrBlank() -> destination.error = "Enter the destination"
-                checks.none { it.isChecked } -> { status.visibility = android.view.View.VISIBLE; status.text = "Select at least one operating day." }
-                else -> perform({
-                    val weekdays = JSONArray(); checks.forEachIndexed { i, c -> if(c.isChecked) weekdays.put(i) }
-                    val saved = ClassMateAuthApi.rpc("save_bus_schedule", JSONObject().put("target_id", existing?.optString("id") ?: JSONObject.NULL)
-                        .put("target_route", route.text.toString().trim()).put("target_departure", time.toString())
-                        .put("target_origin", origin.text.toString().trim()).put("target_destination", destination.text.toString().trim())
-                        .put("target_weekdays", weekdays).put("target_notes", notes.text.toString().trim()).put("target_active", active.isChecked))
-                    ClassMateAcademicCache.updateSchedule(this, intent.getStringExtra("profile_id").orEmpty(), intent.getStringExtra("batch_id").orEmpty(), "bus", saved)
-                }, { finish() })
-            }
+            perform({
+                val saved=ClassMateAuthApi.rpc("save_student_bus_schedule",JSONObject()
+                    .put("target_id",existing?.optString("id") ?: JSONObject.NULL)
+                    .put("target_kind",if(group.checkedButtonId==closedId) "closed" else "office_open")
+                    .put("target_campus_departure",campus.toString()).put("target_city_departure",city.toString()).put("target_active",active.isChecked))
+                ClassMateAcademicCache.updateSchedule(this,intent.getStringExtra("profile_id").orEmpty(),intent.getStringExtra("batch_id").orEmpty(),"bus",if(active.isChecked) saved else null,deletedId=if(active.isChecked) null else saved.getString("id"))
+            },{ finish() })
         }
     }
     override fun onSaveInstanceState(out: Bundle) {
-        super.onSaveInstanceState(out); draft?.let { out.putString("draft", it().toString()) }
+        super.onSaveInstanceState(out); draft?.let { out.putString("draft",it().toString()) }
     }
 }

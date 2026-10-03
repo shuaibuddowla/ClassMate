@@ -518,7 +518,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             { profile ?: JSONObject() },
             { showNoticeForm() }, { showUploadForm() }, { file -> openFileEditor(file) }, { signOut() },
             { showBatchPicker() }, { slot, day -> openPeriodEditor(slot, day) },
-            { bus -> showBusScheduleDialog(bus) },
+            { bus, kind -> showBusScheduleDialog(bus,kind) },
             { courseId, courseName, canManage ->
                 courseFilesLauncher.launch(Intent(this, ClassMateCourseFilesActivity::class.java)
                     .putExtra("course_id", courseId).putExtra("course_name", courseName)
@@ -1856,8 +1856,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if (homeShown) renderHomeTab(selectedTab)
         }
     }
-    private fun showBusScheduleDialog(existing: JSONObject?) {
-        busEditorLauncher.launch(Intent(this, ClassMateBusEditorActivity::class.java).putExtra("profile_id", userId).putExtra("batch_id", selectedBatchId).apply { existing?.let { putExtra("bus", it.toString()) } })
+    private fun showBusScheduleDialog(existing: JSONObject?,dayKind: String?=null) {
+        busEditorLauncher.launch(Intent(this, ClassMateBusEditorActivity::class.java).putExtra("day_kind",dayKind).putExtra("profile_id", userId).putExtra("batch_id", selectedBatchId).apply { existing?.let { putExtra("bus", it.toString()) } })
     }
 
     private fun pickRow(table: String, query: String, title: String,
