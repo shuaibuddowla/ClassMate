@@ -16,9 +16,9 @@ select set_config('request.jwt.claim.sub',current_setting('classmate.bus_test_ow
 -- Unusual times avoid collision with a pre-existing staging schedule.
 select set_config('classmate.bus_test_id',(classmate.save_student_bus_schedule(null,'office_open','00:01','00:31')).id::text,true);
 select pg_temp.assert_true((select schedule_kind='office_open' and departure_time='00:01'::time and city_departure_time='00:31'::time
-  and weekdays=array[0,1,2,3,4]::smallint[] and notes is null from classmate.bus_schedules where id=current_setting('classmate.bus_test_id')::uuid),'Paired office times');
+  and weekdays=array[0,1,2,3,6]::smallint[] and notes is null from classmate.bus_schedules where id=current_setting('classmate.bus_test_id')::uuid),'Paired office times');
 select set_config('classmate.bus_test_closed',(classmate.save_student_bus_schedule(null,'closed','00:02','00:32')).id::text,true);
-select pg_temp.assert_true((select weekdays=array[5,6]::smallint[] and schedule_kind='closed'
+select pg_temp.assert_true((select weekdays=array[4,5]::smallint[] and schedule_kind='closed'
   from classmate.bus_schedules where id=current_setting('classmate.bus_test_closed')::uuid),'Closed days');
 do $$ begin
   begin perform classmate.save_student_bus_schedule(null,'office_open','00:01','00:31'); raise sqlstate 'XX000' using message='Duplicate accepted';

@@ -1,0 +1,263 @@
+[
+  {
+    "source_key": "mbstu-2026-shab-miraj",
+    "title": "শব-ই-মিরাজ",
+    "start_date": "2026-01-17",
+    "end_date": "2026-01-17",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-saraswati",
+    "title": "শ্রী শ্রী সরস্বতী পূজা",
+    "start_date": "2026-01-23",
+    "end_date": "2026-01-23",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-shab-barat",
+    "title": "শব-ই-বরাত",
+    "start_date": "2026-02-04",
+    "end_date": "2026-02-04",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-language-day",
+    "title": "শহিদ দিবস ও আন্তর্জাতিক মাতৃভাষা দিবস",
+    "start_date": "2026-02-21",
+    "end_date": "2026-02-21",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-ramadan-class",
+    "title": "মাহে রমজান, শব-ই-কদর, জুমাতুল বিদা ও ঈদ-উল-ফিতর",
+    "start_date": "2026-03-12",
+    "end_date": "2026-03-25",
+    "scope": "classes",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-ramadan-office",
+    "title": "মাহে রমজান, শব-ই-কদর, জুমাতুল বিদা ও ঈদ-উল-ফিতর",
+    "start_date": "2026-03-14",
+    "end_date": "2026-03-25",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-independence",
+    "title": "মহান স্বাধীনতা ও জাতীয় দিবস",
+    "start_date": "2026-03-26",
+    "end_date": "2026-03-26",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-easter",
+    "title": "ইস্টার সানডে",
+    "start_date": "2026-04-05",
+    "end_date": "2026-04-05",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-bangla-new-year",
+    "title": "বাংলা নববর্ষ",
+    "start_date": "2026-04-14",
+    "end_date": "2026-04-14",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-may-day",
+    "title": "মহান মে দিবস",
+    "start_date": "2026-05-01",
+    "end_date": "2026-05-01",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-buddha",
+    "title": "বুদ্ধপূর্ণিমা",
+    "start_date": "2026-05-01",
+    "end_date": "2026-05-01",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-adha-class",
+    "title": "ঈদ-উল-আযহা",
+    "start_date": "2026-05-21",
+    "end_date": "2026-06-05",
+    "scope": "classes",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-adha-office",
+    "title": "ঈদ-উল-আযহা",
+    "start_date": "2026-05-23",
+    "end_date": "2026-06-03",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-ashura",
+    "title": "আশুরা",
+    "start_date": "2026-06-26",
+    "end_date": "2026-06-26",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-summer",
+    "title": "গ্রীষ্মকালীন অবকাশ",
+    "start_date": "2026-06-27",
+    "end_date": "2026-07-01",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-july-uprising",
+    "title": "জুলাই গণঅভ্যুত্থান দিবস",
+    "start_date": "2026-08-05",
+    "end_date": "2026-08-05",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-akheri",
+    "title": "আখেরি চাহার সোম্বা",
+    "start_date": "2026-08-12",
+    "end_date": "2026-08-12",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-milad",
+    "title": "ঈদ-ই-মিলাদুন্নবী (সা.)",
+    "start_date": "2026-08-26",
+    "end_date": "2026-08-26",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-janmashtami",
+    "title": "শুভ জন্মাষ্টমী",
+    "start_date": "2026-09-04",
+    "end_date": "2026-09-04",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-fateha",
+    "title": "ফাতেহা-ই-ইয়াজদাহম",
+    "start_date": "2026-09-24",
+    "end_date": "2026-09-24",
+    "scope": "university",
+    "provisional": true,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-university-day",
+    "title": "বিশ্ববিদ্যালয় দিবস",
+    "start_date": "2026-10-16",
+    "end_date": "2026-10-16",
+    "scope": "observance",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-durga",
+    "title": "শ্রী শ্রী দুর্গাপূজা",
+    "start_date": "2026-10-18",
+    "end_date": "2026-10-21",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-lakshmi",
+    "title": "শ্রী শ্রী লক্ষ্মীপূজা",
+    "start_date": "2026-10-25",
+    "end_date": "2026-10-25",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-bhashani-death",
+    "title": "মাওলানা আব্দুল হামিদ খান ভাসানীর মৃত্যুবার্ষিকী",
+    "start_date": "2026-11-17",
+    "end_date": "2026-11-17",
+    "scope": "classes",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-bhashani-birth",
+    "title": "মাওলানা ভাসানীর জন্ম দিবস",
+    "start_date": "2026-11-21",
+    "end_date": "2026-11-21",
+    "scope": "observance",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-martyrs",
+    "title": "শহিদ বুদ্ধিজীবী দিবস",
+    "start_date": "2026-12-14",
+    "end_date": "2026-12-14",
+    "scope": "classes",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-victory",
+    "title": "মহান বিজয় দিবস",
+    "start_date": "2026-12-16",
+    "end_date": "2026-12-16",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-christmas",
+    "title": "বড়দিন",
+    "start_date": "2026-12-25",
+    "end_date": "2026-12-25",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  },
+  {
+    "source_key": "mbstu-2026-winter",
+    "title": "শীতকালীন অবকাশ",
+    "start_date": "2026-12-26",
+    "end_date": "2026-12-30",
+    "scope": "university",
+    "provisional": false,
+    "source_note": "User-supplied MBSTU 2026 printed calendar; subject to official amendments."
+  }
+]

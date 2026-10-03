@@ -61,8 +61,9 @@ internal class ClassMateAcademicScreensSupabase(
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
-    private var busDayOverride: String? = null
-    private fun busDayKind()=busDayOverride ?: if(selectedDay in 5..6) "closed" else "office_open"
+    private var calendarMode = false
+    private val calendarData = ClassMateCalendarData(activity) { profile().optString("id") }
+    private fun busDayKind() = calendarData.kindFor(selectedScheduleDate())
     private var timetableRequest = 0
     private var navShown = true
     private var noticeHeaderCollapsed = false
@@ -170,6 +171,11 @@ internal class ClassMateAcademicScreensSupabase(
                 .setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
                     _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
         }
+        if (tab == R.id.nav_timetable) {
+            (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
+                react(y - oldY, y == 0)
+            }
+        }
     }
 
     private fun setNoticeHeaderCollapsed(root: View, collapsed: Boolean) {
@@ -241,6 +247,29 @@ internal class ClassMateAcademicScreensSupabase(
         }
     }
 
+    private fun updateDayPills(root: View) {
+        val selector = root.v<LinearLayout>(R.id.daySelector)
+        for (i in 0 until selector.childCount) {
+            val card = selector.getChildAt(i)
+            val date = card.tag as? LocalDate ?: continue
+            val selected = date.dayOfWeek.value % 7 == selectedDay
+            val closure = calendarData.classClosure(date)
+            card.setBackgroundResource(if (selected) R.drawable.bg_day_card_selected else R.drawable.bg_day_card_unselected)
+            if (closure != null && !selected) card.background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = 16 * activity.resources.displayMetrics.density
+                setColor(activity.getColor(R.color.cm_period_cancel_bg))
+                setStroke((activity.resources.displayMetrics.density).toInt().coerceAtLeast(1), activity.getColor(R.color.cm_notice_cancel_text))
+            }
+            card.v<TextView>(R.id.tvDayShort).setTextColor(activity.getColor(if (selected) android.R.color.white else if (closure != null) R.color.cm_notice_cancel_text else R.color.cm_text_disabled))
+            card.v<TextView>(R.id.tvDayDate).setTextColor(activity.getColor(if (selected) android.R.color.white else if (closure != null) R.color.cm_notice_cancel_text else R.color.cm_text_primary))
+            card.v<View>(R.id.vDayIndicator).apply {
+                visibility = if (selected || closure != null) View.VISIBLE else View.INVISIBLE
+                backgroundTintList = android.content.res.ColorStateList.valueOf(activity.getColor(if (closure != null) R.color.cm_error else android.R.color.white))
+            }
+            card.contentDescription = "${days[date.dayOfWeek.value % 7]}, $date${closure?.let { ", $it. No classes" }.orEmpty()}"
+        }
+    }
+
     private fun setupTimetable(root: View) {
         val name = profile().optString("full_name").substringBefore(' ').ifBlank { "Student" }
         text(root, R.id.tvUserName, name)
@@ -268,42 +297,48 @@ internal class ClassMateAcademicScreensSupabase(
             val card = inflater.inflate(R.layout.item_day_card, selector, false)
             text(card, R.id.tvDayShort, days[index].take(3))
             text(card, R.id.tvDayDate, date.dayOfMonth.toString())
+            card.tag = date
             if (index == selectedDay) {
                 card.setBackgroundResource(R.drawable.bg_day_card_selected)
                 card.v<View>(R.id.vDayIndicator).visibility = View.VISIBLE
                 card.v<TextView>(R.id.tvDayShort).setTextColor(android.graphics.Color.WHITE)
                 card.v<TextView>(R.id.tvDayDate).setTextColor(android.graphics.Color.WHITE)
             }
-            card.setOnClickListener { selectedDay = index; busDayOverride=null; setupTimetable(root) }
+            card.setOnClickListener { selectedDay = index; setupTimetable(root) }
             selector.addView(card)
         }
+        updateDayPills(root)
         val routine = root.v<TextView>(R.id.btnToggleRoutine)
         val bus = root.v<TextView>(R.id.btnToggleBus)
-        val busOptions=root.v<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.busDayOptions)
-        busOptions.clearOnButtonCheckedListeners()
-        busOptions.check(if(busDayKind()=="closed") R.id.busClosedDays else R.id.busOfficeOpen)
-        busOptions.addOnButtonCheckedListener { _,id,checked -> if(checked) {
-            busDayOverride=if(id==R.id.busClosedDays) "closed" else "office_open"
-            if(busMode) loadTimetable(root)
-        } }
+        val calendar = root.v<TextView>(R.id.btnToggleCalendar)
+        val calendarUi = (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)
+            ?: ClassMateCalendarUi(activity, scope, calendarData) { profile().optString("role") == "admin" }.also {
+                root.setTag(R.id.btnToggleCalendar, it)
+                (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            }
         fun updateToggle() {
-            busOptions.visibility=if(busMode) View.VISIBLE else View.GONE
-            routine.setBackgroundResource(if (busMode) android.R.color.transparent else R.drawable.bg_toggle_item_selected)
-            bus.setBackgroundResource(if (busMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
-            routine.setTextColor(activity.getColor(if (busMode) R.color.cm_text_secondary else android.R.color.white))
-            bus.setTextColor(activity.getColor(if (busMode) android.R.color.white else R.color.cm_text_secondary))
+            root.v<View>(R.id.daySelector).visibility = if (calendarMode) View.GONE else View.VISIBLE
+            root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode) View.GONE else View.VISIBLE
+            calendarUi.scroll.visibility = if (calendarMode) View.VISIBLE else View.GONE
+            calendar.setBackgroundResource(if (calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            calendar.setTextColor(activity.getColor(if (calendarMode) android.R.color.white else R.color.cm_text_secondary))
+            routine.setBackgroundResource(if (busMode || calendarMode) android.R.color.transparent else R.drawable.bg_toggle_item_selected)
+            bus.setBackgroundResource(if (busMode && !calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            routine.setTextColor(activity.getColor(if (busMode || calendarMode) R.color.cm_text_secondary else android.R.color.white))
+            bus.setTextColor(activity.getColor(if (busMode && !calendarMode) android.R.color.white else R.color.cm_text_secondary))
             val timetable = com.shuaib.classmate.databinding.FragmentTimetableBinding.bind(root)
             timetable.tvAddPeriod.text = if (busMode) "Add Bus" else "Add Period"
             timetable.btnAddPeriod.apply {
                 val canEdit = if (busMode) canEditBus()
                     else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
-                visibility = if (canEdit) View.VISIBLE else View.GONE
+                visibility = if (canEdit && !calendarMode) View.VISIBLE else View.GONE
                 setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
             }
-            loadTimetable(root)
+            if (calendarMode) { timetableRequest++; calendarUi.show() } else loadTimetable(root)
         }
-        routine.setOnClickListener { busMode = false; updateToggle() }
-        bus.setOnClickListener { busMode = true; updateToggle() }
+        routine.setOnClickListener { busMode = false; calendarMode = false; updateToggle() }
+        bus.setOnClickListener { busMode = true; calendarMode = false; updateToggle() }
+        calendar.setOnClickListener { calendarMode = true; updateToggle() }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
     }
@@ -324,8 +359,47 @@ internal class ClassMateAcademicScreensSupabase(
         val effectiveDate = selectedScheduleDate()
         val selectedBatch = batchId()
         val requestedBusMode = busMode
-        val requestedBusKind = busDayKind()
         val request = ++timetableRequest
+        if (calendarData.snapshot(effectiveDate.year) == null) {
+            // Do not flash recurring classes before a cold calendar sync resolves the date.
+            shimmer.visibility = View.VISIBLE; shimmer.startShimmer()
+            root.v<View>(R.id.rvPeriods).visibility = View.GONE
+            root.v<View>(R.id.emptyState).visibility = View.GONE
+        }
+        if (calendarData.snapshot(effectiveDate.year) == null || force) {
+            runCatching { calendarData.refresh(effectiveDate.year, force) }
+        } else {
+            val oldCalendar = calendarData.events(effectiveDate.year).joinToString { it.toString() }
+            scope.launch {
+                runCatching { calendarData.refresh(effectiveDate.year) }
+                if (active(root) && !calendarMode && day == selectedDay && requestedBusMode == busMode &&
+                    oldCalendar != calendarData.events(effectiveDate.year).joinToString { it.toString() }) loadTimetable(root)
+            }
+        }
+        if (request != timetableRequest || calendarMode || day != selectedDay) return@launch
+        if (!active(root) || requestedBusMode != busMode || selectedBatch != batchId()) return@launch
+        updateDayPills(root)
+        val otherYears = (0..6).map { LocalDate.now().plusDays(it.toLong()).year }.toSet() - effectiveDate.year
+        if (otherYears.isNotEmpty()) scope.launch {
+            otherYears.forEach { year -> runCatching { calendarData.refresh(year) } }
+            if (active(root) && !calendarMode) updateDayPills(root)
+        }
+        val closure = calendarData.classClosure(effectiveDate)
+        root.v<View>(R.id.calendarExceptionBanner).visibility = View.GONE
+        if (!requestedBusMode && closure != null) {
+            shimmer.stopShimmer(); shimmer.visibility = View.GONE; refresh.isRefreshing = false
+            root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
+            text(root, R.id.tvScheduleLabel, "${days[day].uppercase()}'S SCHEDULE")
+            text(root, R.id.tvPeriodCount, "Holiday")
+            root.v<View>(R.id.rvPeriods).visibility = View.GONE
+            root.v<View>(R.id.emptyState).visibility = View.VISIBLE
+            text(root, R.id.tvNoClassesTitle, closure)
+            text(root, R.id.tvNoClassesSubtitle, "${effectiveDate.format(DateTimeFormatter.ofPattern("d MMM yyyy"))} · No classes scheduled on this holiday")
+            return@launch
+        }
+        text(root, R.id.tvNoClassesTitle, "No classes scheduled")
+        text(root, R.id.tvNoClassesSubtitle, "Enjoy your free day")
+        val requestedBusKind = busDayKind()
         val cacheKind = if (requestedBusMode) "bus" else "routine"
         val accountId = profile().optString("id")
         var snapshot = ClassMateAcademicCache.read(activity, accountId, selectedBatch, cacheKind)
@@ -381,9 +455,9 @@ internal class ClassMateAcademicScreensSupabase(
             }
             val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
             if (!active(root) || request != timetableRequest || day != selectedDay ||
-                requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
+                calendarMode || requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
-            text(root, R.id.tvScheduleLabel, if(requestedBusMode) "${if(requestedBusKind=="closed") "CLOSED / HOLIDAYS" else "OFFICE OPEN"} · BUS SCHEDULE" else "${days[day].uppercase()}'S SCHEDULE")
+            text(root, R.id.tvScheduleLabel, if(requestedBusMode) "${days[day].uppercase()}'S BUS SCHEDULE" else "${days[day].uppercase()}'S SCHEDULE")
             text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) "buses" else "classes"}")
             root.v<View>(R.id.emptyState).visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             root.v<View>(R.id.rvPeriods).visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE

@@ -30,7 +30,7 @@ class ClassMateBusEditorActivity : ClassMateScheduleEditor() {
         val oldDays=initial?.optJSONArray("weekdays")
         val closed=(initial?.optString("schedule_kind") ?: intent.getStringExtra("day_kind"))=="closed" ||
             (initial?.optString("schedule_kind").orEmpty() in setOf("","legacy") && oldDays!=null && oldDays.length()>0 &&
-                (0 until oldDays.length()).all { oldDays.optInt(it) in 5..6 })
+                (0 until oldDays.length()).all { oldDays.optInt(it) in 4..5 })
         group.check(if(closed) closedId else openId)
         fun parse(key: String,fallback: LocalTime)=runCatching { LocalTime.parse(initial?.optString(key)?.take(5)) }.getOrNull() ?: fallback
         var campus=parse("departure_time",LocalTime.of(8,0))
