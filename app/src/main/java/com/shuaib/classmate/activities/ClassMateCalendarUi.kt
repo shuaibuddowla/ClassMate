@@ -54,106 +54,131 @@ internal class ClassMateCalendarUi(
         }
     }
     private fun move(offset: Long) { month = month.plusMonths(offset); selected = null; error = null; show() }
+    private fun icon(drawable: Int, description: String, action: () -> Unit) = androidx.appcompat.widget.AppCompatImageButton(activity).apply {
+        setImageResource(drawable); imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.cm_primary))
+        contentDescription = description; setPadding(dp(12), dp(12), dp(12), dp(12))
+        background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.cm_primary_container)),
+            GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(color(R.color.cm_primary_soft)) }, null)
+        setOnClickListener { action() }
+    }
+    private fun surface() = MaterialCardView(activity).apply {
+        radius = dp(24).toFloat(); cardElevation = dp(1).toFloat(); strokeWidth = dp(1)
+        setCardBackgroundColor(color(R.color.cm_surface)); strokeColor = color(R.color.cm_border_glass)
+    }
+    private fun quiet(value: String, action: () -> Unit) = MaterialButton(activity, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+        text = value; isAllCaps = false; textSize = 12f; minWidth = 0; minimumWidth = 0
+        insetTop = 0; insetBottom = 0; setPadding(dp(8), 0, dp(8), 0); setOnClickListener { action() }
+    }
     private fun render() {
         panel.removeAllViews()
-        val header = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(button("‹") { move(-1) }.apply { contentDescription = "Previous month" }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        header.addView(label(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")), 21f, true).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(button("›") { move(1) }.apply { contentDescription = "Next month" }, LinearLayout.LayoutParams(dp(48), dp(48)))
-        panel.addView(header)
-        val tools = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        tools.addView(button("Today") { month = YearMonth.now(); selected = LocalDate.now(); show() })
-        tools.addView(button("Refresh") { show(true) })
-        if (owner()) tools.addView(button("Add event") { edit(null) })
-        panel.addView(HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; addView(tools) })
         val events = data.events(month.year)
-        val grid = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(12)) }
-        val names = LinearLayout(activity)
-        listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach {
-            names.addView(label(it, 12f, true).apply { gravity = Gravity.CENTER; setTextColor(color(R.color.cm_text_secondary)) }, LinearLayout.LayoutParams(0, dp(32), 1f))
+        val monthEvents = events.filter { !LocalDate.parse(it.getString("end_date")).isBefore(month.atDay(1)) &&
+            !LocalDate.parse(it.getString("start_date")).isAfter(month.atEndOfMonth()) }
+        val calendar = surface()
+        val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(14), dp(12), dp(12)) }
+        val header = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
+        val monthTitle = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(4), 0, 0, 0) }
+        monthTitle.addView(label(month.format(DateTimeFormatter.ofPattern("MMMM")), 22f, true))
+        monthTitle.addView(label("${month.year} · ${monthEvents.map { it.getString("title") }.distinct().size} events", 12f).apply { setTextColor(color(R.color.cm_text_disabled)) })
+        monthTitle.contentDescription = "Choose month or year"
+        monthTitle.setOnClickListener {
+            MaterialDatePicker.Builder.datePicker().setTitleText("Jump to a date").setSelection((selected ?: month.atDay(1)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()).build().also { picker ->
+                picker.addOnPositiveButtonClickListener { value -> selected = Instant.ofEpochMilli(value).atZone(ZoneOffset.UTC).toLocalDate(); month = YearMonth.from(selected); show() }
+                picker.show(activity.supportFragmentManager, "calendar_jump")
+            }
         }
-        grid.addView(names)
+        header.addView(monthTitle, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(quiet("Today") { month = YearMonth.now(); selected = LocalDate.now(); scroll.scrollTo(0, 0); show() }, LinearLayout.LayoutParams(-2, dp(48)))
+        header.addView(icon(R.drawable.ic_chevron_left, "Previous month") { move(-1); scroll.scrollTo(0, 0) }, LinearLayout.LayoutParams(dp(44), dp(48)))
+        header.addView(icon(R.drawable.ic_chevron_right, "Next month") { move(1); scroll.scrollTo(0, 0) }, LinearLayout.LayoutParams(dp(44), dp(48)).apply { leftMargin = dp(4) })
+        content.addView(header)
+        val names = LinearLayout(activity).apply { setPadding(0, dp(14), 0, dp(4)) }
+        listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { index, name ->
+            names.addView(label(name, 11f, true).apply { gravity = Gravity.CENTER; setTextColor(color(R.color.cm_text_disabled)); contentDescription = listOf("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")[index] }, LinearLayout.LayoutParams(0, dp(28), 1f))
+        }
+        content.addView(names)
         val first = month.atDay(1).dayOfWeek.value % 7
         val cells = ((first + month.lengthOfMonth() + 6) / 7) * 7
         for (week in 0 until cells / 7) {
             val row = LinearLayout(activity)
             for (day in 0..6) {
                 val number = week * 7 + day - first + 1
-                val cell = label("", 16f, true).apply { gravity = Gravity.CENTER }
+                val cell = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
                 if (number in 1..month.lengthOfMonth()) {
                     val date = month.atDay(number)
                     val matches = events.filter { ClassMateCalendarData.includes(it, date) }
                     val closed = data.kindFor(date) == "closed"
                     val classOnly = matches.any { it.optString("scope") == "classes" }
-                    val hasEvent = matches.isNotEmpty()
-                    cell.text = "$number" + if (hasEvent) "\n•" else ""
-                    cell.setTextColor(when {
-                        date == selected -> Color.WHITE
-                        closed -> color(R.color.cm_error)
-                        classOnly -> Color.rgb(26, 155, 107)
-                        else -> color(R.color.cm_text_primary)
-                    })
-                    cell.background = GradientDrawable().apply {
-                        cornerRadius = dp(14).toFloat()
-                        setColor(if (date == selected) color(R.color.cm_primary) else Color.TRANSPARENT)
+                    val accent = when { closed -> color(R.color.cm_notice_cancel_text); classOnly -> color(R.color.cm_success); else -> color(R.color.cm_primary) }
+                    cell.addView(label("$number", 15f, true).apply { gravity = Gravity.CENTER; setTextColor(if (date == selected) Color.WHITE else if (closed || classOnly) accent else color(R.color.cm_text_primary)) })
+                    val dot = View(activity).apply { visibility = if (matches.isEmpty()) View.INVISIBLE else View.VISIBLE; background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (date == selected) Color.WHITE else accent) } }
+                    cell.addView(dot, LinearLayout.LayoutParams(dp(4), dp(4)).apply { topMargin = dp(3) })
+                    cell.background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.cm_primary_container)), GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat(); setColor(when { date == selected -> color(R.color.cm_primary); matches.any { it.optString("scope") == "university" } -> color(R.color.cm_period_cancel_bg); else -> Color.TRANSPARENT })
                         if (date == LocalDate.now() && date != selected) setStroke(dp(1), color(R.color.cm_primary))
-                    }
+                    }, null)
                     cell.contentDescription = "$date${if (closed) ", offices closed" else ""}${if (classOnly) ", classes closed" else ""}. ${matches.joinToString { it.optString("title") }}"
-                    cell.setOnClickListener { selected = date; render() }
+                    cell.setOnClickListener { selected = if (selected == date) null else date; render() }
                 }
-                row.addView(cell, LinearLayout.LayoutParams(0, dp((52 * activity.resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), 1f).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+                row.addView(cell, LinearLayout.LayoutParams(0, dp((48 * activity.resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), 1f).apply { setMargins(dp(1), dp(2), dp(1), dp(2)) })
             }
-            grid.addView(row)
+            content.addView(row)
         }
-        panel.addView(grid)
-        panel.addView(label("Red · offices closed    Green · classes only    • event", 12f).apply { setTextColor(color(R.color.cm_text_secondary)) })
-        val heading = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        heading.addView(label(selected?.format(DateTimeFormatter.ofPattern("d MMMM")) ?: "This month", 18f, true), LinearLayout.LayoutParams(0, -2, 1f))
-        if (selected != null) heading.addView(button("All events") { selected = null; render() })
-        panel.addView(heading, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
-        val visible = events.filter { event -> selected?.let { ClassMateCalendarData.includes(event, it) } ?: (
-            !LocalDate.parse(event.getString("end_date")).isBefore(month.atDay(1)) &&
-                !LocalDate.parse(event.getString("start_date")).isAfter(month.atEndOfMonth())) }
-        if (visible.isEmpty()) panel.addView(label(when {
-            data.snapshot(month.year) == null -> when { error != null -> "Calendar unavailable. Tap Refresh to retry."; ClassMateAcademicCache.online(activity) -> "Loading calendar…"; else -> "Connect to sync this year's calendar." }
-            selected != null && data.kindFor(selected!!) == "closed" -> "Weekly holiday · offices closed"
-            events.isEmpty() && data.snapshot(month.year)?.optJSONObject("publication") == null -> "No academic calendar published for ${month.year}. Weekly holidays are shown."
-            else -> "No calendar events for this ${if (selected == null) "month" else "day"}."
-        }).apply { setPadding(0, dp(16), 0, dp(16)) })
+        val legend = LinearLayout(activity).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, 0) }
+        listOf("Closed" to R.color.cm_notice_cancel_text, "Classes only" to R.color.cm_success, "Event" to R.color.cm_primary).forEach { (name, tint) ->
+            val part = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), 0, dp(6), 0) }
+            part.addView(View(activity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color(tint)) } }, LinearLayout.LayoutParams(dp(5), dp(5)).apply { rightMargin = dp(5) })
+            part.addView(label(name, 10f).apply { setTextColor(color(R.color.cm_text_disabled)) }); legend.addView(part)
+        }
+        content.addView(legend); calendar.addView(content); panel.addView(calendar)
+        val heading = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(2), dp(18), 0, dp(6)) }
+        heading.addView(label(selected?.format(DateTimeFormatter.ofPattern("EEEE, d MMM")) ?: "Holidays & events", 17f, true), LinearLayout.LayoutParams(0, -2, 1f))
+        if (selected != null) heading.addView(quiet("All") { selected = null; render() }, LinearLayout.LayoutParams(-2, dp(48)))
+        if (owner()) heading.addView(icon(R.drawable.ic_add, "Add calendar event") { edit(null) }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        panel.addView(heading)
+        val visible = if (selected == null) monthEvents else events.filter { ClassMateCalendarData.includes(it, selected!!) }
+        if (visible.isEmpty()) {
+            val message = when {
+                data.snapshot(month.year) == null -> if (ClassMateAcademicCache.online(activity)) "${if (error == null) "Syncing" else "Could not sync"} calendar" else "Connect to sync this calendar"
+                selected != null && data.classClosure(selected!!) != null -> "Weekly holiday · no classes"
+                events.isEmpty() && data.snapshot(month.year)?.optJSONObject("publication") == null -> "Calendar not published for ${month.year}"
+                else -> if (selected == null) "No events this month" else "No events on this day"
+            }
+            panel.addView(surface().apply { addView(label(message, 14f).apply { setTextColor(color(R.color.cm_text_disabled)); setPadding(dp(18), dp(22), dp(18), dp(22)) }) }, LinearLayout.LayoutParams(-1, -2))
+        }
         visible.groupBy { it.getString("title") }.forEach { (title, group) ->
-            val card = MaterialCardView(activity).apply {
-                radius = dp(20).toFloat(); cardElevation = 0f; strokeWidth = dp(1)
-                setCardBackgroundColor(color(R.color.cm_surface)); strokeColor = color(R.color.cm_border_glass)
-            }
-            val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
-            content.addView(label(title, 16f, true))
+            val card = surface(); val body = LinearLayout(activity).apply { gravity = Gravity.TOP; setPadding(dp(14), dp(14), dp(12), dp(14)) }
+            val start = LocalDate.parse(group.first().getString("start_date"))
+            val badgeAccent = color(when { group.any { it.getString("scope") == "university" } -> R.color.cm_notice_cancel_text; group.any { it.getString("scope") == "classes" } -> R.color.cm_success; else -> R.color.cm_primary })
+            val badge = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(androidx.core.graphics.ColorUtils.blendARGB(color(R.color.cm_surface), badgeAccent, 0.1f)) } }
+            badge.addView(label(start.format(DateTimeFormatter.ofPattern("MMM")).uppercase(), 10f, true).apply { setTextColor(badgeAccent); gravity = Gravity.CENTER })
+            badge.addView(label("${start.dayOfMonth}", 23f, true).apply { setTextColor(badgeAccent); gravity = Gravity.CENTER })
+            body.addView(badge, LinearLayout.LayoutParams(dp(48), dp(60)).apply { rightMargin = dp(12) })
+            val details = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+            details.addView(label(title, 15f, true))
             group.forEach { event ->
-                val start = LocalDate.parse(event.getString("start_date")); val end = LocalDate.parse(event.getString("end_date"))
-                val fmt = DateTimeFormatter.ofPattern("d MMM")
-                val dates = if (start == end) start.format(fmt) else "${start.format(fmt)} – ${end.format(fmt)}"
-                val category = when (event.getString("scope")) {
-                    "classes" -> "Classes closed"
-                    "university" -> if (group.any { it.optString("scope") == "classes" }) "Offices closed" else "Classes & offices closed"
-                    "working_day" -> "Working day"
-                    else -> "Observance"
-                }
-                content.addView(label("$dates · $category", 13f).apply { setTextColor(color(R.color.cm_text_secondary)); setPadding(0, dp(6), 0, 0) })
-                if (owner()) content.addView(button("Edit") { edit(event) })
+                val from = LocalDate.parse(event.getString("start_date")); val to = LocalDate.parse(event.getString("end_date")); val fmt = DateTimeFormatter.ofPattern("d MMM")
+                val dates = if (from == to) from.format(fmt) else "${from.format(fmt)} – ${to.format(fmt)}"
+                val category = when (event.getString("scope")) { "classes" -> "Classes closed"; "university" -> if (group.any { it.optString("scope") == "classes" }) "Offices closed" else "Classes & offices closed"; "working_day" -> "Working day"; else -> "Observance" }
+                details.addView(label("$dates · $category", 12f).apply { setTextColor(color(R.color.cm_text_disabled)); setPadding(0, dp(5), 0, 0) })
             }
-            if (group.any { it.optBoolean("provisional") }) content.addView(label("Date depends on moon sighting", 12f).apply { setTextColor(color(R.color.cm_text_secondary)); setPadding(0, dp(6), 0, 0) })
-            card.addView(content); panel.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+            if (group.any { it.optBoolean("provisional") }) details.addView(label("Moon-sighting dependent", 10f).apply { setTextColor(color(R.color.cm_text_disabled)); setPadding(0, dp(5), 0, 0) })
+            body.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+            if (owner()) body.addView(icon(R.drawable.ic_more_vert, "Manage $title") {
+                if (group.size == 1) edit(group.first()) else MaterialAlertDialogBuilder(activity).setTitle("Edit closure dates").setItems(group.map { if (it.getString("scope") == "classes") "Class holidays" else "Office holidays" }.toTypedArray()) { _, index -> edit(group[index]) }.show()
+            }, LinearLayout.LayoutParams(dp(40), dp(48)).apply { leftMargin = dp(4) })
+            card.addView(body); panel.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         }
         val snapshot = data.snapshot(month.year)
-        snapshot?.optJSONObject("publication")?.let { publication ->
-            panel.addView(button("Calendar notes") {
-                MaterialAlertDialogBuilder(activity).setTitle(publication.optString("title"))
-                    .setMessage(publication.optString("notes")).setPositiveButton("Done", null).show()
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
-        }
+        val footer = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(10), 0, 0) }
+        val synced = snapshot?.optLong("synced_at", snapshot.optLong("saved_at"))
+        footer.addView(label(if (synced == null) "Not synced" else "${if (ClassMateAcademicCache.online(activity)) "Synced" else "Offline · synced"} ${Instant.ofEpochMilli(synced).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM, HH:mm"))}", 10f).apply { setTextColor(color(R.color.cm_text_disabled)) }, LinearLayout.LayoutParams(0, -2, 1f))
+        footer.addView(quiet("Refresh") { show(true) }, LinearLayout.LayoutParams(-2, dp(48)))
+        snapshot?.optJSONObject("publication")?.let { publication -> footer.addView(quiet("Notes") {
+            MaterialAlertDialogBuilder(activity).setTitle(publication.optString("title")).setMessage(publication.optString("notes")).setPositiveButton("Done", null).show()
+        }, LinearLayout.LayoutParams(-2, dp(48))) }
+        panel.addView(footer)
         error?.let { panel.addView(label(it, 12f)) }
-        snapshot?.optLong("synced_at", snapshot.optLong("saved_at"))?.let { time ->
-            panel.addView(label("${if (ClassMateAcademicCache.online(activity)) "Last synced" else "Offline · last synced"} ${Instant.ofEpochMilli(time).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM, HH:mm"))}", 12f).apply { setTextColor(color(R.color.cm_text_secondary)); setPadding(0, dp(12), 0, 0) })
-        }
     }
     private fun edit(event: JSONObject?) {
         if (!owner()) return

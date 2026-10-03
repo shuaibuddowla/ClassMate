@@ -63,3 +63,19 @@ production each contain all 29 source rows plus publication notes.
 
 Version 1.1.19 (20); use the existing key0 signing and GitHub publishing workflow.
 No ADB installation or phone UI control.
+
+## Calendar and transport UI refinement (1.1.20 / 21)
+
+Reviewed Calendar and Bus Schedule screenshots from the connected phone before
+editing. Replaced blank glyph month controls with vector icons, moved secondary
+actions below the calendar, added month/year jumping through the date picker,
+and simplified event cards and closure legends. Month changes reset scroll;
+tapping the selected day again restores the full month list. The calendar and
+bus views have dedicated headings rather than a repeated personal greeting.
+
+Bus rows retain both departure directions, legacy route display and existing
+edit permissions. A themed summary shows the next departure in each direction
+for today, or the first departure for a future date. It updates once per minute
+while the view is active, using only the already-loaded schedule. Finished and
+unlisted directions are distinguished. No departures or holiday dates were
+changed, and no APK was installed on the phone during this redesign.

@@ -258,7 +258,7 @@ internal class ClassMateAcademicScreensSupabase(
             if (closure != null && !selected) card.background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = 16 * activity.resources.displayMetrics.density
                 setColor(activity.getColor(R.color.cm_period_cancel_bg))
-                setStroke((activity.resources.displayMetrics.density).toInt().coerceAtLeast(1), activity.getColor(R.color.cm_notice_cancel_text))
+                setStroke((activity.resources.displayMetrics.density).toInt().coerceAtLeast(1), activity.getColor(R.color.cm_border_glass))
             }
             card.v<TextView>(R.id.tvDayShort).setTextColor(activity.getColor(if (selected) android.R.color.white else if (closure != null) R.color.cm_notice_cancel_text else R.color.cm_text_disabled))
             card.v<TextView>(R.id.tvDayDate).setTextColor(activity.getColor(if (selected) android.R.color.white else if (closure != null) R.color.cm_notice_cancel_text else R.color.cm_text_primary))
@@ -317,6 +317,11 @@ internal class ClassMateAcademicScreensSupabase(
                 (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
             }
         fun updateToggle() {
+            val special = calendarMode || busMode
+            text(root, R.id.tvUserName, if (calendarMode) "Academic calendar" else if (busMode) "Campus buses" else name)
+            text(root, R.id.tvGreeting, if (calendarMode) "Your university, month by month" else if (busMode) "Student transport" else greetings[LocalDate.now().dayOfYear % greetings.size])
+            root.v<View>(R.id.tvGreetingWave).visibility = if (special) View.GONE else View.VISIBLE
+            root.v<View>(R.id.busSummary).visibility = View.GONE
             root.v<View>(R.id.daySelector).visibility = if (calendarMode) View.GONE else View.VISIBLE
             root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode) View.GONE else View.VISIBLE
             calendarUi.scroll.visibility = if (calendarMode) View.VISIBLE else View.GONE
@@ -350,6 +355,19 @@ internal class ClassMateAcademicScreensSupabase(
             (account.isNull("cr_valid_until") || runCatching {
                 Instant.parse(account.optString("cr_valid_until")).isAfter(Instant.now())
             }.getOrDefault(false)))
+    }
+
+    private fun updateBusSummary(root: View, entries: List<JSONObject>, date: LocalDate, kind: String) {
+        val today = LocalDate.now(); val now = LocalTime.now().withSecond(0).withNano(0)
+        fun display(key: String): String {
+            val times = entries.mapNotNull { runCatching { LocalTime.parse(it.optString(key).take(8)) }.getOrNull() }
+            if (times.isEmpty()) return "Not listed"
+            return ClassMateBusPresentation.next(times, date, today, now)?.let { hour(it.toString()) } ?: "Finished"
+        }
+        text(root, R.id.tvBusSummaryTitle, if (date == today) "Next departures" else "First departures · ${date.format(DateTimeFormatter.ofPattern("d MMM"))}")
+        text(root, R.id.tvNextCampus, display("departure_time"))
+        text(root, R.id.tvNextCity, display("city_departure_time"))
+        text(root, R.id.tvBusService, if (kind == "closed") "Holiday service · campus ↔ city" else "Regular service · campus ↔ city")
     }
 
     private fun loadTimetable(root: View, force: Boolean = false): Unit = launch(root) {
@@ -457,13 +475,30 @@ internal class ClassMateAcademicScreensSupabase(
             if (!active(root) || request != timetableRequest || day != selectedDay ||
                 calendarMode || requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
-            text(root, R.id.tvScheduleLabel, if(requestedBusMode) "${days[day].uppercase()}'S BUS SCHEDULE" else "${days[day].uppercase()}'S SCHEDULE")
-            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) "buses" else "classes"}")
+            text(root, R.id.tvScheduleLabel, if(requestedBusMode) "${days[day]} · all schedules" else "${days[day].uppercase()}'S SCHEDULE")
+            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "schedule" else "schedules" } else if (entries.size == 1) "class" else "classes"}")
+            root.v<TextView>(R.id.tvScheduleLabel).letterSpacing = if (requestedBusMode) 0f else 0.12f
+            val summaryEntries = entries.filter { it.optString("schedule_kind") in setOf("office_open", "closed") && !it.isNull("city_departure_time") }
+            root.v<View>(R.id.busSummary).visibility = if (requestedBusMode && summaryEntries.isNotEmpty()) View.VISIBLE else View.GONE
+            if (requestedBusMode && summaryEntries.isNotEmpty()) {
+                updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
+                if (effectiveDate == LocalDate.now()) {
+                    val tick = object : Runnable {
+                        override fun run() {
+                            if (!active(root) || request != timetableRequest || !busMode || calendarMode) return
+                            if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
+                            root.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000)
+                        }
+                    }
+                    root.postDelayed(tick, 60_000 - System.currentTimeMillis() % 60_000)
+                }
+            }
             root.v<View>(R.id.emptyState).visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             root.v<View>(R.id.rvPeriods).visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE
             if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, entries) { card, item ->
                 val paired=item.optString("schedule_kind") in setOf("office_open","closed") && !item.isNull("city_departure_time")
-                text(card,R.id.tvBusScheduleName,if(paired) "Student bus departures" else item.optString("route_name"))
+                card.v<View>(R.id.tvBusScheduleName).visibility = if (paired) View.GONE else View.VISIBLE
+                text(card,R.id.tvBusScheduleName,item.optString("route_name"))
                 text(card,R.id.tvCampusDepartureLabel,if(paired) "Campus → City" else "${item.optString("origin")} → ${item.optString("destination")}")
                 text(card,R.id.tvCampusDeparture,hour(item.optString("departure_time")))
                 card.v<View>(R.id.cityDepartureColumn).visibility=if(paired) View.VISIBLE else View.GONE
