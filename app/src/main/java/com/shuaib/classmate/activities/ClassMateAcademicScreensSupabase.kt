@@ -56,6 +56,8 @@ internal class ClassMateAcademicScreensSupabase(
     private val onAddBus: (JSONObject?) -> Unit,
     private val onOpenCourse: (String, String, Boolean) -> Unit,
     private val onEditProfile: () -> Unit,
+    private val onManage: () -> Unit,
+    private val onConfigure: () -> Unit,
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
@@ -334,7 +336,7 @@ internal class ClassMateAcademicScreensSupabase(
                     val offerings = if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))
                     val ids = offerings.map { it.getString("id") }
                     val bundle = coroutineScope {
-                        val courses = async { rows(ClassMateAuthApi.rows("courses", "select=id,course_title")).associateBy { it.getString("id") } }
+                        val courses = async { rows(ClassMateCourses.catalog(selectedBatch)).associateBy { it.getString("id") } }
                         val routines = async { if (ids.isEmpty()) JSONArray() else ClassMateAuthApi.rows("routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.(${ids.joinToString(",")})&order=start_time") }
                         val teachers = async { if (ids.isEmpty()) JSONArray() else JSONArray(ClassMateAuthApi.rpcText("timetable_details", JSONObject().put("target_batch", selectedBatch).put("target_date", LocalDate.now().toString()).put("target_course_ids", JSONArray(ids)))) }
                         val changes = async { ClassMateAuthApi.rows("class_changes", "select=semester_course_id,effective_date&batch_id=eq.$selectedBatch&kind=eq.cancelled&effective_date=gte.${LocalDate.now()}&effective_date=lte.${LocalDate.now().plusDays(7)}") }
@@ -528,17 +530,9 @@ internal class ClassMateAcademicScreensSupabase(
             shimmer.visibility = View.GONE
             val (engagement, authors, reads, previews) = if (visible.isEmpty())
                 listOf(emptyList<JSONObject>(), emptyList(), emptyList(), emptyList())
-            else coroutineScope {
-                val ids = JSONArray(visible.map { it.getString("id") })
-                val reactions = async { rows(JSONArray(ClassMateAuthApi.rpcText(
-                    "notice_engagement", JSONObject().put("target_ids", ids)))) }
-                val authorInfo = async { rows(JSONArray(ClassMateAuthApi.rpcText(
-                    "notice_author_details", JSONObject().put("target_ids", ids)))) }
-                val readInfo = async { rows(JSONArray(ClassMateAuthApi.rpcText(
-                    "notice_read_counts", JSONObject().put("target_ids", ids)))) }
-                val previews = async { rows(JSONArray(ClassMateAuthApi.rpcText(
-                    "notice_reader_previews", JSONObject().put("target_ids", ids)))) }
-                listOf(reactions.await(), authorInfo.await(), readInfo.await(), previews.await())
+            else {
+                val details=ClassMateAuthApi.rpc("notice_feed_details",JSONObject().put("target_ids",JSONArray(visible.map { it.getString("id") })))
+                listOf("engagement","authors","reads","previews").map { key -> rows(details.optJSONArray(key) ?: JSONArray()) }
             }
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
             previews.groupBy { it.getString("notice_id") }.forEach { (id, readers) -> noticeReaderPreviews[id] = readers }
@@ -820,18 +814,33 @@ internal class ClassMateAcademicScreensSupabase(
             .setBackground(background).setTitle("Seen by")
             .setView(form.scroll).setPositiveButton("Close", null).setNeutralButton("Refresh", null).create()
         readerDialog = dialog
-        fun load() {
+        var cursorTime: String?=null
+        var cursorId: String?=null
+        var loading=false
+        var loadedReaders=0
+        val more=com.google.android.material.button.MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply { text="Load more";visibility=View.GONE }
+        form.panel.addView(more)
+        fun load(reset: Boolean=true) {
+            if(loading) return
+            loading=true
+            if(reset) {cursorTime=null;cursorId=null;loadedReaders=0;list.removeAllViews()}
+            more.isEnabled=false
             status.visibility = View.VISIBLE; status.text = "Loading readers…"
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = false
             scope.launch {
                 try {
-                    val readers = rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers", JSONObject().put("target_notice", notice.getString("id")))))
+                    val arguments=JSONObject().put("target_notice",notice.getString("id")).put("page_size",50)
+                    cursorTime?.let { arguments.put("before_time",it).put("before_id",cursorId) }
+                    val readers=rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers_page",arguments)))
                     if (!dialog.isShowing || activity.isFinishing) return@launch
-                    list.removeAllViews(); dialog.setTitle("Seen by ${readers.size}")
-                    status.visibility = if (readers.isEmpty()) View.VISIBLE else View.GONE
+                    loadedReaders+=readers.size
+                    dialog.setTitle("Seen by ${noticeReadCounts[notice.getString("id")]?.optLong("read_count") ?: loadedReaders}")
+                    readers.lastOrNull()?.let { cursorTime=it.optString("read_at");cursorId=it.optString("profile_id") }
+                    more.visibility=if(readers.size==50) View.VISIBLE else View.GONE
+                    status.visibility = if (loadedReaders==0) View.VISIBLE else View.GONE
                     status.text = "No one has read this notice yet"
                     form.scroll.layoutParams = form.scroll.layoutParams.apply {
-                        height = minOf(dp(48 + maxOf(1, readers.size) * 56), (activity.resources.displayMetrics.heightPixels * 0.48f).toInt())
+                        height = minOf(dp(48 + maxOf(1, loadedReaders) * 56), (activity.resources.displayMetrics.heightPixels * 0.48f).toInt())
                     }
                     readers.forEach { reader ->
                         val row = LinearLayout(activity).apply { gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(0, dp(10), 0, dp(10)) }
@@ -844,10 +853,11 @@ internal class ClassMateAcademicScreensSupabase(
                         reader.optString("avatar_url").takeIf { it.startsWith("https://") }?.let { com.bumptech.glide.Glide.with(activity).load(it).placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar) }
                     }
                 } catch (e: Exception) { if (dialog.isShowing) { status.visibility = View.VISIBLE; status.text = "Could not load readers. Tap Refresh to retry." } }
-                finally { if (dialog.isShowing) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = true }
+                finally { loading=false;more.isEnabled=true;if (dialog.isShowing) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).isEnabled = true }
             }
         }
         dialog.setOnDismissListener { readerDialog = null }
+        more.setOnClickListener { load(false) }
         dialog.setOnShowListener {
             form.scroll.layoutParams = form.scroll.layoutParams.apply { height = (activity.resources.displayMetrics.heightPixels * 0.48f).toInt() }
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { load() }
@@ -1101,8 +1111,7 @@ internal class ClassMateAcademicScreensSupabase(
                     val offeringsJob = async { if (semester == null) emptyList() else rows(
                         ClassMateAuthApi.rows("semester_courses",
                             "select=id,course_id&semester_id=eq.$semester")) }
-                    val coursesJob = async { rows(ClassMateAuthApi.rows("courses",
-                        "select=id,course_code,course_title,course_type"))
+                    val coursesJob = async { rows(ClassMateCourses.catalog(selectedBatch))
                         .associateBy { it.getString("id") } }
                     val filesJob = async { rows(ClassMateAuthApi.rows("file_metadata",
                         "select=id,title,file_type,category,size_bytes,created_at,semester_course_id" +
@@ -1115,6 +1124,11 @@ internal class ClassMateAcademicScreensSupabase(
                 }
             }
             val offerings = snapshot.offerings
+            if (snapshot.offerings.isEmpty() && active(root) && root.getTag(R.id.tvLibrarySubtitle) != "setup_prompted" &&
+                (profile().optString("role")=="admin" || profile().optBoolean("is_cr"))) {
+                root.setTag(R.id.tvLibrarySubtitle,"setup_prompted")
+                ClassMateCourses.prompt(activity,onConfigure)
+            }
             val courses = snapshot.courses
             val files = snapshot.files
             val favoriteIds = snapshot.favoriteIds
@@ -1250,6 +1264,7 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun setupProfile(root: View) {
+        fun dp(n: Int)=(n*activity.resources.displayMetrics.density).toInt()
         val account = profile()
         text(root, R.id.tvAppVersion, "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         root.v<View>(R.id.layoutCheckUpdates).setOnClickListener {
@@ -1316,6 +1331,14 @@ internal class ClassMateAcademicScreensSupabase(
                     } }
                 }
             }
+        }
+        if(account.optString("role") in setOf("admin","teacher") || account.optBoolean("is_cr")) {
+            val logout=root.v<View>(R.id.btnLogout)
+            val parent=logout.parent as android.view.ViewGroup
+            val manage=com.google.android.material.button.MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text="Manage"; isAllCaps=false; cornerRadius=dp(16); setOnClickListener { onManage() }
+            }
+            parent.addView(manage,parent.indexOfChild(logout),android.widget.LinearLayout.LayoutParams(-1,dp(56)).apply { bottomMargin=dp(12) })
         }
         root.v<View>(R.id.btnLogout).setOnClickListener { onSignOut() }
         root.v<View>(R.id.cardPersonalInfo).setOnClickListener { onEditProfile() }

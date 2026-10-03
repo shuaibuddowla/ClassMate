@@ -85,7 +85,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             try {
                 val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
                 val offerings = if (semester == null) org.json.JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
-                val catalog = ClassMateAuthApi.rows("courses", "select=id,course_title,course_code")
+                val catalog = ClassMateCourses.catalog(batch)
                 val names = (0 until catalog.length()).associate { i -> catalog.getJSONObject(i).let { it.getString("id") to "${it.getString("course_code")} · ${it.getString("course_title")}" } }
                 val teacher = intent.getStringExtra("role") == "teacher"
                 val assigned = if (teacher) ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.${intent.getStringExtra("profile_id")}&active=eq.true").let { rows ->

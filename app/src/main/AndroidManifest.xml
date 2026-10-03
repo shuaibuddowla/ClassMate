@@ -75,6 +75,7 @@
             android:screenOrientation="portrait" />
         <activity android:name=".update.UpdateActionActivity" android:exported="false" />
         <receiver android:name=".update.InstallResultReceiver" android:exported="false" />
+        <activity android:name=".activities.ClassMateConfigurationActivity" android:theme="@style/Theme.ClassMate.Publish" android:exported="false" />
         <activity
             android:name=".activities.ClassMatePeriodEditorActivity" android:theme="@style/Theme.ClassMate.Publish"
             android:exported="false"

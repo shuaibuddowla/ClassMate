@@ -56,6 +56,29 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private var revealAfterAuth = false
     private var welcomeStep = 0
     private var welcomeDialog: AlertDialog? = null
+    private var welcomePreparing = false
+    private val welcomeProgress by lazy { getSharedPreferences("classmate_welcome_${BuildConfig.CLASSMATE_ENV}", MODE_PRIVATE) }
+
+    private fun startWelcomeFlow() {
+        if(userId.isBlank()) return
+        welcomeProgress.edit().putInt(userId,1).apply()
+        welcomeStep=1; revealAfterAuth=true
+    }
+
+    private fun restoreWelcomeProgress(id: String) {
+        val persisted=if(welcomeProgress.contains(id)) welcomeProgress.getInt(id,0) else null
+        welcomeStep=ClassMateWelcomeProgress.restore(persisted,welcomeStep)
+        revealAfterAuth=welcomeStep>0
+    }
+
+    private fun moveWelcomeStep(expected: Int,next: Int): Boolean {
+        val current=welcomeProgress.getInt(userId,welcomeStep)
+        if(!ClassMateWelcomeProgress.canMove(current,expected) || isDestroyed || isFinishing) return false
+        // Persist before permissions or theme changes can recreate this activity.
+        welcomeProgress.edit().putInt(userId,next).apply()
+        welcomeStep=next; revealAfterAuth=next>0
+        return true
+    }
     private var tabAnimating = false
     private var authBusy = false
     private var profileValidated = false
@@ -75,6 +98,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         catch (_: Exception) { Toast.makeText(this,"Could not open your phone app",Toast.LENGTH_SHORT).show() }
     }
     private var welcomeUi: ClassMateWelcomeUi? = null
+    private var manageOpen = false
     private var selectedTab = R.id.nav_timetable
     private var selectedBatchId = ""
     private var selectedBatchLabel = ""
@@ -84,6 +108,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
+            if(homeShown) academicScreens.invalidateLibrary()
             ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
             if (homeShown) renderHomeTab(selectedTab)
         }
@@ -102,6 +127,32 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 .putExtra("end", it.optString("end_time"))
         }
         periodEditorLauncher.launch(intent)
+    }
+
+    private val configurationLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode==RESULT_OK && homeShown) {
+            academicScreens.invalidateLibrary()
+            ClassMateAcademicCache.invalidateSchedules(this,userId,selectedBatchId)
+            renderHomeTab(if(manageOpen) R.id.nav_manage else selectedTab)
+        }
+    }
+    private fun openConfiguration(mode: String="courses") {
+        configurationLauncher.launch(ClassMateCourses.intent(this,selectedBatchId,selectedBatchLabel,
+            profile?.optString("role").orEmpty(),userId,mode))
+    }
+    private fun openManage() {
+        val p=profile ?: return
+        if(p.optString("role") !in setOf("admin","teacher") && !p.optBoolean("is_cr")) return
+        manageOpen=true
+        findViewById<GlassBottomNavView>(R.id.classmate_home_nav).visibility=View.GONE
+        renderHomeTab(R.id.nav_manage)
+        onBackPressedDispatcher.addCallback(this,object: androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                manageOpen=false; remove()
+                findViewById<GlassBottomNavView>(R.id.classmate_home_nav).visibility=View.VISIBLE
+                renderHomeTab(R.id.nav_profile)
+            }
+        })
     }
 
     private val notificationPermission = registerForActivityResult(
@@ -131,7 +182,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             runAction("Signing in") {
                 val auth = ClassMateAuthApi.signInWithGoogleIdToken(idToken)
                 userId = auth.getJSONObject("user").getString("id")
-                revealAfterAuth = true
+                startWelcomeFlow()
                 loadProfile()
             }
         } catch (error: Exception) {
@@ -308,7 +359,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 if (matches.size == 1) {
                     loaded = ClassMateAuthApi.rpc("complete_student_onboarding",
                         JSONObject().put("selected_department", matches.single().getString("id")))
-                    revealAfterAuth = true
+                    userId=loaded.getString("id")
+                    if(!welcomeProgress.contains(userId)) startWelcomeFlow()
                 }
             }
         }
@@ -317,6 +369,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         profileValidated = true
         ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
+        restoreWelcomeProgress(userId)
         if (loaded.optString("verification_status") == "active") {
             val role = loaded.optString("role")
             if (role == "admin" || role == "teacher") {
@@ -376,31 +429,51 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private suspend fun showIdentityReveal(loaded: JSONObject) {
-        if (welcomeDialog?.isShowing == true || !homeShown || welcomeStep == 0) return
-        val batch = selectedBatchId.takeIf { it.isNotBlank() }?.let { id -> runCatching {
-            ClassMateAuthApi.rows("batches", "select=batch_number,academic_session,department_id&id=eq.$id&limit=1").optJSONObject(0)
-        }.getOrNull() }
-        val departmentId = batch?.optString("department_id") ?: loaded.optString("department_id")
-        val department = departmentId.takeUnless { it.isBlank() || it == "null" }?.let { id -> runCatching {
-            ClassMateAuthApi.rows("departments", "select=name,code&id=eq.$id&limit=1").optJSONObject(0)
-        }.getOrNull() }
+        if (welcomePreparing || welcomeDialog?.isShowing == true || !homeShown || welcomeStep == 0) return
+        welcomePreparing=true
+        val batch: JSONObject?
+        val department: JSONObject?
+        try {
+            batch=selectedBatchId.takeIf { it.isNotBlank() }?.let { id -> runCatching {
+                ClassMateAuthApi.rows("batches", "select=batch_number,academic_session,department_id&id=eq.$id&limit=1").optJSONObject(0)
+            }.getOrNull() }
+            val departmentId=batch?.optString("department_id") ?: loaded.optString("department_id")
+            department=departmentId.takeUnless { it.isBlank() || it=="null" }?.let { id -> runCatching {
+                ClassMateAuthApi.rows("departments", "select=name,code&id=eq.$id&limit=1").optJSONObject(0)
+            }.getOrNull() }
+        } finally { welcomePreparing=false }
         fun showStep() {
-            if (isFinishing || !homeShown || welcomeStep == 0 || welcomeDialog?.isShowing == true) return
-            val permission = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
-            welcomeDialog = ClassMateWelcomeDialogs.show(this,welcomeStep,loaded,batch,department,
+            restoreWelcomeProgress(userId)
+            if (isDestroyed || isFinishing || !homeShown || welcomeStep==0 || welcomeDialog?.isShowing==true) return
+            val shownStep=welcomeStep
+            val permission=Build.VERSION.SDK_INT<33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
+            welcomeDialog=ClassMateWelcomeDialogs.show(this,shownStep,profile ?: loaded,batch,department,
                 permission && androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() && AppPreferences(this).isNotificationsEnabled(),
-                continueFlow = { welcomeDialog=null; welcomeStep++; window.decorView.post { showStep() } },
-                enable = {
-                    welcomeDialog=null; welcomeStep=0; revealAfterAuth=false
-                    AppPreferences(this).setNotificationsEnabled(true)
-                    if(Build.VERSION.SDK_INT >= 33 && !permission) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    else { registerFcmToken(); if(!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName)) }
+                continueFlow={
+                    if(moveWelcomeStep(shownStep,shownStep+1)) {
+                        welcomeDialog=null
+                        window.decorView.post { showStep() }
+                    }
                 },
-                skip = { welcomeDialog=null; welcomeStep=0; revealAfterAuth=false; AppPreferences(this).setNotificationsEnabled(false) },
-                onProfileUpdated = { updated -> updatePersonalProfile(updated) }
+                enable={
+                    if(moveWelcomeStep(shownStep,0)) {
+                        welcomeDialog=null
+                        AppPreferences(this).setNotificationsEnabled(true)
+                        if(Build.VERSION.SDK_INT>=33 && !permission) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        else { registerFcmToken(); if(!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName)) }
+                    }
+                },
+                skip={ if(moveWelcomeStep(shownStep,0)) { welcomeDialog=null; AppPreferences(this).setNotificationsEnabled(false) } },
+                onProfileUpdated={ updated -> updatePersonalProfile(updated) }
             )
         }
         window.decorView.post { showStep() }
+    }
+
+    override fun onDestroy() {
+        welcomeDialog?.dismiss()
+        welcomeDialog=null
+        super.onDestroy()
     }
 
     private fun updatePersonalProfile(updated: JSONObject) {
@@ -452,13 +525,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     .putExtra("batch_id", selectedBatchId).putExtra("profile_id", userId).putExtra("can_manage", canManage)
                     .putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
             },
-            { editPersonalProfile() }
+            { editPersonalProfile() }, { openManage() }, { openConfiguration() }
         )
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
-        nav.menu.findItem(R.id.nav_manage).isVisible =
-            profile?.optString("role") in setOf("admin", "teacher") ||
-                profile?.optBoolean("is_cr") == true
+        nav.menu.findItem(R.id.nav_manage).isVisible = false
         if(nav.menu.findItem(selectedTab)?.isVisible!=true) selectedTab=R.id.nav_timetable
         nav.selectedItemId = selectedTab
         val swipeHost = homeHost as com.shuaib.classmate.ui.ClassMateSwipeTabsHost
@@ -467,7 +538,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             return tabs.getOrNull(tabs.indexOfFirst { it.itemId==selectedTab }+direction)?.itemId
         }
         var swipeSelection = false
-        swipeHost.canSwipe = { direction -> !tabAnimating && destination(direction)!=null }
+        swipeHost.canSwipe = { direction -> !manageOpen && !tabAnimating && destination(direction)!=null }
         swipeHost.onSwipe = { direction -> destination(direction)?.let { next ->
             if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
                 nav.selectedItemId=next
@@ -604,7 +675,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 ?: "ClassMate", 25f)
             label(selectedBatchLabel.ifBlank { "Your timetable" }, 14f)
             showDaySelector()
-        } else label(title, 27f)
+        } else {
+            val toolbar=com.google.android.material.appbar.MaterialToolbar(this).apply {
+                this.title=title; setTitleTextColor(getColor(R.color.cm_text_primary)); setNavigationIcon(R.drawable.ic_chevron_left)
+                navigationIcon?.setTint(getColor(R.color.cm_text_primary))
+                setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+            }
+            content.addView(toolbar)
+        }
         status = label("").apply { visibility = View.GONE }
         profileView = label("").apply { visibility = View.GONE }
         actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -660,25 +738,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
         label(selectedBatchLabel.ifBlank { "Current batch" }, 15f).apply {
             setTextColor(getColor(R.color.cm_text_secondary))
         }
-        label("Batch courses", 21f).setTypeface(null, Typeface.BOLD)
-        label("The same active courses appear in the timetable, library, notices, and course pickers.", 13f)
-            .setTextColor(getColor(R.color.cm_text_secondary))
-        val courseHost = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(courseHost)
-        manageCard(actions, "＋  Add a course", "Choose one from the department or create a new course") {
-            showAddBatchCourse()
-        }
-        loadManageCourses(courseHost)
-
-        label("Academic tools", 21f).apply {
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, (24 * density).toInt(), 0, 0)
-        }
-        manageCard(actions, "Edit timetable", "Add, edit, or remove class periods") { openPeriodEditor() }
-        manageCard(actions, "Post notice", "Share an update with this batch") { showNoticeForm() }
-        manageCard(actions, "Upload library file", "Add a protected resource to a course") { showUploadForm() }
-        manageCard(actions, "Class change", "Cancel or reschedule a class") { showClassChangeForm() }
+        manageCard(actions,"Courses","Configure this batch’s courses and teachers") { openConfiguration() }
         if (role == "admin") {
+            manageCard(actions,"System health","Delivery queue, database growth and hosting usage") {
+                ClassMateHealthDialog.show(this,lifecycleScope)
+            }
             label("Administration", 21f).apply {
                 setTypeface(null, Typeface.BOLD)
                 setPadding(0, (24 * density).toInt(), 0, 0)
@@ -687,25 +751,17 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 showManageMenu("Batches & semesters", listOf(1, 4, 9, 13, 14))
             }
             manageCard(actions, "People & approvals", "Review students and manage the roster") {
-                showManageMenu("People & approvals", listOf(2, 5, 6, 16))
+                openConfiguration("people")
             }
             manageCard(actions, "Teachers", "Allowlist teachers and assign courses") {
-                showManageMenu("Teachers", listOf(11, 12, 17))
-            }
-            manageCard(actions, "Class representatives", "Assign or revoke CR access") {
-                showManageMenu("Class representatives", listOf(7, 8))
+                openConfiguration("teachers")
             }
             manageCard(actions, "Departments", "Create and configure departments") {
                 showManageMenu("Departments", listOf(0, 3, 10))
             }
-            manageCard(actions, "Bus schedule", "Update transport information") {
-                showManageMenu("Bus schedule", listOf(21))
-            }
         }
-        if (role == "admin" || role == "teacher")
-            manageCard(actions, "Switch running batch", "Open another batch environment") { showBatchPicker() }
         content.setPadding(content.paddingLeft, content.paddingTop,
-            content.paddingRight, (112 * density).toInt())
+            content.paddingRight, (32 * density).toInt())
     }
 
     private fun manageCard(parent: LinearLayout, title: String, subtitle: String,
@@ -1185,7 +1241,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     runAction("Completing onboarding") {
                         ClassMateAuthApi.rpc("complete_student_onboarding",
                             JSONObject().put("selected_department", id))
-                        revealAfterAuth = true
+                        startWelcomeFlow()
                         loadProfile()
                     }
                 }.setNegativeButton("Cancel", null).show()
@@ -1264,7 +1320,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private suspend fun renderAcademicCards(table: String, rows: JSONArray, target: LinearLayout) {
         target.removeAllViews()
         val courseNames = if (table == "routine_slots" || table == "semester_courses") {
-            val courses = ClassMateAuthApi.rows("courses", "select=id,course_code,course_title")
+            val courses = ClassMateCourses.catalog(selectedBatchId)
             (0 until courses.length()).associate { i ->
                 val course = courses.getJSONObject(i)
                 course.getString("id") to "${course.getString("course_code")} · ${course.getString("course_title")}"
@@ -1458,7 +1514,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     .filter { it.getString("id") in assignedIds }
             } else (0 until semesterCourses.length()).map { semesterCourses.getJSONObject(it) }
             if (available.isEmpty()) error("No assigned active course is available")
-            val courses = ClassMateAuthApi.rows("courses", "select=id,course_code,course_title")
+            val courses = ClassMateCourses.catalog(selectedBatchId)
             val names = (0 until courses.length()).associate { i ->
                 val course = courses.getJSONObject(i)
                 course.getString("id") to
@@ -1757,7 +1813,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 "select=teacher_id,semester_course_id&active=eq.true&limit=100")
             val people = ClassMateAuthApi.rows("profiles", "select=id,full_name,email&role=eq.teacher")
             val offerings = ClassMateAuthApi.rows("semester_courses", "select=id,course_id")
-            val courses = ClassMateAuthApi.rows("courses", "select=id,course_code,course_title")
+            val courses = ClassMateCourses.catalog(selectedBatchId)
             val teachersById = (0 until people.length()).associate { i ->
                 people.getJSONObject(i).let { it.optString("id") to
                     it.optString("full_name").ifBlank { it.optString("email") } }
@@ -1919,5 +1975,4 @@ class ClassMateAuthActivity : AppCompatActivity() {
         parent.addView(card)
     }
 }
-
 

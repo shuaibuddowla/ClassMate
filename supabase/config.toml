@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.publish-classmate-release]
 verify_jwt = false
+
+[functions.cleanup-classmate-resources]
+verify_jwt = false

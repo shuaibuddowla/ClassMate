@@ -52,7 +52,9 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE -> "channel_disabled"
             else -> "displayed"
         }
-        if (state == "displayed") {
+        val eventKey=inputData.getString("event_id") ?: inputData.getString("record_id")
+        val ledger=ClassMatePushLedger(context,identity.optString("id"))
+        if (state == "displayed" && (eventKey==null || !ledger.contains(eventKey))) {
             if(release) {
                 UpdateNotifications.show(context, inputData.getString("title") ?: "ClassMate update",
                     "Tap to check and install the latest update.", UpdateActionActivity.ACTION_RETRY, notificationId = 3902)
@@ -69,6 +71,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 try { manager.notify(key.hashCode(),notification) } catch (_: SecurityException) { return Result.failure() }
             }
         }
+        if(state=="displayed" && eventKey!=null) ledger.record(eventKey)
         // Automatic checks remain useful even when Android notifications are disabled.
         if(release) UpdateCoordinator.enqueueReleaseCheck(context)
         val event = inputData.getString("event_id")

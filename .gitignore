@@ -50,3 +50,5 @@ notice*.xml
 *.hprof
 *.apk
 /adb
+
+/scripts/capacity/__pycache__/

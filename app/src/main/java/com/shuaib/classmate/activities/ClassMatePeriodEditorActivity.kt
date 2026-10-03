@@ -34,7 +34,16 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
     private var role = ""
     private var profileId = ""
     private var loading = false
+    private var configured = false
+    private lateinit var addHost: android.widget.FrameLayout
     private var editor: androidx.appcompat.app.AlertDialog? = null
+    private val configurationLauncher=registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) {
+        if(it.resultCode==RESULT_OK) { setResult(RESULT_OK); load() }
+    }
+    private fun configure() {
+        ClassMateCourses.prompt(this) { configurationLauncher.launch(ClassMateCourses.intent(this,batchId,
+            intent.getStringExtra("batch_label").orEmpty(),role,profileId)) }
+    }
     override fun onCreate(state: Bundle?) {
         super.onCreate(state); ClassMateAuthApi.attach(applicationContext)
         batchId=intent.getStringExtra("batch_id").orEmpty(); role=intent.getStringExtra("role").orEmpty(); profileId=intent.getStringExtra("profile_id").orEmpty()
@@ -46,14 +55,27 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
         val header=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(14),0,dp(14),dp(12)) }
         val top=LinearLayout(this).apply { gravity=android.view.Gravity.CENTER_VERTICAL }
         top.addView(TextView(this).apply { text=intent.getStringExtra("batch_label").orEmpty(); textSize=13f; maxLines=2; setTextColor(getColor(R.color.cm_text_secondary)) },LinearLayout.LayoutParams(0,-2,1f))
-        add=MaterialButton(this).apply { text="+ Add period"; isAllCaps=false; cornerRadius=dp(20); isEnabled=false; setOnClickListener { openPeriod(null) } }
-        top.addView(add); header.addView(top)
+        add=MaterialButton(this).apply { text="+ Add period"; isAllCaps=false; cornerRadius=dp(24); elevation=dp(6).toFloat(); isEnabled=false; setOnClickListener { if(!configured && role!="teacher") configure() else openPeriod(null) } }
+        header.addView(top)
         dayRow=LinearLayout(this); header.addView(dayRow,LinearLayout.LayoutParams(-1,dp(64)).apply { topMargin=dp(10) })
         root.addView(header,1)
         count=form.label("").apply { setPadding(dp(24),dp(10),dp(24),dp(10)) }
         status=form.status().apply { setPadding(dp(24),0,dp(24),dp(8)) }
         slotList=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; form.panel.addView(slotList)
+        addHost=FrameLayout(this).apply { setPadding(dp(16),dp(16),dp(16),dp(24)) }
+        addHost.addView(add,FrameLayout.LayoutParams(-2,dp(56),android.view.Gravity.END or android.view.Gravity.BOTTOM))
+        form.panel.addView(addHost,LinearLayout.LayoutParams(-1,-2))
+        form.scroll.isFillViewport=true
+        form.scroll.addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> positionAdd() }
         readCache(); renderDays(); renderSlots(); load()
+    }
+    private fun positionAdd() {
+        if(!::addHost.isInitialized) return
+        val before=slotList.bottom
+        val desired=maxOf(dp(96),form.scroll.height-before-dp(16))
+        if(addHost.layoutParams.height!=desired) {
+            addHost.layoutParams=addHost.layoutParams.apply { height=desired }
+        }
     }
     override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); out.putInt("day",day) }
     private fun time(value:String):LocalTime = runCatching { LocalTime.parse(value.take(5)) }.getOrDefault(LocalTime.of(9,0))
@@ -99,6 +121,7 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
             card.setOnClickListener { if(offerings.any { it.id==id }) openPeriod(slot) else Toast.makeText(this,if(loading) "Loading courses…" else if(!ClassMateAcademicCache.online(this)) "Connect to edit periods." else "You can edit only your assigned courses.",Toast.LENGTH_SHORT).show() }
             slotList.addView(card)
         }
+        form.scroll.post { positionAdd() }
     }
     private fun load() {
         if(loading) return
@@ -106,9 +129,9 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
         lifecycleScope.launch {
             runCatching {
                 val semesters=ClassMateAuthApi.rows("semesters","select=id,status&batch_id=eq.$batchId&status=in.(active,not_started)&order=semester_number.desc")
-                val semester=(0 until semesters.length()).map { semesters.getJSONObject(it) }.firstOrNull { it.optString("status")=="active" } ?: semesters.optJSONObject(0) ?: error("No current semester in this batch")
+                val semester=(0 until semesters.length()).map { semesters.getJSONObject(it) }.firstOrNull { it.optString("status")=="active" } ?: semesters.optJSONObject(0) ?: run { configured=false; offerings.clear(); catalog.clear(); slots.clear(); renderSlots(); add.isEnabled=role!="teacher"; status.visibility=View.VISIBLE; status.text="No active semester. Configure courses to get started."; loading=false; return@launch }
                 val rows=ClassMateAuthApi.rows("semester_courses","select=id,course_id&semester_id=eq.${semester.getString("id")}")
-                val courses=ClassMateAuthApi.rows("courses","select=id,course_code,course_title,course_type")
+                val courses=ClassMateCourses.catalog(batchId)
                 val names=(0 until courses.length()).associate { courses.getJSONObject(it).let { item -> item.getString("id") to item } }
                 val allowed=if(role=="teacher") ClassMateAuthApi.rows("teacher_course_assignments","select=semester_course_id&teacher_id=eq.$profileId&active=eq.true").let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("semester_course_id") }.toSet() } else null
                 val nextCatalog=mutableMapOf<String,Offering>()
@@ -119,11 +142,11 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
                 val ids=nextCatalog.keys.joinToString(",")
                 val routine=if(ids.isEmpty()) org.json.JSONArray() else ClassMateAuthApi.rows("routine_slots","select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.($ids)&order=start_time")
                 val details=if(ids.isEmpty()) org.json.JSONArray() else org.json.JSONArray(ClassMateAuthApi.rpcText("timetable_details",JSONObject().put("target_batch",batchId).put("target_date",LocalDate.now().toString()).put("target_course_ids",org.json.JSONArray(nextCatalog.keys.toList()))))
-                catalog.clear(); catalog.putAll(nextCatalog); offerings.clear(); offerings.addAll(nextCatalog.values.filter { allowed==null || it.id in allowed })
+                configured=nextCatalog.isNotEmpty(); catalog.clear(); catalog.putAll(nextCatalog); offerings.clear(); offerings.addAll(nextCatalog.values.filter { allowed==null || it.id in allowed })
                 slots.clear(); for(i in 0 until routine.length()) slots.add(routine.getJSONObject(i))
                 teachers.clear(); for(i in 0 until details.length()) details.getJSONObject(i).let { teachers[it.optString("semester_course_id")]=it.optString("teacher_name").takeUnless { name -> name.equals("null",true) }.orEmpty() }
             }.onSuccess {
-                renderSlots(); add.isEnabled=offerings.isNotEmpty(); status.visibility=View.GONE
+                renderSlots(); add.isEnabled=offerings.isNotEmpty() || role!="teacher"; status.visibility=View.GONE
                 intent.getStringExtra("edit_id")?.let { id -> slots.firstOrNull { it.optString("id")==id }?.let(::openPeriod); intent.removeExtra("edit_id") }
             }.onFailure { status.visibility=View.VISIBLE; status.text="${if(slots.isEmpty()) "Could not load timetable." else "Showing saved timetable."} Tap to retry."; status.setOnClickListener { load() } }
             loading=false
