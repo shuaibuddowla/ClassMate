@@ -18,7 +18,6 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SwitchCompat
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -71,6 +70,10 @@ internal class ClassMateAcademicScreensSupabase(
     private var noticeHeaderCollapsed = false
     private var noticeScrollTravel = 0
     private var noticeRequest = 0
+    private var noticeSyncedAt = 0L
+    private val noticeResourcePattern=Regex("(?i)\\bresource\\s*:")
+    private val noticeCancellationPattern=Regex("(?i)\\b(cancelled|canceled|cancellation)\\b")
+    private val noticeDateFormatter=DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm").withZone(ZoneId.systemDefault())
     private var noticeBatch = ""
     private var noticeFeed = emptyList<JSONObject>()
     private val noticePageSize=10
@@ -105,7 +108,7 @@ internal class ClassMateAcademicScreensSupabase(
     private var librarySnapshot: LibrarySnapshot? = null
     private var libraryLoadingRoot: View? = null
     fun invalidateLibrary() { librarySnapshot = null }
-    fun invalidateNotices() { noticeTranslations.clear(); translatedNotices.clear(); noticeRequest++; noticeFeed=emptyList(); noticeBatch=""; noticeHasMore=true; noticeLoadingOlder=false; noticeOfflineTail=emptyList() }
+    fun invalidateNotices() { noticeSyncedAt=0L; noticeTranslations.clear(); translatedNotices.clear(); noticeRequest++; noticeFeed=emptyList(); noticeBatch=""; noticeHasMore=true; noticeLoadingOlder=false; noticeOfflineTail=emptyList() }
     private val inflater get() = LayoutInflater.from(activity)
     // One instance per signed-in batch. Retain only the four academic roots.
     private val tabRoots = mutableMapOf<Int, View>()
@@ -124,7 +127,7 @@ internal class ClassMateAcademicScreensSupabase(
             root.doOnAttach {
                 when(tab) {
                     R.id.nav_timetable -> if(calendarMode) (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show() else loadTimetable(root)
-                    R.id.nav_notices -> loadNotices(root,preserveOlder=true)
+                    R.id.nav_notices -> if(noticeFeed.isEmpty() || noticeBatch!=batchId() || android.os.SystemClock.elapsedRealtime()-noticeSyncedAt>30_000) loadNotices(root,preserveOlder=true)
                     R.id.nav_pdf -> loadLibrary(root)
                     else -> setupProfile(root)
                 }
@@ -174,6 +177,9 @@ internal class ClassMateAcademicScreensSupabase(
         when (tab) {
             R.id.nav_notices -> root.v<RecyclerView>(R.id.rvNotices)
                 .addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                        if(newState==RecyclerView.SCROLL_STATE_IDLE) markVisibleNoticesRead(root,recyclerView)
+                    }
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                         react(dy, !recyclerView.canScrollVertically(-1))
                         if (!recyclerView.canScrollVertically(-1)) {
@@ -186,7 +192,6 @@ internal class ClassMateAcademicScreensSupabase(
                             if (noticeScrollTravel >= threshold) setNoticeHeaderCollapsed(root, true)
                             if (noticeScrollTravel <= -threshold) setNoticeHeaderCollapsed(root, false)
                         }
-                        markVisibleNoticesRead(root, recyclerView)
                         val last=(recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
                         if(dy>0 && recyclerView.scrollState!=RecyclerView.SCROLL_STATE_IDLE && last>=noticeHeaderOffset+noticeVisibleIds.size-3) loadOlderNotices(root)
                     }
@@ -666,10 +671,13 @@ internal class ClassMateAcademicScreensSupabase(
                 android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(root.windowToken, 0)
             renderNoticeFeed(root)
         }
+        var searchRender:Runnable?=null
         root.v<EditText>(R.id.etNoticeSearch).addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                renderNoticeFeed(root)
+                searchRender?.let { root.removeCallbacks(it) }
+                searchRender=Runnable { if(active(root)) renderNoticeFeed(root) }
+                root.postDelayed(searchRender!!,180)
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
@@ -719,6 +727,7 @@ internal class ClassMateAcademicScreensSupabase(
                 noticeReadCounts[it.getString("notice_id")] = it
                 if (it.optBoolean("read_by_me")) noticeReadSent.add(it.getString("notice_id"))
             }
+            noticeSyncedAt=android.os.SystemClock.elapsedRealtime()
             saveNoticeCache()
             renderNoticeFeed(root)
         } catch (e: Exception) {
@@ -801,18 +810,15 @@ internal class ClassMateAcademicScreensSupabase(
         noticeHeaderOffset = if (filtered.isEmpty()) 0 else 1
         root.v<View>(R.id.emptyNoticeState).visibility = if (filtered.isEmpty() && !noticeHasMore && !noticeLoadingOlder) View.VISIBLE else View.GONE
         val list = root.v<RecyclerView>(R.id.rvNotices)
-        val scrollState = list.layoutManager?.onSaveInstanceState()
         if (list.layoutManager == null) list.layoutManager = LinearLayoutManager(activity)
-        val noticeCards = Cards(R.layout.item_notice_modern, filtered) { card, item ->
+        val bindNotice:(View,JSONObject)->Unit = { card, item ->
                 val noticeId = item.getString("id")
                 val state = noticeStates[noticeId]
                 val resourceId = item.optString("resource_id").takeUnless {
                     it.isBlank() || it == "null" }
                 val title = item.optString("title")
-                val resourceNotice = resourceId != null || title.contains(
-                    Regex("(?i)\\bresource\\s*:"))
-                val cancellation = !resourceNotice && title.contains(
-                    Regex("(?i)\\b(cancelled|canceled|cancellation)\\b"))
+                val resourceNotice = resourceId != null || title.contains(noticeResourcePattern)
+                val cancellation = !resourceNotice && title.contains(noticeCancellationPattern)
                 val (background, icon, accent) = when {
                     resourceNotice -> Triple(R.drawable.bg_notice_premium_resource,
                         R.drawable.ic_notice_resource_art, R.color.cm_notice_premium_resource)
@@ -910,8 +916,7 @@ internal class ClassMateAcademicScreensSupabase(
                     showNoticeContent(display, search)
                 }
             }
-        val contentAdapter = if (filtered.isEmpty()) noticeCards else ConcatAdapter(
-            Cards(R.layout.item_notice_summary, listOf(filtered.maxBy { it.optString("published_at") })) { summary, latest ->
+        val bindSummary:(View,JSONObject)->Unit = { summary, latest ->
                 val authorId = latest.optString("author_id")
                 val author = noticeAuthors[latest.optString("id")]
                 text(summary, R.id.tvSummaryName, author?.optString("author_name")
@@ -927,25 +932,42 @@ internal class ClassMateAcademicScreensSupabase(
                     .load(avatar).placeholder(R.drawable.ic_default_avatar)
                     .error(R.drawable.ic_default_avatar).into(image)
                 else image.setImageResource(R.drawable.ic_default_avatar)
-            }, noticeCards)
-        list.adapter=if(noticeHasMore || noticeLoadingOlder) ConcatAdapter(contentAdapter,
-            Cards(R.layout.item_notice_paging,listOf(JSONObject())) { footer,_ ->
-                val shimmer=footer.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerOlderNotices)
-                shimmer.visibility=if(noticeLoadingOlder) View.VISIBLE else View.GONE
-                if(noticeLoadingOlder) shimmer.startShimmer() else shimmer.stopShimmer()
-                footer.v<android.widget.Button>(R.id.btnNoticePageRetry).apply {
-                    visibility=if(noticeLoadingOlder) View.GONE else View.VISIBLE
-                    text=if(noticeOlderError) "Try loading older notices again" else "Load older notices"
-                    setOnClickListener { loadOlderNotices(root) }
-                }
-            }) else contentAdapter
-        list.layoutManager?.onRestoreInstanceState(scrollState)
-        list.post { if (root.isAttachedToWindow) markVisibleNoticesRead(root, list) }
+            }
+        val bindPaging:(View)->Unit = { footer ->
+            val shimmer=footer.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerOlderNotices)
+            shimmer.visibility=if(noticeLoadingOlder) View.VISIBLE else View.GONE
+            if(noticeLoadingOlder) shimmer.startShimmer() else shimmer.stopShimmer()
+            footer.v<android.widget.Button>(R.id.btnNoticePageRetry).apply {
+                visibility=if(noticeLoadingOlder) View.GONE else View.VISIBLE
+                text=if(noticeOlderError) "Try loading older notices again" else "Load older notices"
+                setOnClickListener { loadOlderNotices(root) }
+            }
+        }
+        val rows=buildList {
+            filtered.maxByOrNull { it.optString("published_at") }?.let { latest ->
+                val id=latest.optString("id")
+                val summarySignature=listOf(id,latest.optString("published_at"),noticeAuthors[id]?.toString(),
+                    filtered.count { it.optString("author_id")==latest.optString("author_id") },profile().toString()).joinToString("\n")
+                add(ClassMateNoticeRow("summary",R.layout.item_notice_summary,summarySignature) { bindSummary(it,latest) })
+            }
+            filtered.forEach { item ->
+                val id=item.getString("id")
+                val signature=listOf(item.toString(),noticeStates[id]?.toString(),noticeReadCounts[id]?.toString(),
+                    noticeReaderPreviews[id]?.joinToString { it.toString() },noticeTranslations[id]?.toString(),
+                    id in translatedNotices,search,profile().optString("role"),profile().optBoolean("is_cr")).joinToString("\n")
+                add(ClassMateNoticeRow("notice:$id",R.layout.item_notice_modern,signature) { bindNotice(it,item) })
+            }
+            if(noticeHasMore || noticeLoadingOlder) add(ClassMateNoticeRow("paging",R.layout.item_notice_paging,
+                "$noticeLoadingOlder:$noticeOlderError",bindPaging))
+        }
+        val adapter=(list.adapter as? ClassMateNoticeRows) ?: ClassMateNoticeRows().also { list.adapter=it }
+        adapter.submitList(rows) {
+            list.post { if(active(root) && list.scrollState==RecyclerView.SCROLL_STATE_IDLE) markVisibleNoticesRead(root,list) }
+        }
     }
 
     private fun noticeDate(value: String): String = runCatching {
-        DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")
-            .withZone(ZoneId.systemDefault()).format(Instant.parse(value))
+        noticeDateFormatter.format(Instant.parse(value))
     }.getOrElse { value.replace('T', ' ').take(16) }
 
     private fun compactCount(count: Long): String = when {
@@ -976,8 +998,11 @@ internal class ClassMateAcademicScreensSupabase(
 
     private fun bindSeenAvatar(card: View, noticeId: String) {
         val group = card.v<android.widget.FrameLayout>(R.id.seenAvatars)
-        group.removeAllViews()
         val readers = noticeReaderPreviews[noticeId].orEmpty().take(if (activity.resources.configuration.screenWidthDp < 360) 3 else 4)
+        val fingerprint=readers.joinToString { it.toString() }
+        if(group.tag==fingerprint) return
+        group.tag=fingerprint
+        group.removeAllViews()
         group.visibility = if (readers.isEmpty()) View.GONE else View.VISIBLE
         fun dp(n: Int) = (n * activity.resources.displayMetrics.density).toInt()
         group.layoutParams = group.layoutParams.apply { width = dp(22 + (readers.size - 1).coerceAtLeast(0) * 14); height = dp(22) }
@@ -1008,23 +1033,25 @@ internal class ClassMateAcademicScreensSupabase(
     private fun markVisibleNoticesRead(root: View, list: RecyclerView) {
         if (!ClassMateAcademicCache.online(activity)) return
         val manager = list.layoutManager as? LinearLayoutManager ?: return
-        val first = manager.findFirstVisibleItemPosition().coerceAtLeast(noticeHeaderOffset)
-        val last = manager.findLastVisibleItemPosition().coerceAtMost(
-            noticeVisibleIds.lastIndex + noticeHeaderOffset)
+        val first = manager.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val last = manager.findLastVisibleItemPosition().coerceAtMost((list.adapter?.itemCount ?: 0)-1)
         if (last < first) return
         val newIds = (first..last).mapNotNull { position ->
             val child = manager.findViewByPosition(position) ?: return@mapNotNull null
             if (child.bottom <= list.paddingTop || child.top >= list.height ||
                 (minOf(child.bottom, list.height) - maxOf(child.top, list.paddingTop)) <
                 child.height / 2) return@mapNotNull null
-            noticeVisibleIds.getOrNull(position - noticeHeaderOffset)?.takeIf { noticeReadSent.add(it) }
+            (list.adapter as? ClassMateNoticeRows)?.noticeId(position)?.takeIf { noticeReadSent.add(it) }
         }
         if (newIds.isEmpty()) return
+        val requestedBatch=batchId()
+        val requestedProfile=profile().optString("id")
         launch(root) {
             runCatching {
                 ClassMateAuthApi.rpcText("mark_notices_read", JSONObject()
                     .put("target_ids", JSONArray(newIds)))
             }.onSuccess {
+                if(!active(root) || requestedBatch!=batchId() || requestedProfile!=profile().optString("id")) return@launch
                 newIds.forEach { id ->
                     val previews = noticeReaderPreviews[id].orEmpty()
                     if (previews.none { it.optString("profile_id") == profile().optString("id") })
@@ -1038,7 +1065,7 @@ internal class ClassMateAcademicScreensSupabase(
                 }
                 saveNoticeCache()
                 for (position in first..last) {
-                    val id = noticeVisibleIds.getOrNull(position - noticeHeaderOffset)
+                    val id = (list.adapter as? ClassMateNoticeRows)?.noticeId(position)
                     val view = manager.findViewByPosition(position)
                     if (id in newIds && view != null) {
                         text(view, R.id.tvReadCount,

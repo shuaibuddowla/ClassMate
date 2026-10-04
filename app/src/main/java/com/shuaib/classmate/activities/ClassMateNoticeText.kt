@@ -31,19 +31,25 @@ internal object ClassMateNoticeText {
         view.movementMethod = LinkMovementMethod.getInstance()
         view.setLinkTextColor(view.context.getColor(R.color.cm_primary))
         view.maxLines = 3
-        view.text = styled(view, body, query)
-        view.tag = body
+        // A card shows three lines. Avoid laying out/linkifying thousands of hidden
+        // characters; the full notice remains available through See more.
+        var limit=minOf(body.length,512)
+        if(limit<body.length && limit>0 && Character.isHighSurrogate(body[limit-1])) limit--
+        val previewBody=body.take(limit)
+        view.text = styled(view, previewBody, query)
+        val binding=Any()
+        view.tag = binding
         view.post {
-            if (view.tag != body) return@post
+            if (view.tag !== binding) return@post
             val layout = view.layout ?: return@post
             val last = minOf(2, layout.lineCount - 1)
             if (last < 0) return@post
-            if (layout.lineCount > 3 || layout.getEllipsisCount(last) > 0) {
+            if (body.length>previewBody.length || layout.lineCount > 3 || layout.getEllipsisCount(last) > 0) {
                 val suffix = "… See more"
                 var low = 0
-                var high = layout.getLineEnd(last).coerceAtMost(body.length)
+                var high = layout.getLineEnd(last).coerceAtMost(previewBody.length)
                 fun fits(end: Int): Boolean = android.text.StaticLayout.Builder.obtain(
-                    body.take(end).trimEnd() + suffix, 0, (body.take(end).trimEnd() + suffix).length,
+                    previewBody.take(end).trimEnd() + suffix, 0, (previewBody.take(end).trimEnd() + suffix).length,
                     view.paint, layout.width).setIncludePad(view.includeFontPadding)
                     .setLineSpacing(view.lineSpacingExtra, view.lineSpacingMultiplier).build().lineCount <= 3
                 while (low < high) {
@@ -53,10 +59,10 @@ internal object ClassMateNoticeText {
                 var end = low
                 if (end > 0 && Character.isHighSurrogate(body[end - 1])) end--
                 val prefix = body.take(end).trimEnd()
-                val full = styled(view, body, query)
+                val full = styled(view, previewBody, query)
                 val result = SpannableStringBuilder(full, 0, prefix.length)
                 result.getSpans(0, result.length, android.text.style.URLSpan::class.java).forEach { link ->
-                    if (full.getSpanEnd(link) > prefix.length) result.removeSpan(link)
+                    if (full.getSpanEnd(link) > prefix.length || (body.length>previewBody.length && full.getSpanEnd(link)==previewBody.length)) result.removeSpan(link)
                 }
                 result.append(suffix)
                 val preview = result.toString()
