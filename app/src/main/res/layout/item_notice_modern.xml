@@ -36,6 +36,7 @@
                 android:drawableStart="@drawable/ic_notice_date_small" android:drawablePadding="6dp"
                 android:drawableTint="@color/cm_text_secondary" android:maxLines="1" android:ellipsize="end"
                 android:textColor="@color/cm_text_secondary" android:textSize="11sp" />
+            <TextView android:id="@+id/btnTranslate" android:layout_width="wrap_content" android:layout_height="40dp" android:gravity="center_vertical" android:drawableStart="@drawable/ic_translate_small" android:drawablePadding="5dp" android:text="Translate" android:textSize="11sp" android:textColor="@color/cm_primary" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" />
             <FrameLayout android:id="@+id/imagePreviewContainer"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="10dp" android:visibility="gone">

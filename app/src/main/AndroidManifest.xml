@@ -68,6 +68,7 @@
         <activity android:name=".activities.ClassMatePublishActivity"
             android:theme="@style/Theme.ClassMate.Publish"
             android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".activities.ClassMateAiActivity" android:theme="@style/Theme.ClassMate.Publish" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <!-- Authentication Activities -->
         <activity
             android:name=".activities.ClassMateAuthActivity"

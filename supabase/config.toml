@@ -15,3 +15,15 @@ verify_jwt = false
 
 [functions.cleanup-classmate-resources]
 verify_jwt = false
+
+[functions.signed-classmate-resource]
+verify_jwt = false
+
+[functions.upload-classmate-resource]
+verify_jwt = false
+
+[functions.test-classmate-web-push]
+verify_jwt = false
+
+[functions.classmate-ai]
+verify_jwt = false

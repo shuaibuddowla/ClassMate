@@ -52,3 +52,19 @@ notice*.xml
 /adb
 
 /scripts/capacity/__pycache__/
+/web/node_modules/
+/web/.next/
+/web/.vercel/
+/web/.env*
+!/web/.env.example
+/web/public/sw.js
+/web/test-results/
+/web/playwright-report/
+
+scripts/web/__pycache__/
+.vercel
+.env*
+
+!/web/.env.example
+
+/web/tsconfig.tsbuildinfo

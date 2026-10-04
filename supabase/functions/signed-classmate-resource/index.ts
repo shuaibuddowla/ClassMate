@@ -1,8 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { S3Client, GetObjectCommand } from "npm:@aws-sdk/client-s3@3.893.0";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3.893.0";
+import { withWebCors } from "../_shared/web-cors.ts";
 
-Deno.serve(async (request) => {
+Deno.serve(request => withWebCors(request, async (request) => {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
@@ -40,4 +41,4 @@ Deno.serve(async (request) => {
   return Response.json({ url: signedUrl, expires_in: 60, mime_type: data.mime_type }, {
     headers: { "Cache-Control": "no-store" },
   });
-});
+}));

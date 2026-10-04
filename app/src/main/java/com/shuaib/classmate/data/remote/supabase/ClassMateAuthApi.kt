@@ -49,8 +49,12 @@ object ClassMateAuthApi {
     fun hasSavedSession(): Boolean = sessionStore?.load() != null
 
     suspend fun restoreSession(): Boolean = withContext(Dispatchers.IO) {
-        val stored = sessionStore?.load() ?: return@withContext false
-        runCatching { refreshSession(stored) }.isSuccess
+        // Startup restoration and API refresh must not rotate the same token concurrently.
+        refreshMutex.withLock {
+            if (accessToken != null && System.currentTimeMillis() < expiresAtMs - 60_000) return@withLock true
+            val stored = refreshToken ?: sessionStore?.load() ?: return@withLock false
+            runCatching { refreshSession(stored) }.isSuccess
+        }
     }
 
     suspend fun signInWithGoogleIdToken(idToken: String): JSONObject {
@@ -64,10 +68,12 @@ object ClassMateAuthApi {
     private fun saveSession(response: JSONObject) {
         val token = response.optString("access_token")
         if (token.isBlank()) throw IOException("Supabase returned no access token")
+        val rotatedRefresh = response.optString("refresh_token").ifBlank { null }
+        // Persist before advertising success; silently losing a rotated token logs users out later.
+        sessionStore?.save(rotatedRefresh)
         accessToken = token
-        refreshToken = response.optString("refresh_token").ifBlank { null }
+        refreshToken = rotatedRefresh
         expiresAtMs = System.currentTimeMillis() + response.optLong("expires_in", 3600) * 1000
-        runCatching { sessionStore?.save(refreshToken) }
     }
 
     private fun refreshSession(token: String) {
@@ -100,6 +106,10 @@ object ClassMateAuthApi {
 
     suspend fun rpcText(name: String, args: JSONObject): String =
         request("POST", "/rest/v1/rpc/$name", args, classmate = true)
+
+    /** AI credentials and all database write authorization stay server-side. */
+    suspend fun ai(args: JSONObject): JSONObject =
+        JSONObject(request("POST", "/functions/v1/classmate-ai", args, longRunning = true))
 
     suspend fun registerDeviceToken(token: String) {
         request("POST", "/rest/v1/rpc/register_device_token",
@@ -210,6 +220,7 @@ object ClassMateAuthApi {
         body: JSONObject? = null,
         classmate: Boolean = false,
         prefer: String? = null,
+        longRunning: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         check(configured) { "Supabase URL or public key is missing" }
         if (!path.startsWith("/auth/v1/")) refreshIfNeeded()
@@ -223,7 +234,7 @@ object ClassMateAuthApi {
         }
         prefer?.let { builder.header("Prefer", it) }
         val request = builder.method(method, body?.toString()?.toRequestBody(jsonType)).build()
-        http.newCall(request).execute().use { response ->
+        (if (longRunning) uploadHttp else http).newCall(request).execute().use { response ->
             val result = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 val error = runCatching { JSONObject(result) }.getOrNull()

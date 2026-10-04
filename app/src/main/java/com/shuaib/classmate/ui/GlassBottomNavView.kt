@@ -10,7 +10,12 @@ class GlassBottomNavView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
 ) : BottomNavigationView(context, attrs, defStyleAttr) {
+    init {
+        // Selection is communicated by icon/text color, without an animated fill.
+        isItemActiveIndicatorEnabled = false
+        itemRippleColor = null
+    }
     override fun getMaxItemCount(): Int = 6
-    // Retained for existing callers; Material's selected indicator owns the active state.
+    // Retained for existing callers; the checked color state owns selection.
     fun updateActiveTab(tabIndex: Int, totalTabs: Int) = Unit
 }

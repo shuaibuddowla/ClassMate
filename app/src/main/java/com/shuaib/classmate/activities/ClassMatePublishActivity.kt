@@ -36,6 +36,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var restoredFileName = ""
     private var busy = false
     private var courses = emptyList<Pair<String, String>>()
+    private var aiAllowed=false
+    private var aiRequest:String?=null
+    private var aiText=""
+    private var aiHistory=org.json.JSONArray()
+    private var restoredAiDraft=""
+    private var aiDraft:com.google.android.material.textfield.TextInputEditText?=null
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected == null) return@registerForActivityResult
         uri = selected
@@ -49,6 +55,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
     }
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        aiRequest=state?.getString("ai_request"); aiText=state?.getString("ai_request_text").orEmpty()
+        restoredAiDraft=state?.getString("ai_draft").orEmpty()
+        aiHistory=org.json.JSONArray(state?.getString("ai_history") ?: "[]")
         ClassMateAuthApi.attach(applicationContext)
         uri = state?.getString("file_uri")?.let(Uri::parse)
         selectedFileLabel = state?.getString("file_label").orEmpty()
@@ -99,7 +108,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     offering?.optString("course_id")?.let { courseId -> courses = courses + (id to (names[courseId] ?: "Current subject")) }
                 }
                 loading.visibility = View.GONE
-                if (upload) buildUpload() else buildNotice()
+                if (upload) buildUpload() else {
+                    aiAllowed=ClassMateAuthApi.rpcText("ai_can_write",JSONObject().put("target_batch",batch)).trim()=="true"
+                    buildNotice()
+                }
             } catch (e: Exception) {
                 loading.text = "Could not load editor. ${e.message}"
                 submit.text = "Retry"; submit.isEnabled = true
@@ -111,6 +123,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         super.onSaveInstanceState(out)
         out.putString("file_uri", uri?.toString()); out.putString("file_label", selectedFileLabel)
         if (::name.isInitialized) out.putString("file_name", name.text.toString())
+        out.putString("ai_request",aiRequest); out.putString("ai_request_text",aiText); out.putString("ai_draft",aiDraft?.text?.toString() ?: restoredAiDraft); out.putString("ai_history",aiHistory.toString())
     }
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     private fun dropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
@@ -130,9 +143,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private fun buildNotice() {
         form.label("Notice type")
         val choices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        val ai = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id=View.generateViewId(); text="AI compose"; setTextColor(getColor(R.color.cm_text_primary)) }
         val general = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "General notice"; setTextColor(getColor(R.color.cm_text_primary)) }
         val cancellation = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "Class cancellation"; setTextColor(getColor(R.color.cm_text_primary)) }
+        if(aiAllowed) choices.addView(ai)
         choices.addView(general); choices.addView(cancellation); form.panel.addView(choices)
+        val rough=form.field("Your rough notice · English or Bengali",true).apply { filters=arrayOf(android.text.InputFilter.LengthFilter(8000)); setText(restoredAiDraft) }; aiDraft=rough
+        val aiHint=form.label("AI organizes and posts in English. For cancellations include the course and today/tomorrow. Start with /silent for no phone alerts.")
         val title = form.field("Notice title")
         val message = form.field("Message · links supported", true)
         val silentHint=form.label("Start with /silent to post without a push notification.")
@@ -141,15 +158,42 @@ class ClassMatePublishActivity : AppCompatActivity() {
         status = form.status()
         choices.setOnCheckedChangeListener { _, checked ->
             val cancelled = checked == cancellation.id
-            (title.parent.parent as View).visibility = if (cancelled) View.GONE else View.VISIBLE
-            (message.parent.parent as View).visibility = if (cancelled) View.GONE else View.VISIBLE
-            silentHint.visibility=if(cancelled) View.GONE else View.VISIBLE
+            val composing=checked==ai.id
+            (rough.parent.parent as View).visibility=if(composing) View.VISIBLE else View.GONE
+            aiHint.visibility=if(composing) View.VISIBLE else View.GONE
+            (title.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
+            (message.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
+            silentHint.visibility=if(cancelled || composing) View.GONE else View.VISIBLE
             courseBox.visibility = if (cancelled) View.VISIBLE else View.GONE
             dateBox.visibility = courseBox.visibility
+            submit.text=if(composing) "Compose & post" else "Post notice"
         }
-        choices.check(general.id)
+        choices.check(if(aiAllowed) ai.id else general.id)
         submit.isEnabled = true
         submit.setOnClickListener {
+            if(choices.checkedRadioButtonId==ai.id) {
+                val value=rough.text.toString().trim()
+                if(value.isBlank()) { rough.error="Write your notice first"; return@setOnClickListener }
+                if(busy) return@setOnClickListener
+                if(aiText!=value) { aiRequest=java.util.UUID.randomUUID().toString(); aiText=value }
+                aiRequest=aiRequest ?: java.util.UUID.randomUUID().toString()
+                busy=true; submit.isEnabled=false; rough.isEnabled=false
+                for(i in 0 until choices.childCount) choices.getChildAt(i).isEnabled=false
+                status.visibility=View.VISIBLE; status.text="Composing…"
+                lifecycleScope.launch {
+                    try {
+                        val response=ClassMateAuthApi.ai(JSONObject().put("mode","compose").put("batch_id",batch).put("request_id",aiRequest).put("text",value).put("history",aiHistory))
+                        if((response.optJSONObject("result")?.optJSONArray("actions")?.length() ?: 0)>0) { setResult(RESULT_OK); finish() }
+                        else {
+                            val reply=response.optJSONObject("plan")?.optString("message") ?: response.optJSONObject("result")?.optString("message") ?: "Add the missing course or date."
+                            status.text=reply; aiHistory.put(JSONObject().put("role","user").put("text",value)); aiHistory.put(JSONObject().put("role","assistant").put("text",reply)); aiRequest=null
+                            while(aiHistory.length()>8) aiHistory.remove(0)
+                        }
+                    } catch(e:Exception) { status.text="${e.message}\nTry again to retry the same request." }
+                    finally { busy=false; submit.isEnabled=true; rough.isEnabled=true; for(i in 0 until choices.childCount) choices.getChildAt(i).isEnabled=true }
+                }
+                return@setOnClickListener
+            }
             val cancelled = choices.checkedRadioButtonId == cancellation.id
             val selected = courses.firstOrNull { it.second == course.text.toString() }
             if (cancelled && selected == null) { courseBox.error = "No assigned course available"; return@setOnClickListener }

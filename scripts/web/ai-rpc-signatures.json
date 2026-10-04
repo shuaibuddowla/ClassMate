@@ -1,0 +1,154 @@
+[
+  {
+    "proname": "approve_student_profile",
+    "arguments": "target_profile uuid, corrected_student_id text, target_batch uuid, corrected_session smallint"
+  },
+  {
+    "proname": "assign_teacher_to_course",
+    "arguments": "target_teacher uuid, target_semester_course uuid"
+  },
+  {
+    "proname": "configure_department",
+    "arguments": "target_department uuid, target_prefix text, target_offset smallint, target_active boolean"
+  },
+  {
+    "proname": "create_batch",
+    "arguments": "target_department uuid, target_batch_number smallint, target_session smallint"
+  },
+  {
+    "proname": "create_department",
+    "arguments": "target_name text, target_code text"
+  },
+  {
+    "proname": "delete_calendar_event",
+    "arguments": "target_id uuid"
+  },
+  {
+    "proname": "delete_global_course",
+    "arguments": "target_course uuid"
+  },
+  {
+    "proname": "delete_notice",
+    "arguments": "target_id uuid"
+  },
+  {
+    "proname": "delete_routine_slot",
+    "arguments": "target_id uuid"
+  },
+  {
+    "proname": "edit_notice",
+    "arguments": "target_id uuid, target_title text, target_body text"
+  },
+  {
+    "proname": "owner_assign_teacher_record",
+    "arguments": "target_record uuid, target_offering uuid"
+  },
+  {
+    "proname": "owner_create_teacher",
+    "arguments": "target_department uuid, target_name text, target_email text"
+  },
+  {
+    "proname": "owner_save_teacher",
+    "arguments": "target_record uuid, target_name text, target_email text"
+  },
+  {
+    "proname": "post_cancellation_notice",
+    "arguments": "target_batch uuid, target_course uuid, change_date date"
+  },
+  {
+    "proname": "post_notice",
+    "arguments": "target_batch uuid, target_course uuid, notice_title text, notice_body text"
+  },
+  {
+    "proname": "remove_batch_course",
+    "arguments": "target_offering uuid"
+  },
+  {
+    "proname": "retry_failed_notifications",
+    "arguments": "target_event uuid"
+  },
+  {
+    "proname": "save_batch_course",
+    "arguments": "target_batch uuid, target_offering uuid, target_code text, target_title text, target_teacher_name text, target_teacher_record uuid DEFAULT NULL::uuid, target_credit numeric DEFAULT NULL::numeric, target_catalog_course uuid DEFAULT NULL::uuid"
+  },
+  {
+    "proname": "save_calendar_event",
+    "arguments": "target_id uuid, target_title text, target_start date, target_end date, target_scope text"
+  },
+  {
+    "proname": "save_routine_slot",
+    "arguments": "target_id uuid, target_semester_course uuid, target_day smallint, target_start time without time zone, target_end time without time zone, target_room text"
+  },
+  {
+    "proname": "save_student_bus_schedule",
+    "arguments": "target_id uuid, target_kind text, target_campus_departure time without time zone, target_city_departure time without time zone, target_active boolean DEFAULT true"
+  },
+  {
+    "proname": "clone_semester",
+    "arguments": "from_id uuid, to_id uuid"
+  },
+  {
+    "proname": "create_or_initialize_profile",
+    "arguments": ""
+  },
+  {
+    "proname": "defer_profile_completion",
+    "arguments": ""
+  },
+  {
+    "proname": "developer_profile",
+    "arguments": ""
+  },
+  {
+    "proname": "edit_resource_metadata",
+    "arguments": "target_resource uuid, target_title text, target_category text, target_course uuid"
+  },
+  {
+    "proname": "enqueue_file",
+    "arguments": ""
+  },
+  {
+    "proname": "finalize_resource_deletion",
+    "arguments": "target_resource uuid"
+  },
+  {
+    "proname": "link_registered_teacher",
+    "arguments": ""
+  },
+  {
+    "proname": "owner_teachers",
+    "arguments": ""
+  },
+  {
+    "proname": "publish_semester",
+    "arguments": "target_semester uuid"
+  },
+  {
+    "proname": "reject_student_profile",
+    "arguments": "target_profile uuid, reason text"
+  },
+  {
+    "proname": "request_resource_cleanup",
+    "arguments": ""
+  },
+  {
+    "proname": "save_profile_details",
+    "arguments": "target_mobile text, target_town text, target_blood text, target_residence text DEFAULT NULL::text"
+  },
+  {
+    "proname": "set_teacher_allowlist",
+    "arguments": "target_email text, target_department uuid, target_active boolean"
+  },
+  {
+    "proname": "sync_resource_notice",
+    "arguments": ""
+  },
+  {
+    "proname": "assign_cr",
+    "arguments": "target_profile uuid, target_batch uuid, valid_until timestamp with time zone DEFAULT NULL::timestamp with time zone"
+  },
+  {
+    "proname": "revoke_cr",
+    "arguments": "target_profile uuid"
+  }
+]

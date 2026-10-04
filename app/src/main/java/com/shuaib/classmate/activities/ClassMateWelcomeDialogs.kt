@@ -36,7 +36,7 @@ internal object ClassMateWelcomeDialogs {
                 field("Student ID", profile.optString("student_id"))
                 field("Department", department?.optString("name"))
                 field("Batch", batch?.let { "Batch ${it.optInt("batch_number")}" })
-                field("Session", (if (profile.optString("role") == "student") profile else batch)?.optString("academic_session"))
+                field("Session", ClassMateAcademicSession.format((if (profile.optString("role") == "student") profile else batch)?.optString("academic_session")))
                 field("Role", if(profile.optBoolean("is_cr")) "Class representative" else profile.optString("role").replaceFirstChar { it.uppercase() })
                 builder.setPositiveButton("Continue") { _,_ -> continueFlow() }
             }

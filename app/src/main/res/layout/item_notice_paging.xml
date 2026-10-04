@@ -1,0 +1,6 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <com.facebook.shimmer.ShimmerFrameLayout android:id="@+id/shimmerOlderNotices" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone" app:shimmer_auto_start="false" app:shimmer_duration="1000" app:shimmer_base_alpha="0.4" app:shimmer_highlight_alpha="0.8" android:contentDescription="Loading older notices">
+        <include layout="@layout/item_shimmer_notice" />
+    </com.facebook.shimmer.ShimmerFrameLayout>
+    <com.google.android.material.button.MaterialButton android:id="@+id/btnNoticePageRetry" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginHorizontal="16dp" android:text="Load older notices" android:textAllCaps="false" app:cornerRadius="14dp" />
+</LinearLayout>

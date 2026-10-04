@@ -1,0 +1,1 @@
+{"rules":[{"allowed":{"origins":["https://classmatebd.vercel.app"],"methods":["GET","HEAD","PUT"],"headers":["Content-Type"]},"exposeHeaders":["ETag"],"maxAgeSeconds":3600}]}

@@ -35,6 +35,9 @@ import org.json.JSONObject
 
 internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,private val scope: CoroutineScope,
     private val currentBatch: ()->String,private val onCall: (String)->Unit) {
+    private var cachedBatch=""
+    private var cachedRoot: LinearLayout?=null
+    private val pages=linkedMapOf<String,List<JSONObject>>()
     private fun dp(n: Int)=(n*activity.resources.displayMetrics.density).toInt()
     private fun text(value: String,size: Float=14f,primary: Boolean=false)=TextView(activity).apply {
         text=value; textSize=size; setTextColor(activity.getColor(if(primary) R.color.cm_text_primary else R.color.cm_text_secondary))
@@ -42,22 +45,32 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
 
     fun render(host: LinearLayout,batchLabel: String) {
         val batch=currentBatch()
+        if(cachedBatch!=batch) { pages.clear(); cachedRoot=null; cachedBatch=batch }
+        cachedRoot?.let { root ->
+            (root.parent as? ViewGroup)?.removeView(root)
+            host.addView(root,LinearLayout.LayoutParams(-1,-1))
+            return
+        }
         val root=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(activity.getColor(R.color.cm_background)) }
+        cachedRoot=root
         host.addView(root,LinearLayout.LayoutParams(-1,-1))
-        val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(20),dp(14),dp(20),dp(8)) }
-        header.addView(text("Friends",32f,true).apply { setTypeface(null,1) })
-        header.addView(text(batchLabel.ifBlank { "People in your batch" }).apply { setPadding(0,dp(4),0,dp(12)) })
+        val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(8),dp(16),dp(4)) }
+        header.addView(text("Friends",24f,true).apply { setTypeface(null,1) })
+        header.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(8)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
         val searchBox=TextInputLayout(activity).apply {
-            hint="Search name or student ID"; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_OUTLINE
-            setBoxCornerRadii(dp(16).toFloat(),dp(16).toFloat(),dp(16).toFloat(),dp(16).toFloat())
+            isHintEnabled=false; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_FILLED
+            boxBackgroundColor=activity.getColor(R.color.cm_surface)
+            boxStrokeWidth=0; boxStrokeWidthFocused=0
+            setBoxCornerRadii(dp(14).toFloat(),dp(14).toFloat(),dp(14).toFloat(),dp(14).toFloat())
             setStartIconDrawable(R.drawable.ic_search_modern); endIconMode=TextInputLayout.END_ICON_CLEAR_TEXT
         }
         val input=TextInputEditText(searchBox.context).apply {
             setSingleLine(true); setTextColor(activity.getColor(R.color.cm_text_primary))
+            hint="Search name or student ID"; textSize=13f; minHeight=dp(48); setPadding(dp(12),dp(8),dp(12),dp(8))
             filters=arrayOf(android.text.InputFilter.LengthFilter(100))
             inputType=android.text.InputType.TYPE_CLASS_TEXT
         }
-        searchBox.addView(input); header.addView(searchBox)
+        searchBox.addView(input,LinearLayout.LayoutParams(-1,dp(48))); header.addView(searchBox)
         val status=text("Loading your batch…",12f).apply { setPadding(0,dp(10),0,dp(4)); accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         header.addView(status)
         val retry=MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply { text="Try again"; visibility=View.GONE }
@@ -92,10 +105,10 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         var loadJob: Job?=null
         fun load(reset: Boolean,wait: Boolean=false) {
             if(!reset && (loading || !hasMore)) return
-            if(reset) { generation++; loadJob?.cancel(); query=input.text.toString().trim(); offset=0; hasMore=true; adapter.submitList(emptyList()) }
+            if(reset) { generation++; loadJob?.cancel(); query=input.text.toString().trim(); offset=0; hasMore=true; adapter.submitList(pages[query].orEmpty()) }
             val request=generation
             val requestedOffset=offset
-            loading=true; retry.visibility=View.GONE; status.text="Loading your batch…"
+            loading=true; retry.visibility=View.GONE; status.text=if(pages[query].isNullOrEmpty()) "Loading your batch…" else "${pages[query]!!.size} people · refreshing"
             loadJob=scope.launch {
                 try {
                     if(wait) delay(250)
@@ -105,6 +118,8 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
                     offset=requestedOffset+page.size; hasMore=page.size==100
                     adapter.submitList(merged)
+                    pages[query]=merged
+                    while(pages.size>8) pages.remove(pages.keys.first())
                     status.text=if(merged.isEmpty()) (if(query.isBlank()) "No members have joined this batch yet." else "No matching people.") else "${merged.size}${if(hasMore) "+" else ""} ${if(merged.size==1) "person" else "people"}"
                 } catch(e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) {

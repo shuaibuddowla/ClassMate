@@ -1,0 +1,1 @@
+{"rules":[{"allowed":{"origins":["https://classmate-web-staging.vercel.app","http://localhost:3000"],"methods":["GET","HEAD","PUT"],"headers":["Content-Type"]},"exposeHeaders":["ETag"],"maxAgeSeconds":3600}]}

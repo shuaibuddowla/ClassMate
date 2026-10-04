@@ -79,8 +79,8 @@
     <color name="cm_file_other_bg">#24183F</color>
     <color name="cm_file_other_text">#A855F7</color>
 
-    <color name="cm_bottom_nav_bg">#E6071323</color>
-    <color name="cm_bottom_nav_selected">#102B5C</color>
+    <color name="cm_bottom_nav_bg">#101D30</color>
+    <color name="cm_bottom_nav_selected">#1B3558</color>
     <color name="cm_bottom_nav_icon_active">#60A5FA</color>
     <color name="cm_bottom_nav_icon_inactive">#AAB5C6</color>
     <color name="cm_bottom_nav_text_active">#60A5FA</color>

@@ -49,7 +49,7 @@ class ClassMateSwipeTabsHost @JvmOverloads constructor(context: Context, attrs: 
         if(!horizontal) return !blocked || super.onTouchEvent(event)
         if(event.actionMasked==MotionEvent.ACTION_UP) {
             val dx=event.x-startX
-            if(abs(dx)>48*resources.displayMetrics.density) onSwipe?.invoke(if(dx<0) 1 else -1)
+            if(abs(dx)>36*resources.displayMetrics.density) onSwipe?.invoke(if(dx<0) 1 else -1)
             horizontal=false; parent?.requestDisallowInterceptTouchEvent(false)
         } else if(event.actionMasked==MotionEvent.ACTION_CANCEL) { horizontal=false; parent?.requestDisallowInterceptTouchEvent(false) }
         return true

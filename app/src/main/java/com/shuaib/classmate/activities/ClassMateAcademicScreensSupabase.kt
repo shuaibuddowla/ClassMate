@@ -58,6 +58,8 @@ internal class ClassMateAcademicScreensSupabase(
     private val onEditProfile: () -> Unit,
     private val onManage: () -> Unit,
     private val onConfigure: () -> Unit,
+    private val onEnableNotifications: () -> Unit,
+    private val onOpenAi: () -> Unit,
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
@@ -71,10 +73,17 @@ internal class ClassMateAcademicScreensSupabase(
     private var noticeRequest = 0
     private var noticeBatch = ""
     private var noticeFeed = emptyList<JSONObject>()
+    private val noticePageSize=10
+    private var noticeHasMore=true
+    private var noticeLoadingOlder=false
+    private var noticeOlderError=false
+    private var noticeOfflineTail=emptyList<JSONObject>()
     private val noticeStates = mutableMapOf<String, JSONObject>()
     private val noticeAuthors = mutableMapOf<String, JSONObject>()
     private val noticeReadCounts = mutableMapOf<String, JSONObject>()
     private val noticeReaderPreviews = mutableMapOf<String, List<JSONObject>>()
+    private val noticeTranslations=mutableMapOf<String,JSONObject>()
+    private val translatedNotices=mutableSetOf<String>()
     private val noticeReadSent = mutableSetOf<String>()
     private var noticeVisibleIds = emptyList<String>()
     private var noticeHeaderOffset = 0
@@ -96,8 +105,10 @@ internal class ClassMateAcademicScreensSupabase(
     private var librarySnapshot: LibrarySnapshot? = null
     private var libraryLoadingRoot: View? = null
     fun invalidateLibrary() { librarySnapshot = null }
-    fun invalidateNotices() { noticeRequest++; noticeFeed=emptyList(); noticeBatch="" }
+    fun invalidateNotices() { noticeTranslations.clear(); translatedNotices.clear(); noticeRequest++; noticeFeed=emptyList(); noticeBatch=""; noticeHasMore=true; noticeLoadingOlder=false; noticeOfflineTail=emptyList() }
     private val inflater get() = LayoutInflater.from(activity)
+    // One instance per signed-in batch. Retain only the four academic roots.
+    private val tabRoots = mutableMapOf<Int, View>()
     private val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
     private fun selectedScheduleDate(): LocalDate {
         val today = LocalDate.now()
@@ -106,6 +117,20 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     fun render(tab: Int, host: LinearLayout) {
+        tabRoots[tab]?.let { root ->
+            navShown=true
+            (root.parent as? ViewGroup)?.removeView(root)
+            host.addView(root,LinearLayout.LayoutParams(-1,-1))
+            root.doOnAttach {
+                when(tab) {
+                    R.id.nav_timetable -> if(calendarMode) (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show() else loadTimetable(root)
+                    R.id.nav_notices -> loadNotices(root,preserveOlder=true)
+                    R.id.nav_pdf -> loadLibrary(root)
+                    else -> setupProfile(root)
+                }
+            }
+            return
+        }
         val layout = when (tab) {
             R.id.nav_timetable -> R.layout.fragment_timetable
             R.id.nav_notices -> R.layout.fragment_notice
@@ -113,10 +138,10 @@ internal class ClassMateAcademicScreensSupabase(
             else -> R.layout.classmate_profile
         }
         val root = inflater.inflate(layout, host, false)
+        tabRoots[tab]=root
         host.addView(root, LinearLayout.LayoutParams(-1, -1))
         navShown = true
-        noticeHeaderCollapsed = false
-        noticeScrollTravel = 0
+        if(tab==R.id.nav_notices) { noticeHeaderCollapsed = false; noticeScrollTravel = 0 }
         // Cold offline loads contain no suspending network call. Wait for attachment
         // so visibility guards do not discard the cached result before the first draw.
         root.doOnAttach {
@@ -162,6 +187,8 @@ internal class ClassMateAcademicScreensSupabase(
                             if (noticeScrollTravel <= -threshold) setNoticeHeaderCollapsed(root, false)
                         }
                         markVisibleNoticesRead(root, recyclerView)
+                        val last=(recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
+                        if(dy>0 && recyclerView.scrollState!=RecyclerView.SCROLL_STATE_IDLE && last>=noticeHeaderOffset+noticeVisibleIds.size-3) loadOlderNotices(root)
                     }
                 })
             R.id.nav_timetable, R.id.nav_pdf -> root.v<androidx.core.widget.NestedScrollView>(
@@ -304,7 +331,7 @@ internal class ClassMateAcademicScreensSupabase(
                 card.v<TextView>(R.id.tvDayShort).setTextColor(android.graphics.Color.WHITE)
                 card.v<TextView>(R.id.tvDayDate).setTextColor(android.graphics.Color.WHITE)
             }
-            card.setOnClickListener { selectedDay = index; setupTimetable(root) }
+            card.setOnClickListener { if(selectedDay!=index) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); selectedDay = index; setupTimetable(root) }
             selector.addView(card)
         }
         updateDayPills(root)
@@ -341,9 +368,9 @@ internal class ClassMateAcademicScreensSupabase(
             }
             if (calendarMode) { timetableRequest++; calendarUi.show() } else loadTimetable(root)
         }
-        routine.setOnClickListener { busMode = false; calendarMode = false; updateToggle() }
-        bus.setOnClickListener { busMode = true; calendarMode = false; updateToggle() }
-        calendar.setOnClickListener { calendarMode = true; updateToggle() }
+        routine.setOnClickListener { if(busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; updateToggle() }
+        bus.setOnClickListener { if(!busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = true; calendarMode = false; updateToggle() }
+        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); calendarMode = true; updateToggle() }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
     }
@@ -359,15 +386,34 @@ internal class ClassMateAcademicScreensSupabase(
 
     private fun updateBusSummary(root: View, entries: List<JSONObject>, date: LocalDate, kind: String) {
         val today = LocalDate.now(); val now = LocalTime.now().withSecond(0).withNano(0)
-        fun display(key: String): String {
-            val times = entries.mapNotNull { runCatching { LocalTime.parse(it.optString(key).take(8)) }.getOrNull() }
-            if (times.isEmpty()) return "Not listed"
-            return ClassMateBusPresentation.next(times, date, today, now)?.let { hour(it.toString()) } ?: "Finished"
+        fun times(key: String) = entries.mapNotNull { runCatching { LocalTime.parse(it.optString(key).take(8)) }.getOrNull() }
+        val campusTimes=times("departure_time"); val cityTimes=times("city_departure_time")
+        val campusNext=ClassMateBusPresentation.next(campusTimes,date,today,now)
+        val cityNext=ClassMateBusPresentation.next(cityTimes,date,today,now)
+        val past=date.isBefore(today)
+        val finished=date==today && campusNext==null && cityNext==null && (campusTimes.isNotEmpty() || cityTimes.isNotEmpty())
+        val empty=campusTimes.isEmpty() && cityTimes.isEmpty()
+        val compact=past || finished || empty
+        root.v<View>(R.id.busSummaryTimes).visibility=if(compact) View.GONE else View.VISIBLE
+        root.v<View>(R.id.tvBusSummaryStatus).visibility=if(compact) View.VISIBLE else View.GONE
+        text(root,R.id.tvBusSummaryStatus,when { past -> "View the selected day’s timetable below."; finished -> "All departures for today are complete."; else -> "No departure times are listed for this day." })
+        text(root, R.id.tvBusSummaryTitle, when { past -> "Past schedule"; finished -> "Service has ended"; empty -> "No departures listed"; date==today -> "Next departures"; else -> "First departures · ${date.format(DateTimeFormatter.ofPattern("d MMM"))}" })
+        fun departure(time: LocalTime?, available: Boolean, timeId: Int, hintId: Int) {
+            text(root,timeId,time?.let { hour(it.toString()) } ?: if(available) "No more buses" else "Not listed")
+            root.v<TextView>(timeId).textSize=if(time==null) 16f else 24f
+            val hint=when {
+                time==null -> if(available) "For this day" else "No scheduled time"
+                date!=today -> date.format(DateTimeFormatter.ofPattern("EEE, d MMM"))
+                else -> {
+                    val minutes=java.time.temporal.ChronoUnit.MINUTES.between(now,time)
+                    if(minutes==0L) "Departs now" else if(minutes<60) "In $minutes min" else "In ${minutes/60}h ${minutes%60}m"
+                }
+            }
+            text(root,hintId,hint)
         }
-        text(root, R.id.tvBusSummaryTitle, if (date == today) "Next departures" else "First departures · ${date.format(DateTimeFormatter.ofPattern("d MMM"))}")
-        text(root, R.id.tvNextCampus, display("departure_time"))
-        text(root, R.id.tvNextCity, display("city_departure_time"))
-        text(root, R.id.tvBusService, if (kind == "closed") "Holiday service · campus ↔ city" else "Regular service · campus ↔ city")
+        departure(campusNext,campusTimes.isNotEmpty(),R.id.tvNextCampus,R.id.tvNextCampusHint)
+        departure(cityNext,cityTimes.isNotEmpty(),R.id.tvNextCity,R.id.tvNextCityHint)
+        text(root, R.id.tvBusService, if (kind == "closed") "HOLIDAY SERVICE" else "REGULAR SERVICE")
     }
 
     private fun loadTimetable(root: View, force: Boolean = false): Unit = launch(root) {
@@ -504,8 +550,8 @@ internal class ClassMateAcademicScreensSupabase(
                 card.v<View>(R.id.cityDepartureColumn).visibility=if(paired) View.VISIBLE else View.GONE
                 if(paired) text(card,R.id.tvCityDeparture,hour(item.optString("city_departure_time")))
                 if (canEditBus()) {
-                    card.setOnClickListener { onAddBus(item,requestedBusKind) }
-                    card.setOnLongClickListener { onAddBus(item,requestedBusKind); true }
+                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddBus(item,requestedBusKind) }
+                    card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddBus(item,requestedBusKind); true }
                     card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
                 }
             } else recycler(root, R.id.rvPeriods, R.layout.item_period, entries) { card, item ->
@@ -539,8 +585,8 @@ internal class ClassMateAcademicScreensSupabase(
                 }.getOrDefault(0)
                 text(card, R.id.tvDuration, "$minutes min")
                 if (item.optString("semester_course_id") in editableCourses) {
-                    card.setOnLongClickListener { onAddPeriod(item, day); true }
-                    card.setOnClickListener { onAddPeriod(item, day) }
+                    card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddPeriod(item, day); true }
+                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddPeriod(item, day) }
                 }
             }
             completed = true
@@ -633,11 +679,14 @@ internal class ClassMateAcademicScreensSupabase(
         if (ClassMateAcademicCache.online(activity)) loadNotices(root)
     }
 
-    private fun loadNotices(root: View): Unit = launch(root) {
+    private fun loadNotices(root: View,preserveOlder: Boolean=false): Unit = launch(root) {
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
         val selectedBatch = batchId()
         if (!ClassMateAcademicCache.online(activity)) { refresh.isRefreshing = false; renderNoticeFeed(root); return@launch }
         val request = ++noticeRequest
+        noticeLoadingOlder=false; noticeOlderError=false
+        val older=if(preserveOlder && noticeBatch==selectedBatch) noticeFeed.drop(noticePageSize)+noticeOfflineTail else emptyList()
+        val previousHasMore=noticeHasMore
         val shimmer = root.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
         if (noticeFeed.isEmpty() || noticeBatch != selectedBatch) {
             shimmer.visibility = View.VISIBLE
@@ -646,10 +695,12 @@ internal class ClassMateAcademicScreensSupabase(
         try {
                 val visible = rows(ClassMateAuthApi.rows("notices",
                 "select=id,title,body,published_at,semester_course_id,author_id,resource_id" +
-                    "&batch_id=eq.$selectedBatch&order=published_at.desc&limit=100"))
+                    "&batch_id=eq.$selectedBatch&order=published_at.desc,id.desc&limit=$noticePageSize"))
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
             noticeBatch = selectedBatch
-            noticeFeed = visible
+            noticeFeed=(visible+if(visible.isNotEmpty()) older else emptyList()).distinctBy { it.optString("id") }
+                .sortedWith(compareByDescending<JSONObject> { it.optString("published_at") }.thenByDescending { it.optString("id") })
+            noticeOfflineTail=emptyList(); noticeHasMore=if(older.isNotEmpty() && visible.isNotEmpty()) previousHasMore else visible.size==noticePageSize
             saveNoticeCache()
             renderNoticeFeed(root)
             shimmer.stopShimmer()
@@ -681,18 +732,57 @@ internal class ClassMateAcademicScreensSupabase(
         }
     }
 
+    private fun loadOlderNotices(root: View) {
+        if(!active(root) || noticeLoadingOlder || !noticeHasMore || noticeFeed.isEmpty()) return
+        val online=ClassMateAcademicCache.online(activity)
+        if(!online && noticeOfflineTail.isEmpty()) return
+        val request=noticeRequest; val batch=batchId(); val cursor=noticeFeed.last()
+        noticeLoadingOlder=true; noticeOlderError=false; renderNoticeFeed(root)
+        launch(root) {
+            try {
+                val page=if(!online) noticeOfflineTail.take(noticePageSize) else {
+                    val timestamp=java.net.URLEncoder.encode(cursor.getString("published_at"),"UTF-8")
+                    val id=cursor.getString("id")
+                    rows(ClassMateAuthApi.rows("notices","select=id,title,body,published_at,semester_course_id,author_id,resource_id"+
+                        "&batch_id=eq.$batch&or=(published_at.lt.$timestamp,and(published_at.eq.$timestamp,id.lt.$id))&order=published_at.desc,id.desc&limit=$noticePageSize"))
+                }
+                if(!active(root) || request!=noticeRequest || batch!=batchId()) return@launch
+                noticeFeed=(noticeFeed+page).distinctBy { it.optString("id") }
+                if(!online) noticeOfflineTail=noticeOfflineTail.drop(page.size)
+                noticeHasMore=if(online) page.size==noticePageSize else noticeOfflineTail.isNotEmpty()
+                saveNoticeCache(); renderNoticeFeed(root)
+                if(online && page.isNotEmpty()) {
+                    val details=ClassMateAuthApi.rpc("notice_feed_details",JSONObject().put("target_ids",JSONArray(page.map { it.getString("id") })))
+                    if(!active(root) || request!=noticeRequest || batch!=batchId()) return@launch
+                    rows(details.optJSONArray("engagement") ?: JSONArray()).forEach { noticeStates[it.getString("notice_id")]=it }
+                    rows(details.optJSONArray("authors") ?: JSONArray()).forEach { noticeAuthors[it.getString("notice_id")]=it }
+                    rows(details.optJSONArray("reads") ?: JSONArray()).forEach { noticeReadCounts[it.getString("notice_id")]=it; if(it.optBoolean("read_by_me")) noticeReadSent.add(it.getString("notice_id")) }
+                    rows(details.optJSONArray("previews") ?: JSONArray()).groupBy { it.getString("notice_id") }.forEach { (id,readers) -> noticeReaderPreviews[id]=readers }
+                    saveNoticeCache()
+                }
+            } catch(e: Exception) {
+                if(request==noticeRequest && active(root)) noticeOlderError=true
+            } finally {
+                if(request==noticeRequest) { noticeLoadingOlder=false; if(active(root)) renderNoticeFeed(root) }
+            }
+        }
+    }
+
     private fun saveNoticeCache() {
         fun mapJson(map: Map<String, JSONObject>) = JSONObject().apply { map.forEach { (id, value) -> put(id, value) } }
         val previews = JSONObject().apply { noticeReaderPreviews.forEach { (id, value) -> put(id, JSONArray(value)) } }
         ClassMateAcademicCache.save(activity, profile().optString("id"), batchId(), "notices", JSONObject()
-            .put("feed", JSONArray(noticeFeed)).put("states", mapJson(noticeStates)).put("authors", mapJson(noticeAuthors))
+            .put("feed", JSONArray((noticeFeed+noticeOfflineTail).distinctBy { it.optString("id") })).put("has_more",noticeHasMore).put("states", mapJson(noticeStates)).put("authors", mapJson(noticeAuthors))
             .put("reads", mapJson(noticeReadCounts)).put("previews", previews))
     }
     private fun restoreNoticeCache() {
         noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear()
+        noticeOfflineTail=emptyList(); noticeHasMore=false; noticeLoadingOlder=false; noticeOlderError=false
         noticeBatch = batchId()
         val data = ClassMateAcademicCache.read(activity, profile().optString("id"), batchId(), "notices") ?: return
-        noticeBatch = batchId(); noticeFeed = rows(data.optJSONArray("feed") ?: JSONArray())
+        val cached=rows(data.optJSONArray("feed") ?: JSONArray())
+        noticeBatch = batchId(); noticeFeed = cached.take(noticePageSize); noticeOfflineTail=cached.drop(noticePageSize)
+        noticeHasMore=noticeOfflineTail.isNotEmpty() || (ClassMateAcademicCache.online(activity) && data.optBoolean("has_more",cached.size>=noticePageSize))
         fun restore(name: String, map: MutableMap<String, JSONObject>) { val json = data.optJSONObject(name) ?: return; json.keys().forEach { id -> json.optJSONObject(id)?.let { map[id] = it } } }
         restore("states", noticeStates); restore("authors", noticeAuthors); restore("reads", noticeReadCounts)
         data.optJSONObject("previews")?.let { json -> json.keys().forEach { id -> noticeReaderPreviews[id] = rows(json.optJSONArray(id) ?: JSONArray()) } }
@@ -701,7 +791,7 @@ internal class ClassMateAcademicScreensSupabase(
     private fun renderNoticeFeed(root: View) {
         if (!root.isAttachedToWindow) return
         val search = root.v<EditText>(R.id.etNoticeSearch).text.toString().trim()
-        text(root, R.id.tvNoticeSubtitle, "${noticeFeed.size} updates · ${if (ClassMateAcademicCache.online(activity)) "Pull to refresh" else "Offline · Last synced"}")
+        text(root, R.id.tvNoticeSubtitle, "${noticeFeed.size}${if(noticeHasMore) "+" else ""} updates · ${if (ClassMateAcademicCache.online(activity)) "Pull to refresh" else "Offline · Last synced"}")
         val filtered = noticeFeed.filter { search.isBlank() ||
             it.optString("title").contains(search, true) || it.optString("body").contains(search, true) }
             .sortedWith(compareByDescending<JSONObject> {
@@ -709,7 +799,7 @@ internal class ClassMateAcademicScreensSupabase(
             }.thenByDescending { it.optString("published_at") })
         noticeVisibleIds = filtered.map { it.optString("id") }
         noticeHeaderOffset = if (filtered.isEmpty()) 0 else 1
-        root.v<View>(R.id.emptyNoticeState).visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+        root.v<View>(R.id.emptyNoticeState).visibility = if (filtered.isEmpty() && !noticeHasMore && !noticeLoadingOlder) View.VISIBLE else View.GONE
         val list = root.v<RecyclerView>(R.id.rvNotices)
         val scrollState = list.layoutManager?.onSaveInstanceState()
         if (list.layoutManager == null) list.layoutManager = LinearLayoutManager(activity)
@@ -742,6 +832,29 @@ internal class ClassMateAcademicScreensSupabase(
                 card.v<View>(R.id.tvPreview).visibility =
                     if (item.optString("body").isBlank()) View.GONE else View.VISIBLE
                 text(card, R.id.tvMeta, noticeDate(item.optString("published_at")))
+                val translation=card.v<TextView>(R.id.btnTranslate)
+                val source=title+"\n"+item.optString("body")
+                if(noticeTranslations[noticeId]?.optString("source")!=source) { noticeTranslations.remove(noticeId); translatedNotices.remove(noticeId) }
+                val cached=noticeTranslations[noticeId]
+                if(noticeId in translatedNotices && cached!=null) {
+                    card.v<TextView>(R.id.tvTitle).text=ClassMateNoticeText.styled(card.v(R.id.tvTitle),cached.optString("title"),search)
+                    ClassMateNoticeText.bind(card.v(R.id.tvPreview),cached.optString("body"),search) { showNoticeContent(JSONObject(item.toString()).put("title",cached.optString("title")).put("body",cached.optString("body")),search) }
+                }
+                translation.text=if(noticeId in translatedNotices) "Original" else "Translate"
+                translation.setOnClickListener {
+                    if(noticeId in translatedNotices) { translatedNotices.remove(noticeId); renderNoticeFeed(root) }
+                    else if(cached!=null) { translatedNotices.add(noticeId); renderNoticeFeed(root) }
+                    else {
+                        translation.isEnabled=false; translation.text="Translating…"
+                        scope.launch {
+                            try {
+                                val result=ClassMateAuthApi.ai(JSONObject().put("mode","translate").put("request_id",java.util.UUID.randomUUID().toString()).put("batch_id",batchId()).put("notice_id",noticeId))
+                                if(!active(root)) return@launch
+                                noticeTranslations[noticeId]=result.getJSONObject("result").put("source",source); translatedNotices.add(noticeId); renderNoticeFeed(root)
+                            } catch(e:Exception) { if(active(root)) { translation.isEnabled=true; translation.text="Translate"; Toast.makeText(activity,e.message,Toast.LENGTH_LONG).show() } }
+                        }
+                    }
+                }
                 text(card, R.id.tvLikeCount, state?.optLong("like_count")?.toString() ?: "0")
                 text(card, R.id.tvCommentCount, state?.optLong("comment_count")?.toString() ?: "0")
                 text(card, R.id.tvReadCount, seenLabel(noticeReadCounts[noticeId]?.optLong("read_count") ?: 0))
@@ -793,10 +906,11 @@ internal class ClassMateAcademicScreensSupabase(
                 setReminderAppearance(card, reminderPending)
                 card.v<View>(R.id.btnReminder).setOnClickListener { showReminderOptions(root, card, item) }
                 card.v<View>(R.id.cardRoot).setOnClickListener {
-                    showNoticeContent(item, search)
+                    val display=if(noticeId in translatedNotices) noticeTranslations[noticeId]?.let { JSONObject(item.toString()).put("title",it.optString("title")).put("body",it.optString("body")) } ?: item else item
+                    showNoticeContent(display, search)
                 }
             }
-        list.adapter = if (filtered.isEmpty()) noticeCards else ConcatAdapter(
+        val contentAdapter = if (filtered.isEmpty()) noticeCards else ConcatAdapter(
             Cards(R.layout.item_notice_summary, listOf(filtered.maxBy { it.optString("published_at") })) { summary, latest ->
                 val authorId = latest.optString("author_id")
                 val author = noticeAuthors[latest.optString("id")]
@@ -814,6 +928,17 @@ internal class ClassMateAcademicScreensSupabase(
                     .error(R.drawable.ic_default_avatar).into(image)
                 else image.setImageResource(R.drawable.ic_default_avatar)
             }, noticeCards)
+        list.adapter=if(noticeHasMore || noticeLoadingOlder) ConcatAdapter(contentAdapter,
+            Cards(R.layout.item_notice_paging,listOf(JSONObject())) { footer,_ ->
+                val shimmer=footer.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerOlderNotices)
+                shimmer.visibility=if(noticeLoadingOlder) View.VISIBLE else View.GONE
+                if(noticeLoadingOlder) shimmer.startShimmer() else shimmer.stopShimmer()
+                footer.v<android.widget.Button>(R.id.btnNoticePageRetry).apply {
+                    visibility=if(noticeLoadingOlder) View.GONE else View.VISIBLE
+                    text=if(noticeOlderError) "Try loading older notices again" else "Load older notices"
+                    setOnClickListener { loadOlderNotices(root) }
+                }
+            }) else contentAdapter
         list.layoutManager?.onRestoreInstanceState(scrollState)
         list.post { if (root.isAttachedToWindow) markVisibleNoticesRead(root, list) }
     }
@@ -1092,33 +1217,9 @@ internal class ClassMateAcademicScreensSupabase(
             }.setNegativeButton("Cancel", null).show()
     }
 
-    private fun showNoticeComments(root: View, notice: JSONObject): Unit = launch(root) {
-        val noticeId = notice.getString("id")
-        val comments = rows(ClassMateAuthApi.rows("notice_comments",
-            "select=id,body,created_at,author_id&notice_id=eq.$noticeId&order=created_at.asc&limit=100"))
-        if (!active(root)) return@launch
-        val content = comments.joinToString("\n\n") { comment ->
-            val author = if (comment.optString("author_id") == profile().optString("id"))
-                profile().optString("full_name") else "ClassMate member"
-            "$author · ${comment.optString("created_at").take(10)}\n${comment.optString("body")}" 
-        }.ifBlank { "No comments yet" }
-        AlertDialog.Builder(activity).setTitle("Comments · ${notice.optString("title")}")
-            .setMessage(content).setPositiveButton("Add comment") { _, _ ->
-                val field = EditText(activity).apply { hint = "Write a comment" }
-                AlertDialog.Builder(activity).setTitle("Add comment").setView(field)
-                    .setPositiveButton("Post") { _, _ ->
-                        val body = field.text.toString().trim()
-                        if (body.isBlank()) return@setPositiveButton
-                        launch(root) {
-                            ClassMateAuthApi.insert("notice_comments", JSONObject()
-                                .put("notice_id", noticeId).put("author_id", profile().getString("id"))
-                                .put("body", body))
-                            if (active(root)) { loadNotices(root); showNoticeComments(root, notice) }
-                        }
-                    }.setNegativeButton("Cancel", null).show()
-            }.setNegativeButton("Close", null).show()
+    private fun showNoticeComments(root: View, notice: JSONObject) {
+        ClassMateComments.show(activity,notice,changed={ if(active(root)) loadNotices(root) })
     }
-
     private fun showReminderOptions(root: View, card: View, notice: JSONObject) {
         val options = arrayOf("In 1 minute", "In one hour", "Tomorrow at 9 AM", "Clear reminder")
         AlertDialog.Builder(activity).setTitle("Remind me about this notice")
@@ -1447,8 +1548,11 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
         root.v<SwitchCompat>(R.id.switchNotifications).apply {
-            isChecked = prefs.isNotificationsEnabled()
+            val channelBlocked=android.os.Build.VERSION.SDK_INT>=26 && activity.getSystemService(android.app.NotificationManager::class.java).getNotificationChannel("classmate_notifications")?.importance==android.app.NotificationManager.IMPORTANCE_NONE
+            isChecked = prefs.isNotificationsEnabled() && androidx.core.app.NotificationManagerCompat.from(activity).areNotificationsEnabled() && !channelBlocked
+            if(prefs.isNotificationsEnabled() && !isChecked) root.v<TextView>(R.id.tvNotificationStatus).text="Blocked in Android settings. Tap to enable."
             setOnCheckedChangeListener { _, checked ->
+                if(checked) { onEnableNotifications(); return@setOnCheckedChangeListener }
                 prefs.setNotificationsEnabled(checked)
                 FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
                     scope.launch { runCatching {
@@ -1458,13 +1562,21 @@ internal class ClassMateAcademicScreensSupabase(
                 }
             }
         }
-        if(account.optString("role") in setOf("admin","teacher") || account.optBoolean("is_cr")) {
-            val logout=root.v<View>(R.id.btnLogout)
-            val parent=logout.parent as android.view.ViewGroup
-            val manage=com.google.android.material.button.MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text="Manage"; isAllCaps=false; cornerRadius=dp(16); setOnClickListener { onManage() }
+        root.v<View>(R.id.tvNotificationStatus).setOnClickListener { onEnableNotifications() }
+        root.v<View>(R.id.cardAboutDeveloper).setOnClickListener { ClassMateFeatureUi.developer(activity) }
+        root.v<View>(R.id.cardProfileAi).apply {
+            visibility=View.GONE
+            scope.launch {
+                try {
+                    val permitted=ClassMateAuthApi.rpcText("ai_can_write",JSONObject().put("target_batch",batchId())).trim()=="true"
+                    if(active(root)) visibility=if(permitted) View.VISIBLE else View.GONE
+                } catch(_:Exception) { }
             }
-            parent.addView(manage,parent.indexOfChild(logout),android.widget.LinearLayout.LayoutParams(-1,dp(56)).apply { bottomMargin=dp(12) })
+            setOnClickListener { onOpenAi() }
+        }
+        root.v<View>(R.id.cardProfileManage).apply {
+            visibility=if(account.optString("role") in setOf("admin","teacher") || account.optBoolean("is_cr")) View.VISIBLE else View.GONE
+            setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onManage() }
         }
         root.v<View>(R.id.btnLogout).setOnClickListener { onSignOut() }
         root.v<View>(R.id.cardPersonalInfo).setOnClickListener { onEditProfile() }
@@ -1482,7 +1594,7 @@ internal class ClassMateAcademicScreensSupabase(
             else ClassMateAuthApi.rows("batches",
                 "select=batch_number,academic_session&id=eq.$assignedBatch")
                 .optJSONObject(0)?.let {
-                    "${it.optInt("batch_number")} · session ${it.optInt("academic_session")}" } ?: "Unknown"
+                    "${it.optInt("batch_number")} · session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}" } ?: "Unknown"
         val semesters = if (batchId().isBlank()) JSONArray() else ClassMateAuthApi.rows("semesters",
             "select=semester_number&batch_id=eq.${batchId()}&status=eq.active&limit=1")
         if (!root.isAttachedToWindow) return@launch

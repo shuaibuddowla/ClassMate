@@ -5,7 +5,7 @@
     <background
         android:drawable="@drawable/ic_launcher_background"/>
     <foreground
-        android:drawable="@mipmap/ic_launcher_foreground"/>
+        android:drawable="@drawable/ic_launcher_foreground_full"/>
     <monochrome
         android:drawable="@drawable/ic_classmate_logo_monochrome"/>
 </adaptive-icon>

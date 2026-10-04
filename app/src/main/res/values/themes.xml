@@ -53,10 +53,10 @@
     <!-- Bottom Nav Indicator Style -->
     <style name="App.CustomIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/cm_bottom_nav_selected</item>
-        <item name="android:width">60dp</item>
-        <item name="android:height">32dp</item>
+        <item name="android:width">42dp</item>
+        <item name="android:height">34dp</item>
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">16dp</item>
+        <item name="cornerSize">12dp</item>
         <item name="marginHorizontal">2dp</item>
     </style>
 
@@ -72,7 +72,7 @@
     </style>
 
     <style name="App.BottomNavLabel.Inactive" parent="TextAppearance.Material3.LabelSmall">
-        <item name="android:textSize">10.5sp</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:fontFamily">sans-serif</item>
     </style>
 

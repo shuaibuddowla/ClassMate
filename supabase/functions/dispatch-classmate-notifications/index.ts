@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { GoogleAuth } from "npm:google-auth-library@9.15.1";
 import { classify, retryDelay } from "./policy.ts";
+import { deliveryPayload } from "./payload.ts";
 type Job={event_id:string;profile_id:string;token_hash:string;lease_id:string;kind:string;record_id:string};
 const url=Deno.env.get("SUPABASE_URL") ?? "";
 const secret=Deno.env.get("CLASSMATE_DISPATCH_SECRET") ?? "";
@@ -48,7 +49,7 @@ Deno.serve(async request=>{
           if(Date.now()>deadline-17_000 || sent>=1000) { await finish(job,"release"); continue; }
           let failures=0;
           try {
-            const context=await db.rpc("notification_job_context",{target_event:job.event_id,target_hash:job.token_hash,target_lease:job.lease_id});
+            const context=await db.rpc("web_notification_job_context",{target_event:job.event_id,target_hash:job.token_hash,target_lease:job.lease_id});
             if(context.error) throw new Error("Context unavailable");
             const content=context.data;
             failures=content?.failures ?? 0;
@@ -61,12 +62,12 @@ Deno.serve(async request=>{
             if(!mock) {
               const response=await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(account.project_id!)}/messages:send`,{
                 method:"POST",signal:AbortSignal.timeout(15_000),headers:{Authorization:`Bearer ${bearer}`,"Content-Type":"application/json"},
-                body:JSON.stringify({message:{token:content.fcm_token,android:{priority:"HIGH",ttl:"86400s"},data:{
+                body:JSON.stringify(deliveryPayload(content.fcm_token,{
                   kind:job.kind,record_id:job.record_id,batch_id:content.batch_id ?? "",event_id:job.event_id,token_hash:job.token_hash,
                   recipient_id:job.profile_id,project_ref:project,version_code:String(content.version_code ?? ""),version_name:String(content.version_name ?? ""),
                   title:release?`ClassMate ${content.version_name} is available`:content.title,
                   body:release?"Tap to check and install the latest update.":content.body
-                }}})
+                },content.client_platform))
               });
               status=response.status; retryAfter=response.headers.get("retry-after");
               if(!response.ok) { const error=await response.json().catch(()=>({})); code=error.error?.details?.find((d:{errorCode?:string})=>d.errorCode)?.errorCode; }

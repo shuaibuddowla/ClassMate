@@ -521,7 +521,7 @@ internal class ClassMateAcademicScreens(
             else ClassMateAuthApi.rows("batches",
                 "select=batch_number,academic_session&id=eq.$assignedBatch")
                 .optJSONObject(0)?.let {
-                    "${it.optInt("batch_number")} · session ${it.optInt("academic_session")}" } ?: "Unknown"
+                    "${it.optInt("batch_number")} · session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}" } ?: "Unknown"
         val semesters = if (batchId().isBlank()) JSONArray() else ClassMateAuthApi.rows("semesters",
             "select=semester_number&batch_id=eq.${batchId()}&status=eq.active&limit=1")
         if (!root.isAttachedToWindow) return@launch

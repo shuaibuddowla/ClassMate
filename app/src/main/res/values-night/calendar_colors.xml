@@ -1,0 +1,16 @@
+<resources>
+    <color name="cm_calendar_surface">#101D30</color>
+    <color name="cm_calendar_border">#28394D</color>
+    <color name="cm_calendar_muted">#AAB9CD</color>
+    <color name="cm_calendar_closed_bg">#35232D</color>
+    <color name="cm_calendar_closed">#FFAAA7</color>
+    <color name="cm_calendar_classes_bg">#18372E</color>
+    <color name="cm_calendar_classes">#8CDCB1</color>
+    <color name="cm_calendar_today_bg">#203B67</color>
+    <color name="cm_calendar_selected">#275BCE</color>
+    <color name="cm_calendar_shell">#12233C</color>
+    <color name="cm_calendar_weekday">#16283E</color>
+    <color name="cm_calendar_cell">#122136</color>
+    <color name="cm_calendar_hill">#7DA7E2</color>
+    <color name="cm_calendar_sun">#C9A16E</color>
+</resources>

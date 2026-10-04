@@ -49,6 +49,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private lateinit var academicCards: LinearLayout
     private lateinit var homeHost: LinearLayout
     private lateinit var academicScreens: ClassMateAcademicScreensSupabase
+    private lateinit var friendsScreen: ClassMateFriendsScreen
     private var profile: JSONObject? = null
     private var userId: String = ""
     private var askedNotificationPermission = false
@@ -185,6 +186,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if (notificationChannelDisabled()) openNotificationSettings()
         }
         if (!granted) status.text = "Notifications are off. Allow them in Android settings to receive class updates."
+        if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
     }
 
     private val courseFilesLauncher = registerForActivityResult(
@@ -556,8 +558,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     .putExtra("batch_id", selectedBatchId).putExtra("profile_id", userId).putExtra("can_manage", canManage)
                     .putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
             },
-            { editPersonalProfile() }, { openManage() }, { openConfiguration() }
+            { editPersonalProfile() }, { openManage() }, { openConfiguration() }, { enableNotificationsFromProfile() },
+            { aiLauncher.launch(Intent(this,ClassMateAiActivity::class.java).putExtra("batch_id",selectedBatchId).putExtra("profile_id",userId)) }
         )
+        friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) })
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
         nav.menu.findItem(R.id.nav_manage).isVisible = false
@@ -568,27 +572,23 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val tabs=(0 until nav.menu.size()).map { nav.menu.getItem(it) }.filter { it.isVisible }
             return tabs.getOrNull(tabs.indexOfFirst { it.itemId==selectedTab }+direction)?.itemId
         }
-        var swipeSelection = false
-        swipeHost.canSwipe = { direction -> !manageOpen && !tabAnimating && destination(direction)!=null }
+        swipeHost.canSwipe = { direction -> !manageOpen && destination(direction)!=null }
         swipeHost.onSwipe = { direction -> destination(direction)?.let { next ->
+            swipeHost.animate().cancel(); swipeHost.alpha=1f; swipeHost.translationX=0f
+            nav.selectedItemId=next
             if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
-                nav.selectedItemId=next
                 return@let
             }
             tabAnimating=true
-            swipeHost.animate().translationX(-direction*24f*resources.displayMetrics.density).alpha(0f).setDuration(90).withEndAction {
-                swipeSelection=true
-                nav.selectedItemId=next
-                swipeSelection=false
-                swipeHost.translationX=direction*24f*resources.displayMetrics.density
-                swipeHost.animate().translationX(0f).alpha(1f).setDuration(160).withEndAction { tabAnimating=false }.start()
-            }.start()
+            swipeHost.translationX=direction*12f*resources.displayMetrics.density; swipeHost.alpha=0.92f
+            swipeHost.animate().translationX(0f).alpha(1f).setDuration(110).withEndAction { tabAnimating=false }.start()
         } }
         nav.setOnItemSelectedListener { item ->
+            if(item.itemId==selectedTab) return@setOnItemSelectedListener true
             if (item.itemId != selectedTab) {
-                nav.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                com.shuaib.classmate.ui.ClassMateHaptics.selection(nav)
             }
-            if(!swipeSelection && tabAnimating) {
+            if(tabAnimating) {
                 swipeHost.animate().cancel(); swipeHost.alpha=1f; swipeHost.translationX=0f; tabAnimating=false
             }
             selectedTab = item.itemId
@@ -645,7 +645,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     val id = batch.getString("id")
                     if (allowed != null && id !in allowed) continue
                     val label = "${codes[batch.getString("department_id")] ?: "Department"} " +
-                        "Batch ${batch.getInt("batch_number")} · Session ${batch.getInt("academic_session")}"
+                        "Batch ${batch.getInt("batch_number")} · Session ${ClassMateAcademicSession.format(batch.getInt("academic_session"))}"
                     ui.action("$label  →", false, actions) {
                         selectedBatchId = id
                         selectedBatchLabel = label
@@ -677,7 +677,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             content = homeHost
             homeHost.removeAllViews()
             if(tab==R.id.nav_friends) {
-                ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) }).render(homeHost,selectedBatchLabel)
+                friendsScreen.render(homeHost,selectedBatchLabel)
                 return
             }
             academicScreens.render(tab, homeHost)
@@ -1144,7 +1144,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             appendLine("Status: ${loaded.optString("verification_status")}")
             if (department != null) appendLine("Department: $department")
             if (!loaded.isNull("student_id")) appendLine("Student ID: ${loaded.optString("student_id")}")
-            if (!loaded.isNull("academic_session")) appendLine("Academic session: ${loaded.optString("academic_session")}")
+            if (!loaded.isNull("academic_session")) appendLine("Academic session: ${ClassMateAcademicSession.format(loaded.optString("academic_session"))}")
             if (batch != null) appendLine("Batch: $batch")
             if (semester != null) appendLine("Current semester: $semester")
             if (loaded.optString("role") == "student")
@@ -1233,6 +1233,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
         // Profile setup belongs to explicit sign-in, never ordinary app resumes.
         if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
     }
@@ -1240,14 +1241,36 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private fun registerFcmToken() {
         if (!AppPreferences(this).isNotificationsEnabled() || !androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+        if(notificationRegistrationBusy) return
+        notificationRegistrationBusy=true
+        FirebaseMessaging.getInstance().token.addOnFailureListener {
+            notificationRegistrationBusy=false
+            findViewById<TextView>(R.id.tvNotificationStatus)?.text="Could not connect. Tap to retry."
+        }.addOnSuccessListener { token ->
             if (token.isNotBlank() && ClassMateAuthApi.hasSavedSession()) {
                 lifecycleScope.launch {
-                    runCatching { ClassMateAuthApi.registerDeviceToken(token) }
-                        .onFailure { status.text = "FCM registration: ${it.message}" }
+                    runCatching {
+                        if(AppPreferences(this@ClassMateAuthActivity).isNotificationsEnabled()) {
+                            ClassMateAuthApi.registerDeviceToken(token)
+                            if(!AppPreferences(this@ClassMateAuthActivity).isNotificationsEnabled()) ClassMateAuthApi.unregisterDeviceToken(token)
+                        }
+                    }
+                        .onFailure { findViewById<TextView>(R.id.tvNotificationStatus)?.text="Could not connect. Tap to retry." }
+                        .onSuccess { findViewById<TextView>(R.id.tvNotificationStatus)?.text="Notices and academic updates" }
+                    notificationRegistrationBusy=false
                 }
-            }
+            } else notificationRegistrationBusy=false
         }
+    }
+    private var notificationRegistrationBusy=false
+    private fun enableNotificationsFromProfile() {
+        AppPreferences(this).setNotificationsEnabled(true)
+        if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) {
+            val asked=welcomeProgress.getBoolean("notification_permission_requested",false)
+            if(asked && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
+            else { welcomeProgress.edit().putBoolean("notification_permission_requested",true).apply(); notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        } else if(!notificationsEnabled()) openNotificationSettings()
+        else registerFcmToken()
     }
 
     private fun showDepartments() {
@@ -1276,13 +1299,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     }
                 }.setNegativeButton("Cancel", null).show()
         } else {
-            form("Manual department request", listOf("Student ID", "Running batch", "Academic session")) { values ->
+            form("Manual department request", listOf("Student ID", "Running batch", "Academic session (e.g. 24-25)")) { values ->
                 runAction("Submitting for verification") {
                     ClassMateAuthApi.rpc("complete_student_onboarding", JSONObject()
                         .put("selected_department", id)
                         .put("entered_student_id", values[0])
                         .put("entered_batch_number", values[1].toInt())
-                        .put("entered_session", values[2].toInt()))
+                        .put("entered_session", ClassMateAcademicSession.end(values[2])))
                     loadProfile()
                 }
             }
@@ -1517,7 +1540,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val labels = Array(batches.length()) { i ->
                 val batch = batches.getJSONObject(i)
                 "${codes[batch.getString("department_id")] ?: "Department"} batch " +
-                    "${batch.getInt("batch_number")} · session ${batch.getInt("academic_session")}"
+                    "${batch.getInt("batch_number")} · session ${ClassMateAcademicSession.format(batch.getInt("academic_session"))}"
             }
             AlertDialog.Builder(this@ClassMateAuthActivity).setTitle("Choose batch")
                 .setItems(labels) { _, index ->
@@ -1560,7 +1583,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private val publishLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK && homeShown) {
             academicScreens.invalidateLibrary()
+            academicScreens.invalidateNotices()
             ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
+            renderHomeTab(selectedTab)
+        }
+    }
+    private val aiLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode==RESULT_OK && homeShown) {
+            academicScreens.invalidateLibrary()
+            academicScreens.invalidateNotices()
+            ClassMateAcademicCache.invalidateSchedules(this,userId,selectedBatchId)
             renderHomeTab(selectedTab)
         }
     }
@@ -1637,7 +1669,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 1 -> showManageRecords("Batches", "batches",
                     "select=batch_number,academic_session,is_active&order=batch_number") {
                     "Batch ${it.optInt("batch_number")}" to
-                        "Session ${it.optInt("academic_session")} · ${if (it.optBoolean("is_active")) "Active" else "Inactive"}"
+                        "Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))} · ${if (it.optBoolean("is_active")) "Active" else "Inactive"}"
                 }
                 2 -> showManageRecords("Pending students", "profiles",
                     "select=full_name,email,student_id,verification_status&verification_status=eq.pending") {
@@ -1649,12 +1681,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 4 -> pickRow("departments", "select=id,name&is_active=eq.true&order=name",
                     "Choose department", { it.optString("name") }) { department ->
                     form("Create batch in ${department.optString("name")}",
-                        listOf("Batch number", "Academic session")) { values ->
+                        listOf("Batch number", "Academic session (e.g. 24-25)")) { values ->
                         runAction("Creating batch") {
                             ClassMateAuthApi.rpc("create_batch", JSONObject()
                                 .put("target_department", department.getString("id"))
                                 .put("target_batch_number", values[0].toInt())
-                                .put("target_session", values[1].toInt()))
+                                .put("target_session", ClassMateAcademicSession.end(values[1])))
                             renderHomeTab(R.id.nav_manage)
                         }
                     }
@@ -1662,15 +1694,15 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 5 -> pickRow("profiles", "select=id,email,student_id,academic_session,department_id&verification_status=eq.pending",
                     "Choose pending student", { it.optString("email") }) { student ->
                     pickRow("batches", "select=id,batch_number,academic_session&department_id=eq.${student.getString("department_id")}&is_active=eq.true",
-                        "Choose verified batch", { "Batch ${it.optInt("batch_number")} · Session ${it.optInt("academic_session")}" }) { batch ->
+                        "Choose verified batch", { "Batch ${it.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}" }) { batch ->
                         form("Approve ${student.optString("email")}", listOf("Student ID", "Session"),
-                            listOf(student.optString("student_id"), batch.optString("academic_session"))) { values ->
+                            listOf(student.optString("student_id"), ClassMateAcademicSession.format(batch.optString("academic_session")))) { values ->
                             runAction("Approving student") {
                                 ClassMateAuthApi.rpc("approve_student_profile", JSONObject()
                                     .put("target_profile", student.getString("id"))
                                     .put("corrected_student_id", values[0])
                                     .put("target_batch", batch.getString("id"))
-                                    .put("corrected_session", values[1].toInt()))
+                                    .put("corrected_session", ClassMateAcademicSession.end(values[1])))
                                 resultView.text = "Student approved."
                             }
                         }
@@ -1915,7 +1947,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 setSingleLine(label != "Body")
                 if (label.contains("email", true)) inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS or
                     android.text.InputType.TYPE_CLASS_TEXT
-                if (label.contains("number", true) || label == "Session" ||
+                if (label.contains("number", true) ||
                     label.contains("offset", true)) inputType = android.text.InputType.TYPE_CLASS_NUMBER
                 panel.addView(TextView(this@ClassMateAuthActivity).apply {
                     text = label

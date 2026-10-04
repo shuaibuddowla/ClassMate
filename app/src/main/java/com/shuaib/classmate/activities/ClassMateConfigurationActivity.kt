@@ -330,7 +330,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                 try {
                     val dept=ClassMateAuthApi.rows("profiles","select=department_id&id=eq.${p.getString("profile_id")}").optJSONObject(0)?.let { clean(it,"department_id") }.orEmpty()
                     val batches=rows(ClassMateAuthApi.rows("batches","select=id,batch_number,academic_session&is_active=eq.true${if(dept.isNotBlank()) "&department_id=eq.$dept" else ""}&order=batch_number"))
-                    val choice=f.choice("Batch",batches.map { "Batch ${it.optInt("batch_number")} · Session ${it.optInt("academic_session")}" })
+                    val choice=f.choice("Batch",batches.map { "Batch ${it.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}" })
                     val d=b.create(); d.show()
                     d.getButton(-1).setOnClickListener {
                         val batch=batches.getOrNull(choice.selectedItemPosition) ?: return@setOnClickListener
