@@ -34,18 +34,34 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         if (inputData.getString("project_ref") != expectedProject) return Result.success()
         var identity = ClassMateAuthApi.notificationIdentity()
         val release = inputData.getString("kind") == "app_update"
-        if (identity == null || (!release && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
+        val blood = inputData.getString("kind") == "blood_request"
+        if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
                 ClassMateAuthApi.saveNotificationIdentity(identity)
             } catch (_: Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
         }
         if (!ClassMatePushPolicy.addressedToCurrentUser(inputData.getString("project_ref"),inputData.getString("recipient_id"),
-                inputData.getString("batch_id"),release,expectedProject,identity.optString("id"),identity.optString("verification_status"),
+                inputData.getString("batch_id"),release || blood,expectedProject,identity.optString("id"),identity.optString("verification_status"),
                 identity.optString("role"),identity.optString("batch_id"))) return Result.success()
         if (release && (inputData.getString("version_code")?.toLongOrNull() ?: 0L) <= BuildConfig.VERSION_CODE) return Result.success()
+        var bloodDetails:JSONObject?=null
+        if(blood) {
+            val key=inputData.getString("record_id") ?: return Result.success()
+            try {
+                if(ClassMateAuthApi.rpcText("blood_alert_allowed",JSONObject().put("target_request",key)).trim()!="true") return Result.success()
+                bloodDetails=ClassMateAuthApi.rpc("blood_request_details",JSONObject().put("target_request",key))
+            } catch (_:Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
+        }
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = if(release) UpdateNotifications.CHANNEL_ID else "classmate_notifications"
+        val channel = if(blood) "classmate_blood_emergency" else if(release) UpdateNotifications.CHANNEL_ID else "classmate_notifications"
+        if(blood && Build.VERSION.SDK_INT>=26) {
+            manager.createNotificationChannel(android.app.NotificationChannel(channel,"Verified blood requests",NotificationManager.IMPORTANCE_HIGH).apply {
+                description="Matching emergency blood requests you opted into"
+                enableVibration(true)
+                setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"),android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build())
+            })
+        }
         val state = when {
             !AppPreferences(context).isNotificationsEnabled() -> "app_notifications_disabled"
             !NotificationManagerCompat.from(context).areNotificationsEnabled() -> "notifications_disabled"
@@ -60,14 +76,26 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     "Tap to check and install the latest update.", UpdateActionActivity.ACTION_RETRY, notificationId = 3902)
             } else {
                 val key = inputData.getString("record_id") ?: id.toString()
-                val intent = Intent(context,ClassMateAuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("OPEN_TAB","notices")
+                val intent = if(blood) Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)
+                    else Intent(context,ClassMateAuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("OPEN_TAB","notices")
                 val pending = PendingIntent.getActivity(context,key.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 val body = inputData.getString("body") ?: "New class update available"
-                val notification = NotificationCompat.Builder(context,channel).setSmallIcon(R.drawable.ic_classmate_notification)
+                val builder = NotificationCompat.Builder(context,channel).setSmallIcon(R.drawable.ic_classmate_notification)
                     .setColor(0xFF3B82F6.toInt()).setContentTitle(inputData.getString("title") ?: "ClassMate update")
                     .setContentText(body).setStyle(NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending)
                     .setPriority(NotificationCompat.PRIORITY_HIGH).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                    .setOnlyAlertOnce(true).setAutoCancel(true).build()
+                    .setOnlyAlertOnce(true).setAutoCancel(true)
+                if(blood) {
+                    builder.setColor(0xFFC43E52.toInt()).setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"))
+                    val volunteerIntent=Intent(intent).putExtra("volunteer_now",true)
+                    val volunteer=PendingIntent.getActivity(context,(key+"donate").hashCode(),volunteerIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                    builder.addAction(R.drawable.ic_classmate_notification,"I can donate",volunteer)
+                    bloodDetails?.optString("attendant_phone")?.takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }?.let { phone ->
+                        val call=PendingIntent.getActivity(context,(key+"call").hashCode(),Intent(Intent.ACTION_DIAL,android.net.Uri.parse("tel:$phone")),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                        builder.addAction(R.drawable.ic_classmate_notification,"Call attendant",call)
+                    }
+                }
+                val notification=builder.build()
                 try { manager.notify(key.hashCode(),notification) } catch (_: SecurityException) { return Result.failure() }
             }
         }

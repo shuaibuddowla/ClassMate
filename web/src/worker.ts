@@ -57,6 +57,7 @@ async function claim(key: string) {
 }
 async function display(data: Record<string, string> | undefined) {
   if (!data?.event_id) return;
+  if(data.kind === "blood_request" && (!data.expires_at || !Number.isFinite(Date.parse(data.expires_at)) || Date.parse(data.expires_at)<=Date.now()))return;
   const identity = await read("identity");
   if (
     !identity?.user ||
@@ -77,6 +78,7 @@ async function display(data: Record<string, string> | undefined) {
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.event_id,
+    ...(data.kind === "blood_request" ? { requireInteraction: true, actions: [{action:"donate",title:"I can donate"},{action:"call",title:"Call attendant"}] } : {}),
     data: {
       kind: data.kind,
       record: data.record_id,
@@ -182,9 +184,9 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const kind = event.notification.data?.kind;
   const path =
-    kind === "release" ? "profile" : kind === "file" ? "library" : "notices";
+    kind === "blood_request" ? "friends/blood" : ["release","app_update"].includes(kind) ? "profile" : kind === "file" ? "library" : "notices";
   const target =
-    kind === "release"
+    ["release","app_update"].includes(kind)
       ? "/#profile"
       : `/#${path}/${encodeURIComponent(event.notification.data?.record || "")}`;
   event.waitUntil(

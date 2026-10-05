@@ -55,7 +55,10 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         cachedRoot=root
         host.addView(root,LinearLayout.LayoutParams(-1,-1))
         val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(8),dp(16),dp(4)) }
-        header.addView(text("Friends",24f,true).apply { setTypeface(null,1) })
+        val titleRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
+        titleRow.addView(text("Friends",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
+        titleRow.addView(ClassMateFeatureUi.button(activity,"Blood requests") { activity.startActivity(Intent(activity,ClassMateBloodActivity::class.java).putExtra("batch_id",batch)) }.apply { textSize=12f })
+        header.addView(titleRow)
         header.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(8)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
         val searchBox=TextInputLayout(activity).apply {
             isHintEnabled=false; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_FILLED

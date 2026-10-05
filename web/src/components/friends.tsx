@@ -1,11 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Search, Phone, MessageCircle, ChevronRight } from "lucide-react";
+import { Search, Phone, MessageCircle, ChevronRight, Droplets } from "lucide-react";
+import { BloodNetwork } from "./blood-network";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
 import { Avatar, Empty, ErrorBox, Modal, Skeleton } from "./ui";
 export function Friends({ ctx }: { ctx: Context }) {
+  const [blood, setBlood] = useState(false);
+  useEffect(() => { const update=()=>{if(location.hash.startsWith("#friends/blood"))setBlood(true)};update();window.addEventListener("hashchange",update);return()=>window.removeEventListener("hashchange",update) },[]);
   const [input, setInput] = useState(""),
     [search, setSearch] = useState(""),
     [person, setPerson] = useState<Row | null>(null),
@@ -48,6 +51,7 @@ export function Friends({ ctx }: { ctx: Context }) {
         body="Connect to view your batchmates and their contact details."
       />
     );
+  if (blood) return <BloodNetwork ctx={ctx} close={()=>{setBlood(false);history.replaceState(null,"","#friends")}} />;
   return (
     <>
       <div className="page-heading">
@@ -55,6 +59,7 @@ export function Friends({ ctx }: { ctx: Context }) {
           <span className="eyebrow">YOUR BATCH COMMUNITY</span>
           <h1>Friends</h1>
         </div>
+        <button className="text-button" onClick={()=>setBlood(true)}><Droplets size={18}/> Blood requests</button>
       </div>
       <label className="search">
         <Search size={18} />
