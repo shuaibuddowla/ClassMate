@@ -305,6 +305,7 @@ function SessionApp() {
             try { const {error}=await supabase().auth.signInWithOAuth({provider:"google",options:{redirectTo:`${location.origin}/auth/callback`,queryParams:{prompt:"select_account"}}}); if(error) throw error; } catch(e) {setError(e)}
           }}>Teacher sign-in <ArrowRight size={18}/></button>
           <InstallWebApp />
+          <nav className="signin-public-links" aria-label="About and policies"><a href="/about">About ClassMate</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
           {!configured() && (
             <p>Server setup is required before sign-in is available.</p>
           )}
