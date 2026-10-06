@@ -17,3 +17,6 @@ Staging rollback SQL tests verify approved Gmail initialization, unapproved Gmai
 
 ## Admin testing
 Edit the existing teacher in Manage > Teachers and assign your test Gmail yourself. Sign out and choose Teacher sign-in with that Google account. Choose an assigned batch and check your courses, timetable, notices and resources. A real approved Gmail OAuth round trip still requires this user test.
+
+## Signup hook correction
+Migration 202610060003_teacher_signup_hook updates the Before User Created hook, which runs before profile initialization. Approved Gmail exceptions are now enforced at both stages. Staging rollback tests cover approved Gmail, institutional student, unapproved Gmail, revoked Gmail and non-Google provider. Production read-only check confirms the registered approved Gmail is accepted. Actual Google login must be retried from Teacher sign-in; an old failed callback cannot be reused.

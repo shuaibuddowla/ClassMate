@@ -15,7 +15,7 @@ export default function Callback() {
     if (!code) {
       setError(
         url.searchParams.has("error")
-          ? "Google sign-in could not finish. Please start again with your university account."
+          ? "Google sign-in could not finish. Try your university account or an admin-approved teacher Gmail."
           : "Sign-in was cancelled.",
       );
       return;
@@ -32,7 +32,7 @@ export default function Callback() {
     <main className="boot">
       <img src="/logo.png" alt="ClassMate" width="64" />
       <h1>{error ? "Sign-in needs another try" : "Welcome to ClassMate"}</h1>
-      <p>{error || "Finishing your university sign-in…"}</p>
+      <p>{error || "Finishing your Google sign-in…"}</p>
       {error && <a href="/">Back to sign in</a>}
     </main>
   );
