@@ -18,8 +18,11 @@ class UpdateMetadataTest {
         assertTrue(UpdatePolicy.isNewer(7, 6))
     }
 
-    @Test fun autoUpdateAndMeteredPolicy() {
+    @Test fun downloadRequiresUserConsentAndRespectsWifi() {
         assertFalse(UpdatePolicy.mayAutoDownload(false, false, false))
+        assertFalse(UpdatePolicy.mayAutoDownload(false, false, true))
+        assertFalse(UpdatePolicy.mayAutoDownload(false, true, false))
+        assertFalse(UpdatePolicy.mayAutoDownload(false, true, true))
         assertFalse(UpdatePolicy.mayAutoDownload(true, true, true))
         assertTrue(UpdatePolicy.mayAutoDownload(true, true, false))
         assertTrue(UpdatePolicy.mayAutoDownload(true, false, true))

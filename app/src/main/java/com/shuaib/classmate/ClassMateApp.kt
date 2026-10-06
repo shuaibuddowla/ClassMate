@@ -70,7 +70,7 @@ class ClassMateApp : Application() {
                 if (updatePrefs.needsInstallerConfirmation()) {
                     updatePrefs.setNeedsInstallerConfirmation(false)
                     activity.startActivity(Intent(activity, UpdateActionActivity::class.java)
-                        .setAction(UpdateActionActivity.ACTION_RETRY))
+                        .setAction(UpdateActionActivity.ACTION_PROMPT))
                 } else if (mandatoryCode > BuildConfig.VERSION_CODE) {
                     activity.startActivity(Intent(activity, UpdateActionActivity::class.java)
                         .setAction(UpdateActionActivity.ACTION_MANDATORY))

@@ -118,6 +118,7 @@ export function Notices({
         .order("published_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(10);
+      if (ctx.profile.role === "teacher") query = query.eq("author_id", ctx.user);
       if (pageParam)
         query = query.or(
           `published_at.lt.${pageParam.published_at},and(published_at.eq.${pageParam.published_at},id.lt.${pageParam.id})`,
@@ -183,6 +184,7 @@ export function Notices({
   const notices =
     feed.data?.pages
       .flatMap((p) => p.entries)
+      .filter((n) => ctx.profile.role !== "teacher" || n.author_id === ctx.user)
       .filter((n, i, a) => a.findIndex((x) => x.id === n.id) === i) || [];
   const details =
     feed.data?.pages.reduce((acc, p) => {
@@ -339,8 +341,8 @@ export function Notices({
       </div>
       {!feed.isPending && !notices.length && (
         <Empty
-          title="You’re all caught up"
-          body="Updates for your batch will appear here."
+          title={ctx.profile.role === "teacher" ? "You haven’t posted any notices" : "You’re all caught up"}
+          body={ctx.profile.role === "teacher" ? "Try posting your first course notice!" : "Updates for your batch will appear here."}
         />
       )}
       <div ref={end} className="paging">

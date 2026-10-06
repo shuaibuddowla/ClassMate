@@ -183,6 +183,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         AppPreferences(this).setNotificationsEnabled(granted)
         if (granted) {
             registerFcmToken()
+            if(homeShown) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
             if (notificationChannelDisabled()) openNotificationSettings()
         }
         if (!granted) status.text = "Notifications are off. Allow them in Android settings to receive class updates."
@@ -289,6 +290,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         val callback = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
                 runOnUiThread {
+                    if(homeShown && profileValidated && ClassMateAuthApi.accessToken!=null) registerFcmToken()
                     if (homeShown && !reconnecting && ClassMateAuthApi.accessToken == null) {
                         reconnecting = true
                         lifecycleScope.launch { try { loadProfile() } catch (_: Exception) { if (!ClassMateAuthApi.hasSavedSession()) signOut() } finally { reconnecting = false } }
@@ -481,6 +483,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if(resumedStep!=welcomeStep) startWelcomeFlow(resumedStep)
             if (isDestroyed || isFinishing || !homeShown || welcomeStep==0 || welcomeDialog?.isShowing==true) return
             val shownStep=welcomeStep
+            if(shownStep==3) notificationOfferShown=true
             val permission=Build.VERSION.SDK_INT<33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
             welcomeDialog=ClassMateWelcomeDialogs.show(this,shownStep,profile ?: loaded,batch,department,
                 notificationsEnabled(),
@@ -545,6 +548,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
             isAppearanceLightNavigationBars = lightTheme
         }
         homeShown = true
+        window.decorView.postDelayed({
+            if(homeShown && welcomeStep==0 && !isFinishing) {
+                offerNotificationPermission(); registerFcmToken()
+                if(notificationsEnabled()) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
+            }
+        },1200)
         ClassMateAcademicCache.saveHome(this, profile ?: JSONObject(), selectedBatchId, selectedBatchLabel)
         homeHost = findViewById(R.id.classmate_home_content)
         content = homeHost
@@ -1239,7 +1248,22 @@ class ClassMateAuthActivity : AppCompatActivity() {
         unreadActivity?.refresh()
         if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
         // Profile setup belongs to explicit sign-in, never ordinary app resumes.
-        if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
+        if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) {
+            val offered=offerNotificationPermission(); registerFcmToken()
+            if(!offered) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
+        }
+    }
+
+    private var notificationOfferShown=false
+    private fun offerNotificationPermission(): Boolean {
+        if(!homeShown || welcomeStep!=0 || notificationOfferShown || notificationsEnabled()) return false
+        notificationOfferShown=true
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Stay updated")
+            .setMessage("Enable notifications for notices, class changes, blood requests and app updates.")
+            .setPositiveButton("Enable") { _, _ -> enableNotificationsFromProfile() }
+            .setNegativeButton("Later") { _, _ -> com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this) }.show()
+        return true
     }
 
     private fun registerFcmToken() {
@@ -1274,7 +1298,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             if(asked && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
             else { welcomeProgress.edit().putBoolean("notification_permission_requested",true).apply(); notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
         } else if(!notificationsEnabled()) openNotificationSettings()
-        else registerFcmToken()
+        else { registerFcmToken(); com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this) }
     }
 
     private fun showDepartments() {

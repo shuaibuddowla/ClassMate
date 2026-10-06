@@ -74,7 +74,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         if (state == "displayed" && (eventKey==null || !ledger.contains(eventKey))) {
             if(release) {
                 UpdateNotifications.show(context, inputData.getString("title") ?: "ClassMate update",
-                    "Tap to check and install the latest update.", UpdateActionActivity.ACTION_RETRY, notificationId = 3902)
+                    "Tap to review the latest update.", UpdateActionActivity.ACTION_PROMPT, notificationId = 3902)
             } else {
                 val key = inputData.getString("record_id") ?: id.toString()
                 val intent = if(blood) Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)

@@ -318,7 +318,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
           </div>
           {mode === "routine" && closed ? (
             <Empty
-              title="No classes today"
+              title={ctx.profile.role === "teacher" ? (date === dhakaToday() ? "You have no classes to take today" : "You have no classes to take on this day") : "No classes today"}
               body={
                 events
                   .filter(
@@ -346,8 +346,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 </>
               ) : entries.length === 0 ? (
                 <Empty
-                  title="Nothing scheduled"
-                  body="Schedules will appear here once configured."
+                  title={mode === "routine" && ctx.profile.role === "teacher" ? (date === dhakaToday() ? "You have no classes to take today" : "You have no classes to take on this day") : "Nothing scheduled"}
+                  body={mode === "routine" && ctx.profile.role === "teacher" ? "Your assigned teaching schedule will appear here." : "Schedules will appear here once configured."}
                 />
               ) : (
                 <>

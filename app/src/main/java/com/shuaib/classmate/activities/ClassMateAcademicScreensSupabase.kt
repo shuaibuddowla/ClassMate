@@ -467,7 +467,9 @@ internal class ClassMateAcademicScreensSupabase(
             text(root, R.id.tvNoClassesSubtitle, "${effectiveDate.format(DateTimeFormatter.ofPattern("d MMM yyyy"))} · No classes scheduled on this holiday")
             return@launch
         }
-        text(root, R.id.tvNoClassesTitle, "No classes scheduled")
+        text(root, R.id.tvNoClassesTitle, if(!requestedBusMode && profile().optString("role")=="teacher") {
+            if(effectiveDate==LocalDate.now()) "You have no classes to take today" else "You have no classes to take on this day"
+        } else "No classes scheduled")
         text(root, R.id.tvNoClassesSubtitle, "Enjoy your free day")
         val requestedBusKind = busDayKind()
         val cacheKind = if (requestedBusMode) "bus" else "routine"
@@ -706,7 +708,7 @@ internal class ClassMateAcademicScreensSupabase(
         try {
                 val visible = rows(ClassMateAuthApi.rows("notices",
                 "select=id,title,body,published_at,semester_course_id,author_id,resource_id" +
-                    "&batch_id=eq.$selectedBatch&order=published_at.desc,id.desc&limit=$noticePageSize"))
+                    "&batch_id=eq.$selectedBatch${teacherNoticeFilter()}&order=published_at.desc,id.desc&limit=$noticePageSize"))
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
             noticeBatch = selectedBatch
             noticeFeed=(visible+if(visible.isNotEmpty()) older else emptyList()).distinctBy { it.optString("id") }
@@ -756,7 +758,7 @@ internal class ClassMateAcademicScreensSupabase(
                     val timestamp=java.net.URLEncoder.encode(cursor.getString("published_at"),"UTF-8")
                     val id=cursor.getString("id")
                     rows(ClassMateAuthApi.rows("notices","select=id,title,body,published_at,semester_course_id,author_id,resource_id"+
-                        "&batch_id=eq.$batch&or=(published_at.lt.$timestamp,and(published_at.eq.$timestamp,id.lt.$id))&order=published_at.desc,id.desc&limit=$noticePageSize"))
+                        "&batch_id=eq.$batch${teacherNoticeFilter()}&or=(published_at.lt.$timestamp,and(published_at.eq.$timestamp,id.lt.$id))&order=published_at.desc,id.desc&limit=$noticePageSize"))
                 }
                 if(!active(root) || request!=noticeRequest || batch!=batchId()) return@launch
                 noticeFeed=(noticeFeed+page).distinctBy { it.optString("id") }
@@ -800,15 +802,21 @@ internal class ClassMateAcademicScreensSupabase(
         data.optJSONObject("previews")?.let { json -> json.keys().forEach { id -> noticeReaderPreviews[id] = rows(json.optJSONArray(id) ?: JSONArray()) } }
     }
 
+    private fun teacherNoticeFilter() = if(profile().optString("role")=="teacher") "&author_id=eq.${profile().optString("id")}" else ""
+
     private fun renderNoticeFeed(root: View) {
         if (!root.isAttachedToWindow) return
         val search = root.v<EditText>(R.id.etNoticeSearch).text.toString().trim()
         text(root, R.id.tvNoticeSubtitle, "${noticeFeed.size}${if(noticeHasMore) "+" else ""} updates · ${if (ClassMateAcademicCache.online(activity)) "Pull to refresh" else "Offline · Last synced"}")
-        val filtered = noticeFeed.filter { search.isBlank() ||
-            it.optString("title").contains(search, true) || it.optString("body").contains(search, true) }
+        val filtered = noticeFeed.filter { (profile().optString("role")!="teacher" || it.optString("author_id")==profile().optString("id")) && (search.isBlank() ||
+            it.optString("title").contains(search, true) || it.optString("body").contains(search, true)) }
             .sortedWith(compareByDescending<JSONObject> {
                 noticeStates[it.optString("id")]?.optBoolean("is_pinned") == true
             }.thenByDescending { it.optString("published_at") })
+        if(profile().optString("role")=="teacher") {
+            text(root,R.id.tvEmptyTitle,"You haven’t posted any notices")
+            text(root,R.id.tvEmptySubtitle,"Try posting your first course notice!")
+        }
         noticeVisibleIds = filtered.map { it.optString("id") }
         noticeHeaderOffset = if (filtered.isEmpty()) 0 else 1
         root.v<View>(R.id.emptyNoticeState).visibility = if (filtered.isEmpty() && !noticeHasMore && !noticeLoadingOlder) View.VISIBLE else View.GONE

@@ -33,6 +33,11 @@ class UpdateActionActivity : AppCompatActivity() {
                 }
                 finish()
             }
+            ACTION_PROMPT -> AlertDialog.Builder(this)
+                .setTitle("New ClassMate update")
+                .setMessage("Update to the latest version? The app will download and verify the release, then open Android’s installer.")
+                .setPositiveButton("Update") { _, _ -> runUpdate() }
+                .setNegativeButton("Later") { _, _ -> finish() }.setOnCancelListener { finish() }.show()
             ACTION_PERMISSION -> showPermissionExplanation()
             ACTION_MANDATORY -> AlertDialog.Builder(this)
                 .setTitle("ClassMate update required")
@@ -73,6 +78,7 @@ class UpdateActionActivity : AppCompatActivity() {
             dialog.dismiss()
             if (isFinishing || isDestroyed) return@launch
             when (val outcome = result.getOrNull()) {
+                is UpdateOutcome.Available -> showResult("Update available", "ClassMate ${outcome.version} is available.")
                 UpdateOutcome.UpToDate -> showResult("You're up to date", "This is the latest ClassMate version.")
                 is UpdateOutcome.WaitingForWifi -> showResult("ClassMate ${outcome.version} is available",
                     "Connect to Wi-Fi to download it, or turn off Wi-Fi only in App Updates.")
@@ -93,6 +99,7 @@ class UpdateActionActivity : AppCompatActivity() {
     }
 
     companion object {
+        const val ACTION_PROMPT = "com.shuaib.classmate.update.PROMPT"
         const val ACTION_CONFIRM = "com.shuaib.classmate.update.CONFIRM"
         const val ACTION_PERMISSION = "com.shuaib.classmate.update.PERMISSION"
         const val ACTION_RETRY = "com.shuaib.classmate.update.RETRY"

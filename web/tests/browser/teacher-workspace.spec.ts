@@ -5,6 +5,7 @@ test("teacher chooses an assigned batch and sees familiar scoped teaching tools"
   await openSavedAccount(page,390);
   await page.evaluate(()=>{
     const p=JSON.parse(localStorage.getItem("classmate:identity:mobile-layout-test")!);
+    localStorage.removeItem("classmate:academic:v1:mobile-layout-test:layout-batch:routine");
     p.role="teacher";p.email="approved.teacher@gmail.com";p.batch_id=null;p.student_id=null;
     localStorage.setItem("classmate:identity:mobile-layout-test",JSON.stringify(p));
   });
@@ -19,10 +20,20 @@ test("teacher chooses an assigned batch and sees familiar scoped teaching tools"
     if(name==="unread_activity")data={notices:0,blood_requests:0};
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(data)});
   });
+  let authorFiltered=false;
+  await page.route("**/rest/v1/notices?**", async route=>{
+    authorFiltered=new URL(route.request().url()).searchParams.get("author_id")==="eq.mobile-layout-test";
+    await route.fulfill({status:200,contentType:"application/json",body:"[]"});
+  });
   await page.evaluate(()=>{Object.defineProperty(navigator,"onLine",{get:()=>true,configurable:true});window.dispatchEvent(new Event("online"));});
   await expect(page.getByRole("heading",{name:"Choose your classroom."})).toBeVisible();
   await expect(page.locator(".teacher-batch-list button")).toHaveCount(1);
   await page.locator(".teacher-batch-list button").click();
+  await expect(page.getByText(/You have no classes to take/)).toBeVisible();
+  await page.locator(".bottom-nav").getByRole("button",{name:"Notices",exact:true}).click();
+  await expect(page.getByText(/You haven.t posted any notices/)).toBeVisible();
+  await page.getByRole("button",{name:/Pull to refresh/}).click();
+  await expect.poll(()=>authorFiltered).toBe(true);
   await expect(page.locator(".bottom-nav").getByRole("button",{name:"Students",exact:true})).toBeVisible();
   await page.locator(".bottom-nav").getByRole("button",{name:"Students",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Students",exact:true})).toBeVisible();

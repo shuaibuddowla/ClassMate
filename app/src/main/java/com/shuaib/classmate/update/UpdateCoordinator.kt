@@ -14,12 +14,15 @@ import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.utils.AppPreferences
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 sealed class UpdateOutcome {
     data object UpToDate : UpdateOutcome()
+    data class Available(val version: String) : UpdateOutcome()
     data class WaitingForWifi(val version: String) : UpdateOutcome()
     data class PermissionRequired(val version: String) : UpdateOutcome()
     data class Installing(val version: String) : UpdateOutcome()
@@ -30,6 +33,27 @@ object UpdateCoordinator {
     private const val PERIODIC_NAME = "ClassMatePeriodicUpdate"
     private const val FOREGROUND_NAME = "ClassMateForegroundUpdate"
     private val mutex = Mutex()
+    private var foregroundBusy=false
+    private var lastForegroundCheck=0L
+    private var promptedVersion=0L
+    fun promptOnOpen(activity: androidx.activity.ComponentActivity) {
+        if(foregroundBusy || System.currentTimeMillis()-lastForegroundCheck<60_000 || !UpdateRepository(activity).configured) return
+        foregroundBusy=true; lastForegroundCheck=System.currentTimeMillis()
+        activity.lifecycleScope.launch {
+            try {
+                val metadata=UpdateRepository(activity).fetch()
+                if(metadata.versionCode<=BuildConfig.VERSION_CODE || metadata.versionCode==promptedVersion || activity.isFinishing || activity.isDestroyed) return@launch
+                if(!activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@launch
+                promptedVersion=metadata.versionCode
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                    .setTitle("ClassMate ${metadata.versionName} is available")
+                    .setMessage("A new update is ready. Tap Update to download and verify it, then confirm installation with Android.")
+                    .setPositiveButton("Update") { _, _ -> activity.startActivity(android.content.Intent(activity,UpdateActionActivity::class.java).setAction(UpdateActionActivity.ACTION_RETRY)) }
+                    .setNegativeButton("Later",null).show()
+            } catch(error:Exception) { android.util.Log.w("ClassMateUpdate","Foreground update check unavailable",error) }
+            finally { foregroundBusy=false }
+        }
+    }
 
     fun schedule(context: Context) {
         val app = context.applicationContext
@@ -82,7 +106,12 @@ object UpdateCoordinator {
                 prefs.setPendingMandatoryVersionCode(0)
                 return@withLock UpdateOutcome.UpToDate
             }
-            if (!UpdatePolicy.mayAutoDownload(true, prefs.isWifiOnlyUpdates(), repository.isMetered()))
+            if (!manual) {
+                UpdateNotifications.show(app,"ClassMate ${metadata.versionName} is available",
+                    "Tap to review the update",UpdateActionActivity.ACTION_PROMPT)
+                return@withLock UpdateOutcome.Available(metadata.versionName)
+            }
+            if (!UpdatePolicy.mayAutoDownload(manual, prefs.isWifiOnlyUpdates(), repository.isMetered()))
                 return@withLock UpdateOutcome.WaitingForWifi(metadata.versionName)
             val started = prefs.updateInstallStartedAt()
             if (!manual && prefs.lastDownloadedVersionCode() == metadata.versionCode &&
