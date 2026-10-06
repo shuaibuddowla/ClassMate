@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ClassMate — your academic day",
   description: "Your batch, connected. Timetables, notices, files and friends.",
+  verification: {
+    google: "N1jaz91POPN5mOXCtWpSiuQUC1Z5dIon3079aDpR1SE",
+  },
   manifest: "/manifest.webmanifest",
   icons: { icon: "/logo.png", apple: "/logo.png" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "ClassMate" },
