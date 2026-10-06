@@ -13,9 +13,10 @@ test("sidebar developer profile links and sign out", async ({ page }) => {
   });
   await page.locator(".sidebar-account-actions").getByRole("button", {name: "About developer"}).click();
   await expect(page.locator(".developer-hero h3")).toHaveText("Mohammad Shuaib-Ud-Dowla");
-  for (const url of ["facebook.com/shuaibuddowla", "github.com/shuaibuddowla", "shuaibuddowla.github.io"]) {
+  for (const url of ["github.com/shuaibuddowla", "shuaibuddowla.github.io"]) {
     await expect(page.locator(`.developer-links a[href="https://${url}"]`)).toBeVisible();
   }
+  await expect(page.locator('.developer-links a[href*="facebook"]')).toHaveCount(0);
   await page.screenshot({path: "test-results/developer-panel.png"});
   await page.keyboard.press("Escape");
   await page.locator(".sidebar-account-actions").getByRole("button", {name: "Sign out", exact: true}).click();

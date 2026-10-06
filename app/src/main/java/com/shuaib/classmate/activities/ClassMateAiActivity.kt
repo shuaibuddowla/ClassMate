@@ -55,7 +55,9 @@ class ClassMateAiActivity : AppCompatActivity() {
             minLines=1; maxLines=4; filters=arrayOf(android.text.InputFilter.LengthFilter(8000)); setText(state?.getString("draft").orEmpty())
         }
         send=ClassMateFeatureUi.button(this,"Send",true) { sendMessage() }.apply { icon=getDrawable(R.drawable.ic_send); isEnabled=false }
-        compose.panel.addView(send); root.addView(compose.panel); setContentView(root)
+        compose.panel.addView(send)
+        (compose.panel.parent as? android.view.ViewGroup)?.removeView(compose.panel)
+        root.addView(compose.panel); setContentView(root)
         onBackPressedDispatcher.addCallback(this,object:androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { if(!busy) finish() else Toast.makeText(this@ClassMateAiActivity,"Please wait for the current request",Toast.LENGTH_SHORT).show() }
         })

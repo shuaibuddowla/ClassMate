@@ -230,7 +230,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ClassMateAuthApi.attach(applicationContext)
-        if (!ClassMateAuthApi.hasSavedSession()) delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
         super.onCreate(savedInstanceState)
         welcomeStep = savedInstanceState?.getInt("welcome_step") ?: 0
         teacherSignIn = savedInstanceState?.getBoolean("teacher_sign_in") ?: false
@@ -325,18 +325,39 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private fun showSignInScreen() {
         homeShown = false
-        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
         val ui = ClassMateWelcomeUi(this)
         welcomeUi = ui; content = ui.content
-        ui.signInHero()
-        ui.title("Welcome to\nClassMate.")
-        ui.text("Students use university email. Teachers can use an approved Gmail or university email.")
-        ui.action("Student sign-in with Google") { signIn() }
-        // ui.text("Teacher Gmail must be approved in Manage → Teachers.", 12f)
-        ui.action("Teacher sign-in") { signIn(true) }
-        status = ui.text("",13f).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
-        profileView = ui.text("").apply { visibility=View.GONE }; resultView = ui.text("").apply { visibility=View.GONE }
-        actions = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(actions)
+
+        var isFacultySelected = false
+
+        val openUrl = { url: String ->
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (_: Exception) {
+                Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        lateinit var cardViews: ClassMateWelcomeUi.SignInCardViews
+        cardViews = ui.renderSignInWebCard(
+            onRoleSelected = { isFaculty ->
+                isFacultySelected = isFaculty
+                teacherSignIn = isFaculty
+                cardViews.requirementText.text = if (isFaculty) "Requires verified mail account" else "Requires @mbstu.ac.bd account"
+            },
+            onGoogleSignIn = {
+                signIn(isFacultySelected)
+            },
+            onAboutClick = { openUrl("https://classmatebd.vercel.app/about") },
+            onPrivacyClick = { openUrl("https://classmatebd.vercel.app/privacy") },
+            onTermsClick = { openUrl("https://classmatebd.vercel.app/terms") }
+        )
+
+        status = cardViews.statusText
+        actions = cardViews.actionsContainer
+        profileView = TextView(this).apply { visibility = View.GONE }
+        resultView = TextView(this).apply { visibility = View.GONE }
         ui.animateEntrance()
     }
 

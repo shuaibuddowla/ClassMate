@@ -28,6 +28,7 @@ import {
   ArrowRight,
   Smartphone,
   Info,
+  Lock,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -77,6 +78,65 @@ export default function App() {
     </QueryClientProvider>
   );
 }
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
+function CalendarTileIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      <rect x="4" y="7" width="28" height="25" rx="7" fill="#ffffff" />
+      <rect x="4" y="7" width="28" height="8" rx="6" fill="#3b82f6" />
+      <rect x="9" y="3.5" width="3.5" height="6.5" rx="1.75" fill="#1d4ed8" />
+      <rect x="23.5" y="3.5" width="3.5" height="6.5" rx="1.75" fill="#1d4ed8" />
+      <circle cx="10" cy="20" r="1.8" fill="#93c5fd" />
+      <circle cx="18" cy="20" r="1.8" fill="#93c5fd" />
+      <circle cx="26" cy="20" r="1.8" fill="#93c5fd" />
+      <circle cx="10" cy="26" r="1.8" fill="#93c5fd" />
+      <circle cx="18" cy="26" r="1.8" fill="#2563eb" />
+      <circle cx="26" cy="26" r="1.8" fill="#93c5fd" />
+    </svg>
+  );
+}
+function MegaphoneTileIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      <path d="M8 21.5L8 14.5L14.5 13L24.5 8.5L24.5 27.5L14.5 23L8 21.5Z" fill="#f43f5e" />
+      <path d="M24.5 10.5C26.5 12 28 15 28 18C28 21 26.5 24 24.5 25.5V10.5Z" fill="#fb7185" />
+      <path d="M10 21.5V25C10 26.5 11.2 27.5 12.8 27.2C13.8 27 14.2 26 14.2 24.8V23" stroke="#e11d48" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="7" cy="18" r="2.5" fill="#fbbf24" />
+    </svg>
+  );
+}
+function BookTileIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      <path d="M5 11.5C5 10 6.5 9.2 8.5 9.6L17 11.5V26.5L8.5 24.5C6.5 24 5 25 5 26.5V11.5Z" fill="#10b981" />
+      <path d="M31 11.5C31 10 29.5 9.2 27.5 9.6L19 11.5V26.5L27.5 24.5C29.5 24 31 25 31 26.5V11.5Z" fill="#059669" />
+      <path d="M7 11L17 12.8V25.2L7 23.4V11Z" fill="#ffffff" opacity="0.9" />
+      <path d="M29 11L19 12.8V25.2L29 23.4V11Z" fill="#f0fdf4" opacity="0.95" />
+      <path d="M17 12V26.5" stroke="#047857" strokeWidth="1.5" />
+    </svg>
+  );
+}
 function SessionApp() {
   const [user, setUser] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
@@ -85,11 +145,12 @@ function SessionApp() {
     [stage, setStage] = useState(""),
     [pushError, setPushError] = useState<unknown>(null),
     [enablingPush, setEnablingPush] = useState(false),
-    [theme, setTheme] = useState("system");
+    [theme, setTheme] = useState("light"),
+    [roleMode, setRoleMode] = useState<"student" | "faculty">("student");
   const qc = useQueryClient();
   const activeUser = useRef<string | null>(null);
   useEffect(() => {
-    const theme = localStorage.getItem("classmate:theme") || "system";
+    const theme = localStorage.getItem("classmate:theme") || "light";
     setTheme(theme);
     if (!configured()) {
       setLoading(false);
@@ -217,7 +278,7 @@ function SessionApp() {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
       const active =
-        !user || theme === "system"
+        theme === "system"
           ? media.matches
             ? "dark"
             : "light"
@@ -258,59 +319,275 @@ function SessionApp() {
         <ErrorBox error={error} />
       </div>
     );
+  const handleGoogleSignIn = async () => {
+    try {
+      sessionStorage.setItem(
+        "classmate:sign-in-mode",
+        roleMode === "student" ? "student" : "teacher",
+      );
+      const { error } = await supabase().auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${location.origin}/auth/callback`,
+          queryParams: {
+            ...(roleMode === "student" ? { hd: "mbstu.ac.bd" } : {}),
+            prompt: "select_account",
+          },
+        },
+      });
+      if (error) throw error;
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   if (!user || !profile)
     return (
-      <main className="landing">
-        <aside className="signin-story"><span className="eyebrow">YOUR UNIVERSITY, CONNECTED</span><h1>A clearer day.<br/>A closer campus.</h1><p>Timetables, learning resources and campus updates, together in ClassMate.</p><div className="signin-features"><span>Plan your classes</span><span>Stay in the loop</span><span>Learn together</span></div></aside>
-        <section className="login card">
-          <div className="signin-brand">
-            <img src="/logo.png" alt="ClassMate logo" />
-            <strong>ClassMate</strong>
+      <>
+        {/* Desktop / Large Tablet Presentation (Visual Source of Truth) */}
+        <div className="desktop-landing-root">
+          <div className="desktop-bg-atmosphere" aria-hidden="true">
+            <div className="desktop-faint-card faint-card-left" />
+            <div className="desktop-faint-card faint-card-right" />
+            <svg className="desktop-orbital-svg" viewBox="0 0 1440 900" fill="none">
+              <path
+                d="M 680 -60 C 820 180, 890 320, 920 480 C 950 640, 800 860, 480 940"
+                stroke="url(#orbitGradient1)"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+                opacity="0.4"
+              />
+              <path
+                d="M 120 720 C 340 680, 520 620, 680 660 C 840 700, 1020 840, 1260 920"
+                stroke="url(#orbitGradient2)"
+                strokeWidth="1.2"
+                opacity="0.35"
+              />
+              <path
+                d="M 520 220 C 640 280, 780 340, 820 440"
+                stroke="rgba(147, 197, 253, 0.45)"
+                strokeWidth="1.5"
+              />
+              <circle cx="890" cy="50" r="10" fill="rgba(59, 130, 246, 0.12)" />
+              <circle cx="890" cy="50" r="4.5" fill="#3b82f6" />
+              <circle cx="790" cy="380" r="12" fill="rgba(59, 130, 246, 0.15)" />
+              <circle cx="790" cy="380" r="5" fill="#2563eb" />
+              <defs>
+                <linearGradient id="orbitGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.2" />
+                  <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.5" />
+                  <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.1" />
+                </linearGradient>
+                <linearGradient id="orbitGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#bfdbfe" stopOpacity="0.1" />
+                  <stop offset="60%" stopColor="#60a5fa" stopOpacity="0.45" />
+                  <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.1" />
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
-          <img className="signin-emblem" src="/logo.png" alt="" />
-          <h2>
-            Welcome to
-            <br />
-            ClassMate.
-          </h2>
-          <p>Students use university email. Teachers can use an approved Gmail or university email.</p>
-          <ErrorBox error={error} />
-          <button
-            className="primary wide"
-            disabled={!configured()}
-            onClick={async () => {
-              try {
-                sessionStorage.setItem("classmate:sign-in-mode", "student");
-                const { error } = await supabase().auth.signInWithOAuth({
-                  provider: "google",
-                  options: {
-                    redirectTo: `${location.origin}/auth/callback`,
-                    queryParams: {
-                      hd: "mbstu.ac.bd",
-                      prompt: "select_account",
-                    },
-                  },
-                });
-                if (error) throw error;
-              } catch (e) {
-                setError(e);
-              }
-            }}
-          >
-            Student sign-in with Google <ArrowRight size={18} />
-          </button>
-          <p className="teacher-signin-hint">Teacher Gmail must be approved in Manage → Teachers.</p>
-          <button className="primary wide teacher-signin-button" disabled={!configured()} onClick={async()=>{
-            sessionStorage.setItem("classmate:sign-in-mode", "teacher");
-            try { const {error}=await supabase().auth.signInWithOAuth({provider:"google",options:{redirectTo:`${location.origin}/auth/callback`,queryParams:{prompt:"select_account"}}}); if(error) throw error; } catch(e) {setError(e)}
-          }}>Teacher sign-in <ArrowRight size={18}/></button>
-          <InstallWebApp />
-          <nav className="signin-public-links" aria-label="About and policies"><a href="/about">About ClassMate</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
-          {!configured() && (
-            <p>Server setup is required before sign-in is available.</p>
-          )}
-        </section>
-      </main>
+
+          <div className="desktop-landing-container">
+            {/* Left Column: Hero Content */}
+            <div className="desktop-hero-column">
+              <div className="desktop-brand">
+                <img src="/logo.png" alt="ClassMate logo" className="desktop-brand-symbol" />
+                <strong className="desktop-brand-name">ClassMate</strong>
+              </div>
+
+              <span className="desktop-eyebrow">CAMPUS COMPANION • CSE, MBSTU</span>
+
+              <h1 className="desktop-headline">
+                <span className="desktop-headline-blue">Never miss</span> a class,
+                <br />
+                notice, or slide.
+              </h1>
+
+              <p className="desktop-description">
+                Timetables, learning resources, and campus
+                <br />
+                updates, together in ClassMate.
+              </p>
+
+              <div className="desktop-pills">
+                <span className="desktop-pill">📅 Live Routine</span>
+                <span className="desktop-pill">📢 Verified Notices</span>
+                <span className="desktop-pill">📚 Semester Library</span>
+              </div>
+
+              {/* 3D Hero Artwork Stage */}
+              <div className="desktop-hero-stage">
+                <div className="desktop-pedestal-outer" />
+                <div className="desktop-pedestal-disc" />
+                <img
+                  src="/logo.png"
+                  alt="ClassMate 3D Emblem"
+                  className="desktop-hero-emblem"
+                />
+
+                <div className="desktop-floating-tile tile-calendar" aria-hidden="true" title="Live Routine">
+                  <CalendarTileIcon />
+                </div>
+
+                <div className="desktop-floating-tile tile-megaphone" aria-hidden="true" title="Verified Notices">
+                  <MegaphoneTileIcon />
+                </div>
+
+                <div className="desktop-floating-tile tile-book" aria-hidden="true" title="Semester Library">
+                  <BookTileIcon />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Sign-in Panel */}
+            <section className="desktop-signin-panel" aria-label="Sign in to ClassMate">
+              <img src="/logo.png" alt="" className="desktop-panel-emblem" />
+              <h2 className="desktop-panel-title">Sign in to ClassMate</h2>
+
+              <div className="desktop-role-toggle" role="tablist" aria-label="Select role">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={roleMode === "student"}
+                  className={`desktop-role-tab ${roleMode === "student" ? "active" : ""}`}
+                  onClick={() => setRoleMode("student")}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={roleMode === "faculty"}
+                  className={`desktop-role-tab ${roleMode === "faculty" ? "active" : ""}`}
+                  onClick={() => setRoleMode("faculty")}
+                >
+                  Faculty
+                </button>
+              </div>
+
+              <ErrorBox error={error} />
+
+              <button
+                type="button"
+                className="desktop-google-button"
+                disabled={!configured()}
+                onClick={handleGoogleSignIn}
+              >
+                <GoogleIcon />
+                <span>Continue with Google</span>
+              </button>
+
+              <p className="desktop-requirement-capsule">
+                <Lock size={12} aria-hidden="true" />
+                <span>
+                  {roleMode === "student"
+                    ? "Requires @mbstu.ac.bd account"
+                    : "Requires verified mail account"}
+                </span>
+              </p>
+
+              <div className="desktop-install-action">
+                <InstallWebApp />
+              </div>
+
+              <div className="desktop-panel-divider" />
+
+              <nav className="desktop-panel-links" aria-label="About and policies">
+                <a href="/about">About ClassMate</a>
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+              </nav>
+
+              {!configured() && (
+                <p className="desktop-unconfigured-note">
+                  Server setup is required before sign-in is available.
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
+
+        {/* Mobile Presentation — 100% untouched layout & styles */}
+        <div className="landing-mobile-root">
+          <main className="landing">
+            <aside className="signin-story">
+              <span className="eyebrow">CAMPUS COMPANION • CSE, MBSTU</span>
+              <h1>
+                Never miss a class,
+                <br />
+                notice, or slide.
+              </h1>
+              <p>
+                Timetables, learning resources, and campus updates, together in ClassMate.
+              </p>
+              <div className="signin-features">
+                <span>📅 Live Routine</span>
+                <span>📢 Verified Notices</span>
+                <span>📚 Semester Library</span>
+              </div>
+            </aside>
+            <section className="login card">
+              <div className="signin-brand">
+                <img src="/logo.png" alt="ClassMate logo" />
+                <strong>ClassMate</strong>
+              </div>
+              <img className="signin-emblem" src="/logo.png" alt="" />
+              <h2>Sign in to ClassMate</h2>
+
+              <div className="signin-role-toggle" role="tablist" aria-label="Select your role">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={roleMode === "student"}
+                  className={`role-tab ${roleMode === "student" ? "active" : ""}`}
+                  onClick={() => setRoleMode("student")}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={roleMode === "faculty"}
+                  className={`role-tab ${roleMode === "faculty" ? "active" : ""}`}
+                  onClick={() => setRoleMode("faculty")}
+                >
+                  Faculty
+                </button>
+              </div>
+
+              <ErrorBox error={error} />
+
+              <button
+                className="primary google-signin-button"
+                disabled={!configured()}
+                onClick={handleGoogleSignIn}
+              >
+                <GoogleIcon />
+                <span>Continue with Google</span>
+              </button>
+
+              <p className="role-requirement-note">
+                <Lock size={12} aria-hidden="true" />
+                <span>
+                  {roleMode === "student"
+                    ? "Requires @mbstu.ac.bd account"
+                    : "Requires verified mail account"}
+                </span>
+              </p>
+
+              <InstallWebApp />
+              <nav className="signin-public-links" aria-label="About and policies">
+                <a href="/about">About ClassMate</a>
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+              </nav>
+              {!configured() && (
+                <p>Server setup is required before sign-in is available.</p>
+              )}
+            </section>
+          </main>
+        </div>
+      </>
     );
   if (profile.verification_status !== "active")
     return (

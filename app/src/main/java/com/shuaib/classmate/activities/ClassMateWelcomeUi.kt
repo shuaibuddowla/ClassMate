@@ -17,6 +17,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.shuaib.classmate.R
 import com.google.android.material.button.MaterialButton
+import android.content.res.ColorStateList
+import androidx.core.content.ContextCompat
 
 /** The welcome flow shares one visual language, independent of the academic screens. */
 internal class ClassMateWelcomeUi(private val activity: Activity) {
@@ -44,22 +46,26 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             val light = activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
             isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
         }
-        val brand = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(ImageView(activity).apply {
-                setImageResource(R.drawable.ic_classmate_logo)
-                contentDescription = "ClassMate logo"
-                scaleType = ImageView.ScaleType.FIT_CENTER
-            }, LinearLayout.LayoutParams(dp(34), dp(34)))
-            addView(TextView(activity).apply {
-                text = "ClassMate"
-                textSize = 18f
-                setTextColor(ink)
-                setTypeface(null, Typeface.BOLD)
-                setPadding(dp(8), 0, 0, 0)
-            })
-        }
+    }
+
+    val brand = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_classmate_logo)
+            contentDescription = "ClassMate logo"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(34), dp(34)))
+        addView(TextView(activity).apply {
+            text = "ClassMate"
+            textSize = 18f
+            setTextColor(ink)
+            setTypeface(null, Typeface.BOLD)
+            setPadding(dp(8), 0, 0, 0)
+        })
+    }
+
+    init {
         content.addView(brand, LinearLayout.LayoutParams(-1, dp(42)))
         animated.add(brand)
     }
@@ -110,6 +116,102 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         animated.add(it)
     }
 
+
+    fun roleToggle(onRoleSelected: (isFaculty: Boolean) -> Unit): LinearLayout {
+        val toggleContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_bg_secondary))
+                cornerRadius = dp(24).toFloat()
+            }
+        }
+        val studentBtn = TextView(activity).apply {
+            text = "Student"
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(9), dp(28), dp(9))
+            setTextColor(activity.getColor(R.color.cm_primary))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+        }
+        val facultyBtn = TextView(activity).apply {
+            text = "Faculty"
+            textSize = 14f
+            setTypeface(null, Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(9), dp(28), dp(9))
+            setTextColor(activity.getColor(R.color.cm_text_muted))
+            background = null
+        }
+        studentBtn.setOnClickListener {
+            studentBtn.setTypeface(null, Typeface.BOLD)
+            studentBtn.setTextColor(activity.getColor(R.color.cm_primary))
+            studentBtn.background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+            facultyBtn.setTypeface(null, Typeface.NORMAL)
+            facultyBtn.setTextColor(activity.getColor(R.color.cm_text_muted))
+            facultyBtn.background = null
+            onRoleSelected(false)
+        }
+        facultyBtn.setOnClickListener {
+            facultyBtn.setTypeface(null, Typeface.BOLD)
+            facultyBtn.setTextColor(activity.getColor(R.color.cm_primary))
+            facultyBtn.background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+            studentBtn.setTypeface(null, Typeface.NORMAL)
+            studentBtn.setTextColor(activity.getColor(R.color.cm_text_muted))
+            studentBtn.background = null
+            onRoleSelected(true)
+        }
+        toggleContainer.addView(studentBtn)
+        toggleContainer.addView(facultyBtn)
+
+        val wrapper = LinearLayout(activity).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, dp(6))
+            addView(toggleContainer, LinearLayout.LayoutParams(-2, -2))
+        }
+        content.addView(wrapper, LinearLayout.LayoutParams(-1, -2))
+        animated.add(wrapper)
+        return toggleContainer
+    }
+
+    fun googleAction(value: String = "Continue with Google", parent: LinearLayout = content, onClick: () -> Unit): MaterialButton =
+        MaterialButton(activity).also {
+            it.text = value
+            it.isAllCaps = false
+            it.textSize = 15f
+            it.cornerRadius = dp(18)
+            it.setTextColor(activity.getColor(R.color.cm_on_primary))
+            it.backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+            it.setPadding(dp(20), dp(12), dp(20), dp(12))
+            it.minHeight = dp(50)
+            try {
+                it.icon = androidx.core.content.ContextCompat.getDrawable(activity, R.drawable.ic_google)
+                it.iconTint = null
+                it.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                it.iconPadding = dp(10)
+            } catch (_: Exception) {}
+            val btnParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(8)
+                gravity = Gravity.CENTER_HORIZONTAL
+                marginStart = dp(24)
+                marginEnd = dp(24)
+            }
+            parent.addView(it, btnParams)
+            it.setOnClickListener { onClick() }
+            animated.add(it)
+        }
+
     fun field(parent: LinearLayout, label: String, value: String) {
         text(label.uppercase(), 10f, accent, parent).letterSpacing = .14f
         text(value, if (label.contains("mail", true)) 15f else 18f, ink, parent)
@@ -128,6 +230,254 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             row.addView(column, LinearLayout.LayoutParams(0, -2, 1f))
             field(column, pair.first, pair.second)
         }
+    }
+
+    class SignInCardViews(
+        val card: View,
+        val requirementText: TextView,
+        val statusText: TextView,
+        val actionsContainer: LinearLayout
+    )
+
+    fun renderSignInWebCard(
+        onRoleSelected: (isFaculty: Boolean) -> Unit,
+        onGoogleSignIn: () -> Unit,
+        onAboutClick: () -> Unit,
+        onPrivacyClick: () -> Unit,
+        onTermsClick: () -> Unit
+    ): SignInCardViews {
+        brand.visibility = View.GONE
+        content.setPadding(dp(16), dp(16), dp(16), dp(24))
+        content.gravity = Gravity.CENTER_HORIZONTAL
+
+        val cardWrapper = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(26), dp(36), dp(26), dp(28))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(32).toFloat()
+                setStroke(dp(1), activity.getColor(R.color.cm_border_glass))
+            }
+            elevation = dp(6).toFloat()
+        }
+
+        // 1. Centered 3D Emblem
+        card.addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_classmate_logo)
+            contentDescription = "ClassMate"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(84), dp(84)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(16)
+        })
+
+        // 2. Title
+        card.addView(TextView(activity).apply {
+            text = "Sign in to ClassMate"
+            textSize = 24f
+            setTextColor(ink)
+            setTypeface(Typeface.create("sans-serif", Typeface.BOLD))
+            gravity = Gravity.CENTER
+            letterSpacing = -0.02f
+        }, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(20)
+        })
+
+        // 3. Segmented Role Toggle
+        val toggleContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_bg_secondary))
+                cornerRadius = dp(24).toFloat()
+                setStroke(dp(1), activity.getColor(R.color.cm_border_glass))
+            }
+        }
+        val studentBtn = TextView(activity).apply {
+            text = "Student"
+            textSize = 13.5f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(activity.getColor(R.color.cm_primary))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+            elevation = dp(2).toFloat()
+        }
+        val facultyBtn = TextView(activity).apply {
+            text = "Faculty"
+            textSize = 13.5f
+            setTypeface(null, Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            setTextColor(activity.getColor(R.color.cm_text_muted))
+            background = null
+            elevation = 0f
+        }
+        studentBtn.setOnClickListener {
+            studentBtn.setTypeface(null, Typeface.BOLD)
+            studentBtn.setTextColor(activity.getColor(R.color.cm_primary))
+            studentBtn.background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+            studentBtn.elevation = dp(2).toFloat()
+
+            facultyBtn.setTypeface(null, Typeface.NORMAL)
+            facultyBtn.setTextColor(activity.getColor(R.color.cm_text_muted))
+            facultyBtn.background = null
+            facultyBtn.elevation = 0f
+            onRoleSelected(false)
+        }
+        facultyBtn.setOnClickListener {
+            facultyBtn.setTypeface(null, Typeface.BOLD)
+            facultyBtn.setTextColor(activity.getColor(R.color.cm_primary))
+            facultyBtn.background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_surface))
+                cornerRadius = dp(20).toFloat()
+            }
+            facultyBtn.elevation = dp(2).toFloat()
+
+            studentBtn.setTypeface(null, Typeface.NORMAL)
+            studentBtn.setTextColor(activity.getColor(R.color.cm_text_muted))
+            studentBtn.background = null
+            studentBtn.elevation = 0f
+            onRoleSelected(true)
+        }
+        toggleContainer.addView(studentBtn, LinearLayout.LayoutParams(0, dp(36), 1f))
+        toggleContainer.addView(facultyBtn, LinearLayout.LayoutParams(0, dp(36), 1f))
+        card.addView(toggleContainer, LinearLayout.LayoutParams(dp(235), dp(44)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(20)
+        })
+
+        // 4. Continue with Google Button
+        val googleBtn = MaterialButton(activity).apply {
+            text = "Continue with Google"
+            isAllCaps = false
+            textSize = 15.5f
+            cornerRadius = dp(16)
+            setTextColor(Color.WHITE)
+            backgroundTintList = ColorStateList.valueOf(Color.parseColor("#1A5DF0"))
+            minHeight = dp(52)
+            elevation = dp(4).toFloat()
+            setTypeface(Typeface.create("sans-serif", Typeface.BOLD))
+            try {
+                icon = ContextCompat.getDrawable(activity, R.drawable.ic_google)
+                iconTint = null
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                iconPadding = dp(12)
+            } catch (_: Exception) {}
+            setOnClickListener { onGoogleSignIn() }
+        }
+        card.addView(googleBtn, LinearLayout.LayoutParams(-1, dp(52)).apply {
+            bottomMargin = dp(16)
+        })
+
+        // 5. Requirement Capsule
+        val reqCapsule = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(6), dp(16), dp(6))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_bg_secondary))
+                cornerRadius = dp(999).toFloat()
+                setStroke(dp(1), activity.getColor(R.color.cm_border_glass))
+            }
+        }
+        reqCapsule.addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_lock)
+            imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_muted))
+        }, LinearLayout.LayoutParams(dp(13), dp(13)).apply {
+            marginEnd = dp(6)
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        val reqText = TextView(activity).apply {
+            text = "Requires @mbstu.ac.bd account"
+            textSize = 12f
+            setTextColor(activity.getColor(R.color.cm_text_muted))
+            gravity = Gravity.CENTER
+        }
+        reqCapsule.addView(reqText, LinearLayout.LayoutParams(-2, -2).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        card.addView(reqCapsule, LinearLayout.LayoutParams(-2, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(24)
+        })
+
+        // 6. Divider Line
+        val divider = View(activity).apply {
+            setBackgroundColor(activity.getColor(R.color.cm_border_glass))
+        }
+        card.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
+            bottomMargin = dp(18)
+        })
+
+        // 7. Footer Policy Links
+        val linksContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        fun link(name: String, onClick: () -> Unit) = TextView(activity).apply {
+            text = name
+            textSize = 12f
+            setTextColor(activity.getColor(R.color.cm_text_muted))
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            setOnClickListener { onClick() }
+        }
+        linksContainer.addView(link("About ClassMate", onAboutClick))
+        linksContainer.addView(link("Privacy Policy", onPrivacyClick))
+        linksContainer.addView(link("Terms of Service", onTermsClick))
+        card.addView(linksContainer, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(4)
+        })
+
+        val maxCardW = dp(420)
+        cardWrapper.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            val screenW = activity.resources.displayMetrics.widthPixels
+            if (screenW > maxCardW) width = maxCardW
+            topMargin = dp(8)
+            bottomMargin = dp(12)
+        })
+
+        // Status text below the card
+        val statusText = TextView(activity).apply {
+            textSize = 12.5f
+            setTextColor(activity.getColor(R.color.cm_text_muted))
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        cardWrapper.addView(statusText, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
+
+        val actionsContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        cardWrapper.addView(actionsContainer, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            val screenW = activity.resources.displayMetrics.widthPixels
+            if (screenW > maxCardW) width = maxCardW
+        })
+
+        content.addView(cardWrapper, LinearLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
+        animated.add(card)
+
+        return SignInCardViews(card, reqText, statusText, actionsContainer)
     }
 
     fun signInHero() {
@@ -152,7 +502,6 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
     fun orbit(complete: Boolean = false) {
         val height = if (complete) 128 else 148
         val hero = FrameLayout(activity)
-        hero.addView(OrbitView(activity, complete), FrameLayout.LayoutParams(-1, -1))
         hero.addView(ImageView(activity).apply {
             setImageResource(R.drawable.ic_classmate_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER

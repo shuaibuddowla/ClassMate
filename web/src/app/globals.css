@@ -1,5 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap");
 
+.classmate-logo-mark{display:grid;place-items:center;padding:16px}.classmate-logo-mark img{width:112px;height:112px;object-fit:contain}
+.developer-signature{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--primary);font-size:10px;font-weight:700;letter-spacing:2px;margin-bottom:22px}
+.developer-panel .developer-hero{padding:28px 20px;border:0;background:linear-gradient(145deg,var(--blue-soft),var(--surface));border-radius:28px}
+.developer-panel .developer-hero h3{font-size:25px;line-height:1.2;margin:18px 0 8px;letter-spacing:-.6px}
+.developer-panel .developer-identity span{padding:5px 9px;background:var(--surface);border-radius:10px}
+.developer-panel .developer-links a{padding:18px;border-radius:20px;background:var(--soft);border:0}
+.developer-panel .developer-caption{font-size:12px;line-height:1.6}
+.sidebar-account-actions button:first-child{padding:12px 14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text)}
+
 /* Public, server-rendered information and policy pages. */
 .public-site{min-height:100dvh;background:var(--bg);color:var(--text);padding:0 clamp(20px,5vw,72px)}
 .public-header{max-width:1120px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0;border-bottom:1px solid var(--border)}
@@ -3702,7 +3711,30 @@ dialog:has(.android-download) > header h2 {
 .blood-entry svg{width:21px;height:21px;flex-shrink:0}
 
 .teacher-signin-hint{font-size:12px!important;color:var(--muted)}.teacher-batch-picker{min-height:100dvh;display:grid;place-items:center;padding:20px;background:var(--background)}.teacher-batch-picker>section{width:100%;max-width:500px;padding:28px}.teacher-batch-picker h1{font-size:30px;margin:16px 0 8px}.teacher-batch-list,.teacher-tool-links{display:grid;gap:12px;margin:20px 0}.teacher-batch-list button{justify-content:space-between;text-align:left;flex-wrap:wrap}.teacher-batch-list button span{display:flex;align-items:center;gap:8px;font-size:12px}.teacher-tool-links a{justify-content:flex-start}
-.landing .login .teacher-signin-button{display:flex;width:100%;min-height:52px;border:1px solid var(--primary);border-radius:18px;color:var(--primary);font-size:15px;font-weight:600;margin-bottom:12px}.landing .login .teacher-signin-hint{margin:12px 0 8px}
+
+@keyframes emblemPulseGlow {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.18));
+  }
+  50% {
+    transform: translateY(-5px) scale(1.06);
+    filter: drop-shadow(0 12px 24px rgba(37, 99, 235, 0.32));
+  }
+}
+
+.signin-role-toggle { display:inline-flex; align-items:center; background:var(--soft, #f1f5f9); padding:4px; border-radius:999px; margin:14px auto 12px; border:1px solid var(--border, #e2e8f0); }
+.signin-role-toggle .role-tab { padding:7px 22px; border-radius:999px; font-size:13px; font-weight:600; color:var(--muted, #64748b); background:transparent; border:none; cursor:pointer; transition:all 0.2s ease; }
+.signin-role-toggle .role-tab:hover { color:var(--text, #0f172a); }
+.signin-role-toggle .role-tab.active { background:var(--surface, #ffffff); color:var(--primary, #2563eb); box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+
+.landing .login .google-signin-button { display:inline-flex; align-items:center; justify-content:center; gap:10px; width:100%; max-width:310px; min-height:48px; margin:10px auto 0 !important; border-radius:16px; font-size:15px; font-weight:600; background:#2563eb; color:white; box-shadow:0 4px 14px rgba(37,99,235,0.2); transition:transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease; cursor:pointer; }
+.landing .login .google-signin-button:hover:not(:disabled) { background:#1d4ed8; transform:translateY(-1px); box-shadow:0 6px 18px rgba(37,99,235,0.28); }
+.landing .login .google-signin-button:active:not(:disabled) { transform:translateY(0); }
+
+.landing .login .role-requirement-note { display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:12.5px; font-weight:500; color:var(--muted, #64748b); background:var(--soft, #f1f5f9); border:1px solid var(--border, #e2e8f0); padding:6px 15px; border-radius:999px; margin:15px auto 18px !important; line-height:1.4; letter-spacing:0.1px; }
+[data-theme="dark"] .landing .login .role-requirement-note { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); color:#94a3b8; }
+
 
 
 /* Sign-in has a desktop composition, with a compact single column on phones. */
@@ -3711,14 +3743,13 @@ dialog:has(.android-download) > header h2 {
 .signin-story p { color:var(--muted); font-size:18px; max-width:440px; line-height:1.7; }
 .signin-features { display:flex; flex-wrap:wrap; gap:10px; margin-top:32px; }
 .signin-features span { padding:10px 14px; background:var(--surface); border-radius:14px; font-size:13px; }
-.landing .login { width:100%; max-width:480px; padding:24px; border-radius:28px; margin:0; background:var(--surface); border:1px solid var(--border); box-shadow:0 16px 60px #2563eb0a; }
+.landing .login { width:100%; max-width:420px; padding:24px; border-radius:28px; margin:0; background:var(--surface); border:1px solid var(--border); box-shadow:0 16px 60px #2563eb0a; }
 .landing .signin-brand { height:34px; font-size:17px; }
-.landing .login .signin-emblem { width:56px; height:56px; object-fit:contain; margin:14px 0 4px; border-radius:16px; }
+.landing .login .signin-emblem { width:60px; height:60px; object-fit:contain; margin:16px auto 6px; border-radius:18px; display:block; animation:emblemPulseGlow 3.6s ease-in-out infinite; transition:transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); will-change:transform, filter; }
+.landing .login .signin-emblem:hover { transform:translateY(-6px) scale(1.1) rotate(3deg); }
 .landing .login h2 { font-size:34px; line-height:1.1; margin:8px 0 12px; }
 .landing .login p { font-size:14px; line-height:1.5; margin-bottom:12px; }
 .landing .login .primary { background:#2563eb; color:white; min-height:48px; padding:12px 16px; border-radius:16px; margin-top:8px; }
-.landing .login .teacher-signin-button { background:var(--primary); color:white; border:0; margin-bottom:0; }
-.landing .login .teacher-signin-hint { margin:8px 0 6px; line-height:1.4; }
 .landing .login>.install-web-app { margin:6px auto 0; }
 .landing .signin-public-links { margin-top:12px; gap:8px 14px; font-size:11px; }
 .course-files-page .library-files { order:initial; }
@@ -3738,4 +3769,507 @@ dialog:has(.android-download) > header h2 {
   .landing .login h2 { font-size:28px; margin:6px 0 10px; }
   .landing .login p { margin-bottom:10px; }
   .landing .signin-public-links { margin-top:8px; }
+}
+
+/* ==========================================================================
+   Desktop Landing Page (Reference Visual Source of Truth)
+   Active exclusively on screens >= 1024px.
+   Mobile screens (< 1024px) remain 100% untouched.
+   ========================================================================== */
+
+.desktop-landing-root {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .landing-mobile-root {
+    display: none !important;
+  }
+
+  .desktop-landing-root {
+    display: flex;
+    min-height: 100dvh;
+    width: 100%;
+    position: relative;
+    background: radial-gradient(1100px 700px at 85% 15%, rgba(191, 219, 254, 0.45), transparent 70%),
+                radial-gradient(900px 600px at 15% 85%, rgba(219, 234, 254, 0.4), transparent 70%),
+                radial-gradient(700px 500px at 45% 65%, rgba(186, 230, 253, 0.35), transparent 70%),
+                #f6f9fe;
+    overflow-x: hidden;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(24px, 4vh, 48px) clamp(32px, 5vw, 84px);
+  }
+
+  /* Atmospheric and orbital background */
+  .desktop-bg-atmosphere {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .desktop-faint-card {
+    position: absolute;
+    border-radius: 28px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(219, 234, 254, 0.45));
+    box-shadow: 0 20px 45px rgba(37, 99, 235, 0.08);
+    filter: blur(4px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .faint-card-left {
+    width: 150px;
+    height: 200px;
+    left: -45px;
+    bottom: 80px;
+    transform: rotate(-14deg);
+  }
+
+  .faint-card-right {
+    width: 160px;
+    height: 210px;
+    right: -35px;
+    top: 100px;
+    transform: rotate(14deg);
+  }
+
+  .desktop-orbital-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* Desktop Two-Column Layout */
+  .desktop-landing-container {
+    width: 100%;
+    max-width: 1240px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.32fr) minmax(360px, 0.95fr);
+    align-items: center;
+    gap: clamp(40px, 5vw, 84px);
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Left Column */
+  .desktop-hero-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 640px;
+  }
+
+  .desktop-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 24px;
+  }
+
+  .desktop-brand-symbol {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+  }
+
+  .desktop-brand-name {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.025em;
+  }
+
+  .desktop-eyebrow {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 12px;
+  }
+
+  .desktop-headline {
+    font-size: clamp(38px, 3.8vw, 54px);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+    color: #0f172a;
+    margin: 0 0 16px;
+  }
+
+  .desktop-headline-blue {
+    color: #1d4ed8;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .desktop-description {
+    font-size: 16.5px;
+    line-height: 1.6;
+    color: #64748b;
+    margin: 0 0 22px;
+    max-width: 480px;
+  }
+
+  .desktop-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .desktop-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 9999px;
+    padding: 7px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1e293b;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+
+  /* 3D Hero Artwork Stage */
+  .desktop-hero-stage {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    height: 275px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 14px;
+  }
+
+  .desktop-pedestal-outer {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 380px;
+    height: 84px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(147, 197, 253, 0.55) 0%, rgba(191, 219, 254, 0.25) 45%, transparent 72%);
+    border: 1.5px solid rgba(191, 219, 254, 0.6);
+    box-shadow: 0 0 50px rgba(59, 130, 246, 0.22);
+    pointer-events: none;
+  }
+
+  .desktop-pedestal-disc {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 290px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(224, 242, 254, 0.85) 100%);
+    border: 1.5px solid rgba(191, 219, 254, 0.8);
+    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.16), inset 0 2px 5px rgba(255, 255, 255, 0.95);
+    pointer-events: none;
+  }
+
+  .desktop-hero-emblem {
+    position: relative;
+    z-index: 5;
+    width: 220px;
+    height: 220px;
+    object-fit: contain;
+    margin-bottom: 24px;
+    filter: drop-shadow(0 20px 32px rgba(37, 99, 235, 0.22));
+    animation: desktopEmblemReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Floating Feature Tiles */
+  .desktop-floating-tile {
+    position: absolute;
+    z-index: 7;
+    width: 56px;
+    height: 56px;
+    border-radius: 17px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 12px 28px rgba(30, 58, 138, 0.09), 0 2px 6px rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s ease;
+    animation: desktopTileFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .desktop-floating-tile:hover {
+    transform: translateY(-4px) scale(1.05);
+  }
+
+  .tile-calendar {
+    left: 28px;
+    top: 110px;
+    animation-delay: 0.15s;
+  }
+
+  .tile-megaphone {
+    right: 50px;
+    top: 25px;
+    animation-delay: 0.25s;
+  }
+
+  .tile-book {
+    right: 35px;
+    bottom: 45px;
+    animation-delay: 0.35s;
+  }
+
+  /* Right Column: Sign-in Panel */
+  .desktop-signin-panel {
+    width: 100%;
+    max-width: 425px;
+    background: #ffffff;
+    border-radius: 36px;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(255, 255, 255, 0.9);
+    padding: 42px 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 auto;
+    animation: desktopPanelReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .desktop-panel-emblem {
+    width: 88px;
+    height: 88px;
+    object-fit: contain;
+    margin: 0 auto 16px;
+    display: block;
+  }
+
+  .desktop-panel-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: center;
+    margin: 0 0 22px;
+    letter-spacing: -0.02em;
+  }
+
+  /* Segmented Role Control */
+  .desktop-role-toggle {
+    display: flex;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 9999px;
+    margin: 0 auto 22px;
+    width: 235px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .desktop-role-tab {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 9999px;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: center;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .desktop-role-tab.active {
+    background: #ffffff;
+    color: #2563eb;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .desktop-role-tab:hover:not(.active) {
+    color: #0f172a;
+  }
+
+  /* Google Sign-In Button */
+  .desktop-google-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    background: #1a5df0;
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    font-size: 15.5px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -2px rgba(26, 93, 240, 0.38);
+    transition: all 0.15s ease;
+    margin: 0 0 16px;
+  }
+
+  .desktop-google-button:hover:not(:disabled) {
+    background: #154fd0;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(26, 93, 240, 0.44);
+  }
+
+  .desktop-google-button:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .desktop-google-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Requirement Capsule */
+  .desktop-requirement-capsule {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    padding: 6px 15px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    margin: 0 auto 20px;
+  }
+
+  /* Install Web App */
+  .desktop-install-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+  }
+
+  .desktop-install-action .install-web-app {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+  }
+
+  .desktop-install-action .install-web-app:hover {
+    background: rgba(37, 99, 235, 0.06);
+    color: #1d4ed8;
+  }
+
+  .desktop-install-action .install-web-app svg {
+    color: #2563eb;
+    width: 17px;
+    height: 17px;
+  }
+
+  .desktop-install-action .web-installed {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #10b981;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Divider & Footer Links */
+  .desktop-panel-divider {
+    width: 100%;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 0 0 18px;
+  }
+
+  .desktop-panel-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: 100%;
+  }
+
+  .desktop-panel-links a {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .desktop-panel-links a:hover {
+    color: #64748b;
+    text-decoration: underline;
+  }
+
+  .desktop-unconfigured-note {
+    font-size: 12px;
+    color: #ef4444;
+    text-align: center;
+    margin-top: 12px;
+  }
+}
+
+/* Animations */
+@keyframes desktopEmblemReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes desktopTileFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes desktopPanelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-hero-emblem,
+  .desktop-floating-tile,
+  .desktop-signin-panel {
+    animation: none !important;
+  }
 }

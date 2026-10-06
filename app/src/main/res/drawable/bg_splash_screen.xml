@@ -11,4 +11,9 @@
                 android:endColor="@color/cm_background" />
         </shape>
     </item>
+    <item
+        android:width="200dp"
+        android:height="200dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_classmate_splash_logo" />
 </layer-list>

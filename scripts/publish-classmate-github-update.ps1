@@ -60,10 +60,10 @@ if (-not $expectedCert -and (Test-Path $identityFile)) {
 if (-not $expectedCert -or $actualCert -ne ($expectedCert -replace ':', '').ToLowerInvariant()) {
     throw 'Signing certificate does not match the configured ClassMate release identity.'
 }
-
 $fileHash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
 $fileSize = (Get-Item -LiteralPath $apk).Length
 $expectedUpdateSource = "$releaseBase/latest/download"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($apk)
 $hasUpdateSource = $false
 try {

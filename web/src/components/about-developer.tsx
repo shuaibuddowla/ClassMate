@@ -1,7 +1,7 @@
 "use client";
 import { academicSession } from "@/lib/academic-session";
 import { useQuery } from "@tanstack/react-query";
-import { Facebook, Github, Globe, ArrowUpRight } from "lucide-react";
+import { Github, Globe, ArrowUpRight, Code2 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import { Avatar, ErrorBox, Modal, Skeleton } from "./ui";
 
@@ -21,7 +21,7 @@ export function AboutDeveloper({
     <Modal title="About developer" close={close}>
       <div className="developer-panel">
         <div className="developer-hero">
-          <span className="eyebrow">BEHIND CLASSMATE</span>
+          <span className="developer-signature"><Code2 size={16} /> DESIGNED & BUILT BY</span>
           {profile.isPending ? (
             <Skeleton />
           ) : profile.data ? (
@@ -31,7 +31,7 @@ export function AboutDeveloper({
                 url={profile.data.avatar_url}
               />
               <h3>{profile.data.full_name}</h3>
-              <p>{profile.data.department}</p>
+              <p>ClassMate creator · {profile.data.department || "MBSTU"}</p>
               <div className="developer-identity">
                 {profile.data.student_id && (
                   <span>{profile.data.student_id}</span>
@@ -53,7 +53,6 @@ export function AboutDeveloper({
         <ErrorBox error={profile.error} retry={() => profile.refetch()} />
         <div className="developer-links">
           {[
-            ["Facebook", "facebook.com/shuaibuddowla", Facebook],
             ["GitHub", "github.com/shuaibuddowla", Github],
             ["Portfolio", "shuaibuddowla.github.io", Globe],
           ].map(([label, path, Icon]) => {
@@ -76,7 +75,7 @@ export function AboutDeveloper({
           })}
         </div>
         <small className="developer-caption">
-          Built for our university community.
+          A student-built space for a more connected campus.
         </small>
       </div>
     </Modal>

@@ -31,21 +31,23 @@ internal object ClassMateFeatureUi {
         val form=ClassMateFormUi(activity)
         val hero=LinearLayout(activity).apply {
             orientation=LinearLayout.VERTICAL; gravity=android.view.Gravity.CENTER_HORIZONTAL
-            setPadding(dp(activity,20),dp(activity,24),dp(activity,20),dp(activity,20))
-            background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_primary_soft)); cornerRadius=dp(activity,24).toFloat() }
+            setPadding(dp(activity,20),dp(activity,28),dp(activity,20),dp(activity,24))
+            background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(activity.getColor(R.color.cm_primary_soft),activity.getColor(R.color.cm_surface))).apply { cornerRadius=dp(activity,28).toFloat() }
         }
         form.panel.addView(hero,LinearLayout.LayoutParams(-1,-2))
-        hero.addView(TextView(activity).apply { text="BEHIND CLASSMATE"; textSize=10f; letterSpacing=.16f; setTextColor(activity.getColor(R.color.cm_primary)) })
+        hero.addView(TextView(activity).apply { text="DESIGNED & BUILT BY"; textSize=10f; letterSpacing=.18f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_primary)) })
         val photo=ImageView(activity).apply { contentDescription="Developer profile photo"; setImageResource(R.drawable.ic_default_avatar) }
-        hero.addView(photo,LinearLayout.LayoutParams(dp(activity,80),dp(activity,80)).apply { topMargin=dp(activity,16); bottomMargin=dp(activity,12) })
+        hero.addView(photo,LinearLayout.LayoutParams(dp(activity,76),dp(activity,76)).apply { topMargin=dp(activity,20); bottomMargin=dp(activity,16) })
         val heading=TextView(activity).apply { text="ClassMate developer"; gravity=android.view.Gravity.CENTER; textSize=22f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) }
         hero.addView(heading)
         val details=TextView(activity).apply { text="Loading developer profile…"; gravity=android.view.Gravity.CENTER; textSize=13f; setPadding(0,dp(activity,10),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) }
         hero.addView(details)
-        for((label,url) in listOf("Facebook" to "https://facebook.com/shuaibuddowla", "GitHub" to "https://github.com/shuaibuddowla", "Portfolio" to "https://shuaibuddowla.github.io")) {
+        hero.addView(TextView(activity).apply { text="A student-built space for a more connected campus."; gravity=android.view.Gravity.CENTER; textSize=13f; setPadding(0,dp(activity,14),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) })
+        for((label,url) in listOf("Explore my work" to "https://shuaibuddowla.github.io", "Find me on GitHub" to "https://github.com/shuaibuddowla")) {
             val row=LinearLayout(activity).apply {
                 orientation=LinearLayout.HORIZONTAL; gravity=android.view.Gravity.CENTER_VERTICAL
-                setPadding(dp(activity,16),dp(activity,14),dp(activity,16),dp(activity,14))
+                setPadding(dp(activity,18),dp(activity,18),dp(activity,18),dp(activity,18))
                 background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_surface)); cornerRadius=dp(activity,18).toFloat(); setStroke(dp(activity,1),activity.getColor(R.color.cm_border)) }
                 isClickable=true; isFocusable=true; contentDescription="Open $label"
                 setOnClickListener { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url))) } }
@@ -57,8 +59,20 @@ internal object ClassMateFeatureUi {
             row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); imageTintList=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_primary)) },LinearLayout.LayoutParams(dp(activity,20),dp(activity,20)))
             form.panel.addView(row,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(activity,12) })
         }
-        form.label("Built for our university community.")
-        val dialog=MaterialAlertDialogBuilder(activity).setTitle("About developer").setBackground(surface(activity)).setView(form.scroll).setPositiveButton("Close",null).show()
+        val dialog=com.google.android.material.bottomsheet.BottomSheetDialog(activity)
+        form.panel.setPadding(dp(activity,20),dp(activity,20),dp(activity,20),dp(activity,20))
+        form.panel.addView(button(activity,"Done") { dialog.dismiss() },LinearLayout.LayoutParams(-1,dp(activity,48)).apply { topMargin=dp(activity,8) })
+        dialog.setContentView(form.scroll)
+        dialog.setOnShowListener {
+            dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.apply {
+                background=surface(activity)
+                com.google.android.material.bottomsheet.BottomSheetBehavior.from(this).apply {
+                    state=com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                    skipCollapsed=true
+                }
+            }
+        }
+        dialog.show()
         fun load() { activity.lifecycleScope.launch {
             try {
                 val p=ClassMateAuthApi.rpc("developer_profile",org.json.JSONObject())
