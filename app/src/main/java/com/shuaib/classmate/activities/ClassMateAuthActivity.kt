@@ -275,7 +275,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         }
                 } else {
                     authBusy = false
-                    status.text = "Use your @mbstu.ac.bd Google account to join."
+                    status.text = "Students: use university email. Teachers: use your approved Google account."
                 }
             }
         }
@@ -322,9 +322,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
         welcomeUi = ui; content = ui.content
         ui.orbit()
         ui.title("Welcome to\nClassMate.")
-        ui.text("Sign in with your @mbstu.ac.bd university email.")
-        ui.action("Continue with Google") { signIn() }
-        ui.text("Teachers: use the university email or Gmail approved by your administrator.", 12f)
+        ui.text("Students use university email. Teachers can use an approved Gmail or university account.")
+        ui.action("Student sign-in with Google") { signIn() }
+        ui.text("Teacher Gmail must be approved in Manage → Teachers.", 12f)
         ui.action("Teacher sign-in", false) { signIn(true) }
         status = ui.text("",13f).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         profileView = ui.text("").apply { visibility=View.GONE }; resultView = ui.text("").apply { visibility=View.GONE }
