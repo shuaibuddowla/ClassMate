@@ -234,7 +234,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ClassMateAuthApi.attach(applicationContext)
-        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
+        if (!ClassMateAuthApi.hasSavedSession()) delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         super.onCreate(savedInstanceState)
         welcomeStep = savedInstanceState?.getInt("welcome_step") ?: 0
         teacherSignIn = savedInstanceState?.getBoolean("teacher_sign_in") ?: false
@@ -329,7 +329,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private fun showSignInScreen() {
         homeShown = false
-        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         val ui = ClassMateWelcomeUi(this)
         welcomeUi = ui; content = ui.content
 
