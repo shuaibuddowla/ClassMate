@@ -122,6 +122,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         catch (_: Exception) { Toast.makeText(this,"Could not open your phone app",Toast.LENGTH_SHORT).show() }
     }
     private var welcomeUi: ClassMateWelcomeUi? = null
+    private var signInCardViews: ClassMateWelcomeUi.SignInCardViews? = null
     private var manageOpen = false
     private var selectedTab = R.id.nav_timetable
     private var selectedBatchId = ""
@@ -204,12 +205,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private val googleLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        signInCardViews?.setLoading(false)
         try {
             val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
                 .getResult(ApiException::class.java)
             val idToken = account.idToken ?: error("Google returned no ID token")
             if (!teacherSignIn && !account.email.orEmpty().endsWith("@mbstu.ac.bd", true))
                 error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.")
+            signInCardViews?.setLoading(true)
             runAction("Signing in") {
                 val auth = ClassMateAuthApi.signInWithGoogleIdToken(idToken)
                 userId = auth.getJSONObject("user").getString("id")
@@ -221,6 +224,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 loadProfile()
             }
         } catch (error: Exception) {
+            signInCardViews?.setLoading(false)
             authBusy = false
             status.text = if (error is ApiException && error.statusCode == 12501)
                 "Sign-in cancelled. Continue whenever you’re ready."
@@ -339,12 +343,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }
         }
 
-        lateinit var cardViews: ClassMateWelcomeUi.SignInCardViews
-        cardViews = ui.renderSignInWebCard(
+        val cardViews = ui.renderSignInWebCard(
             onRoleSelected = { isFaculty ->
                 isFacultySelected = isFaculty
                 teacherSignIn = isFaculty
-                cardViews.requirementText.text = if (isFaculty) "Requires verified mail account" else "Requires @mbstu.ac.bd account"
+                signInCardViews?.requirementText?.text = if (isFaculty) "Requires verified mail account" else "Requires @mbstu.ac.bd account"
             },
             onGoogleSignIn = {
                 signIn(isFacultySelected)
@@ -353,6 +356,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             onPrivacyClick = { openUrl("https://classmatebd.vercel.app/privacy") },
             onTermsClick = { openUrl("https://classmatebd.vercel.app/terms") }
         )
+        signInCardViews = cardViews
 
         status = cardViews.statusText
         actions = cardViews.actionsContainer
@@ -370,6 +374,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         if (!ClassMateAuthApi.configured || authBusy) return
         authBusy = true
         teacherSignIn = teacher
+        signInCardViews?.setLoading(true)
         status.text = if(teacher) "Choose your approved teacher Google account…" else "Choose your @mbstu.ac.bd Google account…"
         val client = googleClient(teacher)
         client.signOut().addOnCompleteListener { googleLauncher.launch(client.signInIntent) }
@@ -2069,6 +2074,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
                 .onFailure {
                     authBusy = false
+                    signInCardViews?.setLoading(false)
                     status.text = if(label=="Signing in" && teacherSignIn) "Teacher sign-in could not finish. Your Google email must be approved by an administrator and assigned to a course. Check your account or ask the administrator for help." else "$label failed: ${it.message}"
                     if (!homeShown && ClassMateAuthApi.accessToken != null) {
                         actions.removeAllViews()

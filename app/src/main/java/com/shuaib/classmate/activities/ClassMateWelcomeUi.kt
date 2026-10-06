@@ -17,7 +17,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.shuaib.classmate.R
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import android.content.res.ColorStateList
+import android.os.Build
 import androidx.core.content.ContextCompat
 
 /** The welcome flow shares one visual language, independent of the academic screens. */
@@ -36,12 +38,19 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
     init {
         val scroll = ScrollView(activity).apply {
             isFillViewport = true
-            setBackgroundColor(activity.getColor(R.color.cm_background))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    Color.parseColor("#F8FAFC"),
+                    Color.parseColor("#F1F5F9"),
+                    Color.parseColor("#E8EDF4")
+                )
+            )
             addView(content)
         }
         activity.setContentView(scroll)
-        activity.window.statusBarColor = activity.getColor(R.color.cm_background)
-        activity.window.navigationBarColor = activity.getColor(R.color.cm_background)
+        activity.window.statusBarColor = Color.parseColor("#F8FAFC")
+        activity.window.navigationBarColor = Color.parseColor("#E8EDF4")
         androidx.core.view.WindowCompat.getInsetsController(activity.window, scroll).apply {
             val light = activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
             isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
@@ -52,7 +61,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         addView(ImageView(activity).apply {
-            setImageResource(R.drawable.ic_classmate_logo)
+            setImageResource(R.drawable.ic_classmate_logo_mark)
             contentDescription = "ClassMate logo"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }, LinearLayout.LayoutParams(dp(34), dp(34)))
@@ -236,8 +245,12 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         val card: View,
         val requirementText: TextView,
         val statusText: TextView,
-        val actionsContainer: LinearLayout
-    )
+        val actionsContainer: LinearLayout,
+        val googleButton: MaterialButton,
+        private val onSetLoading: (Boolean) -> Unit = {}
+    ) {
+        fun setLoading(loading: Boolean) = onSetLoading(loading)
+    }
 
     fun renderSignInWebCard(
         onRoleSelected: (isFaculty: Boolean) -> Unit,
@@ -248,37 +261,48 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
     ): SignInCardViews {
         brand.visibility = View.GONE
         content.setPadding(dp(16), dp(16), dp(16), dp(24))
-        content.gravity = Gravity.CENTER_HORIZONTAL
+        content.gravity = Gravity.CENTER
 
         val cardWrapper = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.CENTER
         }
 
-        val card = LinearLayout(activity).apply {
+        // Elevated Bright Material Card with smooth 360-degree ambient shadow
+        val card = MaterialCardView(activity).apply {
+            radius = dp(30).toFloat()
+            cardElevation = dp(12).toFloat()
+            maxCardElevation = dp(16).toFloat()
+            setCardBackgroundColor(Color.WHITE)
+            strokeColor = Color.parseColor("#E2E8F0")
+            strokeWidth = dp(1)
+            useCompatPadding = true
+            preventCornerOverlap = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                outlineAmbientShadowColor = Color.argb(65, 15, 23, 42)
+                outlineSpotShadowColor = Color.argb(45, 29, 78, 216)
+            }
+        }
+
+        val cardContent = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(26), dp(36), dp(26), dp(28))
-            background = GradientDrawable().apply {
-                setColor(activity.getColor(R.color.cm_surface))
-                cornerRadius = dp(32).toFloat()
-                setStroke(dp(1), activity.getColor(R.color.cm_border_glass))
-            }
-            elevation = dp(6).toFloat()
+            setPadding(dp(26), dp(32), dp(26), dp(24))
         }
+        card.addView(cardContent, FrameLayout.LayoutParams(-1, -2))
 
-        // 1. Centered 3D Emblem
-        card.addView(ImageView(activity).apply {
-            setImageResource(R.drawable.ic_classmate_logo)
+        // 1. Centered Classic Emblem
+        cardContent.addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_classmate_logo_mark)
             contentDescription = "ClassMate"
             scaleType = ImageView.ScaleType.FIT_CENTER
-        }, LinearLayout.LayoutParams(dp(84), dp(84)).apply {
+        }, LinearLayout.LayoutParams(dp(80), dp(80)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(16)
         })
 
         // 2. Title
-        card.addView(TextView(activity).apply {
+        cardContent.addView(TextView(activity).apply {
             text = "Sign in to ClassMate"
             textSize = 24f
             setTextColor(ink)
@@ -308,7 +332,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             gravity = Gravity.CENTER
             setTextColor(activity.getColor(R.color.cm_primary))
             background = GradientDrawable().apply {
-                setColor(activity.getColor(R.color.cm_surface))
+                setColor(Color.WHITE)
                 cornerRadius = dp(20).toFloat()
             }
             elevation = dp(2).toFloat()
@@ -326,7 +350,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             studentBtn.setTypeface(null, Typeface.BOLD)
             studentBtn.setTextColor(activity.getColor(R.color.cm_primary))
             studentBtn.background = GradientDrawable().apply {
-                setColor(activity.getColor(R.color.cm_surface))
+                setColor(Color.WHITE)
                 cornerRadius = dp(20).toFloat()
             }
             studentBtn.elevation = dp(2).toFloat()
@@ -341,7 +365,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             facultyBtn.setTypeface(null, Typeface.BOLD)
             facultyBtn.setTextColor(activity.getColor(R.color.cm_primary))
             facultyBtn.background = GradientDrawable().apply {
-                setColor(activity.getColor(R.color.cm_surface))
+                setColor(Color.WHITE)
                 cornerRadius = dp(20).toFloat()
             }
             facultyBtn.elevation = dp(2).toFloat()
@@ -354,19 +378,25 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         }
         toggleContainer.addView(studentBtn, LinearLayout.LayoutParams(0, dp(36), 1f))
         toggleContainer.addView(facultyBtn, LinearLayout.LayoutParams(0, dp(36), 1f))
-        card.addView(toggleContainer, LinearLayout.LayoutParams(dp(235), dp(44)).apply {
+        cardContent.addView(toggleContainer, LinearLayout.LayoutParams(dp(235), dp(44)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(20)
         })
 
-        // 4. Continue with Google Button
+        // 4. Continue with Google Button with animated loading state
+        val googleButtonContainer = FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(52)).apply {
+                bottomMargin = dp(16)
+            }
+        }
+
         val googleBtn = MaterialButton(activity).apply {
             text = "Continue with Google"
             isAllCaps = false
             textSize = 15.5f
             cornerRadius = dp(16)
             setTextColor(Color.WHITE)
-            backgroundTintList = ColorStateList.valueOf(Color.parseColor("#1A5DF0"))
+            backgroundTintList = ColorStateList.valueOf(Color.parseColor("#1D4ED8"))
             minHeight = dp(52)
             elevation = dp(4).toFloat()
             setTypeface(Typeface.create("sans-serif", Typeface.BOLD))
@@ -376,11 +406,49 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
                 iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
                 iconPadding = dp(12)
             } catch (_: Exception) {}
-            setOnClickListener { onGoogleSignIn() }
+            setOnClickListener {
+                animate().scaleX(0.96f).scaleY(0.96f).setDuration(80).withEndAction {
+                    animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                }.start()
+                onGoogleSignIn()
+            }
         }
-        card.addView(googleBtn, LinearLayout.LayoutParams(-1, dp(52)).apply {
-            bottomMargin = dp(16)
-        })
+
+        val progressBar = com.google.android.material.progressindicator.CircularProgressIndicator(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER)
+            isIndeterminate = true
+            trackThickness = dp(3)
+            setIndicatorColor(Color.WHITE)
+            visibility = View.GONE
+            elevation = dp(8).toFloat()
+        }
+
+        val setLoadingState: (Boolean) -> Unit = { loading ->
+            if (loading) {
+                googleBtn.isEnabled = false
+                googleBtn.text = ""
+                googleBtn.icon = null
+                progressBar.visibility = View.VISIBLE
+                progressBar.alpha = 0f
+                progressBar.animate().alpha(1f).setDuration(150).start()
+            } else {
+                googleBtn.isEnabled = true
+                googleBtn.text = "Continue with Google"
+                try {
+                    googleBtn.icon = ContextCompat.getDrawable(activity, R.drawable.ic_google)
+                    googleBtn.iconTint = null
+                    googleBtn.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    googleBtn.iconPadding = dp(12)
+                } catch (_: Exception) {}
+                progressBar.animate().alpha(0f).setDuration(120).withEndAction {
+                    progressBar.visibility = View.GONE
+                }.start()
+            }
+        }
+
+        googleButtonContainer.addView(googleBtn, FrameLayout.LayoutParams(-1, -1))
+        googleButtonContainer.addView(progressBar)
+        cardContent.addView(googleButtonContainer)
 
         // 5. Requirement Capsule
         val reqCapsule = LinearLayout(activity).apply {
@@ -409,7 +477,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         reqCapsule.addView(reqText, LinearLayout.LayoutParams(-2, -2).apply {
             gravity = Gravity.CENTER_VERTICAL
         })
-        card.addView(reqCapsule, LinearLayout.LayoutParams(-2, -2).apply {
+        cardContent.addView(reqCapsule, LinearLayout.LayoutParams(-2, -2).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(24)
         })
@@ -418,7 +486,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         val divider = View(activity).apply {
             setBackgroundColor(activity.getColor(R.color.cm_border_glass))
         }
-        card.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
+        cardContent.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
             bottomMargin = dp(18)
         })
 
@@ -437,7 +505,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         linksContainer.addView(link("About ClassMate", onAboutClick))
         linksContainer.addView(link("Privacy Policy", onPrivacyClick))
         linksContainer.addView(link("Terms of Service", onTermsClick))
-        card.addView(linksContainer, LinearLayout.LayoutParams(-1, -2).apply {
+        cardContent.addView(linksContainer, LinearLayout.LayoutParams(-1, -2).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(4)
         })
@@ -447,8 +515,8 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             gravity = Gravity.CENTER_HORIZONTAL
             val screenW = activity.resources.displayMetrics.widthPixels
             if (screenW > maxCardW) width = maxCardW
-            topMargin = dp(8)
-            bottomMargin = dp(12)
+            topMargin = dp(4)
+            bottomMargin = dp(8)
         })
 
         // Status text below the card
@@ -473,11 +541,11 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         })
 
         content.addView(cardWrapper, LinearLayout.LayoutParams(-1, -2).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.CENTER
         })
         animated.add(card)
 
-        return SignInCardViews(card, reqText, statusText, actionsContainer)
+        return SignInCardViews(card, reqText, statusText, actionsContainer, googleBtn, setLoadingState)
     }
 
     fun signInHero() {
