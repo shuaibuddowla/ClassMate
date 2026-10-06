@@ -18,7 +18,7 @@ class UpdateMetadataTest {
         assertTrue(UpdatePolicy.isNewer(7, 6))
     }
 
-    @Test fun downloadRequiresUserConsentAndRespectsWifi() {
+    @Test fun automaticDownloadRespectsPreferencesAndWifi() {
         assertFalse(UpdatePolicy.mayAutoDownload(false, false, false))
         assertFalse(UpdatePolicy.mayAutoDownload(false, false, true))
         assertFalse(UpdatePolicy.mayAutoDownload(false, true, false))
@@ -26,6 +26,11 @@ class UpdateMetadataTest {
         assertFalse(UpdatePolicy.mayAutoDownload(true, true, true))
         assertTrue(UpdatePolicy.mayAutoDownload(true, true, false))
         assertTrue(UpdatePolicy.mayAutoDownload(true, false, true))
+    }
+
+    @Test fun installationRequiresExplicitConsent() {
+        assertFalse(UpdatePolicy.mayInstall(false))
+        assertTrue(UpdatePolicy.mayInstall(true))
     }
 
     @Test fun metadataParsesAndMandatoryFloorWorks() {

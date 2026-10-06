@@ -47,7 +47,7 @@ object UpdateCoordinator {
                 promptedVersion=metadata.versionCode
                 com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
                     .setTitle("ClassMate ${metadata.versionName} is available")
-                    .setMessage("A new update is ready. Tap Update to download and verify it, then confirm installation with Android.")
+                    .setMessage(if(UpdateRepository(activity).hasDownloaded(metadata)) "The update has been downloaded. Tap Update to verify it and open Android's installer." else "The update can download automatically using your update settings. Tap Update to prepare it now and open Android's installer.")
                     .setPositiveButton("Update") { _, _ -> activity.startActivity(android.content.Intent(activity,UpdateActionActivity::class.java).setAction(UpdateActionActivity.ACTION_RETRY)) }
                     .setNegativeButton("Later",null).show()
             } catch(error:Exception) { android.util.Log.w("ClassMateUpdate","Foreground update check unavailable",error) }
@@ -106,12 +106,7 @@ object UpdateCoordinator {
                 prefs.setPendingMandatoryVersionCode(0)
                 return@withLock UpdateOutcome.UpToDate
             }
-            if (!manual) {
-                UpdateNotifications.show(app,"ClassMate ${metadata.versionName} is available",
-                    "Tap to review the update",UpdateActionActivity.ACTION_PROMPT)
-                return@withLock UpdateOutcome.Available(metadata.versionName)
-            }
-            if (!UpdatePolicy.mayAutoDownload(manual, prefs.isWifiOnlyUpdates(), repository.isMetered()))
+            if (!repository.hasDownloaded(metadata) && !UpdatePolicy.mayAutoDownload(manual || prefs.isAutoUpdateEnabled(), prefs.isWifiOnlyUpdates(), repository.isMetered()))
                 return@withLock UpdateOutcome.WaitingForWifi(metadata.versionName)
             val started = prefs.updateInstallStartedAt()
             if (!manual && prefs.lastDownloadedVersionCode() == metadata.versionCode &&
@@ -123,6 +118,12 @@ object UpdateCoordinator {
             catch (error: Exception) {
                 apk.delete()
                 throw error
+            }
+            // Background work may prepare the APK, but only a user action may open the installer.
+            if (!UpdatePolicy.mayInstall(manual)) {
+                UpdateNotifications.show(app,"ClassMate ${metadata.versionName} is ready",
+                    "Downloaded and verified. Tap to update when you're ready.",UpdateActionActivity.ACTION_PROMPT)
+                return@withLock UpdateOutcome.Available(metadata.versionName)
             }
             if (metadata.isMandatoryFor(installedCode))
                 prefs.setPendingMandatoryVersionCode(metadata.versionCode)

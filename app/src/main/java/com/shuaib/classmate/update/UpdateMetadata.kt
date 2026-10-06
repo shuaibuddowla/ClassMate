@@ -63,6 +63,7 @@ data class UpdateMetadata(
 }
 
 object UpdatePolicy {
+    fun mayInstall(userConfirmed: Boolean) = userConfirmed
     fun isNewer(serverCode: Long, installedCode: Long) = serverCode > installedCode
     fun mayAutoDownload(enabled: Boolean, wifiOnly: Boolean, isMetered: Boolean) =
         enabled && (!wifiOnly || !isMetered)

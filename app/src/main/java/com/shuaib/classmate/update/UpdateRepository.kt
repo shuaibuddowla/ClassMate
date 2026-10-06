@@ -68,6 +68,8 @@ class UpdateRepository(private val context: Context) {
         return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }
 
+    fun hasDownloaded(metadata: UpdateMetadata): Boolean = File(context.filesDir,"updates/classmate-${metadata.versionCode}.apk").let { it.exists() && it.length()==metadata.apkSize }
+
     suspend fun download(metadata: UpdateMetadata, progress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
         val directory = File(context.filesDir, "updates").apply { mkdirs() }
         directory.listFiles()?.filter { it.name != "classmate-${metadata.versionCode}.apk" }

@@ -35,7 +35,7 @@ class UpdateActionActivity : AppCompatActivity() {
             }
             ACTION_PROMPT -> AlertDialog.Builder(this)
                 .setTitle("New ClassMate update")
-                .setMessage("Update to the latest version? The app will download and verify the release, then open Android’s installer.")
+                .setMessage("Update to the latest version? ClassMate will use the downloaded APK when available, verify it, then open the Android installer.")
                 .setPositiveButton("Update") { _, _ -> runUpdate() }
                 .setNegativeButton("Later") { _, _ -> finish() }.setOnCancelListener { finish() }.show()
             ACTION_PERMISSION -> showPermissionExplanation()
