@@ -19,7 +19,7 @@ import org.json.JSONObject
 /** Counts are account-scoped on the server; contacts are never cached here. */
 class ClassMateUnreadActivity(private val activity: AppCompatActivity,
     private val batch: () -> String, private val user: () -> String,
-    private val friendsVisible: () -> Boolean) {
+    private val friendsVisible: () -> Boolean, private val enabled: () -> Boolean = { true }) {
     private var refreshing = false
     private var refreshAgain = false
     private var popupLoading = false
@@ -32,13 +32,17 @@ class ClassMateUnreadActivity(private val activity: AppCompatActivity,
         }
     }
     fun refresh() {
+        if (!enabled()) {
+            activity.findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.let { it.removeBadge(R.id.nav_notices); it.removeBadge(R.id.nav_friends) }
+            return
+        }
         if (batch().isBlank() || user().isBlank()) return
         if (refreshing) { refreshAgain=true; return }
         val requestedBatch=batch(); val requestedUser=user(); refreshing=true
         activity.lifecycleScope.launch {
             try {
                 val counts=ClassMateAuthApi.rpc("unread_activity",JSONObject().put("target_batch",requestedBatch))
-                if(requestedBatch!=batch() || requestedUser!=user()) return@launch
+                if(!enabled() || requestedBatch!=batch() || requestedUser!=user()) return@launch
                 val nav=activity.findViewById<GlassBottomNavView>(R.id.classmate_home_nav) ?: return@launch
                 for ((tab, count) in listOf(R.id.nav_notices to counts.optInt("notices"), R.id.nav_friends to counts.optInt("blood_requests"))) {
                     if(count==0) nav.removeBadge(tab) else nav.getOrCreateBadge(tab).apply {
@@ -52,6 +56,7 @@ class ClassMateUnreadActivity(private val activity: AppCompatActivity,
         }
     }
     fun showUnseenRequest() {
+        if(!enabled()) return
         if(popupLoading) return
         popupLoading=true; val requestedUser=user(); val requestedBatch=batch()
         activity.lifecycleScope.launch {

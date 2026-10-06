@@ -308,7 +308,7 @@ internal class ClassMateAcademicScreensSupabase(
         text(root, R.id.tvUserName, name)
         val hour = LocalTime.now().hour
         val greetings = when (hour) {
-            in 0..4 -> listOf("Up late?", "A little planning for tomorrow?", "Your campus, even after hours.")
+            in 0..4 -> listOf("Your campus, even after hours.")
             in 5..11 -> listOf("Ready for a fresh start?", "Welcome back.", "What’s on your schedule?")
             in 12..17 -> listOf("Let’s plan the rest of your day.", "Your next class, at a glance.", "Ready for what’s next?")
             else -> listOf("Time to wrap up your day.", "A quick look at tomorrow?", "Welcome back.")
@@ -490,7 +490,7 @@ internal class ClassMateAcademicScreensSupabase(
                     snapshot = JSONObject().put("entries", buses).put("saved_at", System.currentTimeMillis())
                 } else {
                     val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
-                    val selectedCatalog=rows(ClassMateCourses.catalog(selectedBatch))
+                    val selectedCatalog=rows(JSONArray(ClassMateAuthApi.rpcText("batch_timetable_catalog", JSONObject().put("target_batch", selectedBatch))))
                     val visibleIds=selectedCatalog.map {it.optString("offering_id")}.toSet()
                     val offerings = (if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))).filter {profile().optString("role")!="teacher" || it.optString("id") in visibleIds}
                     val ids = offerings.map { it.getString("id") }
@@ -498,7 +498,7 @@ internal class ClassMateAcademicScreensSupabase(
                         val courses = async { selectedCatalog.associateBy { it.getString("id") } }
                         val routines = async { if (ids.isEmpty()) JSONArray() else ClassMateAuthApi.rows("routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.(${ids.joinToString(",")})&order=start_time") }
                         val teachers = async { if (ids.isEmpty()) JSONArray() else JSONArray(ClassMateAuthApi.rpcText("timetable_details", JSONObject().put("target_batch", selectedBatch).put("target_date", LocalDate.now().toString()).put("target_course_ids", JSONArray(ids)))) }
-                        val changes = async { ClassMateAuthApi.rows("class_changes", "select=semester_course_id,effective_date&batch_id=eq.$selectedBatch&kind=eq.cancelled&effective_date=gte.${LocalDate.now()}&effective_date=lte.${LocalDate.now().plusDays(7)}") }
+                        val changes = async { JSONArray(ClassMateAuthApi.rpcText("timetable_cancellations",JSONObject().put("target_batch",selectedBatch).put("target_start",LocalDate.now().toString()).put("target_end",LocalDate.now().plusDays(7).toString()))) }
                         val assigned = async { when {
                             profile().optString("role") == "admin" || profile().optBoolean("is_cr") -> ids
                             profile().optString("role") == "teacher" -> rows(ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.$accountId&active=eq.true")).map { it.getString("semester_course_id") }
@@ -1587,6 +1587,7 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
         root.v<SwitchCompat>(R.id.switchNotifications).apply {
+            (parent as? View)?.visibility = if(account.optString("role")=="teacher") View.GONE else View.VISIBLE
             val channelBlocked=android.os.Build.VERSION.SDK_INT>=26 && activity.getSystemService(android.app.NotificationManager::class.java).getNotificationChannel("classmate_notifications")?.importance==android.app.NotificationManager.IMPORTANCE_NONE
             isChecked = prefs.isNotificationsEnabled() && androidx.core.app.NotificationManagerCompat.from(activity).areNotificationsEnabled() && !channelBlocked
             if(prefs.isNotificationsEnabled() && !isChecked) root.v<TextView>(R.id.tvNotificationStatus).text="Blocked in Android settings. Tap to enable."

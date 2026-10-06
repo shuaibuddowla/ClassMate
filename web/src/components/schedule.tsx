@@ -44,7 +44,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     ctx.batch,
     "routine",
     async () => {
-      const catalog = await rpc<Row[]>("batch_course_catalog", {
+      const catalog = await rpc<Row[]>("batch_timetable_catalog", {
         target_batch: ctx.batch,
       });
       if (!catalog.length) return [];
@@ -68,14 +68,14 @@ export function Schedule({ ctx }: { ctx: Context }) {
     ctx.batch,
     "timetable-details",
     () =>
-      ctx.courses.length
+      routine.data?.length
         ? rpc<Row[]>("timetable_details", {
             target_batch: ctx.batch,
             target_date: date,
-            target_course_ids: ctx.courses.map((c) => c.offering_id),
+            target_course_ids: [...new Set(routine.data.map((s) => s.semester_course_id))],
           })
         : Promise.resolve([]),
-    [date, ctx.courses.map((c) => c.offering_id).join(",")],
+    [date, routine.data?.map((s) => s.semester_course_id).join(",") || ""],
   );
   const busPermission = useQuery({
     queryKey: [ctx.user, "bus-permission"],

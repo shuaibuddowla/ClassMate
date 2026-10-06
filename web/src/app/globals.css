@@ -3692,3 +3692,27 @@ dialog:has(.android-download) > header h2 {
 
 .teacher-signin-hint{font-size:12px!important;color:var(--muted)}.teacher-batch-picker{min-height:100dvh;display:grid;place-items:center;padding:20px;background:var(--background)}.teacher-batch-picker>section{width:100%;max-width:500px;padding:28px}.teacher-batch-picker h1{font-size:30px;margin:16px 0 8px}.teacher-batch-list,.teacher-tool-links{display:grid;gap:12px;margin:20px 0}.teacher-batch-list button{justify-content:space-between;text-align:left;flex-wrap:wrap}.teacher-batch-list button span{display:flex;align-items:center;gap:8px;font-size:12px}.teacher-tool-links a{justify-content:flex-start}
 .landing .login .teacher-signin-button{display:flex;width:100%;min-height:52px;border:1px solid var(--primary);border-radius:18px;color:var(--primary);font-size:15px;font-weight:600;margin-bottom:12px}.landing .login .teacher-signin-hint{margin:12px 0 8px}
+
+
+/* Sign-in has a desktop composition, with a compact single column on phones. */
+.landing { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(340px, .8fr); align-items:center; gap:clamp(40px,7vw,100px); min-height:100dvh; padding:clamp(24px,6vw,84px); max-width:1360px; margin:auto; }
+.signin-story h1 { font-size:clamp(48px,5.5vw,78px); line-height:1.06; letter-spacing:-.055em; margin:24px 0; }
+.signin-story p { color:var(--muted); font-size:18px; max-width:440px; line-height:1.7; }
+.signin-features { display:flex; flex-wrap:wrap; gap:10px; margin-top:32px; }
+.signin-features span { padding:10px 14px; background:var(--surface); border-radius:14px; font-size:13px; }
+.landing .login { width:100%; max-width:480px; padding:32px; border-radius:32px; margin:0; background:var(--surface); border:1px solid var(--border); box-shadow:0 16px 60px #2563eb0a; }
+.landing .login .signin-emblem { width:76px; height:76px; object-fit:contain; margin:28px 0 12px; }
+.landing .login h2 { font-size:40px; line-height:1.12; margin:12px 0 18px; }
+.landing .login p { line-height:1.6; }
+.landing .login .teacher-signin-button { background:var(--primary); color:white; border:0; min-height:52px; }
+.landing .login .primary { background:#2563eb; color:white; }
+.course-files-page .library-files { order:initial; }
+.profile-screen .profile-batch.profile-switch-batch > span { display:block; font-size:14px; font-weight:600; white-space:nowrap; }
+.profile-screen .profile-batch.profile-switch-batch select { width:auto; max-width:64%; margin-left:auto; }
+@media(max-width:760px) {
+  .landing { display:flex; flex-direction:column; justify-content:center; min-height:100dvh; padding:24px 20px; gap:0; }
+  .signin-story { display:none; }
+  .landing .login { padding:24px; max-width:440px; }
+  .landing .login h2 { font-size:34px; }
+  .landing .login .signin-emblem { width:68px; height:68px; margin-top:24px; }
+}

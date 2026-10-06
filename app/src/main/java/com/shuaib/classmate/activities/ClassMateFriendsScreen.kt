@@ -117,7 +117,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     if(wait) delay(250)
                     val result=JSONArray(ClassMateAuthApi.rpcText("batch_friends",JSONObject().put("target_batch",batch).put("query_text",query).put("result_offset",requestedOffset)))
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
-                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { !teacher() || it.optString("role")=="student" }
+                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { !teacher() || it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
                     offset=requestedOffset+result.length(); hasMore=result.length()==100
                     adapter.submitList(merged)
@@ -159,22 +159,28 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             row.addView(avatar,LinearLayout.LayoutParams(dp(48),dp(48)))
             val labels=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,dp(8),0) }
             val name=text("",16f,true).apply { setTypeface(null,1) }
+            val badge=text("Admin",11f,true).apply {
+                setPadding(dp(8),dp(3),dp(8),dp(3)); setTextColor(activity.getColor(R.color.cm_primary))
+                background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_primary_soft)); cornerRadius=dp(8).toFloat() }
+            }
             val id=text("",12f).apply { setPadding(0,dp(4),0,0) }
-            labels.addView(name); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
+            labels.addView(name); labels.addView(badge,LinearLayout.LayoutParams(-2,-2).apply { topMargin=dp(4) }); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
             row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO },LinearLayout.LayoutParams(dp(18),dp(18)))
             card.addView(row)
-            return FriendHolder(card,avatar,name,id)
+            return FriendHolder(card,avatar,name,id,badge)
         }
         override fun onBindViewHolder(holder: FriendHolder,position: Int) {
             val member=getItem(position)
+            holder.badge.visibility=if(member.optString("role")=="admin") View.VISIBLE else View.GONE
             holder.name.text=member.optString("full_name").ifBlank { "ClassMate member" }
-            holder.studentId.text=if(member.optString("role")=="teacher") "Teacher" else listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ")
+            holder.studentId.text=when(member.optString("role")) { "admin" -> member.optString("student_id").takeUnless {it=="null"}.orEmpty(); "teacher" -> "Teacher"; else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ") }
+            holder.studentId.setTextColor(activity.getColor(if(member.optString("role")=="admin") R.color.cm_primary else R.color.cm_text_secondary))
             Glide.with(activity).load(member.optString("avatar_url").takeUnless { it=="null" || it.isBlank() }).circleCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(holder.avatar)
-            holder.itemView.setOnClickListener { click(member) }
+            holder.itemView.setOnClickListener { if(member.optString("role")=="admin") ClassMateFeatureUi.developer(activity) else click(member) }
             holder.itemView.contentDescription="${holder.name.text}, ${holder.studentId.text}. Open profile"
         }
     }
-    private class FriendHolder(view: View,val avatar: ImageView,val name: TextView,val studentId: TextView): RecyclerView.ViewHolder(view)
+    private class FriendHolder(view: View,val avatar: ImageView,val name: TextView,val studentId: TextView,val badge: TextView): RecyclerView.ViewHolder(view)
 
     private fun showDetails(member: JSONObject): AlertDialog {
         val form=ClassMateFormUi(activity)

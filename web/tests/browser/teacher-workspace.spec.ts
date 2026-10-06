@@ -16,8 +16,9 @@ test("teacher chooses an assigned batch and sees familiar scoped teaching tools"
     let data:unknown=[];
     if(name==="available_batches")data=[{id:"layout-batch",department_id:"layout-department",batch_number:22,academic_session:25,departments:{code:"cse",name:"CSE"}}];
     if(name==="batch_course_catalog")data=[course];
-    if(name==="batch_friends")data=[{profile_id:"teacher-peer",role:"teacher",full_name:"Hidden teacher"},{profile_id:"student-one",role:"student",full_name:"Visible student",student_id:"CE25001"}];
-    if(name==="unread_activity")data={notices:0,blood_requests:0};
+    if(name==="batch_timetable_catalog")data=[course,{...course,offering_id:"other-offering",course_title:"Another teacher's course"}];
+    if(name==="batch_friends")data=[{profile_id:"owner",role:"admin",full_name:"Campus owner"},{profile_id:"teacher-peer",role:"teacher",full_name:"Hidden teacher"},{profile_id:"student-one",role:"student",full_name:"Visible student",student_id:"CE25001"}];
+    if(name==="unread_activity")data={notices:9,blood_requests:4};
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(data)});
   });
   let authorFiltered=false;
@@ -39,7 +40,12 @@ test("teacher chooses an assigned batch and sees familiar scoped teaching tools"
   await expect(page.getByRole("heading",{name:"Students",exact:true})).toBeVisible();
   await expect(page.locator(".people-grid")).toContainText("Visible student");
   await expect(page.locator(".people-grid")).not.toContainText("Hidden teacher");
+  await expect(page.locator(".people-grid .person").first()).toContainText("Campus owner");
+  await expect(page.locator(".people-grid .person").first()).toContainText("Admin");
+  await expect(page.locator(".unread-badge")).toHaveCount(0);
   await page.locator(".bottom-nav").getByRole("button",{name:"Profile",exact:true}).click();
+  await expect(page.getByText("Switch batch",{exact:true})).toBeVisible();
+  await expect(page.getByRole("switch",{name:"Push notifications"})).toHaveCount(0);
   await page.getByRole("button",{name:/Teaching tools/}).click();
   await expect(page.getByRole("heading",{name:"Teaching tools"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add course",exact:true})).toHaveCount(0);

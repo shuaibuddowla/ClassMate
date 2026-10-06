@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Phone, MessageCircle, ChevronRight, Droplets } from "lucide-react";
 import { BloodNetwork } from "./blood-network";
+import { AboutDeveloper } from "./about-developer";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
 import { Avatar, Empty, ErrorBox, Modal, Skeleton } from "./ui";
@@ -10,10 +11,11 @@ export function Friends({ ctx }: { ctx: Context }) {
   const qc = useQueryClient();
   const [alert, setAlert] = useState<Row | null>(null);
   const [blood, setBlood] = useState(false);
+  const [developer, setDeveloper] = useState(false);
   useEffect(() => {
     let live = true;
     setAlert(null);
-    if(ctx.active && !blood && navigator.onLine && !location.hash.startsWith("#friends/blood")) {
+    if(ctx.profile.role !== "teacher" && ctx.active && !blood && navigator.onLine && !location.hash.startsWith("#friends/blood")) {
       rpc<Row[]>("unread_blood_requests").then(async requests => {
         if(!live || !requests[0]) return;
         const details = await rpc<Row>("blood_request_details", {target_request: requests[0].id});
@@ -72,6 +74,7 @@ export function Friends({ ctx }: { ctx: Context }) {
   if (blood) return <BloodNetwork ctx={ctx} close={()=>{setBlood(false);history.replaceState(null,"","#friends")}} />;
   return (
     <>
+      {developer && <AboutDeveloper user={ctx.user} close={() => setDeveloper(false)} />}
       {alert && ctx.active && <Modal title={`${alert.blood_group} blood needed`} close={()=>setAlert(null)}>
         <div className="blood-detail"><h3>{alert.hospital}</h3>
           <p>For: {alert.patient_name || alert.requester_name}</p><p>Requested by: {alert.requester_name}</p>
@@ -106,12 +109,13 @@ export function Friends({ ctx }: { ctx: Context }) {
         <Skeleton />
       ) : (
         <div className="people-grid">
-          {friends.data?.pages.flat().filter(p=>ctx.profile.role!=="teacher" || p.role==="student").map((p) => (
+          {friends.data?.pages.flat().filter(p=>ctx.profile.role!=="teacher" || ["student", "admin"].includes(p.role)).map((p) => (
             <button
               disabled={busy}
               className="card person"
               key={p.profile_id}
               onClick={async () => {
+                if(p.role === "admin") { setDeveloper(true); return; }
                 setBusy(true);
                 setError(null);
                 try {
@@ -131,6 +135,7 @@ export function Friends({ ctx }: { ctx: Context }) {
               <Avatar name={p.full_name} url={p.avatar_url} />
               <span>
                 <strong>{p.full_name}</strong>
+                {p.role === "admin" && <span className="role">Admin</span>}
                 <small>
                   {p.student_id || p.role}
                   {p.is_cr ? " · CR" : ""}

@@ -19,6 +19,7 @@ export const viewport: Viewport = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
       <Script id="classmate-install-capture" strategy="beforeInteractive">{`
         window.addEventListener('beforeinstallprompt', function(event) {
           event.preventDefault();
@@ -29,6 +30,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           window.classmateInstalled = true;
         });
       `}</Script>
+      </head>
       <body>{children}</body>
     </html>
   );

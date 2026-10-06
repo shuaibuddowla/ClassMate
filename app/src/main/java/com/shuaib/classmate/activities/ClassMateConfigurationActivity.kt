@@ -32,6 +32,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
     private var generation=0
     private var editor: androidx.appcompat.app.AlertDialog?=null
     private var semesterAvailable=false
+    private var openedTarget=false
     private val pendingCRChanges=mutableSetOf<String>()
     private fun rows(a: JSONArray)=(0 until a.length()).map { a.getJSONObject(it) }
     private fun clean(item: JSONObject,key: String)=item.optString(key).takeUnless { it=="null" }.orEmpty()
@@ -75,6 +76,8 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                     if(version!=generation) return@launch
                     rowsHost.removeAllViews(); records.forEach { t -> card(clean(t,"full_name"),
                         listOf(clean(t,"email").ifBlank { "Email not added" },"${t.optInt("course_count")} courses").joinToString(" · ")) { teacherForm(t) } }
+                    val target=intent.getStringExtra("edit_target")
+                    if(!openedTarget && !target.isNullOrBlank()) { openedTarget=true; records.find {it.optString("id")==target}?.let {teacherForm(it)} }
                     status.text=if(records.isEmpty()) "Add a teacher while configuring a course." else "${records.size} teachers"
                 } else {
                     val semesters=ClassMateAuthApi.rows("semesters","select=id&batch_id=eq.$batch&status=eq.active&limit=1")
@@ -85,6 +88,9 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                         MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity).setTitle(c.optString("course_title"))
                             .setItems(if(role=="teacher") arrayOf("Delete from this batch") else arrayOf("Edit course","Delete from this batch")) { _,i -> if(role!="teacher" && i==0) courseForm(c) else deleteCourse(c) }.show()
                     } }
+                    val target=intent.getStringExtra("edit_target")
+                    if(!openedTarget && mode=="catalog") { openedTarget=true; catalogPicker() }
+                    else if(!openedTarget && !target.isNullOrBlank()) { openedTarget=true; courses.find {it.optString("offering_id")==target}?.let {courseForm(it)} }
                     status.text=if(!semesterAvailable) "No active semester. Ask the global admin to publish one." else if(courses.isEmpty()) "No courses yet. Add your first course." else "${courses.size} courses · Changes stay within this batch"
                 }
             } catch(e: kotlinx.coroutines.CancellationException) { throw e }

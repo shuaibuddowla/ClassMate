@@ -29,21 +29,44 @@ internal object ClassMateFeatureUi {
         }
     fun developer(activity: AppCompatActivity) {
         val form=ClassMateFormUi(activity)
-        val heading=form.label("Behind ClassMate").apply { textSize=22f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) }
-        val details=form.label("Loading developer profile…")
-        for((label,url) in listOf("Facebook" to "https://facebook.com/shuaibuddowla", "GitHub" to "https://github.com/shuaibuddowla", "Portfolio" to "https://shuaibuddowla.github.io")) {
-            form.panel.addView(button(activity,label) { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url))) } })
+        val hero=LinearLayout(activity).apply {
+            orientation=LinearLayout.VERTICAL; gravity=android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(dp(activity,20),dp(activity,24),dp(activity,20),dp(activity,20))
+            background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_primary_soft)); cornerRadius=dp(activity,24).toFloat() }
         }
+        form.panel.addView(hero,LinearLayout.LayoutParams(-1,-2))
+        hero.addView(TextView(activity).apply { text="BEHIND CLASSMATE"; textSize=10f; letterSpacing=.16f; setTextColor(activity.getColor(R.color.cm_primary)) })
+        val photo=ImageView(activity).apply { contentDescription="Developer profile photo"; setImageResource(R.drawable.ic_default_avatar) }
+        hero.addView(photo,LinearLayout.LayoutParams(dp(activity,80),dp(activity,80)).apply { topMargin=dp(activity,16); bottomMargin=dp(activity,12) })
+        val heading=TextView(activity).apply { text="ClassMate developer"; gravity=android.view.Gravity.CENTER; textSize=22f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) }
+        hero.addView(heading)
+        val details=TextView(activity).apply { text="Loading developer profile…"; gravity=android.view.Gravity.CENTER; textSize=13f; setPadding(0,dp(activity,10),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) }
+        hero.addView(details)
+        for((label,url) in listOf("Facebook" to "https://facebook.com/shuaibuddowla", "GitHub" to "https://github.com/shuaibuddowla", "Portfolio" to "https://shuaibuddowla.github.io")) {
+            val row=LinearLayout(activity).apply {
+                orientation=LinearLayout.HORIZONTAL; gravity=android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(activity,16),dp(activity,14),dp(activity,16),dp(activity,14))
+                background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_surface)); cornerRadius=dp(activity,18).toFloat(); setStroke(dp(activity,1),activity.getColor(R.color.cm_border)) }
+                isClickable=true; isFocusable=true; contentDescription="Open $label"
+                setOnClickListener { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url))) } }
+            }
+            val labels=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL }
+            labels.addView(TextView(activity).apply { text=label; textSize=16f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) })
+            labels.addView(TextView(activity).apply { text=Uri.parse(url).host+Uri.parse(url).path.orEmpty(); textSize=12f; setTextColor(activity.getColor(R.color.cm_text_secondary)) })
+            row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
+            row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); imageTintList=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_primary)) },LinearLayout.LayoutParams(dp(activity,20),dp(activity,20)))
+            form.panel.addView(row,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(activity,12) })
+        }
+        form.label("Built for our university community.")
         val dialog=MaterialAlertDialogBuilder(activity).setTitle("About developer").setBackground(surface(activity)).setView(form.scroll).setPositiveButton("Close",null).show()
         fun load() { activity.lifecycleScope.launch {
             try {
                 val p=ClassMateAuthApi.rpc("developer_profile",org.json.JSONObject())
                 if(!dialog.isShowing) return@launch
                 heading.text=p.optString("full_name","ClassMate developer")
-                details.text=listOf(p.optString("department"), p.optString("student_id"), "Batch ${p.optString("batch_number")}", "Session ${ClassMateAcademicSession.format(p.optString("academic_session"))}").filter { it.isNotBlank() && it!="null" }.joinToString("\n")
+                fun value(key:String)=p.optString(key).takeUnless {it.isBlank() || it=="null"}
+                details.text=listOfNotNull(value("department"),value("student_id"),value("batch_number")?.let {"Batch $it"},value("academic_session")?.let {"Session ${ClassMateAcademicSession.format(it)}"}).joinToString(" · ")
                 p.optString("avatar_url").takeIf { it.startsWith("https://") }?.let {
-                    val photo=ImageView(activity).apply { contentDescription="Developer profile photo" }
-                    form.panel.addView(photo,0,LinearLayout.LayoutParams(dp(activity,72),dp(activity,72)))
                     com.bumptech.glide.Glide.with(activity).load(it).circleCrop().into(photo)
                 }
             } catch(e:Exception) { if(dialog.isShowing) { details.text="Could not load profile. Tap to retry."; details.setOnClickListener { load() } } }

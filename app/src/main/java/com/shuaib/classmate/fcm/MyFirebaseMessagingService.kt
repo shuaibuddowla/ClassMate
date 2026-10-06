@@ -93,6 +93,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         ClassMateAuthApi.attach(applicationContext)
+        if (ClassMateAuthApi.notificationIdentity()?.optString("role") == "teacher") return
         if (BuildConfig.CLASSMATE_AUTH_ENABLED && ClassMateAuthApi.hasSavedSession() &&
             com.shuaib.classmate.utils.AppPreferences(this).isNotificationsEnabled() && androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {

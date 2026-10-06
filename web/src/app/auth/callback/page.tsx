@@ -9,13 +9,16 @@ export default function Callback() {
     started.current = true;
     const url = new URL(location.href);
     const code = url.searchParams.get("code");
+    const signInHelp = sessionStorage.getItem("classmate:sign-in-mode") === "teacher"
+      ? "Teacher sign-in could not finish. Ask your administrator to approve this Google email and assign a course, then try again."
+      : "Google sign-in could not finish. Try your university account or an admin-approved teacher Gmail.";
     // Provider errors can include authorization codes. Keep these out of
     // rendered text and remove callback query parameters from browser history.
     history.replaceState({}, "", location.pathname);
     if (!code) {
       setError(
         url.searchParams.has("error")
-          ? "Google sign-in could not finish. Try your university account or an admin-approved teacher Gmail."
+          ? signInHelp
           : "Sign-in was cancelled.",
       );
       return;

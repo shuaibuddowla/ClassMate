@@ -130,6 +130,25 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         }
     }
 
+    fun signInHero() {
+        val hero = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(24), dp(20), dp(24))
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.cm_primary_soft)); cornerRadius = dp(28).toFloat()
+            }
+        }
+        hero.addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_classmate_logo); contentDescription = "ClassMate"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(80), dp(80)))
+        text("Your campus. One place.", 22f, ink, hero).setTypeface(null, Typeface.BOLD)
+        text("Classes, resources and updates, together.", 14f, muted, hero)
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(24); bottomMargin = dp(12) })
+        animated.add(hero)
+    }
+
     fun orbit(complete: Boolean = false) {
         val height = if (complete) 128 else 148
         val hero = FrameLayout(activity)

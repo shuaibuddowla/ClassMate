@@ -103,6 +103,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
     private var tabAnimating = false
     private var authBusy = false
+    private var teacherSignIn = false
+    private var manageSection = "courses"
     private var profileValidated = false
     private var pendingCallNumber: String? = null
     private val callPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -158,9 +160,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
             renderHomeTab(if(manageOpen) R.id.nav_manage else selectedTab)
         }
     }
-    private fun openConfiguration(mode: String="courses") {
+    private fun openConfiguration(mode: String="courses", editTarget: String="") {
         configurationLauncher.launch(ClassMateCourses.intent(this,selectedBatchId,selectedBatchLabel,
-            profile?.optString("role").orEmpty(),userId,mode))
+            profile?.optString("role").orEmpty(),userId,mode).putExtra("edit_target",editTarget))
     }
     private fun openManage() {
         val p=profile ?: return
@@ -206,6 +208,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
                 .getResult(ApiException::class.java)
             val idToken = account.idToken ?: error("Google returned no ID token")
+            if (!teacherSignIn && !account.email.orEmpty().endsWith("@mbstu.ac.bd", true))
+                error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.")
             runAction("Signing in") {
                 val auth = ClassMateAuthApi.signInWithGoogleIdToken(idToken)
                 userId = auth.getJSONObject("user").getString("id")
@@ -229,6 +233,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         if (!ClassMateAuthApi.hasSavedSession()) delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         super.onCreate(savedInstanceState)
         welcomeStep = savedInstanceState?.getInt("welcome_step") ?: 0
+        teacherSignIn = savedInstanceState?.getBoolean("teacher_sign_in") ?: false
         pendingCallNumber=savedInstanceState?.getString("pending_call_number")
         selectedBatchId = savedInstanceState?.getString("selected_batch_id").orEmpty()
         selectedBatchLabel = savedInstanceState?.getString("selected_batch_label").orEmpty()
@@ -308,6 +313,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("teacher_sign_in", teacherSignIn)
         outState.putInt("welcome_step", welcomeStep)
         outState.putString("pending_call_number",pendingCallNumber)
         outState.putString("selected_batch_id", selectedBatchId)
@@ -322,27 +328,29 @@ class ClassMateAuthActivity : AppCompatActivity() {
         delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         val ui = ClassMateWelcomeUi(this)
         welcomeUi = ui; content = ui.content
-        ui.orbit()
+        ui.signInHero()
         ui.title("Welcome to\nClassMate.")
-        ui.text("Students use university email. Teachers can use an approved Gmail or university account.")
+        ui.text("Students use university email. Teachers can use an approved Gmail or university email.")
         ui.action("Student sign-in with Google") { signIn() }
-        ui.text("Teacher Gmail must be approved in Manage → Teachers.", 12f)
-        ui.action("Teacher sign-in", false) { signIn(true) }
+        // ui.text("Teacher Gmail must be approved in Manage → Teachers.", 12f)
+        ui.action("Teacher sign-in") { signIn(true) }
         status = ui.text("",13f).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         profileView = ui.text("").apply { visibility=View.GONE }; resultView = ui.text("").apply { visibility=View.GONE }
         actions = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(actions)
         ui.animateEntrance()
     }
 
-    private fun googleClient() = GoogleSignIn.getClient(this,
+    private fun googleClient(teacher: Boolean = false) = GoogleSignIn.getClient(this,
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id)).requestEmail().build())
+            .requestIdToken(getString(R.string.default_web_client_id)).requestEmail()
+            .apply { if (!teacher) setHostedDomain("mbstu.ac.bd") }.build())
 
     private fun signIn(teacher: Boolean = false) {
         if (!ClassMateAuthApi.configured || authBusy) return
         authBusy = true
+        teacherSignIn = teacher
         status.text = if(teacher) "Choose your approved teacher Google account…" else "Choose your @mbstu.ac.bd Google account…"
-        val client = googleClient()
+        val client = googleClient(teacher)
         client.signOut().addOnCompleteListener { googleLauncher.launch(client.signInIntent) }
     }
 
@@ -382,6 +390,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private suspend fun loadProfile() {
         var loaded = ClassMateAuthApi.initializeProfile()
+        if(teacherSignIn && loaded.optString("role")!="teacher") {
+            ClassMateAuthApi.signOut(); authBusy=false
+            error("This account is not approved as a teacher. Ask your administrator to approve this email and assign a course.")
+        }
+        teacherSignIn=false
         if (loaded.optString("role") == "student" && loaded.isNull("department_id")) {
             val prefix = Regex("^([a-z]+)[0-9]{2}[0-9]{3,4}@mbstu\\.ac\\.bd$")
                 .matchEntire(loaded.optString("email").lowercase())?.groupValues?.get(1)
@@ -403,6 +416,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
         restoreWelcomeProgress(userId)
+        if (loaded.optString("role") == "teacher") startWelcomeFlow(0)
         val resumedStep=ClassMateWelcomeProgress.resume(welcomeStep,profileComplete(loaded),notificationsEnabled())
         if(resumedStep!=welcomeStep) startWelcomeFlow(resumedStep)
         if (loaded.optString("verification_status") == "active") {
@@ -573,7 +587,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             { aiLauncher.launch(Intent(this,ClassMateAiActivity::class.java).putExtra("batch_id",selectedBatchId).putExtra("profile_id",userId)) },
             { unreadActivity?.refresh() }
         )
-        if(unreadActivity==null) unreadActivity=ClassMateUnreadActivity(this,{selectedBatchId},{userId},{selectedTab==R.id.nav_friends && !manageOpen})
+        if(unreadActivity==null) unreadActivity=ClassMateUnreadActivity(this,{selectedBatchId},{userId},{selectedTab==R.id.nav_friends && !manageOpen},{profile?.optString("role")!="teacher"})
         unreadActivity?.refresh()
         friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) },{profile?.optString("role")=="teacher"})
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
@@ -620,7 +634,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ui.orbit(true)
         ui.text(if (profile?.optString("role") == "teacher") "TEACHER WORKSPACE" else "ADMIN WORKSPACE", 11f)
         ui.title("Choose your\nclassroom.")
-        ui.text("Choose a running batch.")
+        ui.text(if(profile?.optString("role")=="teacher") "Choose your classroom. Your assigned batches appear below." else "Choose a running batch.")
         status = ui.text("Finding your batches…")
         status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         profileView = ui.text("").apply { visibility = View.GONE }
@@ -779,28 +793,47 @@ class ClassMateAuthActivity : AppCompatActivity() {
             manageCard(actions,"Teaching resources","Share files for your courses") { teachingTab(R.id.nav_pdf) }
             return
         }
-        manageCard(actions,"Courses","Configure this batch’s courses and teachers") { openConfiguration() }
-        if (role == "admin") {
-            manageCard(actions,"System health","Delivery queue, database growth and hosting usage") {
-                ClassMateHealthDialog.show(this,lifecycleScope)
+        val tabs = android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled=false }
+        val tabRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        tabs.addView(tabRow); actions.addView(tabs)
+        val sections=if(role=="admin") listOf("courses" to "Courses", "catalog" to "Catalog", "teachers" to "Teachers", "people" to "People", "structure" to "Structure", "health" to "Health") else listOf("courses" to "Courses")
+        if(sections.none { it.first==manageSection }) manageSection="courses"
+        val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+        actions.addView(panel)
+        fun renderSection() {
+            panel.removeAllViews()
+            when(manageSection) {
+                "courses" -> manageCard(panel,"Manage courses","Add, edit and organize this batch's courses") { openConfiguration() }
+                "catalog" -> manageCard(panel,"Shared course catalog","Choose, edit or delete courses across batches") { openConfiguration("catalog") }
+                "teachers" -> manageCard(panel,"Teacher profiles","Approved emails, course assignments and teaching access") { openConfiguration("teachers") }
+                "people" -> manageCard(panel,"People & approvals","Search accounts, review requests and assign representatives") { openConfiguration("people") }
+                "structure" -> {
+                    manageCard(panel,"Batches & semesters","Create batches, publish semesters or clone a plan") { showManageMenu("Batches & semesters",listOf(1,4,9,13,14)) }
+                    manageCard(panel,"Departments","Configure departments and student account rules") { showManageMenu("Departments",listOf(0,3,10)) }
+                }
+                "health" -> manageCard(panel,"System health","Delivery queue, database growth and hosting usage") { ClassMateHealthDialog.show(this,lifecycleScope) }
             }
-            label("Administration", 21f).apply {
-                setTypeface(null, Typeface.BOLD)
-                setPadding(0, (24 * density).toInt(), 0, 0)
-            }
-            manageCard(actions, "Batches & semesters", "Create batches, publish semesters, clone a plan") {
-                showManageMenu("Batches & semesters", listOf(1, 4, 9, 13, 14))
-            }
-            manageCard(actions, "People & approvals", "Review students and manage the roster") {
-                openConfiguration("people")
-            }
-            manageCard(actions, "Teachers", "Allowlist teachers and assign courses") {
-                openConfiguration("teachers")
-            }
-            manageCard(actions, "Departments", "Create and configure departments") {
-                showManageMenu("Departments", listOf(0, 3, 10))
+            if(manageSection in setOf("courses","teachers")) {
+                val section=manageSection; val batch=selectedBatchId
+                lifecycleScope.launch {
+                    try {
+                        val data=JSONArray(ClassMateAuthApi.rpcText(if(section=="teachers") "owner_teachers" else "batch_course_catalog",if(section=="teachers") JSONObject() else JSONObject().put("target_batch",batch)))
+                        if(!manageOpen || section!=manageSection || batch!=selectedBatchId || !panel.isAttachedToWindow) return@launch
+                        for(i in 0 until data.length()) {
+                            val item=data.getJSONObject(i)
+                            val title=if(section=="teachers") item.optString("full_name") else item.optString("course_title")
+                            val detail=if(section=="teachers") "${item.optInt("course_count")} courses" else listOf(item.optString("course_code"),item.optString("teacher_name").takeUnless { it=="null" }.orEmpty()).filter {it.isNotBlank()}.joinToString(" · ")
+                            manageCard(panel,title,detail) { openConfiguration(if(section=="teachers") "teachers" else "courses",item.optString(if(section=="teachers") "id" else "offering_id")) }
+                        }
+                    } catch(_:Exception) { /* Editors offer their own retry and validation. */ }
+                }
             }
         }
+        sections.forEach { (key,title) ->
+            val tab=ClassMateFeatureUi.button(this,title,manageSection==key) { manageSection=key; renderHomeTab(R.id.nav_manage) }
+            tabRow.addView(tab,LinearLayout.LayoutParams(-2,(48*density).toInt()).apply { marginEnd=(6*density).toInt() })
+        }
+        renderSection()
         content.setPadding(content.paddingLeft, content.paddingTop,
             content.paddingRight, (32 * density).toInt())
     }
@@ -1256,6 +1289,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private var notificationOfferShown=false
     private fun offerNotificationPermission(): Boolean {
+        if(profile?.optString("role")=="teacher") return false
         if(!homeShown || welcomeStep!=0 || notificationOfferShown || notificationsEnabled()) return false
         notificationOfferShown=true
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
@@ -1267,6 +1301,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private fun registerFcmToken() {
+        if(profile?.optString("role")=="teacher") return
         if (!AppPreferences(this).isNotificationsEnabled() || !androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         if(notificationRegistrationBusy) return
@@ -2013,7 +2048,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
                 .onFailure {
                     authBusy = false
-                    status.text = "$label failed: ${it.message}"
+                    status.text = if(label=="Signing in" && teacherSignIn) "Teacher sign-in could not finish. Your Google email must be approved by an administrator and assigned to a course. Check your account or ask the administrator for help." else "$label failed: ${it.message}"
                     if (!homeShown && ClassMateAuthApi.accessToken != null) {
                         actions.removeAllViews()
                         welcomeUi?.action("Retry profile setup", parent = actions) {

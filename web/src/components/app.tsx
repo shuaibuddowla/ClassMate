@@ -170,13 +170,24 @@ function SessionApp() {
               };
           }
         }
+        if (sessionStorage.getItem("classmate:sign-in-mode") === "teacher" && p.role !== "teacher") {
+          sessionStorage.removeItem("classmate:sign-in-mode");
+          await client.auth.signOut({scope:"local"});
+          throw new Error("This email is not approved as a teacher. Ask your administrator to approve your email and assign a course.");
+        }
+        if (sessionStorage.getItem("classmate:sign-in-mode") === "student" && !p.email?.toLowerCase().endsWith("@mbstu.ac.bd")) {
+          sessionStorage.removeItem("classmate:sign-in-mode");
+          await client.auth.signOut({scope:"local"});
+          throw new Error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.");
+        }
+        sessionStorage.removeItem("classmate:sign-in-mode");
         if (!live) return;
         setUser(id);
         setProfile(p);
         saveIdentity(p);
         const signed = new URL(location.href).searchParams.has("signedin");
         history.replaceState({}, "", location.pathname + location.hash);
-        if (p.verification_status === "active") {
+        if (p.verification_status === "active" && p.role !== "teacher") {
           if (existing.length === 0) setStage("account");
           else if (
             !p.profile_completed_at &&
@@ -250,24 +261,26 @@ function SessionApp() {
   if (!user || !profile)
     return (
       <main className="landing">
+        <aside className="signin-story"><span className="eyebrow">YOUR UNIVERSITY, CONNECTED</span><h1>A clearer day.<br/>A closer campus.</h1><p>Timetables, learning resources and campus updates, together in ClassMate.</p><div className="signin-features"><span>Plan your classes</span><span>Stay in the loop</span><span>Learn together</span></div></aside>
         <section className="login card">
           <div className="signin-brand">
             <img src="/logo.png" alt="ClassMate logo" />
             <strong>ClassMate</strong>
           </div>
-          <OrbitLogo />
+          <img className="signin-emblem" src="/logo.png" alt="" />
           <h2>
             Welcome to
             <br />
             ClassMate.
           </h2>
-          <p>Students use university email. Teachers can use an approved Gmail or university account.</p>
+          <p>Students use university email. Teachers can use an approved Gmail or university email.</p>
           <ErrorBox error={error} />
           <button
             className="primary wide"
             disabled={!configured()}
             onClick={async () => {
               try {
+                sessionStorage.setItem("classmate:sign-in-mode", "student");
                 const { error } = await supabase().auth.signInWithOAuth({
                   provider: "google",
                   options: {
@@ -287,7 +300,8 @@ function SessionApp() {
             Student sign-in with Google <ArrowRight size={18} />
           </button>
           <p className="teacher-signin-hint">Teacher Gmail must be approved in Manage → Teachers.</p>
-          <button className="secondary wide teacher-signin-button" disabled={!configured()} onClick={async()=>{
+          <button className="primary wide teacher-signin-button" disabled={!configured()} onClick={async()=>{
+            sessionStorage.setItem("classmate:sign-in-mode", "teacher");
             try { const {error}=await supabase().auth.signInWithOAuth({provider:"google",options:{redirectTo:`${location.origin}/auth/callback`,queryParams:{prompt:"select_account"}}}); if(error) throw error; } catch(e) {setError(e)}
           }}>Teacher sign-in <ArrowRight size={18}/></button>
           <InstallWebApp />
@@ -517,7 +531,7 @@ function TabDeck({
   }, [current]);
   useEffect(() => {
     const restore = () => {
-      if (document.visibilityState === "visible") void restorePush(ctx.user).catch(() => {});
+      if (ctx.profile.role !== "teacher" && document.visibilityState === "visible") void restorePush(ctx.user).catch(() => {});
     };
     restore();
     window.addEventListener("online", restore);
@@ -528,7 +542,7 @@ function TabDeck({
       window.removeEventListener("focus", restore);
       document.removeEventListener("visibilitychange", restore);
     };
-  }, [ctx.user]);
+  }, [ctx.user, ctx.profile.role]);
   const render = (value: string) => {
     const active = { ...ctx, active: value === current };
     if (value === "profile")
@@ -645,9 +659,9 @@ function Home({
   const unread = useQuery({
     queryKey: [user, batch, "unread-activity"],
     queryFn: () => rpc<Row>("unread_activity", { target_batch: batch }),
-    enabled: online && !!batch, refetchInterval: 30_000,
+    enabled: online && !!batch && profile.role !== "teacher", refetchInterval: 30_000,
   });
-  function unreadCount(value: string) { return Number(value === "notices" ? unread.data?.notices : value === "friends" ? unread.data?.blood_requests : 0) || 0; }
+  function unreadCount(value: string) { return profile.role === "teacher" ? 0 : Number(value === "notices" ? unread.data?.notices : value === "friends" ? unread.data?.blood_requests : 0) || 0; }
   const owner = useQuery({
     queryKey: [user, "owner"],
     queryFn: () => rpc<boolean>("is_owner"),

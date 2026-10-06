@@ -159,7 +159,7 @@ export function Profile({
           </span>
           <ChevronRight />
         </button>
-        <label className="setting profile-batch">
+        <label className={`setting profile-batch ${ctx.profile.role !== "student" ? "profile-switch-batch" : ""}`}>
           <GraduationCap />
           <span>
             {ctx.profile.role === "student" ? "Your batch" : "Switch batch"}
@@ -228,7 +228,7 @@ export function Profile({
             Use device theme
           </button>
         )}
-        <div className="setting push-setting">
+        {ctx.profile.role !== "teacher" && <div className="setting push-setting">
           <span>
             Push notifications<small>{pushEnabled && pushStatus !== "ready"
               ? pushStatus === "error" ? "Connection failed — retry below" : "Connecting when online…"
@@ -260,8 +260,8 @@ export function Profile({
           >
             <span />
           </button>
-        </div>
-        {pushEnabled && pushStatus === "error" && (
+        </div>}
+        {ctx.profile.role !== "teacher" && pushEnabled && pushStatus === "error" && (
           <button className="text-button" disabled={pushBusy} onClick={async () => {
             setPushBusy(true); setError(null);
             try { await restorePush(ctx.user); } catch (e) { setError(e); }

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Trash2,
   BookOpen,
+  ArrowLeft,
 } from "lucide-react";
 import { rpc, supabase, edge, openFile, uploadFile, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -30,6 +31,25 @@ export function Library({ ctx }: { ctx: Context }) {
     [deleting, setDeleting] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null);
   const qc = useQueryClient();
+  useEffect(() => {
+    const restore = () => {
+      const match = location.hash.match(/^#library\/course\/([0-9a-f-]{36})$/i);
+      setCourse(match && ctx.courses.some(c => c.offering_id === match[1]) ? match[1] : "");
+    };
+    restore();
+    window.addEventListener("hashchange", restore);
+    window.addEventListener("popstate", restore);
+    return () => { window.removeEventListener("hashchange", restore); window.removeEventListener("popstate", restore); };
+  }, [ctx.batch, ctx.courses]);
+  const selectedCourse = ctx.courses.find(c => c.offering_id === course);
+  function openCourse(id: string) {
+    setCategory("all"); setSearch(""); setCourse(id);
+    history.pushState({classmateCourse:true}, "", `#library/course/${id}`);
+  }
+  function closeCourse() {
+    if (history.state?.classmateCourse) history.back();
+    else { history.replaceState(null, "", "#library"); setCourse(""); }
+  }
   const permissions = useQuery({
     queryKey: [
       ctx.user,
@@ -133,14 +153,14 @@ export function Library({ ctx }: { ctx: Context }) {
     ));
   return (
     <div
-      className={`library-screen ${type === "syllabus" ? "syllabus-view" : ""}`}
+      className={`library-screen ${selectedCourse ? "course-files-page" : ""} ${type === "syllabus" ? "syllabus-view" : ""}`}
     >
       <div className="page-heading">
         <div>
-          <span className="eyebrow">LEARN TOGETHER</span>
-          <h1>Library</h1>
+          {selectedCourse ? <button className="inline" onClick={closeCourse}><ArrowLeft size={18}/> Back to Library</button> : <span className="eyebrow">LEARN TOGETHER</span>}
+          <h1>{selectedCourse?.course_title || "Library"}</h1>
           <p>
-            {entries.length}
+            {selectedCourse && <span>{selectedCourse.course_code} · </span>}{entries.length}
             {files.hasNextPage ? "+" : ""}{" "}
             {entries.length === 1 ? "file" : "files"} shown
           </p>
@@ -174,7 +194,7 @@ export function Library({ ctx }: { ctx: Context }) {
           </button>
         ))}
       </div>
-      <section className="library-courses">
+      {!selectedCourse && <section className="library-courses">
         <div className="section-heading">
           <h2>Courses</h2>
           <small>
@@ -223,7 +243,7 @@ export function Library({ ctx }: { ctx: Context }) {
                 <button
                   className={`card course-tile ${course === c.offering_id ? "active" : ""}`}
                   key={c.offering_id}
-                  onClick={() => setCourse(c.offering_id)}
+                  onClick={() => openCourse(c.offering_id)}
                 >
                   <BookOpen size={23} />
                   <span>
@@ -235,12 +255,12 @@ export function Library({ ctx }: { ctx: Context }) {
               ))}
           </div>
         )}
-      </section>
+      </section>}
       <section className="library-files">
         <div className="section-heading">
           <h2>
             {course
-              ? ctx.courses.find((c) => c.offering_id === course)?.course_title
+              ? "Course files"
               : type === "syllabus"
                 ? "Syllabus files"
                 : "Recently shared"}
@@ -248,11 +268,6 @@ export function Library({ ctx }: { ctx: Context }) {
           {!course && (
             <button className="inline" onClick={() => setAllFiles(true)}>
               All files <ChevronRight size={13} />
-            </button>
-          )}
-          {course && (
-            <button className="inline" onClick={() => setCourse("")}>
-              Clear course
             </button>
           )}
         </div>
