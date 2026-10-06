@@ -261,7 +261,7 @@ function SessionApp() {
             <br />
             ClassMate.
           </h2>
-          <p>Sign in with your @mbstu.ac.bd university email.</p>
+          <p>Students use university email. Teachers can use an approved Gmail or university account.</p>
           <ErrorBox error={error} />
           <button
             className="primary wide"
@@ -284,10 +284,10 @@ function SessionApp() {
               }
             }}
           >
-            Continue with Google <ArrowRight size={18} />
+            Student sign-in with Google <ArrowRight size={18} />
           </button>
-          <p className="teacher-signin-hint">Teachers: use your admin-approved university email or Gmail.</p>
-          <button className="secondary wide" disabled={!configured()} onClick={async()=>{
+          <p className="teacher-signin-hint">Teacher Gmail must be approved in Manage → Teachers.</p>
+          <button className="secondary wide teacher-signin-button" disabled={!configured()} onClick={async()=>{
             try { const {error}=await supabase().auth.signInWithOAuth({provider:"google",options:{redirectTo:`${location.origin}/auth/callback`,queryParams:{prompt:"select_account"}}}); if(error) throw error; } catch(e) {setError(e)}
           }}>Teacher sign-in <ArrowRight size={18}/></button>
           <InstallWebApp />
