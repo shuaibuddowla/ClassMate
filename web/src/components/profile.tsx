@@ -183,7 +183,7 @@ export function Profile({
             <Shield className="profile-desktop" />
             <LayoutGrid className="profile-mobile" />
             <span>
-              Manage<small>Courses, people and batch settings</small>
+              {ctx.profile.role==="teacher" ? "Teaching tools" : "Manage"}<small>{ctx.profile.role==="teacher" ? "Assigned courses and teaching resources" : "Courses, people and batch settings"}</small>
             </span>
             <ChevronRight />
           </button>

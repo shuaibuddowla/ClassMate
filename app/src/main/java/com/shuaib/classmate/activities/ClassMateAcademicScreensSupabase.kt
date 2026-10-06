@@ -488,10 +488,12 @@ internal class ClassMateAcademicScreensSupabase(
                     snapshot = JSONObject().put("entries", buses).put("saved_at", System.currentTimeMillis())
                 } else {
                     val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
-                    val offerings = if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))
+                    val selectedCatalog=rows(ClassMateCourses.catalog(selectedBatch))
+                    val visibleIds=selectedCatalog.map {it.optString("offering_id")}.toSet()
+                    val offerings = (if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))).filter {profile().optString("role")!="teacher" || it.optString("id") in visibleIds}
                     val ids = offerings.map { it.getString("id") }
                     val bundle = coroutineScope {
-                        val courses = async { rows(ClassMateCourses.catalog(selectedBatch)).associateBy { it.getString("id") } }
+                        val courses = async { selectedCatalog.associateBy { it.getString("id") } }
                         val routines = async { if (ids.isEmpty()) JSONArray() else ClassMateAuthApi.rows("routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.(${ids.joinToString(",")})&order=start_time") }
                         val teachers = async { if (ids.isEmpty()) JSONArray() else JSONArray(ClassMateAuthApi.rpcText("timetable_details", JSONObject().put("target_batch", selectedBatch).put("target_date", LocalDate.now().toString()).put("target_course_ids", JSONArray(ids)))) }
                         val changes = async { ClassMateAuthApi.rows("class_changes", "select=semester_course_id,effective_date&batch_id=eq.$selectedBatch&kind=eq.cancelled&effective_date=gte.${LocalDate.now()}&effective_date=lte.${LocalDate.now().plusDays(7)}") }

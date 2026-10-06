@@ -141,6 +141,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         return box to field
     }
     private fun buildNotice() {
+        val teacher = intent.getStringExtra("role") == "teacher"
         form.label("Notice type")
         val choices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
         val ai = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id=View.generateViewId(); text="AI compose"; setTextColor(getColor(R.color.cm_text_primary)) }
@@ -153,7 +154,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val title = form.field("Notice title")
         val message = form.field("Message · links supported", true)
         val silentHint=form.label("Start with /silent to post without a push notification.")
-        val (courseBox, course) = dropdown("Cancelled course", courses.map { it.second })
+        val (courseBox, course) = dropdown(if (teacher) "Assigned course" else "Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
         choices.setOnCheckedChangeListener { _, checked ->
@@ -164,8 +165,8 @@ class ClassMatePublishActivity : AppCompatActivity() {
             (title.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
             (message.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
             silentHint.visibility=if(cancelled || composing) View.GONE else View.VISIBLE
-            courseBox.visibility = if (cancelled) View.VISIBLE else View.GONE
-            dateBox.visibility = courseBox.visibility
+            courseBox.visibility = if (cancelled || teacher) View.VISIBLE else View.GONE
+            dateBox.visibility = if (cancelled) View.VISIBLE else View.GONE
             submit.text=if(composing) "Compose & post" else "Post notice"
         }
         choices.check(if(aiAllowed) ai.id else general.id)
@@ -196,12 +197,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
             val cancelled = choices.checkedRadioButtonId == cancellation.id
             val selected = courses.firstOrNull { it.second == course.text.toString() }
-            if (cancelled && selected == null) { courseBox.error = "No assigned course available"; return@setOnClickListener }
+            if ((cancelled || teacher) && selected == null) { courseBox.error = "No assigned course available"; return@setOnClickListener }
             if (!cancelled && title.text.isNullOrBlank()) { title.error = "Enter a title"; return@setOnClickListener }
             perform {
                 if (cancelled) ClassMateAuthApi.rpc("post_cancellation_notice", JSONObject().put("target_batch", batch)
                     .put("target_course", selected!!.first).put("change_date", LocalDate.now().plusDays(if (date.text.toString() == "Tomorrow") 1 else 0).toString()))
-                else ClassMateAuthApi.rpc("post_notice", JSONObject().put("target_batch", batch).put("target_course", JSONObject.NULL)
+                else ClassMateAuthApi.rpc("post_notice", JSONObject().put("target_batch", batch).put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
                     .put("notice_title", title.text.toString().trim()).put("notice_body", message.text.toString().trim()))
             }
         }

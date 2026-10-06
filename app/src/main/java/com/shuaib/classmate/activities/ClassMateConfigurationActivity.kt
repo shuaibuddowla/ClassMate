@@ -184,7 +184,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
     private fun teacherForm(t: JSONObject) {
         if(role!="admin" || editor?.isShowing==true) return
         val f=ClassMateFormUi(this); val name=f.field("Teacher name").apply { setText(clean(t,"full_name")) }
-        val email=f.field("University email (optional)").apply { inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; setText(clean(t,"email")) }
+        val email=f.field("University email or Gmail (optional)").apply { inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS; setText(clean(t,"email")) }
         f.label("${t.optInt("course_count")} courses · ${clean(t,"course_names")}")
         f.label("Adding an email allows this teacher to sign in and access assigned courses.")
         f.panel.addView(MaterialButton(this,null,com.google.android.material.R.attr.borderlessButtonStyle).apply {
@@ -211,7 +211,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
             val departments=rows(ClassMateAuthApi.rows("departments","select=id,name&order=name"))
             val f=ClassMateFormUi(this@ClassMateConfigurationActivity)
             val department=f.choice("Department",departments.map { it.optString("name") })
-            val name=f.field("Teacher name"); val email=f.field("University email (optional)")
+            val name=f.field("Teacher name"); val email=f.field("University email or Gmail (optional)")
             val error=f.status(); val d=MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity).setTitle("Add teacher").setView(f.scroll).setNegativeButton("Cancel",null).setPositiveButton("Add teacher",null).create(); d.show()
             d.getButton(-1).setOnClickListener { write(d,error,{
                 val dept=departments.getOrNull(department.selectedItemPosition) ?: throw IllegalArgumentException("Select a department")

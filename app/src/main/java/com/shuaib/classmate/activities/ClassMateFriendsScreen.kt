@@ -34,7 +34,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,private val scope: CoroutineScope,
-    private val currentBatch: ()->String,private val onCall: (String)->Unit) {
+    private val currentBatch: ()->String,private val onCall: (String)->Unit,private val teacher: ()->Boolean = {false}) {
     private var cachedBatch=""
     private var cachedRoot: LinearLayout?=null
     private val pages=linkedMapOf<String,List<JSONObject>>()
@@ -56,7 +56,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         host.addView(root,LinearLayout.LayoutParams(-1,-1))
         val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(8),dp(16),dp(4)) }
         val titleRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
-        titleRow.addView(text("Friends",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
+        titleRow.addView(text(if(teacher()) "Students" else "Friends",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
         titleRow.addView(ClassMateFeatureUi.button(activity,"Blood requests") { activity.startActivity(Intent(activity,ClassMateBloodActivity::class.java).putExtra("batch_id",batch)) }.apply { textSize=13f; minHeight=dp(48); icon=androidx.core.content.ContextCompat.getDrawable(activity,R.drawable.ic_blood_drop); iconTint=android.content.res.ColorStateList.valueOf(0xFFD94B55.toInt()); iconSize=dp(20); setTextColor(0xFFD94B55.toInt()); strokeWidth=dp(1); strokeColor=android.content.res.ColorStateList.valueOf(0x66D94B55); cornerRadius=dp(16); backgroundTintList=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) })
         header.addView(titleRow)
         header.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(8)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
@@ -69,7 +69,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         }
         val input=TextInputEditText(searchBox.context).apply {
             setSingleLine(true); setTextColor(activity.getColor(R.color.cm_text_primary))
-            hint="Search name or student ID"; textSize=13f; minHeight=dp(48); setPadding(dp(12),dp(8),dp(12),dp(8))
+            hint=if(teacher()) "Search students by name or ID" else "Search name or student ID"; textSize=13f; minHeight=dp(48); setPadding(dp(12),dp(8),dp(12),dp(8))
             filters=arrayOf(android.text.InputFilter.LengthFilter(100))
             inputType=android.text.InputType.TYPE_CLASS_TEXT
         }
@@ -117,9 +117,9 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     if(wait) delay(250)
                     val result=JSONArray(ClassMateAuthApi.rpcText("batch_friends",JSONObject().put("target_batch",batch).put("query_text",query).put("result_offset",requestedOffset)))
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
-                    val page=(0 until result.length()).map { result.getJSONObject(it) }
+                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { !teacher() || it.optString("role")=="student" }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
-                    offset=requestedOffset+page.size; hasMore=page.size==100
+                    offset=requestedOffset+result.length(); hasMore=result.length()==100
                     adapter.submitList(merged)
                     pages[query]=merged
                     while(pages.size>8) pages.remove(pages.keys.first())

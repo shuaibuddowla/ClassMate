@@ -137,6 +137,7 @@ export default function Manage({
       ] as [string, string, typeof BookOpen][]),
     );
   if (canManage.isPending && !ctx.owner) return <Skeleton />;
+  if(ctx.profile.role==="teacher") return <><button className="text-button" onClick={back}><ArrowLeft size={17}/>Profile</button><div className="page-heading"><div><h1>Teaching tools</h1><p>Your assigned courses in this batch.</p></div></div><div className="course-grid">{ctx.courses.map(c=><div className="card" key={c.offering_id}><strong>{c.course_title}</strong><p>{c.course_code}</p></div>)}</div><div className="teacher-tool-links"><a className="secondary" href="#timetable">My teaching schedule</a><a className="secondary" href="#notices">Course notices & cancellations</a><a className="secondary" href="#library">Teaching resources</a><a className="secondary" href="#friends">Students</a></div></>;
   if (!ctx.owner && !canManage.data)
     return (
       <div className="card">
@@ -306,7 +307,7 @@ export default function Manage({
                     },
                     {
                       name: "target_email",
-                      label: "University email (optional)",
+                      label: "University email or Gmail (optional)",
                       type: "email",
                     },
                   ],
@@ -341,7 +342,7 @@ export default function Manage({
                       },
                       {
                         name: "target_email",
-                        label: "University email",
+                        label: "University email or Gmail",
                         type: "email",
                         value: t.email,
                       },

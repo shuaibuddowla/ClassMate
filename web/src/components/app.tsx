@@ -286,6 +286,10 @@ function SessionApp() {
           >
             Continue with Google <ArrowRight size={18} />
           </button>
+          <p className="teacher-signin-hint">Teachers: use your admin-approved university email or Gmail.</p>
+          <button className="secondary wide" disabled={!configured()} onClick={async()=>{
+            try { const {error}=await supabase().auth.signInWithOAuth({provider:"google",options:{redirectTo:`${location.origin}/auth/callback`,queryParams:{prompt:"select_account"}}}); if(error) throw error; } catch(e) {setError(e)}
+          }}>Teacher sign-in <ArrowRight size={18}/></button>
           <InstallWebApp />
           {!configured() && (
             <p>Server setup is required before sign-in is available.</p>
@@ -347,7 +351,7 @@ function SessionApp() {
           <Avatar name={profile.full_name} url={profile.avatar_url} />
           <h3>{profile.full_name}</h3>
           <dl>
-            {["student_id", "academic_session", "role"].map((key) => (
+            {(profile.role==="teacher" ? ["role"] : ["student_id", "academic_session", "role"]).map((key) => (
               <div key={key}>
                 <dt>{key.replace("_", " ")}</dt>
                 <dd>
@@ -359,8 +363,7 @@ function SessionApp() {
             ))}
           </dl>
           <p>
-            Your department and batch are assigned by the university account
-            rules.
+            {profile.role==="teacher" ? "Your teaching access comes from the courses assigned by your administrator." : "Your department and batch are assigned by the university account rules."}
           </p>
           <button className="primary wide" onClick={() => setStage("profile")}>
             Continue
@@ -632,6 +635,7 @@ function Home({
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  const [teacherEntered,setTeacherEntered]=useState(false);
   const [tab, setTab] = useState("timetable"),
     [batch, setBatch] = useState(""),
     [online, setOnline] = useState(true),
@@ -648,14 +652,7 @@ function Home({
     queryKey: [user, "owner"],
     queryFn: () => rpc<boolean>("is_owner"),
   });
-  const batches = useAcademic<Row[]>(user, "account", "batches", () =>
-    rows(
-      "batches",
-      { is_active: true },
-      "*,departments(name,code)",
-      "batch_number",
-    ),
-  );
+  const batches = useAcademic<Row[]>(user, "account", "batches", () => rpc<Row[]>("available_batches"));
   const courses = useAcademic<Row[]>(user, batch, "courses", () =>
     rpc<Row[]>("batch_course_catalog", { target_batch: batch }),
   );
@@ -668,6 +665,7 @@ function Home({
   useEffect(() => {
     const data = batches.data || [];
     if (!data.length) return;
+    if(profile.role==="teacher" && !teacherEntered) return;
     setBatch((current) =>
       data.some((b) => b.id === current)
         ? current
@@ -677,7 +675,7 @@ function Home({
               (b) => b.id === localStorage.getItem(`classmate:batch:${user}`),
             )?.id || data[0].id,
     );
-  }, [batches.data, profile, user]);
+  }, [batches.data, profile, user, teacherEntered]);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     update();
@@ -788,7 +786,7 @@ function Home({
     ["timetable", "Timetable", CalendarDays],
     ["notices", "Notices", Bell],
     ["library", "Library", BookOpen],
-    ["friends", "Friends", Users],
+    ["friends", profile.role==="teacher" ? "Students" : "Friends", Users],
     ["profile", "Profile", User],
   ] as const;
   const select = (value: string) => {
@@ -797,6 +795,12 @@ function Home({
     history.replaceState({}, "", `/#${value}`);
   };
   const navigationTab = tab === "ai" ? "profile" : desktop && tab === "notices" ? "timetable" : tab;
+  if(profile.role==="teacher" && !teacherEntered) return <main className="teacher-batch-picker"><section className="card">
+    <OrbitLogo/><span className="eyebrow">TEACHER WORKSPACE</span><h1>Choose your classroom.</h1><p>Select an assigned batch to open your teaching workspace.</p>
+    <ErrorBox error={batches.error} retry={()=>batches.refetch()}/>
+    {batches.isPending ? <Skeleton/> : !(batches.data || []).length ? <p>No active courses are assigned yet. Ask your administrator to assign a course, then refresh.</p> : <div className="teacher-batch-list">{batches.data!.map(b=><button className="secondary" key={b.id} onClick={()=>{setBatch(b.id);setTeacherEntered(true)}}><strong>{b.departments?.code?.toUpperCase()} Batch {b.batch_number}</strong><span>Session {academicSession(b.academic_session)} <ArrowRight size={18}/></span></button>)}</div>}
+    <div className="actions"><button onClick={()=>batches.refetch()}>Refresh</button><button onClick={()=>signOut()}>Sign out</button></div>
+  </section></main>;
   return (
     <div className="app" ref={panels.root} style={panels.style}>
       <aside className="sidebar">

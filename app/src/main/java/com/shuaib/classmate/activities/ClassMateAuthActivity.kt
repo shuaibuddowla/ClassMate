@@ -219,7 +219,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             authBusy = false
             status.text = if (error is ApiException && error.statusCode == 12501)
                 "Sign-in cancelled. Continue whenever you’re ready."
-            else "Could not sign in. Please try your MBSTU edumail again. ${error.message.orEmpty()}"
+            else "Could not sign in. Use your university account or an admin-approved teacher Gmail. ${error.message.orEmpty()}"
         }
     }
 
@@ -324,6 +324,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ui.title("Welcome to\nClassMate.")
         ui.text("Sign in with your @mbstu.ac.bd university email.")
         ui.action("Continue with Google") { signIn() }
+        ui.text("Teachers: use the university email or Gmail approved by your administrator.", 12f)
+        ui.action("Teacher sign-in", false) { signIn(true) }
         status = ui.text("",13f).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         profileView = ui.text("").apply { visibility=View.GONE }; resultView = ui.text("").apply { visibility=View.GONE }
         actions = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(actions)
@@ -334,10 +336,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id)).requestEmail().build())
 
-    private fun signIn() {
+    private fun signIn(teacher: Boolean = false) {
         if (!ClassMateAuthApi.configured || authBusy) return
         authBusy = true
-        status.text = "Choose your @mbstu.ac.bd Google account…"
+        status.text = if(teacher) "Choose your approved teacher Google account…" else "Choose your @mbstu.ac.bd Google account…"
         val client = googleClient()
         client.signOut().addOnCompleteListener { googleLauncher.launch(client.signInIntent) }
     }
@@ -564,9 +566,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
         )
         if(unreadActivity==null) unreadActivity=ClassMateUnreadActivity(this,{selectedBatchId},{userId},{selectedTab==R.id.nav_friends && !manageOpen})
         unreadActivity?.refresh()
-        friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) })
+        friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) },{profile?.optString("role")=="teacher"})
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
+        nav.menu.findItem(R.id.nav_friends).title=if(profile?.optString("role")=="teacher") "Students" else "Friends"
         nav.menu.findItem(R.id.nav_manage).isVisible = false
         if(nav.menu.findItem(selectedTab)?.isVisible!=true) selectedTab=R.id.nav_timetable
         nav.selectedItemId = selectedTab
@@ -617,36 +620,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
         ui.animateEntrance()
         lifecycleScope.launch {
             runCatching {
-                val batches = ClassMateAuthApi.rows("batches",
-                    "select=id,batch_number,academic_session,department_id&is_active=eq.true&order=batch_number")
-                val departments = ClassMateAuthApi.rows("departments", "select=id,code")
-                val codes = (0 until departments.length()).associate { i ->
-                    departments.getJSONObject(i).getString("id") to
-                        departments.getJSONObject(i).getString("code").uppercase()
+                val batches = JSONArray(ClassMateAuthApi.rpcText("available_batches",JSONObject()))
+                val codes = (0 until batches.length()).associate { i ->
+                    val b=batches.getJSONObject(i)
+                    b.getString("department_id") to b.getJSONObject("departments").getString("code").uppercase()
                 }
-                val allowed = if (profile?.optString("role") == "teacher") {
-                    val assignments = ClassMateAuthApi.rows("teacher_course_assignments",
-                        "select=semester_course_id&teacher_id=eq.$userId&active=eq.true")
-                    val courseIds = (0 until assignments.length()).map { i ->
-                        assignments.getJSONObject(i).getString("semester_course_id")
-                    }.toSet()
-                    val offerings = ClassMateAuthApi.rows("semester_courses", "select=id,semester_id")
-                    val semesterIds = (0 until offerings.length()).mapNotNull { i ->
-                        offerings.getJSONObject(i).takeIf { it.getString("id") in courseIds }
-                            ?.getString("semester_id")
-                    }.toSet()
-                    val semesters = ClassMateAuthApi.rows("semesters", "select=id,batch_id&status=eq.active")
-                    (0 until semesters.length()).mapNotNull { i ->
-                        semesters.getJSONObject(i).takeIf { it.getString("id") in semesterIds }
-                            ?.getString("batch_id")
-                    }.toSet()
-                } else null
                 actions.removeAllViews()
                 var count = 0
                 for (i in 0 until batches.length()) {
                     val batch = batches.getJSONObject(i)
                     val id = batch.getString("id")
-                    if (allowed != null && id !in allowed) continue
                     val label = "${codes[batch.getString("department_id")] ?: "Department"} " +
                         "Batch ${batch.getInt("batch_number")} · Session ${ClassMateAcademicSession.format(batch.getInt("academic_session"))}"
                     ui.action("$label  →", false, actions) {
@@ -772,6 +755,20 @@ class ClassMateAuthActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         label(selectedBatchLabel.ifBlank { "Current batch" }, 15f).apply {
             setTextColor(getColor(R.color.cm_text_secondary))
+        }
+        if(role=="teacher") {
+            manageCard(actions,"My courses","Your assigned subjects in this batch") {
+                runAction("Loading assigned courses") {
+                    val list=JSONArray(ClassMateAuthApi.rpcText("batch_course_catalog",JSONObject().put("target_batch",selectedBatchId)))
+                    val names=(0 until list.length()).map { val c=list.getJSONObject(it); "${c.optString("course_code")} · ${c.optString("course_title")}" }
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle("My courses").setBackground(ClassMateFeatureUi.surface(this)).setMessage(names.joinToString("\n\n").ifBlank {"Ask the admin to assign your courses."}).setPositiveButton("Close",null).show()
+                }
+            }
+            fun teachingTab(tab:Int) { manageOpen=false;selectedTab=tab;findViewById<GlassBottomNavView>(R.id.classmate_home_nav).selectedItemId=tab;renderHomeTab(tab) }
+            manageCard(actions,"My teaching schedule","View and edit your assigned periods") { teachingTab(R.id.nav_timetable) }
+            manageCard(actions,"Course notices","Post updates or class cancellations") { teachingTab(R.id.nav_notices) }
+            manageCard(actions,"Teaching resources","Share files for your courses") { teachingTab(R.id.nav_pdf) }
+            return
         }
         manageCard(actions,"Courses","Configure this batch’s courses and teachers") { openConfiguration() }
         if (role == "admin") {
@@ -1786,7 +1783,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
                 11 -> pickRow("departments", "select=id,name&order=name", "Choose department",
                     { it.optString("name") }) { department ->
-                    form("Teacher university email", listOf("University email")) { v ->
+                    form("Teacher sign-in email", listOf("University email or Gmail")) { v ->
                         AlertDialog.Builder(this).setTitle("Teacher access")
                             .setItems(arrayOf("Allow teacher", "Remove access")) { _, choice ->
                                 runAction("Updating teacher access") {

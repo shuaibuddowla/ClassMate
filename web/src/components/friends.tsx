@@ -84,7 +84,7 @@ export function Friends({ ctx }: { ctx: Context }) {
       <div className="page-heading">
         <div>
           <span className="eyebrow">YOUR BATCH COMMUNITY</span>
-          <h1>Friends</h1>
+          <h1>{ctx.profile.role==="teacher" ? "Students" : "Friends"}</h1>
         </div>
         <button className="blood-entry" onClick={()=>setBlood(true)}><Droplets size={18}/> Blood requests</button>
       </div>
@@ -106,7 +106,7 @@ export function Friends({ ctx }: { ctx: Context }) {
         <Skeleton />
       ) : (
         <div className="people-grid">
-          {friends.data?.pages.flat().map((p) => (
+          {friends.data?.pages.flat().filter(p=>ctx.profile.role!=="teacher" || p.role==="student").map((p) => (
             <button
               disabled={busy}
               className="card person"

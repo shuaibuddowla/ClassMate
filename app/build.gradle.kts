@@ -55,8 +55,8 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.1.25"
+        versionCode = 27
+        versionName = "1.1.26"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"${getLocalProperty("BACKEND_BASE_URL")}\"")
