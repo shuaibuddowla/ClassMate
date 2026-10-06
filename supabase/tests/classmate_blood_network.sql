@@ -45,9 +45,9 @@ select classmate.respond_blood_request('b1000000-0000-4000-8000-000000000021','i
 select classmate.respond_blood_request('b1000000-0000-4000-8000-000000000021','interested');
 select pg_temp.check(jsonb_array_length(classmate.blood_request_details('b1000000-0000-4000-8000-000000000021')->'volunteers')=0,'Responders cannot enumerate donor contacts');
 select classmate.save_blood_preferences(true,(now() at time zone 'Asia/Dhaka')::date-119);
-select pg_temp.check(not classmate.blood_alert_allowed('b1000000-0000-4000-8000-000000000021'),'119-day donation cooldown');
+select pg_temp.check(not (classmate.blood_request_details('b1000000-0000-4000-8000-000000000021')->>'can_donate')::boolean,'119-day donation cooldown');
 select classmate.save_blood_preferences(true,(now() at time zone 'Asia/Dhaka')::date-121);
-select pg_temp.check(not classmate.blood_alert_allowed('b1000000-0000-4000-8000-000000000021'),'Older donation cannot erase latest donation');
+select pg_temp.check(not (classmate.blood_request_details('b1000000-0000-4000-8000-000000000021')->>'can_donate')::boolean,'Older donation cannot erase latest donation');
 select set_config('request.jwt.claim.sub','b1000000-0000-4000-8000-000000000012',true);
 select pg_temp.check(jsonb_array_length(classmate.blood_request_details('b1000000-0000-4000-8000-000000000021')->'volunteers')=1,'Organizer can contact voluntary responder');
 reset role;
@@ -61,7 +61,13 @@ do $$ declare e uuid; h text; l uuid:=gen_random_uuid(); c jsonb; begin
  c:=classmate.web_notification_job_context(e,h,l);
  perform pg_temp.check(c->>'title'='Urgent: A+ blood needed','Shared worker blood context');
  update classmate.blood_donor_preferences set opted_in=false where profile_id='b1000000-0000-4000-8000-000000000012';
- perform pg_temp.check(classmate.web_notification_job_context(e,h,l) is null,'Recheck consent on leased job');
+ perform pg_temp.check(classmate.web_notification_job_context(e,h,l) is not null,'General alerts do not require volunteer enrollment');
+ update classmate.profiles set blood_group='B+' where id='b1000000-0000-4000-8000-000000000012';
+ c:=classmate.web_notification_job_context(e,h,l);
+ perform pg_temp.check(c->>'title'='A+ blood needed' and not (c->>'blood_match')::boolean and c->>'body' like 'Know a friend%','Nonmatching leased device receives referral payload');
+ update classmate.profiles set verification_status='pending' where id='b1000000-0000-4000-8000-000000000012';
+ perform pg_temp.check(classmate.web_notification_job_context(e,h,l) is null,'Revoked membership suppresses leased blood job');
+ update classmate.profiles set verification_status='active',blood_group='A+' where id='b1000000-0000-4000-8000-000000000012';
 end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','b1000000-0000-4000-8000-000000000012',true);
@@ -92,4 +98,33 @@ do $$ begin
  begin perform classmate.create_blood_request(gen_random_uuid(),'b1000000-0000-4000-8000-000000000002','A+','Rate hospital',1,now()+interval '1 day','+8801700000099');raise sqlstate 'XX000' using message='Rate limit missing';
  exception when raise_exception then perform pg_temp.check(sqlerrm like '%at most three%','Request rate limit');end;
 end $$;
+-- General broadcasts span batches and include nonmatching groups and non-enrolled users.
+reset role;
+update classmate.profiles set verification_status='active',blood_group='B+' where id='b1000000-0000-4000-8000-000000000013';
+select pg_temp.check(classmate.blood_broadcast_allowed('b1000000-0000-4000-8000-000000000022','b1000000-0000-4000-8000-000000000013'),'Nonmatching group receives university alert');
+select pg_temp.check(not classmate.blood_matching_alert('b1000000-0000-4000-8000-000000000022','b1000000-0000-4000-8000-000000000013'),'Nonmatching user gets referral wording');
+update classmate.profiles set blood_group='Unknown' where id='b1000000-0000-4000-8000-000000000013';
+select pg_temp.check(classmate.blood_broadcast_allowed('b1000000-0000-4000-8000-000000000022','b1000000-0000-4000-8000-000000000013'),'Unknown group still receives general alert');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','b1000000-0000-4000-8000-000000000013',true);
+select pg_temp.check((classmate.unread_activity('b1000000-0000-4000-8000-000000000003')->>'blood_requests')::int=1,'Unread blood spans batches');
+select pg_temp.check(jsonb_array_length(classmate.unread_blood_requests())=1,'Unseen request popup list');
+select classmate.mark_blood_request_read('b1000000-0000-4000-8000-000000000022');
+select classmate.mark_blood_request_read('b1000000-0000-4000-8000-000000000022');
+select pg_temp.check((classmate.unread_activity('b1000000-0000-4000-8000-000000000003')->>'blood_requests')::int=0,'Viewing details clears blood badge idempotently');
+do $$ begin
+ begin perform classmate.unread_activity('b1000000-0000-4000-8000-000000000002');raise exception 'Cross-batch counts accepted';exception when insufficient_privilege then null;end;
+end $$;
+reset role;
+insert into classmate.notices(id,department_id,batch_id,author_id,title,body) values
+('b1000000-0000-4000-8000-000000000031','b1000000-0000-4000-8000-000000000001','b1000000-0000-4000-8000-000000000003','b1000000-0000-4000-8000-000000000013','Unread fixture','/silent Fixture'),
+('b1000000-0000-4000-8000-000000000032','b1000000-0000-4000-8000-000000000001','b1000000-0000-4000-8000-000000000002','b1000000-0000-4000-8000-000000000012','Other batch fixture','/silent Fixture');
+set local role authenticated;
+select pg_temp.check((classmate.unread_activity('b1000000-0000-4000-8000-000000000003')->>'notices')::int=1,'Notice counts exclude other batch');
+select classmate.mark_notices_read(array['b1000000-0000-4000-8000-000000000031']::uuid[]);
+select pg_temp.check((classmate.unread_activity('b1000000-0000-4000-8000-000000000003')->>'notices')::int=0,'Seen notice clears badge');
+reset role;
+select pg_temp.check(not has_table_privilege('authenticated','classmate.blood_request_reads','SELECT'),'Private blood read history');
+select pg_temp.check(not has_function_privilege('anon','classmate.unread_activity(uuid)','EXECUTE'),'Anonymous unread counts denied');
+select pg_temp.check(not has_function_privilege('authenticated','classmate.blood_broadcast_allowed(uuid,uuid)','EXECUTE'),'Cannot inspect another user eligibility');
 rollback;

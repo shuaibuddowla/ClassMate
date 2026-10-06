@@ -65,7 +65,7 @@ Deno.serve(async request=>{
                 body:JSON.stringify(deliveryPayload(content.fcm_token,{
                   kind:job.kind,record_id:job.record_id,batch_id:content.batch_id ?? "",event_id:job.event_id,token_hash:job.token_hash,
                   recipient_id:job.profile_id,project_ref:project,version_code:String(content.version_code ?? ""),version_name:String(content.version_name ?? ""),
-                  ...(job.kind==="blood_request"?{expires_at:String(content.expires_at)}:{}),
+                  ...(job.kind==="blood_request"?{expires_at:String(content.expires_at),blood_match:String(content.blood_match===true)}:{}),
                   title:release?`ClassMate ${content.version_name} is available`:content.title,
                   body:release?"Tap to check and install the latest update.":content.body
                 },content.client_platform))

@@ -54,10 +54,11 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             } catch (_:Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
         }
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = if(blood) "classmate_blood_emergency" else if(release) UpdateNotifications.CHANNEL_ID else "classmate_notifications"
-        if(blood && Build.VERSION.SDK_INT>=26) {
+        val matched = blood && inputData.getString("blood_match") == "true"
+        val channel = if(matched) "classmate_blood_emergency" else if(release) UpdateNotifications.CHANNEL_ID else "classmate_notifications"
+        if(matched && Build.VERSION.SDK_INT>=26) {
             manager.createNotificationChannel(android.app.NotificationChannel(channel,"Verified blood requests",NotificationManager.IMPORTANCE_HIGH).apply {
-                description="Matching emergency blood requests you opted into"
+                description="Urgent blood requests matching your profile"
                 enableVibration(true)
                 setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"),android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build())
             })
@@ -86,10 +87,11 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     .setPriority(NotificationCompat.PRIORITY_HIGH).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     .setOnlyAlertOnce(true).setAutoCancel(true)
                 if(blood) {
-                    builder.setColor(0xFFC43E52.toInt()).setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"))
+                    builder.setColor(0xFFC43E52.toInt())
+                    if(matched) builder.setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"))
                     val volunteerIntent=Intent(intent).putExtra("volunteer_now",true)
                     val volunteer=PendingIntent.getActivity(context,(key+"donate").hashCode(),volunteerIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                    builder.addAction(R.drawable.ic_classmate_notification,"I can donate",volunteer)
+                    if(bloodDetails?.optBoolean("can_donate")==true) builder.addAction(R.drawable.ic_classmate_notification,"I can donate",volunteer)
                     bloodDetails?.optString("attendant_phone")?.takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }?.let { phone ->
                         val call=PendingIntent.getActivity(context,(key+"call").hashCode(),Intent(Intent.ACTION_DIAL,android.net.Uri.parse("tel:$phone")),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                         builder.addAction(R.drawable.ic_classmate_notification,"Call attendant",call)
@@ -102,6 +104,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         if(state=="displayed" && eventKey!=null) ledger.record(eventKey)
         // Automatic checks remain useful even when Android notifications are disabled.
         if(release) UpdateCoordinator.enqueueReleaseCheck(context)
+        if(!release) com.shuaib.classmate.activities.ClassMateUnreadActivity.changed()
         val event = inputData.getString("event_id")
         val hash = inputData.getString("token_hash")
         if (event != null && hash != null) {
@@ -116,7 +119,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
     companion object {
         fun enqueue(context: Context, values: Map<String,String>) {
             // Only known, bounded fields enter WorkManager's persisted Data (10 KB limit).
-            val fields = listOf("project_ref","recipient_id","batch_id","kind","record_id","event_id","token_hash","version_code","version_name","title","body")
+            val fields = listOf("project_ref","recipient_id","batch_id","kind","record_id","event_id","token_hash","version_code","version_name","title","body","blood_match","expires_at")
             val data = Data.Builder().apply { fields.forEach { key -> values[key]?.let { putString(key,it.take(500)) } } }.build()
             val work = OneTimeWorkRequestBuilder<ClassMatePushWorker>().setInputData(data)
                 .apply { if(Build.VERSION.SDK_INT>=31) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) }.build()

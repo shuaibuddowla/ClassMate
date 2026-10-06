@@ -68,7 +68,7 @@ test("blood requests fit phones and desktops, preserve consent and volunteer act
     "Tangail General Hospital",
   );
   await page.getByRole("button", { name: "Donor settings" }).click();
-  await page.getByLabel("Matching blood alerts").selectOption("yes");
+  await page.getByLabel("Available to volunteer").selectOption("yes");
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(page.getByRole("dialog")).not.toBeVisible();
   expect(enabled).toBe(true);

@@ -328,11 +328,10 @@ export function Notices({
               onReminder={() => setReminder(n)}
               markRead={() =>
                 rpc("mark_notices_read", { target_ids: [n.id] })
-                  .then(() =>
-                    qc.invalidateQueries({
-                      queryKey: [ctx.user, ctx.batch, "notices"],
-                    }),
-                  )
+                  .then(() => Promise.all([
+                    qc.invalidateQueries({queryKey: [ctx.user, ctx.batch, "notices"]}),
+                    qc.invalidateQueries({queryKey: [ctx.user, ctx.batch, "unread-activity"]}),
+                  ]))
                   .catch(() => {})
               }
             />

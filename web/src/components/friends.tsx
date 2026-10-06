@@ -1,13 +1,31 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Phone, MessageCircle, ChevronRight, Droplets } from "lucide-react";
 import { BloodNetwork } from "./blood-network";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
 import { Avatar, Empty, ErrorBox, Modal, Skeleton } from "./ui";
 export function Friends({ ctx }: { ctx: Context }) {
+  const qc = useQueryClient();
+  const [alert, setAlert] = useState<Row | null>(null);
   const [blood, setBlood] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setAlert(null);
+    if(ctx.active && !blood && navigator.onLine && !location.hash.startsWith("#friends/blood")) {
+      rpc<Row[]>("unread_blood_requests").then(async requests => {
+        if(!live || !requests[0]) return;
+        const details = await rpc<Row>("blood_request_details", {target_request: requests[0].id});
+        if(live) setAlert(details);
+      }).catch(() => {});
+    }
+    return () => { live=false; };
+  }, [ctx.active, ctx.user, ctx.batch, blood]);
+  useEffect(() => {
+    if(!alert || !ctx.active) return;
+    rpc("mark_blood_request_read", {target_request: alert.id}).then(() => qc.invalidateQueries({queryKey:[ctx.user,ctx.batch,"unread-activity"]})).catch(() => {});
+  }, [alert, ctx.active, ctx.user, ctx.batch, qc]);
   useEffect(() => { const update=()=>{if(location.hash.startsWith("#friends/blood"))setBlood(true)};update();window.addEventListener("hashchange",update);return()=>window.removeEventListener("hashchange",update) },[]);
   const [input, setInput] = useState(""),
     [search, setSearch] = useState(""),
@@ -18,7 +36,7 @@ export function Friends({ ctx }: { ctx: Context }) {
   useEffect(() => {
     const update = () => {
       setOnline(navigator.onLine);
-      if (!navigator.onLine) setPerson(null);
+      if (!navigator.onLine) { setPerson(null); setAlert(null); }
     };
     update();
     window.addEventListener("online", update);
@@ -54,12 +72,21 @@ export function Friends({ ctx }: { ctx: Context }) {
   if (blood) return <BloodNetwork ctx={ctx} close={()=>{setBlood(false);history.replaceState(null,"","#friends")}} />;
   return (
     <>
+      {alert && ctx.active && <Modal title={`${alert.blood_group} blood needed`} close={()=>setAlert(null)}>
+        <div className="blood-detail"><h3>{alert.hospital}</h3>
+          <p>For: {alert.patient_name || alert.requester_name}</p><p>Requested by: {alert.requester_name}</p>
+          <p>{alert.units} unit(s) · Needed by {new Date(alert.needed_by).toLocaleString()}</p>
+          <p>Attendant: {alert.attendant_phone}</p><p>Can you help, or find someone who can?</p>
+          <div className="actions"><a className="secondary" href={`tel:${alert.attendant_phone}`}><Phone size={18}/> Call attendant</a>
+          <button className="primary" onClick={()=>{location.hash=`friends/blood/${alert.id}`;setAlert(null);setBlood(true)}}>View request</button></div>
+        </div>
+      </Modal>}
       <div className="page-heading">
         <div>
           <span className="eyebrow">YOUR BATCH COMMUNITY</span>
           <h1>Friends</h1>
         </div>
-        <button className="text-button" onClick={()=>setBlood(true)}><Droplets size={18}/> Blood requests</button>
+        <button className="blood-entry" onClick={()=>setBlood(true)}><Droplets size={18}/> Blood requests</button>
       </div>
       <label className="search">
         <Search size={18} />

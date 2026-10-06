@@ -59,6 +59,7 @@ internal class ClassMateAcademicScreensSupabase(
     private val onConfigure: () -> Unit,
     private val onEnableNotifications: () -> Unit,
     private val onOpenAi: () -> Unit,
+    private val onNoticeRead: () -> Unit = {},
 ) {
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
     private var busMode = false
@@ -1052,6 +1053,7 @@ internal class ClassMateAcademicScreensSupabase(
                     .put("target_ids", JSONArray(newIds)))
             }.onSuccess {
                 if(!active(root) || requestedBatch!=batchId() || requestedProfile!=profile().optString("id")) return@launch
+                onNoticeRead()
                 newIds.forEach { id ->
                     val previews = noticeReaderPreviews[id].orEmpty()
                     if (previews.none { it.optString("profile_id") == profile().optString("id") })

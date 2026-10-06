@@ -78,7 +78,7 @@ async function display(data: Record<string, string> | undefined) {
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.event_id,
-    ...(data.kind === "blood_request" ? { requireInteraction: true, actions: [{action:"donate",title:"I can donate"},{action:"call",title:"Call attendant"}] } : {}),
+    ...(data.kind === "blood_request" ? { requireInteraction: true, actions: [...(data.blood_match === "true" ? [{action:"donate",title:"I can donate"}] : []),{action:"call",title:"Call attendant"}] } : {}),
     data: {
       kind: data.kind,
       record: data.record_id,

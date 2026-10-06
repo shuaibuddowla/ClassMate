@@ -638,6 +638,12 @@ function Home({
     [linked, setLinked] = useState<Row | null>(null),
     [linkError, setLinkError] = useState<unknown>(null);
   const qc = useQueryClient();
+  const unread = useQuery({
+    queryKey: [user, batch, "unread-activity"],
+    queryFn: () => rpc<Row>("unread_activity", { target_batch: batch }),
+    enabled: online && !!batch, refetchInterval: 30_000,
+  });
+  function unreadCount(value: string) { return Number(value === "notices" ? unread.data?.notices : value === "friends" ? unread.data?.blood_requests : 0) || 0; }
   const owner = useQuery({
     queryKey: [user, "owner"],
     queryFn: () => rpc<boolean>("is_owner"),
@@ -696,7 +702,10 @@ function Home({
           table: "notices",
           filter: `batch_id=eq.${batch}`,
         },
-        () => qc.invalidateQueries({ queryKey: [user, batch, "notices"] }),
+        () => {
+          qc.invalidateQueries({ queryKey: [user, batch, "notices"] });
+          qc.invalidateQueries({ queryKey: [user, batch, "unread-activity"] });
+        },
       )
       .subscribe();
     return () => {
@@ -822,7 +831,7 @@ function Home({
               }
               onClick={() => select(value)}
             >
-              <Icon size={21} />
+              <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
               <span>{label}</span>
             </button>
           ))}
@@ -943,7 +952,7 @@ function Home({
             className={navigationTab === value ? "selected" : ""}
             onClick={() => select(value)}
           >
-            <Icon size={21} />
+            <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
             <span>{label}</span>
           </button>
         ))}

@@ -57,7 +57,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(8),dp(16),dp(4)) }
         val titleRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
         titleRow.addView(text("Friends",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
-        titleRow.addView(ClassMateFeatureUi.button(activity,"Blood requests") { activity.startActivity(Intent(activity,ClassMateBloodActivity::class.java).putExtra("batch_id",batch)) }.apply { textSize=12f })
+        titleRow.addView(ClassMateFeatureUi.button(activity,"Blood requests") { activity.startActivity(Intent(activity,ClassMateBloodActivity::class.java).putExtra("batch_id",batch)) }.apply { textSize=13f; minHeight=dp(48); icon=androidx.core.content.ContextCompat.getDrawable(activity,R.drawable.ic_blood_drop); iconTint=android.content.res.ColorStateList.valueOf(0xFFD94B55.toInt()); iconSize=dp(20); setTextColor(0xFFD94B55.toInt()); strokeWidth=dp(1); strokeColor=android.content.res.ColorStateList.valueOf(0x66D94B55); cornerRadius=dp(16); backgroundTintList=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) })
         header.addView(titleRow)
         header.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(8)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
         val searchBox=TextInputLayout(activity).apply {

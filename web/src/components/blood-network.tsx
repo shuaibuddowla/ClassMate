@@ -84,6 +84,10 @@ export function BloodNetwork({
       live = false;
     };
   }, [selected]);
+  useEffect(() => {
+    if(!details || !selected || details.id !== selected.id || !ctx.active) return;
+    rpc("mark_blood_request_read",{target_request:details.id}).then(()=>qc.invalidateQueries({queryKey:[ctx.user,ctx.batch,"unread-activity"]})).catch(()=>{});
+  },[details,selected,ctx.active,ctx.user,ctx.batch,qc]);
   async function action(fn: () => Promise<unknown>) {
     if (busy) return;
     setBusy(true);
@@ -129,8 +133,8 @@ export function BloodNetwork({
           <strong>Be there for your campus</strong>
           <p>
             {prefs.data?.opted_in
-              ? "You’re enrolled for matching blood alerts."
-              : "Join voluntarily to receive matching blood requests."}
+              ? "You’re available to volunteer for matching requests."
+              : "Verified requests alert everyone. Join to volunteer."}
           </p>
         </div>
         <button onClick={() => setSettings(true)}>Donor settings</button>
@@ -237,13 +241,7 @@ export function BloodNetwork({
                 required: true,
               },
               {
-                name: "target_audience",
-                label: "Reach",
-                required: true,
-                options: [
-                  { value: "university", label: "University-wide" },
-                  { value: "batch", label: "My batch" },
-                ],
+                name: "target_patient_name", label: "Patient / requested for (optional)",
               },
               {
                 name: "matching",
@@ -269,7 +267,8 @@ export function BloodNetwork({
                 target_units: Number(d.target_units),
                 target_deadline: new Date(d.target_deadline).toISOString(),
                 target_phone: phone,
-                target_audience: d.target_audience,
+                target_audience: "university",
+                target_patient_name: d.target_patient_name || null,
                 allow_compatible: d.matching === "compatible",
               });
               setCreate(false);
@@ -281,11 +280,11 @@ export function BloodNetwork({
       {settings && (
         <Modal title="Your donor preferences" close={() => setSettings(false)}>
           <p>
-            Opt in to matching emergency alerts. Volunteering shares your name
+            Make yourself available to volunteer. Volunteering shares your name
             and mobile number only with the request’s organizer and verifier.
           </p>
           <p>
-            A recorded donation pauses matching alerts for 120 days. This does
+            Everyone receives verified blood requests. A recorded donation pauses the matching appeal for 120 days. This does
             not certify medical eligibility. Also enable Push notifications in
             Profile.
           </p>
@@ -298,7 +297,7 @@ export function BloodNetwork({
             fields={[
               {
                 name: "enabled",
-                label: "Matching blood alerts",
+                label: "Available to volunteer",
                 required: true,
                 value: prefs.data?.opted_in ? "yes" : "no",
                 options: [
@@ -353,6 +352,8 @@ export function BloodNetwork({
               <Skeleton />
             ) : (
               <>
+                <p>For: {details.patient_name || details.requester_name}</p>
+                <p>Requested by: {details.requester_name}</p><p>Attendant: {details.attendant_phone}</p>
                 <a className="primary" href={`tel:${details.attendant_phone}`}>
                   <Phone size={18} /> Call attendant
                 </a>
@@ -405,7 +406,7 @@ export function BloodNetwork({
                       className="primary"
                       onClick={() => status("open")}
                     >
-                      Verify & send matching alerts
+                      Verify & notify university
                     </button>
                     <button disabled={busy} onClick={() => status("rejected")}>
                       Reject request
@@ -455,7 +456,7 @@ export function BloodNetwork({
         >
           <p>
             {confirmStatus === "open"
-              ? "Confirm you called the attendant and verified all request details. Matching donors will receive an alert."
+              ? "Confirm you called the attendant and verified all request details. Users across the university will receive an alert."
               : "This closes the request and stops pending blood alerts."}
           </p>
           <button

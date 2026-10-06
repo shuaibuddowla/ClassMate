@@ -66,9 +66,9 @@ class ClassMateBloodActivity: AppCompatActivity() {
  private fun dial(phone:String){if(phone.matches(Regex("\\+[1-9][0-9]{7,14}")))runCatching{startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:$phone")))}}
  private fun preferences(){operation{
   val p=ClassMateAuthApi.rpc("blood_preferences",JSONObject());val f=ClassMateFormUi(this)
-  f.label("Join voluntarily. Volunteering shares your name and mobile with the organizer and verifier. Recorded donations pause matching alerts for 120 days; hospital screening is still required. Also enable Push notifications in Profile.")
+  f.label("Join voluntarily. Volunteering shares your name and mobile with the organizer and verifier. Everyone receives verified blood requests. Matching groups receive a direct appeal; recorded donations pause this matching appeal for 120 days. Hospital screening is still required. Also enable Push notifications in Profile.")
   f.label("Last donation: ${p.optString("last_donation").takeUnless{it=="null"||it.isBlank()}?:"Not recorded"}")
-  val enabled=CheckBox(this).apply{text="Receive matching blood alerts";isChecked=p.optBoolean("opted_in");setTextColor(getColor(R.color.cm_text_primary))};f.panel.addView(enabled)
+  val enabled=CheckBox(this).apply{text="Available to volunteer";isChecked=p.optBoolean("opted_in");setTextColor(getColor(R.color.cm_text_primary))};f.panel.addView(enabled)
   val donated=f.field("Record donation date (optional, YYYY-MM-DD)")
   val dialog=MaterialAlertDialogBuilder(this).setTitle("Donor settings").setView(f.scroll).setBackground(ClassMateFeatureUi.surface(this)).setNegativeButton("Cancel",null).create()
   f.panel.addView(ClassMateFeatureUi.button(this,"Save preferences",true){operation{val d=donated.text.toString().trim();if(d.isNotEmpty())java.time.LocalDate.parse(d);ClassMateAuthApi.rpc("save_blood_preferences",JSONObject().put("target_enabled",enabled.isChecked).put("donation_date",if(d.isBlank())JSONObject.NULL else d));dialog.dismiss();fetch()}});dialog.show()
@@ -76,34 +76,34 @@ class ClassMateBloodActivity: AppCompatActivity() {
  private fun create(){
   if(batch.isBlank()||batch=="null"){Toast.makeText(this,"Select your batch in Profile first",Toast.LENGTH_LONG).show();return}
   val f=ClassMateFormUi(this);f.label("Confirm details with the attendant. Your admin or batch CR verifies this request before alerts are sent.")
-  val group=f.choice("Blood group needed",groups);val hospital=f.field("Hospital / patient location")
+  val group=f.choice("Blood group needed",groups);val hospital=f.field("Hospital / patient location");val patient=f.field("Patient / requested for (optional)")
   val units=f.field("Units (pints)").apply{inputType=android.text.InputType.TYPE_CLASS_NUMBER;setText("1")}
   val deadline=f.field("Needed by").apply{isFocusable=false;setText("Choose date and time")};var deadlineText:String?=null
   deadline.setOnClickListener{val c=java.util.Calendar.getInstance();android.app.DatePickerDialog(this,{_,y,m,d->android.app.TimePickerDialog(this,{_,h,min->deadlineText=java.time.LocalDateTime.of(y,m+1,d,h,min).atZone(java.time.ZoneId.of("Asia/Dhaka")).toOffsetDateTime().toString();deadline.setText("$d/${m+1}/$y  %02d:%02d".format(h,min))},c.get(java.util.Calendar.HOUR_OF_DAY),c.get(java.util.Calendar.MINUTE),false).show()},c.get(java.util.Calendar.YEAR),c.get(java.util.Calendar.MONTH),c.get(java.util.Calendar.DAY_OF_MONTH)).show()}
   val phone=f.field("Attendant phone (01XXXXXXXXX)").apply{inputType=android.text.InputType.TYPE_CLASS_PHONE}
-  val audience=f.choice("Reach",listOf("University-wide","My batch"));val compatible=CheckBox(this).apply{text="Hospital accepts compatible red-cell donors";setTextColor(getColor(R.color.cm_text_primary))};f.panel.addView(compatible)
+  f.label("Verified requests alert users across the university.");val compatible=CheckBox(this).apply{text="Hospital accepts compatible red-cell donors";setTextColor(getColor(R.color.cm_text_primary))};f.panel.addView(compatible)
   val key=UUID.randomUUID().toString();val dialog=MaterialAlertDialogBuilder(this).setTitle("Request blood").setView(f.scroll).setBackground(ClassMateFeatureUi.surface(this)).setNegativeButton("Cancel",null).create()
   f.panel.addView(ClassMateFeatureUi.button(this,"Submit for verification",true){operation{
    var n=phone.text.toString().replace(Regex("[\\s()-]"),"");if(n.matches(Regex("01[0-9]{9}")))n="+88$n"
    require(deadlineText!=null){"Choose a deadline"}
-   ClassMateAuthApi.rpcText("create_blood_request",JSONObject().put("request_key",key).put("target_batch",batch).put("target_group",groups[group.selectedItemPosition]).put("target_hospital",hospital.text.toString()).put("target_units",units.text.toString().toInt()).put("target_deadline",deadlineText).put("target_phone",n).put("target_audience",if(audience.selectedItemPosition==0)"university" else "batch").put("allow_compatible",compatible.isChecked));dialog.dismiss();fetch()
+   ClassMateAuthApi.rpcText("create_blood_request",JSONObject().put("request_key",key).put("target_batch",batch).put("target_group",groups[group.selectedItemPosition]).put("target_hospital",hospital.text.toString()).put("target_units",units.text.toString().toInt()).put("target_deadline",deadlineText).put("target_phone",n).put("target_audience","university").put("target_patient_name",patient.text.toString().trim().ifBlank { null }).put("allow_compatible",compatible.isChecked));dialog.dismiss();fetch()
   }});dialog.show()
  }
  private fun details(r:JSONObject){operation{showDetails(r,ClassMateAuthApi.rpc("blood_request_details",JSONObject().put("target_request",r.getString("id"))))}}
  private fun showDetails(r:JSONObject,d:JSONObject){
-  val f=ClassMateFormUi(this);f.label("${r.optString("hospital")}\n${r.optInt("units")} unit(s) · ${date(r.optString("needed_by"))}\n${r.optString("status")}")
+  val f=ClassMateFormUi(this);f.label("Requested by: ${d.optString("requester_name")}\nFor: ${d.optString("patient_name").takeUnless { it=="null" || it.isBlank() } ?: d.optString("requester_name")}\nAttendant: ${d.optString("attendant_phone")}");f.label("${r.optString("hospital")}\n${r.optInt("units")} unit(s) · ${date(r.optString("needed_by"))}\n${r.optString("status")}")
   f.label("Hospital screening and cross-matching are required. Volunteering shares your name and mobile with the organizer and verifier.")
   val dialog=MaterialAlertDialogBuilder(this).setTitle("${r.optString("blood_group")} blood request").setBackground(ClassMateFeatureUi.surface(this)).setView(f.scroll).setNegativeButton("Close",null).create()
   f.panel.addView(ClassMateFeatureUi.button(this,"Call attendant"){dial(d.optString("attendant_phone"))})
   fun action(label:String,rpc:String,args:JSONObject){f.panel.addView(ClassMateFeatureUi.button(this,label,true){
    val apply={operation{ClassMateAuthApi.rpcText(rpc,args);dialog.dismiss();fetch()}}
-   if(rpc=="set_blood_request_status")MaterialAlertDialogBuilder(this).setTitle(label).setBackground(ClassMateFeatureUi.surface(this)).setMessage(if(args.optString("target_status")=="open")"Confirm you called the attendant and verified all request details. Matching donors will receive an alert." else "This closes the request and stops pending blood alerts.").setNegativeButton("Keep request",null).setPositiveButton("Confirm"){_,_->apply()}.show() else apply()
+   if(rpc=="set_blood_request_status")MaterialAlertDialogBuilder(this).setTitle(label).setBackground(ClassMateFeatureUi.surface(this)).setMessage(if(args.optString("target_status")=="open")"Confirm you called the attendant and verified all request details. Users across the university will receive an alert, with a direct appeal for matching groups." else "This closes the request and stops pending blood alerts.").setNegativeButton("Keep request",null).setPositiveButton("Confirm"){_,_->apply()}.show() else apply()
   })}
   if(r.optBoolean("can_donate")&&r.optString("my_response")!="interested")action("I can donate","respond_blood_request",JSONObject().put("target_request",r.getString("id")).put("target_response","interested"))
   if(r.optString("my_response")=="interested")action("Withdraw response","respond_blood_request",JSONObject().put("target_request",r.getString("id")).put("target_response","withdrawn"))
   if(r.optBoolean("can_verify")&&r.optString("status")=="pending"){
    f.label("Call the attendant and verify all details before approving.")
-   action("Verify & send matching alerts","set_blood_request_status",JSONObject().put("target_request",r.getString("id")).put("target_status","open"))
+   action("Verify & notify university","set_blood_request_status",JSONObject().put("target_request",r.getString("id")).put("target_status","open"))
    action("Reject request","set_blood_request_status",JSONObject().put("target_request",r.getString("id")).put("target_status","rejected"))
   }
   if(d.optBoolean("can_manage")&&r.optString("status") in listOf("open","pending")){
@@ -111,5 +111,6 @@ class ClassMateBloodActivity: AppCompatActivity() {
    action("Cancel request","set_blood_request_status",JSONObject().put("target_request",r.getString("id")).put("target_status","cancelled"))
    val v=d.optJSONArray("volunteers")?:JSONArray();for(i in 0 until v.length()){val p=v.getJSONObject(i);f.panel.addView(ClassMateFeatureUi.button(this,"Call ${p.optString("full_name")}"){dial(p.optString("mobile_number"))})}
   };dialog.show()
+  lifecycleScope.launch { runCatching { ClassMateAuthApi.rpcText("mark_blood_request_read",JSONObject().put("target_request",r.getString("id"))) } }
  }
 }

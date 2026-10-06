@@ -559,8 +559,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     .putExtra("role", profile?.optString("role")).putExtra("is_cr", profile?.optBoolean("is_cr") == true))
             },
             { editPersonalProfile() }, { openManage() }, { openConfiguration() }, { enableNotificationsFromProfile() },
-            { aiLauncher.launch(Intent(this,ClassMateAiActivity::class.java).putExtra("batch_id",selectedBatchId).putExtra("profile_id",userId)) }
+            { aiLauncher.launch(Intent(this,ClassMateAiActivity::class.java).putExtra("batch_id",selectedBatchId).putExtra("profile_id",userId)) },
+            { unreadActivity?.refresh() }
         )
+        if(unreadActivity==null) unreadActivity=ClassMateUnreadActivity(this,{selectedBatchId},{userId},{selectedTab==R.id.nav_friends && !manageOpen})
+        unreadActivity?.refresh()
         friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) })
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
@@ -678,6 +681,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             homeHost.removeAllViews()
             if(tab==R.id.nav_friends) {
                 friendsScreen.render(homeHost,selectedBatchLabel)
+                unreadActivity?.showUnseenRequest()
                 return
             }
             academicScreens.render(tab, homeHost)
@@ -1231,8 +1235,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
     }
 
+    private var unreadActivity: ClassMateUnreadActivity? = null
+
     override fun onResume() {
         super.onResume()
+        unreadActivity?.refresh()
         if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
         // Profile setup belongs to explicit sign-in, never ordinary app resumes.
         if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) registerFcmToken()
