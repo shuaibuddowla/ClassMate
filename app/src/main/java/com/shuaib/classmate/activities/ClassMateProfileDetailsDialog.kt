@@ -56,7 +56,6 @@ internal object ClassMateProfileDetailsDialog {
             codes.indexOf(value("blood_group")).takeIf { it>=0 }?.let { setText(groups[it],false) }
         }
         bloodBox.addView(blood); form.panel.addView(bloodBox)
-        val residence=form.field("Current mess / flat · optional").apply { setText(value("current_residence")); filters=arrayOf(InputFilter.LengthFilter(150)) }
         val status=form.status()
         val shape=MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(24*activity.resources.displayMetrics.density).build()).apply {
             fillColor=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface))
@@ -69,7 +68,7 @@ internal object ClassMateProfileDetailsDialog {
         dialog.show()
         var busy=false
         fun saving(active: Boolean) {
-            busy=active; listOf(mobile,town,blood,residence).forEach { it.isEnabled=!active }
+            busy=active; listOf(mobile,town,blood).forEach { it.isEnabled=!active }
             dialog.getButton(-1).isEnabled=!active; dialog.getButton(-2).isEnabled=!active
             dialog.setCancelable(!onboarding && !active)
         }
@@ -85,7 +84,7 @@ internal object ClassMateProfileDetailsDialog {
                 try {
                     val saved=ClassMateAuthApi.rpc("save_profile_details",JSONObject().put("target_mobile",mobile.text.toString())
                         .put("target_town",town.text.toString()).put("target_blood",codes[groupIndex])
-                        .put("target_residence",residence.text.toString()))
+                        .put("target_residence",value("current_residence")))
                     ClassMateProfileReminder.clear(activity,saved.getString("id"))
                     dialog.dismiss(); onDone(saved)
                 } catch(e: Exception) { status.text=e.message?.replace(Regex("^\\d{3}:\\s*"),"") ?: "Could not save. Your information is still here."; saving(false) }

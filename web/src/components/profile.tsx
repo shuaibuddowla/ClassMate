@@ -60,14 +60,9 @@ export function ProfileForm({
             "Unknown",
           ].map((value) => ({ value, label: value })),
         },
-        {
-          name: "target_residence",
-          label: "Current mess / flat (optional)",
-          value: profile.current_residence,
-        },
       ]}
       label="Save profile"
-      submit={async (d) => done(await rpc("save_profile_details", d))}
+      submit={async (d) => done(await rpc("save_profile_details", { ...d, target_residence: profile.current_residence || null }))}
     />
   );
 }
