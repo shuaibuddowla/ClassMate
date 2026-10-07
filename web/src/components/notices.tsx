@@ -47,6 +47,14 @@ export function Notices({
     [comments, setComments] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null),
     [reminder, setReminder] = useState<Row | null>(null);
+  const receiptsEnabled = useQuery({
+    queryKey: [ctx.user, "owner-preferences"],
+    enabled: ctx.owner,
+    queryFn: async () => {
+      const res = await rpc<{ read_receipts_enabled?: boolean }>("owner_preferences");
+      return res?.read_receipts_enabled ?? true;
+    },
+  });
   const end = useRef<HTMLDivElement>(null);
   const scrolled = useRef(false);
   useEffect(() => {
@@ -309,6 +317,14 @@ export function Notices({
               read={details.reads?.find((x: Row) => x.notice_id === n.id) || {}}
               previews={(details.previews || [])
                 .filter((x: Row) => x.notice_id === n.id)
+                .filter(
+                  (x: Row) =>
+                    !(
+                      ctx.owner &&
+                      receiptsEnabled.data === false &&
+                      x.profile_id === ctx.user
+                    ),
+                )
                 .slice(0, 4)}
               editable={
                 ctx.owner ||
@@ -328,14 +344,26 @@ export function Notices({
                 })
               }
               onReminder={() => setReminder(n)}
-              markRead={() =>
+              markRead={() => {
+                // Optimistically clear unread badge in unread-activity query
+                qc.setQueryData(
+                  [ctx.user, ctx.batch, "unread-activity"],
+                  (old: any) => {
+                    if (!old) return old;
+                    return {
+                      ...old,
+                      notices: false,
+                      notice_count: 0,
+                    };
+                  },
+                );
                 rpc("mark_notices_read", { target_ids: [n.id] })
                   .then(() => Promise.all([
                     qc.invalidateQueries({queryKey: [ctx.user, ctx.batch, "notices"]}),
                     qc.invalidateQueries({queryKey: [ctx.user, ctx.batch, "unread-activity"]}),
                   ]))
-                  .catch(() => {})
-              }
+                  .catch(() => {});
+              }}
             />
           ))}
       </div>
@@ -363,7 +391,22 @@ export function Notices({
           <NoticeComposer
             ctx={ctx}
             allowed={permissions.data}
-            done={async () => {
+            done={async (created?: Row) => {
+              if (created && created.id) {
+                qc.setQueryData(
+                  [ctx.user, ctx.batch, "notices"],
+                  (old: any) => {
+                    if (!old || !old.pages || old.pages.length === 0) return old;
+                    const firstPage = old.pages[0];
+                    const newEntries = [created, ...firstPage.entries.filter((e: Row) => e.id !== created.id)];
+                    const newPages = [
+                      { ...firstPage, entries: newEntries },
+                      ...old.pages.slice(1),
+                    ];
+                    return { ...old, pages: newPages };
+                  },
+                );
+              }
               await refresh();
               setComposer(false);
             }}
@@ -407,7 +450,12 @@ export function Notices({
         />
       )}
       {readers && (
-        <ReaderList notice={readers} ctx={ctx} close={() => setReaders(null)} />
+        <ReaderList
+          notice={readers}
+          ctx={ctx}
+          receiptsEnabled={receiptsEnabled.data !== false}
+          close={() => setReaders(null)}
+        />
       )}{" "}
       {comments && (
         <Comments notice={comments} ctx={ctx} close={() => setComments(null)} />
@@ -461,7 +509,7 @@ function NoticeComposer({
 }: {
   ctx: Context;
   allowed?: Row;
-  done: () => Promise<void>;
+  done: (created?: Row) => Promise<void>;
 }) {
   const aiAllowed =
     ctx.owner || (ctx.profile.is_cr && ctx.profile.cr_batch_id === ctx.batch);
@@ -554,20 +602,21 @@ function NoticeComposer({
                 ]
           }
           submit={async (d) => {
+            let created: Row | null = null;
             if (type === "general")
-              await rpc("post_notice", {
+              created = await rpc<Row>("post_notice", {
                 target_batch: ctx.batch,
                 target_course: d.course || null,
                 notice_title: d.title,
                 notice_body: d.body,
               });
             else
-              await rpc("post_cancellation_notice", {
+              created = await rpc<Row>("post_cancellation_notice", {
                 target_batch: ctx.batch,
                 target_course: d.course,
                 change_date: d.date,
               });
-            await done();
+            await done(created || undefined);
           }}
         />
       )}
@@ -874,10 +923,12 @@ function NoticeCard({
 function ReaderList({
   notice,
   ctx,
+  receiptsEnabled,
   close,
 }: {
   notice: Row;
   ctx: Context;
+  receiptsEnabled: boolean;
   close: () => void;
 }) {
   const readers = useInfiniteQuery({
@@ -898,15 +949,25 @@ function ReaderList({
       {readers.isPending ? (
         <Skeleton />
       ) : (
-        readers.data?.pages.flat().map((p) => (
-          <div className="person" key={p.profile_id}>
-            <Avatar name={p.reader_name} url={p.avatar_url} />
-            <span>
-              <strong>{p.reader_name}</strong>
-              <small>{formatStamp(p.read_at)}</small>
-            </span>
-          </div>
-        ))
+        readers.data?.pages
+          .flat()
+          .filter(
+            (p) =>
+              !(
+                ctx.owner &&
+                !receiptsEnabled &&
+                p.profile_id === ctx.user
+              ),
+          )
+          .map((p) => (
+            <div className="person" key={p.profile_id}>
+              <Avatar name={p.reader_name} url={p.avatar_url} />
+              <span>
+                <strong>{p.reader_name}</strong>
+                <small>{formatStamp(p.read_at)}</small>
+              </span>
+            </div>
+          ))
       )}
       {readers.hasNextPage && (
         <button

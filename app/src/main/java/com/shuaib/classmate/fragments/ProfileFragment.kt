@@ -232,7 +232,7 @@ class ProfileFragment : Fragment() {
         
         binding.layoutCheckUpdates.setOnClickListener {
             startActivity(Intent(requireContext(), UpdateActionActivity::class.java)
-                .setAction(UpdateActionActivity.ACTION_RETRY))
+                .setAction(UpdateActionActivity.ACTION_CHECK))
         }
         val prefs = AppPreferences(requireContext())
         binding.switchAutoUpdates.isChecked = prefs.isAutoUpdateEnabled()

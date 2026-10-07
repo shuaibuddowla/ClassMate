@@ -107,6 +107,7 @@ object AuthErrorMapper {
             "ERROR_USER_DISABLED" -> "This account has been disabled."
             "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Try again later."
             else -> null
+
         }
     }
 }

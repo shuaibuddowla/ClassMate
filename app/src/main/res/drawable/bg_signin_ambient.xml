@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="412dp"
+    android:height="892dp"
+    android:viewportWidth="412"
+    android:viewportHeight="892">
+
+    <!-- Base full-screen gradient -->
+    <path
+        android:pathData="M0,0 L412,0 L412,892 L0,892 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="206"
+                android:startY="0"
+                android:endX="206"
+                android:endY="892"
+                android:startColor="#F4F8FE"
+                android:centerColor="#F9FBFE"
+                android:endColor="#F2F6FE" />
+        </aapt:attr>
+    </path>
+
+    <!-- Top-left atmospheric organic curved wave -->
+    <path
+        android:pathData="M-40,-30 C60,-40 140,20 160,80 C180,140 110,210 20,230 C-20,240 -60,220 -80,180 Z"
+        android:fillColor="#E3EEFD"
+        android:fillAlpha="0.55" />
+
+    <!-- Top-right atmospheric organic curved wave -->
+    <path
+        android:pathData="M440,-20 C420,60 380,120 320,160 C260,200 240,160 260,100 C280,40 360,-30 440,-20 Z"
+        android:fillColor="#E6F0FE"
+        android:fillAlpha="0.5" />
+
+    <!-- Soft mid-page ambient radial glow behind hero area -->
+    <path
+        android:pathData="M206,120 m-180,0 a180,180 0,1 1,360 0 a180,180 0,1 1,-360 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="206"
+                android:centerY="120"
+                android:gradientRadius="180"
+                android:startColor="#1A3B82F6"
+                android:endColor="#003B82F6" />
+        </aapt:attr>
+    </path>
+
+</vector>

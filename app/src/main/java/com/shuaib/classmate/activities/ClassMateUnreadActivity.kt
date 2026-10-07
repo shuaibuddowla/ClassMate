@@ -31,6 +31,9 @@ class ClassMateUnreadActivity(private val activity: AppCompatActivity,
             }
         }
     }
+    fun clearNoticeBadge() {
+        activity.findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.removeBadge(R.id.nav_notices)
+    }
     fun refresh() {
         if (!enabled()) {
             activity.findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.let { it.removeBadge(R.id.nav_notices); it.removeBadge(R.id.nav_friends) }

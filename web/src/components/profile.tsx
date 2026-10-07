@@ -12,6 +12,7 @@ import {
   GraduationCap,
   LayoutGrid,
   Sparkles,
+  Eye,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -78,11 +79,23 @@ export function Profile({
   signOut: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false),
+    [receiptsEnabled, setReceiptsEnabled] = useState(true),
+    [receiptsBusy, setReceiptsBusy] = useState(false),
     [pushEnabled, setPushEnabled] = useState(false),
     [pushBusy, setPushBusy] = useState(false),
     [pushStatus, setPushStatus] = useState("pending"),
     [error, setError] = useState<unknown>(null),
     [dark, setDark] = useState(false);
+  useEffect(() => {
+    if (!ctx.owner) return;
+    rpc<{ read_receipts_enabled?: boolean }>("owner_preferences")
+      .then((res) => {
+        if (typeof res?.read_receipts_enabled === "boolean") {
+          setReceiptsEnabled(res.read_receipts_enabled);
+        }
+      })
+      .catch(() => {});
+  }, [ctx.owner]);
   useEffect(() => {
     const update = () => {
       setPushEnabled(isPushEnabled(ctx.user));
@@ -222,6 +235,44 @@ export function Profile({
           <button className="device-theme" onClick={() => setTheme("system")}>
             Use device theme
           </button>
+        )}
+        {ctx.owner && (
+          <div className="setting">
+            <Eye />
+            <span>
+              Notice read receipts
+              <small>
+                {receiptsEnabled
+                  ? "Recording your reads on notices"
+                  : "Silent mode — your reads are not recorded"}
+              </small>
+            </span>
+            <button
+              className="theme-switch"
+              role="switch"
+              aria-label="Notice read receipts"
+              aria-checked={receiptsEnabled}
+              disabled={receiptsBusy}
+              onClick={async () => {
+                setReceiptsBusy(true);
+                setError(null);
+                const nextState = !receiptsEnabled;
+                try {
+                  const res = await rpc<{ read_receipts_enabled?: boolean }>(
+                    "save_owner_preferences",
+                    { target_read_receipts: nextState }
+                  );
+                  setReceiptsEnabled(res?.read_receipts_enabled ?? nextState);
+                } catch (e) {
+                  setError(e);
+                } finally {
+                  setReceiptsBusy(false);
+                }
+              }}
+            >
+              <span />
+            </button>
+          </div>
         )}
         {ctx.profile.role !== "teacher" && <div className="setting push-setting">
           <span>

@@ -611,7 +611,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
             },
             { editPersonalProfile() }, { openManage() }, { openConfiguration() }, { enableNotificationsFromProfile() },
             { aiLauncher.launch(Intent(this,ClassMateAiActivity::class.java).putExtra("batch_id",selectedBatchId).putExtra("profile_id",userId)) },
-            { unreadActivity?.refresh() }
+            {
+                unreadActivity?.clearNoticeBadge()
+                unreadActivity?.refresh()
+            }
         )
         if(unreadActivity==null) unreadActivity=ClassMateUnreadActivity(this,{selectedBatchId},{userId},{selectedTab==R.id.nav_friends && !manageOpen},{profile?.optString("role")!="teacher"})
         unreadActivity?.refresh()
@@ -822,7 +825,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         val tabs = android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled=false }
         val tabRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         tabs.addView(tabRow); actions.addView(tabs)
-        val sections=if(role=="admin") listOf("courses" to "Courses", "catalog" to "Catalog", "teachers" to "Teachers", "people" to "People", "structure" to "Structure", "health" to "Health") else listOf("courses" to "Courses")
+        val sections=if(role=="admin") listOf("courses" to "Courses", "catalog" to "Catalog", "teachers" to "Teachers", "people" to "People", "overrides" to "Overrides", "structure" to "Structure", "health" to "Health") else listOf("courses" to "Courses")
         if(sections.none { it.first==manageSection }) manageSection="courses"
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
         actions.addView(panel)
@@ -833,6 +836,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 "catalog" -> manageCard(panel,"Shared course catalog","Choose, edit or delete courses across batches") { openConfiguration("catalog") }
                 "teachers" -> manageCard(panel,"Teacher profiles","Approved emails, course assignments and teaching access") { openConfiguration("teachers") }
                 "people" -> manageCard(panel,"People & approvals","Search accounts, review requests and assign representatives") { openConfiguration("people") }
+                "overrides" -> manageCard(panel,"Batch overrides","Pre-register and manage semester drop / repeat student batch overrides") { openConfiguration("overrides") }
                 "structure" -> {
                     manageCard(panel,"Batches & semesters","Create batches, publish semesters or clone a plan") { showManageMenu("Batches & semesters",listOf(1,4,9,13,14)) }
                     manageCard(panel,"Departments","Configure departments and student account rules") { showManageMenu("Departments",listOf(0,3,10)) }
@@ -1304,6 +1308,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::academicScreens.isInitialized) academicScreens.onResume()
         unreadActivity?.refresh()
         if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
         // Profile setup belongs to explicit sign-in, never ordinary app resumes.
@@ -1671,10 +1676,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private val publishLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK && homeShown) {
-            academicScreens.invalidateLibrary()
-            academicScreens.invalidateNotices()
-            ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
-            renderHomeTab(selectedTab)
+            val createdJson = result.data?.getStringExtra("created_notice")?.let { raw ->
+                runCatching { JSONObject(raw) }.getOrNull()
+            }
+            if (createdJson != null) {
+                academicScreens.onNoticeCreated(createdJson)
+                if (selectedTab != R.id.nav_notices) {
+                    selectedTab = R.id.nav_notices
+                    findViewById<GlassBottomNavView>(R.id.classmate_home_nav).selectedItemId = R.id.nav_notices
+                }
+            } else {
+                academicScreens.invalidateLibrary()
+                academicScreens.invalidateNotices()
+                ClassMateAcademicCache.invalidateSchedules(this, userId, selectedBatchId)
+                renderHomeTab(selectedTab)
+            }
         }
     }
     private val aiLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->

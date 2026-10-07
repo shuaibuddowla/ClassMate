@@ -216,7 +216,8 @@ class FriendsFragment : Fragment() {
                 if (snapshot != null) {
                     allUsersList = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(User::class.java)?.copy(uid = doc.id)
-                    }.sortedBy { it.name }
+                    }.filter { it.role.lowercase() != "teacher" }
+                    .sortedBy { it.name }
 
                     val query = binding.etSearch.text.toString()
                     filterList(query)

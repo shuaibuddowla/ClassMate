@@ -61,7 +61,9 @@ internal class ClassMateAcademicScreensSupabase(
     private val onOpenAi: () -> Unit,
     private val onNoticeRead: () -> Unit = {},
 ) {
+    private val appPrefs by lazy { AppPreferences(activity) }
     private var selectedDay = LocalDate.now().dayOfWeek.value % 7
+    private var lastTimetableSetupDate = LocalDate.now()
     private var busMode = false
     private var calendarMode = false
     private val calendarData = ClassMateCalendarData(activity) { profile().optString("id") }
@@ -110,6 +112,18 @@ internal class ClassMateAcademicScreensSupabase(
     private var libraryLoadingRoot: View? = null
     fun invalidateLibrary() { librarySnapshot = null }
     fun invalidateNotices() { noticeSyncedAt=0L; noticeTranslations.clear(); translatedNotices.clear(); noticeRequest++; noticeFeed=emptyList(); noticeBatch=""; noticeHasMore=true; noticeLoadingOlder=false; noticeOfflineTail=emptyList() }
+    fun onNoticeCreated(createdNotice: JSONObject) {
+        val id = createdNotice.optString("id")
+        if (id.isBlank()) return
+        noticeFeed = (listOf(createdNotice) + noticeFeed).distinctBy { it.optString("id") }
+        saveNoticeCache()
+        tabRoots[R.id.nav_notices]?.let { root ->
+            if (active(root)) {
+                renderNoticeFeed(root)
+                loadNotices(root, preserveOlder = true)
+            }
+        }
+    }
     private val inflater get() = LayoutInflater.from(activity)
     // One instance per signed-in batch. Retain only the four academic roots.
     private val tabRoots = mutableMapOf<Int, View>()
@@ -120,6 +134,18 @@ internal class ClassMateAcademicScreensSupabase(
         return today.plusDays(((selectedDay - todayIndex + 7) % 7).toLong())
     }
 
+    fun onResume() {
+        tabRoots[R.id.nav_timetable]?.let { root ->
+            if (LocalDate.now() != lastTimetableSetupDate) {
+                lastTimetableSetupDate = LocalDate.now()
+                selectedDay = LocalDate.now().dayOfWeek.value % 7
+                if (root.isAttachedToWindow) {
+                    setupTimetable(root)
+                }
+            }
+        }
+    }
+
     fun render(tab: Int, host: LinearLayout) {
         tabRoots[tab]?.let { root ->
             navShown=true
@@ -127,7 +153,17 @@ internal class ClassMateAcademicScreensSupabase(
             host.addView(root,LinearLayout.LayoutParams(-1,-1))
             root.doOnAttach {
                 when(tab) {
-                    R.id.nav_timetable -> if(calendarMode) (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show() else loadTimetable(root)
+                    R.id.nav_timetable -> {
+                        if (LocalDate.now() != lastTimetableSetupDate) {
+                            lastTimetableSetupDate = LocalDate.now()
+                            selectedDay = LocalDate.now().dayOfWeek.value % 7
+                            setupTimetable(root)
+                        } else if(calendarMode) {
+                            (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show()
+                        } else {
+                            loadTimetable(root)
+                        }
+                    }
                     R.id.nav_notices -> if(noticeFeed.isEmpty() || noticeBatch!=batchId() || android.os.SystemClock.elapsedRealtime()-noticeSyncedAt>30_000) loadNotices(root,preserveOlder=true)
                     R.id.nav_pdf -> loadLibrary(root)
                     else -> setupProfile(root)
@@ -304,6 +340,7 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun setupTimetable(root: View) {
+        lastTimetableSetupDate = LocalDate.now()
         val name = profile().optString("full_name").substringBefore(' ').ifBlank { "Student" }
         text(root, R.id.tvUserName, name)
         val hour = LocalTime.now().hour
@@ -424,6 +461,12 @@ internal class ClassMateAcademicScreensSupabase(
 
     private fun loadTimetable(root: View, force: Boolean = false): Unit = launch(root) {
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
+        if (LocalDate.now() != lastTimetableSetupDate) {
+            lastTimetableSetupDate = LocalDate.now()
+            selectedDay = LocalDate.now().dayOfWeek.value % 7
+            setupTimetable(root)
+            return@launch
+        }
         val shimmer = root.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
         val day = selectedDay
         val effectiveDate = selectedScheduleDate()
@@ -579,14 +622,45 @@ internal class ClassMateAcademicScreensSupabase(
                 text(card, R.id.tvRoom, room)
                 card.v<View>(R.id.layoutRoomInfo).visibility =
                     if (room.isBlank()) View.GONE else View.VISIBLE
-                text(card, R.id.tvTypeBadge,
-                    if (cancelled) "CANCELLED" else item.optString("type").uppercase())
+                val isToday = effectiveDate == LocalDate.now()
+                val isLive = isToday && !cancelled && runCatching {
+                    val now = LocalTime.now()
+                    val start = LocalTime.parse(item.getString("start_time").take(8))
+                    val end = LocalTime.parse(item.getString("end_time").take(8))
+                    !now.isBefore(start) && now.isBefore(end)
+                }.getOrDefault(false)
+                val isLabSession = item.optString("type").equals("lab", true) ||
+                    (names[courseId] ?: "").trim().endsWith("lab", ignoreCase = true) ||
+                    (names[courseId] ?: "").trim().endsWith("labs", ignoreCase = true)
+
                 if (cancelled) {
+                    text(card, R.id.tvTypeBadge, "CANCELLED")
                     card.v<com.google.android.material.card.MaterialCardView>(R.id.cardRoot)
                         .setCardBackgroundColor(activity.getColor(R.color.cm_period_cancel_bg))
                     card.v<TextView>(R.id.tvTypeBadge).apply {
                         setBackgroundResource(R.drawable.bg_badge_cancelled)
                         setTextColor(activity.getColor(R.color.cm_notice_cancel_text))
+                    }
+                } else if (isLive) {
+                    text(card, R.id.tvTypeBadge, "LIVE NOW")
+                    card.v<com.google.android.material.card.MaterialCardView>(R.id.cardRoot)
+                        .setCardBackgroundColor(activity.getColor(R.color.cm_card))
+                    card.v<TextView>(R.id.tvTypeBadge).apply {
+                        setBackgroundResource(R.drawable.bg_badge_green)
+                        setTextColor(activity.getColor(R.color.cm_file_lab_text))
+                    }
+                } else {
+                    text(card, R.id.tvTypeBadge, if (isLabSession) "LAB" else "CLASS")
+                    card.v<com.google.android.material.card.MaterialCardView>(R.id.cardRoot)
+                        .setCardBackgroundColor(activity.getColor(R.color.cm_card))
+                    card.v<TextView>(R.id.tvTypeBadge).apply {
+                        if (isLabSession) {
+                            setBackgroundResource(R.drawable.bg_badge_green)
+                            setTextColor(activity.getColor(R.color.cm_file_lab_text))
+                        } else {
+                            setBackgroundResource(R.drawable.bg_badge_blue)
+                            setTextColor(activity.getColor(R.color.cm_primary))
+                        }
                     }
                 }
                 val minutes = runCatching {
@@ -598,6 +672,18 @@ internal class ClassMateAcademicScreensSupabase(
                     card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddPeriod(item, day); true }
                     card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddPeriod(item, day) }
                 }
+            }
+            if (!requestedBusMode && effectiveDate == LocalDate.now() && entries.isNotEmpty()) {
+                val routineTick = object : Runnable {
+                    override fun run() {
+                        if (!active(root) || request != timetableRequest || busMode || calendarMode) return
+                        if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                            root.v<RecyclerView>(R.id.rvPeriods).adapter?.notifyDataSetChanged()
+                        }
+                        root.postDelayed(this, 15_000L)
+                    }
+                }
+                root.postDelayed(routineTick, 15_000L)
             }
             completed = true
             if (!force && ClassMateAcademicCache.online(activity) && System.currentTimeMillis() - data.optLong("saved_at") > 60_000)
@@ -1009,7 +1095,10 @@ internal class ClassMateAcademicScreensSupabase(
 
     private fun bindSeenAvatar(card: View, noticeId: String) {
         val group = card.v<android.widget.FrameLayout>(R.id.seenAvatars)
-        val readers = noticeReaderPreviews[noticeId].orEmpty().take(if (activity.resources.configuration.screenWidthDp < 360) 3 else 4)
+        val adminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
+        val readers = noticeReaderPreviews[noticeId].orEmpty()
+            .filterNot { adminReceiptsOff && it.optString("profile_id") == profile().optString("id") }
+            .take(if (activity.resources.configuration.screenWidthDp < 360) 3 else 4)
         val fingerprint=readers.joinToString { it.toString() }
         if(group.tag==fingerprint) return
         group.tag=fingerprint
@@ -1043,6 +1132,10 @@ internal class ClassMateAcademicScreensSupabase(
 
     private fun markVisibleNoticesRead(root: View, list: RecyclerView) {
         if (!ClassMateAcademicCache.online(activity)) return
+        if (list.height == 0) {
+            list.post { if (active(root) && list.height > 0) markVisibleNoticesRead(root, list) }
+            return
+        }
         val manager = list.layoutManager as? LinearLayoutManager ?: return
         val first = manager.findFirstVisibleItemPosition().coerceAtLeast(0)
         val last = manager.findLastVisibleItemPosition().coerceAtMost((list.adapter?.itemCount ?: 0)-1)
@@ -1055,37 +1148,51 @@ internal class ClassMateAcademicScreensSupabase(
             (list.adapter as? ClassMateNoticeRows)?.noticeId(position)?.takeIf { noticeReadSent.add(it) }
         }
         if (newIds.isEmpty()) return
+
+        val myProfileId = profile().optString("id")
+        val isAdminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
+
+        // Optimistically apply read state immediately to UI and cache so badge and seen counts update with 0ms lag
+        newIds.forEach { id ->
+            if (!isAdminReceiptsOff) {
+                val previews = noticeReaderPreviews[id].orEmpty()
+                if (previews.none { it.optString("profile_id") == myProfileId }) {
+                    noticeReaderPreviews[id] = (listOf(JSONObject().put("profile_id", myProfileId)
+                        .put("reader_name", profile().optString("full_name")).put("avatar_url", ownGoogleAvatar ?: "")) + previews).take(4)
+                }
+            }
+            val count = noticeReadCounts.getOrPut(id) { JSONObject() }
+            if (!count.optBoolean("read_by_me")) {
+                count.put("read_by_me", true)
+                if (!isAdminReceiptsOff) {
+                    count.put("read_count", count.optLong("read_count") + 1)
+                }
+            }
+        }
+        saveNoticeCache()
+        onNoticeRead()
+
+        for (position in first..last) {
+            val id = (list.adapter as? ClassMateNoticeRows)?.noticeId(position)
+            val view = manager.findViewByPosition(position)
+            if (id in newIds && view != null) {
+                text(view, R.id.tvReadCount,
+                    seenLabel(noticeReadCounts[id]?.optLong("read_count") ?: 0))
+                id?.let { bindSeenAvatar(view, it) }
+            }
+        }
+
         val requestedBatch=batchId()
         val requestedProfile=profile().optString("id")
         launch(root) {
             runCatching {
                 ClassMateAuthApi.rpcText("mark_notices_read", JSONObject()
                     .put("target_ids", JSONArray(newIds)))
-            }.onSuccess {
-                if(!active(root) || requestedBatch!=batchId() || requestedProfile!=profile().optString("id")) return@launch
-                onNoticeRead()
-                newIds.forEach { id ->
-                    val previews = noticeReaderPreviews[id].orEmpty()
-                    if (previews.none { it.optString("profile_id") == profile().optString("id") })
-                        noticeReaderPreviews[id] = (listOf(JSONObject().put("profile_id", profile().optString("id"))
-                            .put("reader_name", profile().optString("full_name")).put("avatar_url", ownGoogleAvatar ?: "")) + previews).take(4)
-                    val count = noticeReadCounts.getOrPut(id) { JSONObject() }
-                    if (!count.optBoolean("read_by_me")) {
-                        count.put("read_by_me", true)
-                        count.put("read_count", count.optLong("read_count") + 1)
-                    }
+            }.onFailure {
+                if (active(root) && requestedBatch == batchId() && requestedProfile == profile().optString("id")) {
+                    noticeReadSent.removeAll(newIds.toSet())
                 }
-                saveNoticeCache()
-                for (position in first..last) {
-                    val id = (list.adapter as? ClassMateNoticeRows)?.noticeId(position)
-                    val view = manager.findViewByPosition(position)
-                    if (id in newIds && view != null) {
-                        text(view, R.id.tvReadCount,
-                            seenLabel(noticeReadCounts[id]?.optLong("read_count") ?: 0))
-                        id?.let { bindSeenAvatar(view, it) }
-                    }
-                }
-            }.onFailure { noticeReadSent.removeAll(newIds.toSet()) }
+            }
         }
     }
 
@@ -1121,12 +1228,14 @@ internal class ClassMateAcademicScreensSupabase(
                 try {
                     val arguments=JSONObject().put("target_notice",notice.getString("id")).put("page_size",50)
                     cursorTime?.let { arguments.put("before_time",it).put("before_id",cursorId) }
-                    val readers=rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers_page",arguments)))
+                    val rawReaders=rows(JSONArray(ClassMateAuthApi.rpcText("notice_readers_page",arguments)))
+                    val adminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
+                    val readers = if (adminReceiptsOff) rawReaders.filterNot { it.optString("profile_id") == profile().optString("id") } else rawReaders
                     if (!dialog.isShowing || activity.isFinishing) return@launch
                     loadedReaders+=readers.size
                     dialog.setTitle("Seen by ${noticeReadCounts[notice.getString("id")]?.optLong("read_count") ?: loadedReaders}")
-                    readers.lastOrNull()?.let { cursorTime=it.optString("read_at");cursorId=it.optString("profile_id") }
-                    more.visibility=if(readers.size==50) View.VISIBLE else View.GONE
+                    rawReaders.lastOrNull()?.let { cursorTime=it.optString("read_at");cursorId=it.optString("profile_id") }
+                    more.visibility=if(rawReaders.size==50) View.VISIBLE else View.GONE
                     status.visibility = if (loadedReaders==0) View.VISIBLE else View.GONE
                     status.text = "No one has read this notice yet"
                     form.scroll.layoutParams = form.scroll.layoutParams.apply {
@@ -1561,7 +1670,7 @@ internal class ClassMateAcademicScreensSupabase(
         val photo = GoogleSignIn.getLastSignedInAccount(activity)?.photoUrl
         if (photo != null) com.bumptech.glide.Glide.with(activity).load(photo)
             .placeholder(R.drawable.ic_default_avatar).into(root.v(R.id.ivProfile))
-        val prefs = AppPreferences(activity)
+        val prefs = appPrefs
         root.v<SwitchCompat>(R.id.switchAutoUpdates).apply {
             isChecked = prefs.isAutoUpdateEnabled()
             setOnCheckedChangeListener { _, checked ->
@@ -1603,6 +1712,36 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
         root.v<View>(R.id.tvNotificationStatus).setOnClickListener { onEnableNotifications() }
+        root.v<View>(R.id.rowReadReceipts).apply {
+            val isAdmin = account.optString("role") == "admin"
+            visibility = if (isAdmin) View.VISIBLE else View.GONE
+            if (isAdmin) {
+                val switch = root.v<SwitchCompat>(R.id.switchReadReceipts)
+                val status = root.v<TextView>(R.id.tvReadReceiptsStatus)
+                switch.isChecked = prefs.isNoticeReadReceiptsEnabled()
+                status.text = if (switch.isChecked) "Recording your reads on notices" else "Silent mode — your reads are not recorded"
+                scope.launch {
+                    runCatching {
+                        val prefsJson = ClassMateAuthApi.rpc("owner_preferences", JSONObject())
+                        if (active(root) && prefsJson.has("read_receipts_enabled")) {
+                            val enabled = prefsJson.optBoolean("read_receipts_enabled", true)
+                            prefs.setNoticeReadReceiptsEnabled(enabled)
+                            switch.isChecked = enabled
+                            status.text = if (enabled) "Recording your reads on notices" else "Silent mode — your reads are not recorded"
+                        }
+                    }
+                }
+                switch.setOnCheckedChangeListener { _, checked ->
+                    prefs.setNoticeReadReceiptsEnabled(checked)
+                    status.text = if (checked) "Recording your reads on notices" else "Silent mode — your reads are not recorded"
+                    scope.launch {
+                        runCatching {
+                            ClassMateAuthApi.rpc("save_owner_preferences", JSONObject().put("target_read_receipts", checked))
+                        }
+                    }
+                }
+            }
+        }
         root.v<View>(R.id.cardAboutDeveloper).setOnClickListener { ClassMateFeatureUi.developer(activity) }
         root.v<View>(R.id.cardProfileAi).apply {
             visibility=View.GONE

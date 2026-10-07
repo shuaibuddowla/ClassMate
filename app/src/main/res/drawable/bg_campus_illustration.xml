@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="412dp"
+    android:height="160dp"
+    android:viewportWidth="412"
+    android:viewportHeight="160">
+
+    <!-- Atmospheric background gradient hill 1 -->
+    <path
+        android:pathData="M0,118 C85,102 180,116 260,136 C315,148 368,142 412,138 L412,160 L0,160 Z"
+        android:fillColor="#E1ECFD" />
+
+    <!-- Mid hill wave -->
+    <path
+        android:pathData="M0,132 C110,118 215,135 340,147 C370,150 395,148 412,146 L412,160 L0,160 Z"
+        android:fillColor="#ECF3FE" />
+
+    <!-- Foreground soft hill wave -->
+    <path
+        android:pathData="M0,146 C120,138 240,149 412,152 L412,160 L0,160 Z"
+        android:fillColor="#F4F8FE" />
+
+    <!-- Left foreground tropical / campus foliage -->
+    <!-- Large leaf 1 -->
+    <path
+        android:pathData="M-8,148 C-2,120 16,112 25,128 C28,136 22,154 6,160 Z"
+        android:fillColor="#38BDF8"
+        android:fillAlpha="0.65" />
+    <!-- Medium leaf 2 -->
+    <path
+        android:pathData="M-6,155 C12,138 34,138 44,152 C38,158 24,161 4,160 Z"
+        android:fillColor="#60A5FA"
+        android:fillAlpha="0.75" />
+    <!-- Small leaf 3 -->
+    <path
+        android:pathData="M12,160 C26,146 44,148 50,158 C42,161 28,161 12,160 Z"
+        android:fillColor="#2DD4BF"
+        android:fillAlpha="0.6" />
+
+    <!-- Tree bushes behind campus building -->
+    <path
+        android:pathData="M236,154 C236,144 246,140 256,142 C261,135 273,135 280,142 C288,138 298,143 298,154 Z"
+        android:fillColor="#93C5FD"
+        android:fillAlpha="0.7" />
+    <path
+        android:pathData="M255,156 C255,146 265,142 274,144 C279,138 290,138 296,144 C303,141 312,145 312,156 Z"
+        android:fillColor="#60A5FA"
+        android:fillAlpha="0.6" />
+
+    <!-- Tree cluster far right -->
+    <path
+        android:pathData="M376,156 C376,147 384,142 393,144 C397,139 406,140 410,146 C412,148 412,156 412,156 Z"
+        android:fillColor="#60A5FA"
+        android:fillAlpha="0.7" />
+
+    <!-- University Main Building - Left wing -->
+    <path
+        android:pathData="M294,124 L348,124 L348,156 L294,156 Z"
+        android:fillColor="#C6DDFB" />
+    <!-- Roof parapet line -->
+    <path
+        android:pathData="M292,122 L350,122 L350,125 L292,125 Z"
+        android:fillColor="#A8CBF8" />
+    <!-- Left wing upper windows -->
+    <path
+        android:pathData="M299,128 L307,128 L307,137 L299,137 Z M312,128 L320,128 L320,137 L312,137 Z M325,128 L333,128 L333,137 L325,137 Z M338,128 L344,128 L344,137 L338,137 Z"
+        android:fillColor="#EDF5FF" />
+    <!-- Left wing lower windows -->
+    <path
+        android:pathData="M299,141 L307,141 L307,151 L299,151 Z M312,141 L320,141 L320,151 L312,151 Z M325,141 L333,141 L333,151 L325,151 Z M338,141 L344,141 L344,151 L338,151 Z"
+        android:fillColor="#EDF5FF" />
+
+    <!-- University Clock Tower Base & Body -->
+    <path
+        android:pathData="M346,96 L384,96 L384,158 L346,158 Z"
+        android:fillColor="#B7D5FA" />
+    <!-- Tower Shadow edge -->
+    <path
+        android:pathData="M374,96 L384,96 L384,158 L374,158 Z"
+        android:fillColor="#A2C7F7" />
+
+    <!-- Tower Belfry Cornice -->
+    <path
+        android:pathData="M343,94 L387,94 L387,97 L343,97 Z"
+        android:fillColor="#8BB8F5" />
+
+    <!-- Clock Tower Roof (Pyramidal cap) -->
+    <path
+        android:pathData="M344,94 L365,72 L386,94 Z"
+        android:fillColor="#7BAEF2" />
+    <!-- Roof shadow facet -->
+    <path
+        android:pathData="M365,72 L386,94 L365,94 Z"
+        android:fillColor="#6B9FE8" />
+    <!-- Spire top finial -->
+    <path
+        android:pathData="M364,68 L366,68 L366,72 L364,72 Z"
+        android:fillColor="#5A90E0" />
+
+    <!-- Clock Tower Face (Circle) -->
+    <path
+        android:pathData="M365,108 m-10,0 a10,10 0,1 1,20 0 a10,10 0,1 1,-20 0"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M365,108 m-10,0 a10,10 0,1 1,20 0 a10,10 0,1 1,-20 0"
+        android:strokeColor="#7BAEF2"
+        android:strokeWidth="1.2"
+        android:fillColor="@android:color/transparent" />
+    <!-- Clock Hands (at ~10:10) -->
+    <path
+        android:pathData="M365,108 L365,102 M365,108 L369,106"
+        android:strokeColor="#5A90E0"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round" />
+
+    <!-- Tower arched entrance / lower window -->
+    <path
+        android:pathData="M360,134 C360,131 370,131 370,134 L370,154 L360,154 Z"
+        android:fillColor="#EAF2FF" />
+
+    <!-- Right building wing -->
+    <path
+        android:pathData="M384,130 L412,130 L412,158 L384,158 Z"
+        android:fillColor="#C6DDFB" />
+    <path
+        android:pathData="M389,134 L396,134 L396,143 L389,143 Z M401,134 L408,134 L408,143 L401,143 Z"
+        android:fillColor="#EDF5FF" />
+    <path
+        android:pathData="M389,146 L396,146 L396,155 L389,155 Z M401,146 L408,146 L408,155 L401,155 Z"
+        android:fillColor="#EDF5FF" />
+
+    <!-- Soft foreground shrubs and landscaping -->
+    <path
+        android:pathData="M285,158 C285,152 293,149 299,152 C304,148 312,148 316,153 C321,150 328,153 328,158 Z"
+        android:fillColor="#60A5FA"
+        android:fillAlpha="0.75" />
+    <path
+        android:pathData="M336,158 C336,151 346,148 353,152 C358,147 368,148 372,158 Z"
+        android:fillColor="#38BDF8"
+        android:fillAlpha="0.75" />
+
+</vector>

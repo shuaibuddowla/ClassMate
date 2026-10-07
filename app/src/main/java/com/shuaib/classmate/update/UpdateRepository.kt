@@ -72,25 +72,38 @@ class UpdateRepository(private val context: Context) {
 
     suspend fun download(metadata: UpdateMetadata, progress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
         val directory = File(context.filesDir, "updates").apply { mkdirs() }
-        directory.listFiles()?.filter { it.name != "classmate-${metadata.versionCode}.apk" }
-            ?.forEach { it.delete() }
+        directory.listFiles()?.filter {
+            it.name != "classmate-${metadata.versionCode}.apk" && it.name != "classmate-update.tmp"
+        }?.forEach { it.delete() }
         val ready = File(directory, "classmate-${metadata.versionCode}.apk")
         val temp = File(directory, "classmate-update.tmp")
         if (ready.exists() && ready.length() == metadata.apkSize) return@withContext ready
         ready.delete()
-        temp.delete()
-        val request = Request.Builder().url(metadata.apkUrl)
-            .header("User-Agent", "ClassMate-Android-Updater").build()
+
+        if (temp.exists() && temp.length() > metadata.apkSize) {
+            temp.delete()
+        }
+
+        val existingBytes = if (temp.exists()) temp.length() else 0L
+        val requestBuilder = Request.Builder().url(metadata.apkUrl)
+            .header("User-Agent", "ClassMate-Android-Updater")
+
+        if (existingBytes in 1 until metadata.apkSize) {
+            requestBuilder.header("Range", "bytes=$existingBytes-")
+        }
+
         try {
-            client.newCall(request).execute().use { response ->
+            client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("APK download HTTP ${response.code}")
+                val isResumed = response.code == 206 && existingBytes > 0
                 val body = response.body ?: throw IOException("Empty APK response")
-                if (body.contentLength() > 0 && body.contentLength() != metadata.apkSize)
-                    throw PermanentUpdateException("APK size differs from metadata")
-                var count = 0L
+
+                var count = if (isResumed) existingBytes else 0L
                 var lastProgress = -1
+
                 body.byteStream().use { input ->
-                    temp.outputStream().buffered().use { output ->
+                    val append = isResumed
+                    java.io.FileOutputStream(temp, append).buffered().use { output ->
                         val buffer = ByteArray(32 * 1024)
                         while (true) {
                             currentCoroutineContext().ensureActive()
@@ -105,12 +118,22 @@ class UpdateRepository(private val context: Context) {
                                 progress(percent)
                             }
                         }
+                        output.flush()
                     }
                 }
                 if (count != metadata.apkSize) throw IOException("APK download was incomplete")
             }
-            if (!temp.renameTo(ready)) throw IOException("Could not finalize APK download")
+            ready.delete()
+            if (!temp.renameTo(ready)) {
+                temp.copyTo(ready, overwrite = true)
+                temp.delete()
+            }
             ready
-        } finally { temp.delete() }
+        } catch (error: Exception) {
+            if (error is PermanentUpdateException) {
+                temp.delete()
+            }
+            throw error
+        }
     }
 }

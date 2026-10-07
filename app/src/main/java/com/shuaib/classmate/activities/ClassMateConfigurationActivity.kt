@@ -38,12 +38,24 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
     private fun clean(item: JSONObject,key: String)=item.optString(key).takeUnless { it=="null" }.orEmpty()
     override fun onCreate(state: Bundle?) {
         super.onCreate(state); ClassMateAuthApi.attach(applicationContext)
-        page(when(mode) { "people" -> "People & approvals"; "teachers" -> "Teachers"; else -> "Courses" })
+        page(when(mode) { "people" -> "People & approvals"; "teachers" -> "Teachers"; "overrides" -> "Batch overrides"; else -> "Courses" })
         save.visibility=View.GONE
-        form.label(if(mode=="courses") intent.getStringExtra("batch_label").orEmpty() else if(mode=="people") "All ClassMate accounts" else "Teacher profiles and course assignments")
+        form.label(when(mode) {
+            "courses" -> intent.getStringExtra("batch_label").orEmpty()
+            "people" -> "All ClassMate accounts"
+            "teachers" -> "Teacher profiles and course assignments"
+            "overrides" -> "Pre-register dropout or re-add students with an effective batch"
+            else -> ""
+        })
         status=form.status()
         rowsHost=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
         if(mode=="people") { setupPeople(); return }
+        if(mode=="overrides") {
+            form.panel.addView(MaterialButton(this).apply {
+                text="＋ Add student override"; isAllCaps=false; cornerRadius=dp(16)
+                setOnClickListener { overrideForm() }
+            },LinearLayout.LayoutParams(-1,dp(56)))
+        }
         if(mode=="teachers") form.panel.addView(MaterialButton(this).apply {
             text="＋ Add teacher"; isAllCaps=false; setOnClickListener { addTeacher() }
         },LinearLayout.LayoutParams(-1,dp(56)))
@@ -70,7 +82,18 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         request?.cancel(); val version=++generation; status.visibility=View.VISIBLE; status.text="Loading…"
         request=lifecycleScope.launch {
             try {
-                if(mode=="teachers") {
+                if(mode=="overrides") {
+                    val records=rows(JSONArray(ClassMateAuthApi.rpcText("owner_batch_overrides",JSONObject())))
+                    if(version!=generation) return@launch
+                    rowsHost.removeAllViews()
+                    records.forEach { o ->
+                        val sid=clean(o,"student_id")
+                        val bName="${clean(o,"department_code").uppercase()} Batch ${o.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(o.optInt("academic_session"))}"
+                        val r=clean(o,"reason").ifBlank { "No reason specified" }
+                        card(sid,"$bName\n$r") { overrideForm(sid,clean(o,"effective_batch_id"),o) }
+                    }
+                    status.text=if(records.isEmpty()) "No overrides configured. Add an override for a dropout student." else "${records.size} overrides configured"
+                } else if(mode=="teachers") {
                     // Owner-only RPC also includes signed-in teachers without draft records.
                     val records=rows(JSONArray(ClassMateAuthApi.rpcText("owner_teachers",JSONObject())))
                     if(version!=generation) return@launch
@@ -264,6 +287,9 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         val parent=form.scroll.parent as LinearLayout
         // Keep search fixed and use RecyclerView for the paginated roster.
         parent.removeView(form.scroll); parent.addView(form.panel.apply { (this.parent as? android.view.ViewGroup)?.removeView(this) },LinearLayout.LayoutParams(-1,-2))
+        form.panel.addView(MaterialButton(this,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text="＋ Add batch override (Re-add)"; isAllCaps=false; cornerRadius=dp(14); setOnClickListener { overrideForm() }
+        })
         val list=RecyclerView(this).apply { layoutManager=LinearLayoutManager(this@ClassMateConfigurationActivity); itemAnimator=null; setPadding(dp(16),dp(8),dp(16),dp(16)); clipToPadding=false }
         parent.addView(list,LinearLayout.LayoutParams(-1,0,1f)); val people=mutableListOf<JSONObject>(); var offset=0; var more=true; var loading=false; var searchJob: Job?=null; var query=""; var epoch=0
         val adapter=object: RecyclerView.Adapter<PersonHolder>() {
@@ -328,7 +354,10 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
     private fun personDetails(p: JSONObject) {
         val f=ClassMateFormUi(this); f.label(listOf(clean(p,"student_id"),clean(p,"batch_name"),clean(p,"verification_status"),if(p.optBoolean("is_cr")) clean(p,"cr_valid_until").takeIf { it.isNotBlank() }?.let { "CR until ${it.take(10)}" }.orEmpty() else "").filter { it.isNotBlank() }.joinToString(" · "))
         val b=MaterialAlertDialogBuilder(this).setTitle(clean(p,"full_name")).setView(f.scroll).setNegativeButton("Close",null)
-        if(clean(p,"role")=="student" && clean(p,"verification_status") in setOf("pending","rejected") && clean(p,"profile_source")=="manual") {
+        if(clean(p,"role")=="student" && clean(p,"verification_status")=="active") {
+            b.setNeutralButton("Batch override") { _,_ -> overrideForm(clean(p,"student_id"),clean(p,"batch_id")) }
+            b.show()
+        } else if(clean(p,"role")=="student" && clean(p,"verification_status") in setOf("pending","rejected") && clean(p,"profile_source")=="manual") {
             val id=f.field("Corrected student ID").apply { setText(clean(p,"student_id")) }; val error=f.status()
             b.setPositiveButton("Approve",null)
             if(clean(p,"verification_status")=="pending") b.setNeutralButton("Reject",null)
@@ -360,5 +389,80 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                 } catch(e: Exception) { Toast.makeText(this@ClassMateConfigurationActivity,e.message,Toast.LENGTH_LONG).show() }
             }
         } else b.show()
+    }
+    private fun overrideForm(prefillStudentId: String?=null,prefillBatchId: String?=null,currentOverride: JSONObject?=null) {
+        if(editor?.isShowing==true || busy) return
+        val f=ClassMateFormUi(this)
+        f.label("Assigns a specific batch to a student ID, overriding their email-derived cohort.")
+        val studentId=f.field("Student ID (e.g. CE23045)").apply {
+            setText(prefillStudentId ?: currentOverride?.optString("student_id").orEmpty())
+            filters=arrayOf(android.text.InputFilter.LengthFilter(30))
+        }
+        val reason=f.field("Reason (optional, e.g. Semester drop)").apply {
+            setText(currentOverride?.optString("reason").orEmpty())
+            filters=arrayOf(android.text.InputFilter.LengthFilter(100))
+        }
+        val error=f.status()
+        val builder=MaterialAlertDialogBuilder(this)
+            .setTitle(if(currentOverride!=null) "Edit batch override" else "Add batch override")
+            .setView(f.scroll)
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Save",null)
+        if(currentOverride!=null) builder.setNeutralButton("Delete",null)
+        lifecycleScope.launch {
+            try {
+                val batches=rows(ClassMateAuthApi.rows("batches","select=id,batch_number,academic_session,department_id&is_active=eq.true&order=batch_number"))
+                val depts=rows(ClassMateAuthApi.rows("departments","select=id,code&is_active=eq.true")).associate { it.getString("id") to it.getString("code").uppercase() }
+                val targetBatchId=prefillBatchId ?: currentOverride?.optString("effective_batch_id").orEmpty()
+                val initialIndex=batches.indexOfFirst { it.optString("id")==targetBatchId }.coerceAtLeast(0)
+                val choice=f.choice("Effective batch",batches.map {
+                    val d=depts[it.optString("department_id")] ?: "Dept"
+                    "$d Batch ${it.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}"
+                })
+                if(batches.isNotEmpty() && initialIndex<batches.size) choice.setSelection(initialIndex)
+                val dialog=builder.create()
+                dialog.show()
+                dialog.getButton(-1).setOnClickListener {
+                    val batch=batches.getOrNull(choice.selectedItemPosition) ?: return@setOnClickListener
+                    val sid=studentId.text.toString().trim()
+                    if(sid.length<4) {
+                        error.visibility=View.VISIBLE; error.text="Enter a valid student ID"; return@setOnClickListener
+                    }
+                    if(busy) return@setOnClickListener
+                    busy=true; dialog.getButton(-1).isEnabled=false
+                    lifecycleScope.launch {
+                        try {
+                            ClassMateAuthApi.rpc("set_batch_override",JSONObject()
+                                .put("target_student_id",sid)
+                                .put("target_batch",batch.getString("id"))
+                                .put("target_reason",reason.text.toString().trim()))
+                            setResult(RESULT_OK); dialog.dismiss()
+                            if(mode=="overrides") load()
+                            else Toast.makeText(this@ClassMateConfigurationActivity,"Override saved for $sid",Toast.LENGTH_SHORT).show()
+                        } catch(e: Exception) {
+                            error.visibility=View.VISIBLE; error.text=e.message
+                        } finally {
+                            busy=false; dialog.getButton(-1).isEnabled=true
+                        }
+                    }
+                }
+                dialog.getButton(-3)?.setOnClickListener {
+                    val sid=currentOverride?.optString("student_id") ?: studentId.text.toString().trim()
+                    if(busy) return@setOnClickListener
+                    busy=true
+                    lifecycleScope.launch {
+                        try {
+                            ClassMateAuthApi.rpc("delete_batch_override",JSONObject().put("target_student_id",sid))
+                            setResult(RESULT_OK); dialog.dismiss()
+                            if(mode=="overrides") load()
+                        } catch(e: Exception) {
+                            error.visibility=View.VISIBLE; error.text=e.message
+                        } finally { busy=false }
+                    }
+                }
+            } catch(e: Exception) {
+                Toast.makeText(this@ClassMateConfigurationActivity,e.message,Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

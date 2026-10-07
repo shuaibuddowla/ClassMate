@@ -68,3 +68,5 @@ scripts/web/__pycache__/
 !/web/.env.example
 
 /web/tsconfig.tsbuildinfo
+release_build.log
+deliverables/

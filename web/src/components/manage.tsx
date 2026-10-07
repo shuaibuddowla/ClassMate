@@ -17,6 +17,7 @@ import {
   Building,
   Activity,
   Trash2,
+  UserCheck,
 } from "lucide-react";
 import { rpc, rows, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -132,6 +133,7 @@ export default function Manage({
         ["catalog", "Shared catalog", BookOpen],
         ["teachers", "Teachers", GraduationCap],
         ["people", "People & approvals", Users],
+        ["overrides", "Batch overrides", UserCheck],
         ["structure", "Academic structure", Building],
         ["health", "System health", Activity],
       ] as [string, string, typeof BookOpen][]),
@@ -380,6 +382,9 @@ export default function Manage({
       )}
       {section === "people" && (
         <People ctx={ctx} open={setAction} refresh={refresh} />
+      )}
+      {section === "overrides" && (
+        <Overrides ctx={ctx} open={setAction} refresh={refresh} />
       )}
       {section === "structure" && (
         <>
@@ -685,6 +690,42 @@ function People({
                 />
               </label>
             )}
+            {p.role === "student" && p.student_id && (
+              <button
+                className="secondary"
+                onClick={() =>
+                  open({
+                    title: `Override batch: ${p.student_id}`,
+                    name: "set_batch_override",
+                    fields: [
+                      {
+                        name: "target_student_id",
+                        label: "Student ID",
+                        required: true,
+                        value: p.student_id,
+                      },
+                      {
+                        name: "target_batch",
+                        label: "Effective batch",
+                        required: true,
+                        value: p.batch_id,
+                        options: (ctx.batches || [ctx.batchInfo]).map((b) => ({
+                          value: b.id,
+                          label: `${b.departments?.code?.toUpperCase() || ""} Batch ${b.batch_number}`,
+                        })),
+                      },
+                      {
+                        name: "target_reason",
+                        label: "Reason (optional)",
+                        value: "",
+                      },
+                    ],
+                  })
+                }
+              >
+                Override
+              </button>
+            )}
             {p.profile_source === "manual" &&
               ["pending", "rejected"].includes(p.verification_status) && (
                 <button
@@ -749,6 +790,157 @@ function People({
       )}
       {users.hasNextPage && (
         <button onClick={() => users.fetchNextPage()}>Load 50 more</button>
+      )}
+    </>
+  );
+}
+function Overrides({
+  ctx,
+  open,
+  refresh,
+}: {
+  ctx: Context;
+  open: (a: Action) => void;
+  refresh: () => Promise<void>;
+}) {
+  const [search, setSearch] = useState(""),
+    [error, setError] = useState<unknown>(null),
+    [deleting, setDeleting] = useState<Row | null>(null);
+
+  const overrides = useQuery({
+    queryKey: [ctx.user, "owner-batch-overrides"],
+    queryFn: () => rpc<Row[]>("owner_batch_overrides"),
+  });
+
+  const batches = useQuery({
+    queryKey: [ctx.user, "available-batches"],
+    queryFn: () => rpc<Row[]>("available_batches"),
+  });
+
+  const batchOptions = (batches.data || []).map((b) => ({
+    value: b.id,
+    label: `${b.departments?.code?.toUpperCase() || ""} Batch ${b.batch_number}${b.academic_session ? ` (${academicSession(b.academic_session)})` : ""}`,
+  }));
+
+  const openForm = (initial?: Row) => {
+    open({
+      title: initial ? "Edit batch override" : "Add batch override (Re-add)",
+      name: "set_batch_override",
+      fields: [
+        {
+          name: "target_student_id",
+          label: "Student ID (e.g. CE23045)",
+          required: true,
+          value: initial?.student_id || "",
+        },
+        {
+          name: "target_batch",
+          label: "Effective batch",
+          required: true,
+          value: initial?.effective_batch_id || (batchOptions[0]?.value ?? ""),
+          options: batchOptions,
+        },
+        {
+          name: "target_reason",
+          label: "Reason (optional)",
+          value: initial?.reason || "",
+        },
+      ],
+    });
+  };
+
+  const list = (overrides.data || []).filter((o) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      o.student_id?.toLowerCase().includes(q) ||
+      o.profile_full_name?.toLowerCase().includes(q) ||
+      o.reason?.toLowerCase().includes(q) ||
+      o.department_code?.toLowerCase().includes(q) ||
+      String(o.batch_number).includes(q)
+    );
+  });
+
+  return (
+    <>
+      <div className="section-heading">
+        <div>
+          <h2>Batch overrides</h2>
+          <small>
+            Pre-register students with dropped/repeated semesters to place them in the correct batch.
+          </small>
+        </div>
+        <button className="primary" onClick={() => openForm()}>
+          <Plus size={17} />
+          Add override
+        </button>
+      </div>
+      <label className="search">
+        <Search size={18} />
+        <input
+          placeholder="Search by student ID, batch, or reason"
+          aria-label="Search overrides"
+          value={search}
+          maxLength={100}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </label>
+      <ErrorBox error={error || overrides.error || batches.error} />
+      {overrides.isPending ? (
+        <Skeleton />
+      ) : list.length === 0 ? (
+        <p className="card">
+          {search
+            ? "No overrides match your search."
+            : "No overrides registered yet. Students with dropped semesters can be pre-assigned to their new batch here before or after they sign in."}
+        </p>
+      ) : (
+        list.map((o) => (
+          <div className="card person" key={o.id}>
+            <span>
+              <strong>
+                {o.student_id} → {o.department_code} Batch {o.batch_number}
+              </strong>
+              <small>
+                {o.reason ? `Reason: ${o.reason} · ` : ""}
+                {o.profile_full_name
+                  ? `Active profile: ${o.profile_full_name} (${o.profile_verification_status})`
+                  : "Awaiting first sign-in"}
+                {o.added_by_name ? ` · Added by ${o.added_by_name}` : ""}
+              </small>
+            </span>
+            <button className="secondary" onClick={() => openForm(o)}>
+              Edit
+            </button>
+            <button
+              className="icon danger"
+              aria-label="Delete override"
+              onClick={() => setDeleting(o)}
+            >
+              <Trash2 size={17} />
+            </button>
+          </div>
+        ))
+      )}
+      {deleting && (
+        <Confirm
+          title="Delete batch override?"
+          body={`Remove the override for student ${deleting.student_id}? If this student signs in again, they will fall back to their email-derived batch.`}
+          close={() => setDeleting(null)}
+          action={async () => {
+            try {
+              await rpc("delete_batch_override", {
+                target_student_id: deleting.student_id,
+                target_override_id: deleting.id,
+              });
+              await refresh();
+              await overrides.refetch();
+              setDeleting(null);
+            } catch (e) {
+              setError(e);
+            }
+          }}
+        />
       )}
     </>
   );

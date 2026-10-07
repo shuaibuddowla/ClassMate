@@ -79,7 +79,8 @@ begin
  postponed:=classmate.defer_profile_completion();
  if postponed.profile_remind_after<now()+interval '23 hours' then raise exception 'Reminder not postponed'; end if;
  select count(*) into count_members from classmate.batch_friends(current_setting('classmate.qa_batch')::uuid);
- if count_members<>3 then raise exception 'Directory should contain two students and assigned teacher; got %',count_members; end if;
+ if count_members<>2 then raise exception 'Directory should contain two students only; got %',count_members; end if;
+ if exists(select 1 from classmate.batch_friends(current_setting('classmate.qa_batch')::uuid) where profile_id=current_setting('classmate.qa_teacher')::uuid) then raise exception 'Teacher profile must not appear in batch friends directory'; end if;
  select count(*) into count_members from classmate.batch_friends(current_setting('classmate.qa_batch')::uuid,'QA Student');
  if count_members<>1 then raise exception 'Search did not match actual account'; end if;
  details:=classmate.batch_friend_details(current_setting('classmate.qa_batch')::uuid,current_setting('classmate.qa_student')::uuid);

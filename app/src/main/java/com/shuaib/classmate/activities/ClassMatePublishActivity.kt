@@ -1,6 +1,7 @@
 package com.shuaib.classmate.activities
 
 import android.os.Bundle
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.view.View
@@ -184,7 +185,14 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     try {
                         val response=ClassMateAuthApi.ai(JSONObject().put("mode","compose").put("batch_id",batch).put("request_id",aiRequest).put("text",value).put("history",aiHistory))
-                        if((response.optJSONObject("result")?.optJSONArray("actions")?.length() ?: 0)>0) { setResult(RESULT_OK); finish() }
+                        val actions=response.optJSONObject("result")?.optJSONArray("actions")
+                        if((actions?.length() ?: 0)>0) {
+                            val createdNotice=actions?.optJSONObject(0)?.optJSONObject("outcome")
+                            val data=Intent()
+                            if(createdNotice!=null) data.putExtra("created_notice",createdNotice.toString())
+                            setResult(RESULT_OK,data)
+                            finish()
+                        }
                         else {
                             val reply=response.optJSONObject("plan")?.optString("message") ?: response.optJSONObject("result")?.optString("message") ?: "Add the missing course or date."
                             status.text=reply; aiHistory.put(JSONObject().put("role","user").put("text",value)); aiHistory.put(JSONObject().put("role","assistant").put("text",reply)); aiRequest=null
@@ -234,20 +242,28 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 if (editingFile != null) {
                     ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject().put("target_resource", editingFile!!.getString("id"))
                         .put("target_title", title).put("target_category", kind).put("target_course", course.first))
+                    null
                 } else {
-                val size = contentResolver.query(selected!!, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null } ?: error("Could not read file size")
-                ClassMateAuthApi.uploadResource(contentResolver, selected, batch, course.first, title,
-                    contentResolver.getType(selected) ?: "application/octet-stream", size, kind)
+                    val size = contentResolver.query(selected!!, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null } ?: error("Could not read file size")
+                    ClassMateAuthApi.uploadResource(contentResolver, selected, batch, course.first, title,
+                        contentResolver.getType(selected) ?: "application/octet-stream", size, kind)
+                    null
                 }
             }
         }
     }
-    private fun perform(action: suspend () -> Unit) {
+    private fun perform(action: suspend () -> JSONObject?) {
         if (busy) return
         busy = true; submit.isEnabled = false; status.visibility = View.VISIBLE
         status.text = if (editingFile != null) "Saving changes…" else if (upload) "Uploading file…" else "Posting notice…"
         lifecycleScope.launch {
-            try { action(); setResult(RESULT_OK); finish() }
+            try {
+                val outcome = action()
+                val data = Intent()
+                if (outcome != null) data.putExtra("created_notice", outcome.toString())
+                setResult(RESULT_OK, data)
+                finish()
+            }
             catch (e: Exception) { status.text = e.message ?: "Could not complete. Try again." }
             finally { busy = false; submit.isEnabled = true }
         }

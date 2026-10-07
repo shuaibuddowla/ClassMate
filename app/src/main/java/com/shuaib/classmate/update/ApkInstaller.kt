@@ -14,7 +14,7 @@ class ApkInstaller(private val context: Context) {
             setAppPackageName(context.packageName)
             setSize(apk.length())
             if (Build.VERSION.SDK_INT >= 31) {
-                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
+                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
         }
         val sessionId = installer.createSession(params)

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -27,14 +27,52 @@ import {
 import type { Context } from "./app";
 import { Empty, ErrorBox, Form, Modal, Skeleton, Confirm } from "./ui";
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function dhakaNowTime() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Dhaka",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
 export function Schedule({ ctx }: { ctx: Context }) {
   const [mode, setMode] = useState("routine"),
     [date, setDate] = useState(dhakaToday()),
     [month, setMonth] = useState(() => parseDate(dhakaToday())),
+    [currentTime, setCurrentTime] = useState(dhakaNowTime),
     [editing, setEditing] = useState<Row | null>(null),
     [event, setEvent] = useState<Row | null>(null),
     [deleting, setDeleting] = useState<Row | null>(null);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    let lastToday = dhakaToday();
+    const handleDayRollover = () => {
+      const today = dhakaToday();
+      if (today !== lastToday) {
+        lastToday = today;
+        setDate((prev) => (prev <= lastToday ? today : prev));
+        setMonth(parseDate(today));
+        qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
+      }
+      setCurrentTime(dhakaNowTime());
+    };
+    const timer = setInterval(handleDayRollover, 10_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleDayRollover();
+      }
+    };
+    window.addEventListener("focus", handleDayRollover);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", handleDayRollover);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [ctx.user, ctx.batch, qc]);
   const calendar = useAcademic<Row[]>(ctx.user, ctx.batch, "calendar", () =>
     rows("academic_calendar_events", {}, "*", "start_date", 1000),
   );
@@ -363,6 +401,18 @@ export function Schedule({ ctx }: { ctx: Context }) {
                         mode === "bus"
                           ? busPermission.data
                           : editable.data?.[s.semester_course_id];
+                      const isToday = date === dhakaToday();
+                      const isLive =
+                        mode === "routine" &&
+                        isToday &&
+                        !detail?.cancelled &&
+                        !closed &&
+                        Boolean(
+                          s.start_time &&
+                            s.end_time &&
+                            s.start_time.slice(0, 5) <= currentTime &&
+                            currentTime < s.end_time.slice(0, 5),
+                        );
                       return (
                         <button
                           className={`card schedule-row ${mode === "routine" ? "routine-row" : "bus-row"} ${detail?.cancelled && mode === "routine" ? "cancelled" : ""}`}
@@ -431,13 +481,15 @@ export function Schedule({ ctx }: { ctx: Context }) {
                               </div>
                               <div className="period-status">
                                 <span
-                                  className={`period-tag ${detail?.cancelled ? "red" : ""}`}
+                                  className={`period-tag ${detail?.cancelled ? "red" : isLive ? "live" : ""}`}
                                 >
                                   {detail?.cancelled
                                     ? "Cancelled"
-                                    : s.type === "lab"
-                                      ? "Lab"
-                                      : "Class"}
+                                    : isLive
+                                      ? "Live now"
+                                      : s.type === "lab"
+                                        ? "Lab"
+                                        : "Class"}
                                 </span>
                                 <small className="period-duration">
                                   <Clock3 size={13} />

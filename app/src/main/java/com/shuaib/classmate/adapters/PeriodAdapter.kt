@@ -94,8 +94,8 @@ class PeriodAdapter(
             }
             bindStatusColor(context, b, ThemeColors.success(context))
             b.tvTypeBadge.text = "LIVE NOW"
-            b.tvTypeBadge.setBackgroundResource(R.drawable.bg_library_badge_green)
-            b.tvTypeBadge.setTextColor(ThemeColors.success(context))
+            b.tvTypeBadge.setBackgroundResource(R.drawable.bg_badge_green)
+            b.tvTypeBadge.setTextColor(ContextCompat.getColor(context, R.color.cm_file_lab_text))
         } else {
             b.cardRoot.clearAnimation()
             when {

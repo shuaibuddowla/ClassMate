@@ -117,7 +117,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     if(wait) delay(250)
                     val result=JSONArray(ClassMateAuthApi.rpcText("batch_friends",JSONObject().put("target_batch",batch).put("query_text",query).put("result_offset",requestedOffset)))
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
-                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { !teacher() || it.optString("role") in setOf("student", "admin") }
+                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
                     offset=requestedOffset+result.length(); hasMore=result.length()==100
                     adapter.submitList(merged)
@@ -173,7 +173,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             val member=getItem(position)
             holder.badge.visibility=if(member.optString("role")=="admin") View.VISIBLE else View.GONE
             holder.name.text=member.optString("full_name").ifBlank { "ClassMate member" }
-            holder.studentId.text=when(member.optString("role")) { "admin" -> member.optString("student_id").takeUnless {it=="null"}.orEmpty(); "teacher" -> "Teacher"; else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ") }
+            holder.studentId.text=when(member.optString("role")) { "admin" -> member.optString("student_id").takeUnless {it=="null"}.orEmpty(); else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ") }
             holder.studentId.setTextColor(activity.getColor(if(member.optString("role")=="admin") R.color.cm_primary else R.color.cm_text_secondary))
             Glide.with(activity).load(member.optString("avatar_url").takeUnless { it=="null" || it.isBlank() }).circleCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(holder.avatar)
             holder.itemView.setOnClickListener { if(member.optString("role")=="admin") ClassMateFeatureUi.developer(activity) else click(member) }
@@ -183,23 +183,49 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
     private class FriendHolder(view: View,val avatar: ImageView,val name: TextView,val studentId: TextView,val badge: TextView): RecyclerView.ViewHolder(view)
 
     private fun showDetails(member: JSONObject): AlertDialog {
-        val form=ClassMateFormUi(activity)
+        val panel=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(4),dp(18),dp(8)) }
+        val scroll=android.widget.ScrollView(activity).apply { isFillViewport=true; addView(panel) }
+
+        val header=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,dp(4),0,dp(12)) }
         val avatar=ImageView(activity).apply { importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-        form.panel.addView(avatar,LinearLayout.LayoutParams(dp(64),dp(64)).apply { gravity=Gravity.CENTER_HORIZONTAL; topMargin=dp(8); bottomMargin=dp(8) })
+        header.addView(avatar,LinearLayout.LayoutParams(dp(48),dp(48)))
         Glide.with(activity).load(member.optString("avatar_url").takeUnless { it=="null" || it.isBlank() }).circleCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar)
-        fun info(label: String,key: String) {
-            form.label(label).apply { textSize=11f }
-            form.panel.addView(text(member.optString(key).takeUnless { it.isBlank() || it=="null" } ?: "Not provided",16f,true))
+
+        val titles=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,0,0) }
+        titles.addView(text(member.optString("full_name").ifBlank { "ClassMate member" },16f,true).apply { setTypeface(null,1) })
+        val sub=when(member.optString("role")) {
+            "admin" -> member.optString("student_id").takeUnless { it=="null" }.orEmpty()
+            else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ")
         }
-        info("Name","full_name"); info("Student ID","student_id"); info("Mobile number","mobile_number")
-        info("Home town","home_town"); info("Blood group","blood_group"); info("Current mess / flat","current_residence")
+        if(sub.isNotBlank()) titles.addView(text(sub,12f).apply { setPadding(0,dp(2),0,0) })
+        header.addView(titles,LinearLayout.LayoutParams(0,-2,1f))
+        panel.addView(header)
+
+        val rows=listOf(
+            "Student ID" to "student_id",
+            "Mobile number" to "mobile_number",
+            "Home town" to "home_town",
+            "Blood group" to "blood_group",
+            "Current mess / flat" to "current_residence"
+        )
+        rows.forEachIndexed { i,(label,key) ->
+            val itemVal=member.optString(key).takeUnless { it.isBlank() || it=="null" } ?: "Not provided"
+            val row=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,dp(7),0,dp(7)) }
+            row.addView(text(label,12f).apply { setTextColor(activity.getColor(R.color.cm_text_secondary)) },LinearLayout.LayoutParams(0,-2,0.42f))
+            row.addView(text(itemVal,13f,true).apply { gravity=Gravity.END; textAlignment=View.TEXT_ALIGNMENT_VIEW_END },LinearLayout.LayoutParams(0,-2,0.58f))
+            panel.addView(row)
+            if(i<rows.size-1) {
+                panel.addView(View(activity).apply { setBackgroundColor(activity.getColor(R.color.cm_border)); alpha=0.5f },LinearLayout.LayoutParams(-1,dp(1)))
+            }
+        }
+
         val phone=member.optString("mobile_number").takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }
-        val actions=LinearLayout(activity).apply { gravity=Gravity.CENTER; setPadding(0,dp(16),0,0) }
+        val actions=LinearLayout(activity).apply { gravity=Gravity.CENTER; setPadding(0,dp(12),0,0) }
         fun action(label: String,icon: Int,callback: ()->Unit) {
             actions.addView(MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text=label; setIconResource(icon); iconSize=dp(20); cornerRadius=dp(14); isEnabled=phone!=null
+                text=label; textSize=13f; setIconResource(icon); iconSize=dp(18); cornerRadius=dp(12); isEnabled=phone!=null
                 setOnClickListener { callback() }
-            },LinearLayout.LayoutParams(0,dp(52),1f).apply { marginStart=dp(4); marginEnd=dp(4) })
+            },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginStart=dp(4); marginEnd=dp(4) })
         }
         action("Call",R.drawable.ic_phone) { phone?.let(onCall) }
         action("WhatsApp",R.drawable.ic_whatsapp) { phone?.let {
@@ -213,8 +239,18 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             }
             catch (_: android.content.ActivityNotFoundException) { Toast.makeText(activity,"No app can open WhatsApp",Toast.LENGTH_SHORT).show() }
         } }
-        form.panel.addView(actions)
-        val surface=MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(dp(24).toFloat()).build()).apply { fillColor=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) }
-        return MaterialAlertDialogBuilder(activity).setBackground(surface).setTitle("Profile").setView(form.scroll).setPositiveButton("Done",null).show()
+        panel.addView(actions)
+
+        val surface=MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(dp(22).toFloat()).build()).apply { fillColor=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) }
+        val dialog=MaterialAlertDialogBuilder(activity).setBackground(surface).setTitle("Profile").setView(scroll).setPositiveButton("Done",null).create()
+        dialog.show()
+
+        val metrics=activity.resources.displayMetrics
+        val dialogWidth=minOf((metrics.widthPixels * 0.94f).toInt(),dp(520))
+        dialog.window?.let { win ->
+            win.setLayout(dialogWidth,ViewGroup.LayoutParams.WRAP_CONTENT)
+            win.setBackgroundDrawable(surface)
+        }
+        return dialog
     }
 }

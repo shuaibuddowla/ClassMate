@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="130dp"
+    android:viewportWidth="200"
+    android:viewportHeight="130">
+
+    <!-- Soft ambient glow behind logo -->
+    <path
+        android:pathData="M100,65 m-48,0 a48,48 0,1 1,96 0 a48,48 0,1 1,-96 0"
+        android:fillColor="#223B82F6" />
+
+    <!-- Left side radiant pill dashes -->
+    <!-- Top-left (sky blue, slanted down-right) -->
+    <path
+        android:pathData="M38,36 L24,24"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- Mid-left (royal blue, horizontal) -->
+    <path
+        android:pathData="M32,65 L18,65"
+        android:strokeColor="#3B82F6"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- Bot-left (soft purple/indigo, slanted up-right) -->
+    <path
+        android:pathData="M38,94 L24,106"
+        android:strokeColor="#818CF8"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- Right side radiant pill dashes -->
+    <!-- Top-right (teal/cyan, slanted down-left) -->
+    <path
+        android:pathData="M162,36 L176,24"
+        android:strokeColor="#2DD4BF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- Mid-right (royal blue, horizontal) -->
+    <path
+        android:pathData="M168,65 L182,65"
+        android:strokeColor="#3B82F6"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- Bot-right (warm amber/yellow, slanted up-left) -->
+    <path
+        android:pathData="M162,94 L176,106"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+</vector>

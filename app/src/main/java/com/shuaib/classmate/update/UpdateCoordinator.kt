@@ -37,21 +37,34 @@ object UpdateCoordinator {
     private var lastForegroundCheck=0L
     private var promptedVersion=0L
     fun promptOnOpen(activity: androidx.activity.ComponentActivity) {
-        if(foregroundBusy || System.currentTimeMillis()-lastForegroundCheck<60_000 || !UpdateRepository(activity).configured) return
-        foregroundBusy=true; lastForegroundCheck=System.currentTimeMillis()
+        if (foregroundBusy || System.currentTimeMillis() - lastForegroundCheck < 60_000 || !UpdateRepository(activity).configured) return
+        foregroundBusy = true; lastForegroundCheck = System.currentTimeMillis()
         activity.lifecycleScope.launch {
             try {
-                val metadata=UpdateRepository(activity).fetch()
-                if(metadata.versionCode<=BuildConfig.VERSION_CODE || metadata.versionCode==promptedVersion || activity.isFinishing || activity.isDestroyed) return@launch
-                if(!activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@launch
-                promptedVersion=metadata.versionCode
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
-                    .setTitle("ClassMate ${metadata.versionName} is available")
-                    .setMessage(if(UpdateRepository(activity).hasDownloaded(metadata)) "The update has been downloaded. Tap Update to verify it and open Android's installer." else "The update can download automatically using your update settings. Tap Update to prepare it now and open Android's installer.")
-                    .setPositiveButton("Update") { _, _ -> activity.startActivity(android.content.Intent(activity,UpdateActionActivity::class.java).setAction(UpdateActionActivity.ACTION_RETRY)) }
-                    .setNegativeButton("Later",null).show()
-            } catch(error:Exception) { android.util.Log.w("ClassMateUpdate","Foreground update check unavailable",error) }
-            finally { foregroundBusy=false }
+                val metadata = UpdateRepository(activity).fetch()
+                val installedCode = BuildConfig.VERSION_CODE.toLong()
+                if (metadata.versionCode <= installedCode || activity.isFinishing || activity.isDestroyed) return@launch
+                if (!activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@launch
+
+                val isMandatory = metadata.isMandatoryFor(installedCode)
+                if (isMandatory) {
+                    AppPreferences(activity).setPendingMandatoryVersionCode(metadata.versionCode)
+                    activity.startActivity(android.content.Intent(activity, UpdateActionActivity::class.java).apply {
+                        action = UpdateActionActivity.ACTION_MANDATORY
+                    })
+                    return@launch
+                }
+
+                if (metadata.versionCode == promptedVersion) return@launch
+                promptedVersion = metadata.versionCode
+                activity.startActivity(android.content.Intent(activity, UpdateActionActivity::class.java).apply {
+                    action = UpdateActionActivity.ACTION_PROMPT
+                })
+            } catch (error: Exception) {
+                android.util.Log.w("ClassMateUpdate", "Foreground update check unavailable", error)
+            } finally {
+                foregroundBusy = false
+            }
         }
     }
 
@@ -128,8 +141,10 @@ object UpdateCoordinator {
             if (metadata.isMandatoryFor(installedCode))
                 prefs.setPendingMandatoryVersionCode(metadata.versionCode)
             if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
-                UpdateNotifications.show(app, "Allow ClassMate updates",
-                    "Tap to allow installs from ClassMate", UpdateActionActivity.ACTION_PERMISSION)
+                if (!manual) {
+                    UpdateNotifications.show(app, "Allow ClassMate updates",
+                        "Tap to allow installs from ClassMate", UpdateActionActivity.ACTION_PERMISSION)
+                }
                 return@withLock UpdateOutcome.PermissionRequired(metadata.versionName)
             }
             try {

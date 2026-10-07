@@ -78,6 +78,7 @@ class TimetableFragment : Fragment() {
     private val academicCalendarRepository = AcademicCalendarRepository()
     private var activeExceptionsList: List<AcademicCalendarException> = emptyList()
     private var lastAnimatedDay = ""
+    private var lastLivePeriodIds: Set<String> = emptySet()
     private var isHeroExpanded = false
     private var todayPeriods: List<Period>? = null
     private var currentHeroSubject: String? = null
@@ -596,6 +597,18 @@ class TimetableFragment : Fragment() {
                         val periods = todayPeriods
                         if (periods != null) {
                             updateHeroNextClass(periods)
+                            val now = LocalTime.now()
+                            val currentLive = periods.filter { period ->
+                                !period.isCancelled && try {
+                                    val start = LocalTime.parse(period.startTime)
+                                    val end = LocalTime.parse(period.endTime)
+                                    !now.isBefore(start) && now.isBefore(end)
+                                } catch (_: Exception) { false }
+                            }.map { it.id }.toSet()
+                            if (currentLive != lastLivePeriodIds) {
+                                lastLivePeriodIds = currentLive
+                                periodAdapter?.notifyDataSetChanged()
+                            }
                         }
                     }
                     kotlinx.coroutines.delay(1000)

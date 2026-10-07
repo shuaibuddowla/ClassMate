@@ -43,6 +43,15 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
+    fun isNoticeReadReceiptsEnabled(): Boolean =
+        prefs.getBoolean("notice_read_receipts_enabled", true)
+
+    fun setNoticeReadReceiptsEnabled(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean("notice_read_receipts_enabled", enabled)
+            .apply()
+    }
+
     fun isNotificationsEnabled(): Boolean =
         prefs.getBoolean("notifications_enabled", true)
 

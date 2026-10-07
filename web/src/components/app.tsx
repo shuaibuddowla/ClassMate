@@ -391,7 +391,7 @@ function SessionApp() {
             {/* Left Column: Hero Content */}
             <div className="desktop-hero-column">
               <div className="desktop-brand">
-                <img src="/logo.png" alt="ClassMate logo" className="desktop-brand-symbol" />
+                <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate logo" className="desktop-brand-symbol" />
                 <strong className="desktop-brand-name">ClassMate</strong>
               </div>
 
@@ -528,7 +528,7 @@ function SessionApp() {
             </aside>
             <section className="login card">
               <div className="signin-brand">
-                <img src="/logo.png" alt="ClassMate logo" />
+                <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate logo" />
                 <strong>ClassMate</strong>
               </div>
               <img className="signin-emblem" src="/logo.png" alt="" />
@@ -1104,7 +1104,7 @@ function Home({
             select("timetable");
           }}
         >
-          <img src="/logo.png" alt="" />
+          <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate" className="sidebar-brand-icon" />
           <span>
             ClassMate<small>University workspace</small>
           </span>
