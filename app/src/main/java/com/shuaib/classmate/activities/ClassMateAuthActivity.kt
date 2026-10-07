@@ -285,7 +285,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         }
                 } else {
                     authBusy = false
-                    status.text = "Students: use university email. Teachers: use your approved Google account."
+                    status.text = ""
                 }
             }
         }

@@ -301,9 +301,19 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
         val scrollContent = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, topPadding, 0, dp(135))
+            setPadding(0, dp(12), 0, dp(20))
         }
-        scroll.addView(scrollContent, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        val scrollParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+        scroll.addView(scrollContent, scrollParams)
+
+        // Top flexible spacer for true vertical centering
+        val topSpacer = View(activity)
+        scrollContent.addView(topSpacer, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f))
 
         // 1. Hero App Logo with radiant accent strokes
         val heroContainer = FrameLayout(activity).apply {
@@ -599,7 +609,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
 
         // Supporting text below the card
         val supportingText = TextView(activity).apply {
-            text = "Students: use university email. Teachers: use your\napproved Google account."
+            text = "Students: use university email.\nTeachers: use your approved Google account."
             textSize = if (screenWdp < 375) 12f else 12.8f
             setTextColor(Color.parseColor("#536583"))
             gravity = Gravity.CENTER
@@ -613,8 +623,8 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             gravity = Gravity.CENTER_HORIZONTAL
             leftMargin = sideMargin
             rightMargin = sideMargin
-            topMargin = dp(18)
-            bottomMargin = dp(8)
+            topMargin = dp(16)
+            bottomMargin = dp(4)
         })
         animated.add(supportingText)
 
@@ -625,7 +635,28 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             gravity = Gravity.CENTER
             setPadding(dp(16), dp(4), dp(16), dp(4))
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            visibility = View.GONE
         }
+        statusText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val t = s?.toString()?.trim() ?: ""
+                if (t.isEmpty() || t.contains("Students: use university email", ignoreCase = true) || t.contains("Teachers: use your approved", ignoreCase = true)) {
+                    if (t.contains("Students: use university email", ignoreCase = true) || t.contains("Teachers: use your approved", ignoreCase = true)) {
+                        statusText.post { statusText.text = "" }
+                    }
+                    statusText.visibility = View.GONE
+                } else {
+                    statusText.visibility = View.VISIBLE
+                    if (t.contains("fail", ignoreCase = true) || t.contains("error", ignoreCase = true) || t.contains("missing", ignoreCase = true)) {
+                        statusText.setTextColor(Color.parseColor("#DC2626"))
+                    } else {
+                        statusText.setTextColor(activity.getColor(R.color.cm_text_muted))
+                    }
+                }
+            }
+        })
         scrollContent.addView(statusText, LinearLayout.LayoutParams(
             if (dm.widthPixels > maxCardW) maxCardW else LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -646,6 +677,10 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             leftMargin = sideMargin
             rightMargin = sideMargin
         })
+
+        // Bottom flexible spacer with optical balance above campus decoration
+        val bottomSpacer = View(activity)
+        scrollContent.addView(bottomSpacer, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.15f))
 
         val setLoadingState: (Boolean) -> Unit = { loading ->
             if (loading) {
