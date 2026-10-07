@@ -4,7 +4,8 @@ param(
     [switch]$ValidateOnly,
     [long]$MinSupportedVersionCode = 0,
     [switch]$Mandatory,
-    [string[]]$ReleaseNotes = @('ClassMate improvements and bug fixes')
+    [string[]]$ReleaseNotes = @('ClassMate improvements and bug fixes'),
+    [switch]$NoNotification
 )
 
 $ErrorActionPreference = 'Stop'
@@ -171,7 +172,11 @@ try {
     & gh release edit $tag --repo $repo --draft=false --latest
     if ($LASTEXITCODE -ne 0) { throw 'Could not publish the release; check the draft in GitHub.' }
     Write-Host "Published $tag to $latestMetadataUrl"
-    & (Join-Path $PSScriptRoot 'notify-classmate-release.ps1') -VersionName $versionName -VersionCode $versionCode
+    if (-not $NoNotification) {
+        & (Join-Path $PSScriptRoot 'notify-classmate-release.ps1') -VersionName $versionName -VersionCode $versionCode
+    } else {
+        Write-Host "Skipping release push notification as requested (-NoNotification)."
+    }
 } finally {
     $cleanupPath = [IO.Path]::GetFullPath($tempDir)
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
