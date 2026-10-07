@@ -81,6 +81,8 @@ android {
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeystore.getProperty("keyAlias")
                 keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
             }
         }
     }
@@ -201,3 +203,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
+

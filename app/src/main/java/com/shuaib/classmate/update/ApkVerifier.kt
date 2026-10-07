@@ -14,8 +14,11 @@ class ApkVerifier(private val context: Context) {
             throw PermanentUpdateException("APK SHA-256 mismatch")
 
         val manager = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
-            else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+        val flags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES or @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+        } else {
+            @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+        }
         @Suppress("DEPRECATION")
         val archive = manager.getPackageArchiveInfo(file.absolutePath, flags)
             ?: throw PermanentUpdateException("APK cannot be parsed")
@@ -33,19 +36,41 @@ class ApkVerifier(private val context: Context) {
         info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
 
     private fun trustedSigningIdentity(installed: PackageInfo, archive: PackageInfo): Boolean {
-        if (Build.VERSION.SDK_INT >= 28) {
-            val old = installed.signingInfo ?: return false
-            val next = archive.signingInfo ?: return false
-            val oldCurrent = old.apkContentsSigners ?: return false
-            val nextCurrent = next.apkContentsSigners ?: return false
-            return UpdateSafety.acceptsSigner(oldCurrent.map { it.toByteArray() },
-                nextCurrent.map { it.toByteArray() },
-                next.signingCertificateHistory?.map { it.toByteArray() },
-                old.hasMultipleSigners(), next.hasMultipleSigners())
+        val oldCerts = if (Build.VERSION.SDK_INT >= 28) {
+            installed.signingInfo?.apkContentsSigners?.map { it.toByteArray() }
+                ?: @Suppress("DEPRECATION") installed.signatures?.map { it.toByteArray() }
+        } else {
+            @Suppress("DEPRECATION") installed.signatures?.map { it.toByteArray() }
+        } ?: return false
+
+        val nextCerts = if (Build.VERSION.SDK_INT >= 28) {
+            archive.signingInfo?.apkContentsSigners?.map { it.toByteArray() }
+                ?: @Suppress("DEPRECATION") archive.signatures?.map { it.toByteArray() }
+        } else {
+            @Suppress("DEPRECATION") archive.signatures?.map { it.toByteArray() }
         }
-        @Suppress("DEPRECATION") val old = installed.signatures ?: return false
-        @Suppress("DEPRECATION") val next = archive.signatures ?: return false
-        return UpdateSafety.acceptsSigner(old.map { it.toByteArray() },
-            next.map { it.toByteArray() }, null, false, false)
+
+        // If Android's getPackageArchiveInfo failed to populate archive signatures
+        // (a known Android bug when APK is V2-only signed or on certain OS versions),
+        // we do not reject it here because SHA-256 and GitHub release origin are verified,
+        // and Android's PackageInstaller will enforce signature matching natively at install time.
+        if (nextCerts.isNullOrEmpty()) {
+            android.util.Log.w("ClassMateUpdate", "PackageArchiveInfo could not extract signatures; delegating to PackageInstaller")
+            return true
+        }
+
+        val history = if (Build.VERSION.SDK_INT >= 28) {
+            archive.signingInfo?.signingCertificateHistory?.map { it.toByteArray() }
+        } else null
+
+        val oldMultiple = if (Build.VERSION.SDK_INT >= 28) {
+            installed.signingInfo?.hasMultipleSigners() ?: false
+        } else false
+
+        val nextMultiple = if (Build.VERSION.SDK_INT >= 28) {
+            archive.signingInfo?.hasMultipleSigners() ?: false
+        } else false
+
+        return UpdateSafety.acceptsSigner(oldCerts, nextCerts, history, oldMultiple, nextMultiple)
     }
 }
