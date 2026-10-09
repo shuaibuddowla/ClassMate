@@ -3,7 +3,7 @@
     android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp">
     <com.google.android.material.card.MaterialCardView android:id="@+id/cardRoot"
         android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:clickable="true" android:focusable="true" app:cardCornerRadius="20dp"
+        android:clickable="false" android:focusable="false" app:cardCornerRadius="20dp"
         app:cardElevation="0dp" app:cardBackgroundColor="@color/cm_surface"
         app:strokeColor="@color/cm_notice_premium_stroke" app:strokeWidth="1dp">
         <LinearLayout android:id="@+id/noticeCardSurface" android:layout_width="match_parent"
@@ -29,7 +29,7 @@
             </LinearLayout>
             <TextView android:id="@+id/tvPreview" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:layout_marginEnd="4dp" android:includeFontPadding="false"
-                android:lineSpacingExtra="3dp" android:maxLines="3" android:ellipsize="end"
+                android:lineSpacingExtra="3dp" android:maxLines="6" android:ellipsize="end"
                 android:textColor="@color/cm_text_primary" android:textSize="15sp" />
             <LinearLayout
                 android:layout_width="match_parent"
@@ -47,9 +47,9 @@
                     android:layout_marginStart="10dp"
                     android:gravity="center_vertical" android:drawableStart="@drawable/ic_translate_small"
                     android:drawablePadding="5dp" android:text="Translate" android:textSize="11sp"
-                    android:textColor="@color/cm_primary" android:background="?attr/selectableItemBackgroundBorderless"
+                    android:textColor="@color/cm_primary" android:background="@drawable/bg_btn_translate"
                     android:clickable="true" android:focusable="true"
-                    android:paddingHorizontal="4dp" android:paddingVertical="4dp" />
+                    android:paddingHorizontal="6dp" android:paddingVertical="3dp" />
             </LinearLayout>
             <FrameLayout android:id="@+id/imagePreviewContainer"
                 android:layout_width="match_parent" android:layout_height="wrap_content"

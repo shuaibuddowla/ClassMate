@@ -167,7 +167,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
     private fun openManage() {
         val p=profile ?: return
-        if(p.optString("role") !in setOf("admin","teacher") && !p.optBoolean("is_cr")) return
+        val isServerOwner = p.optBoolean("is_server_owner")
+        val isTeacher = p.optString("role") == "teacher"
+        val isCr = p.optBoolean("is_cr")
+        if (!isServerOwner && !isTeacher && !isCr) return
         manageOpen=true
         findViewById<GlassBottomNavView>(R.id.classmate_home_nav).visibility=View.GONE
         renderHomeTab(R.id.nav_manage)
@@ -436,28 +439,34 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
             }
         }
+        val isServerOwner = runCatching {
+            ClassMateAuthApi.rpcText("is_owner", JSONObject()).trim() == "true"
+        }.getOrDefault(false)
+        loaded.put("is_server_owner", isServerOwner)
         authBusy = false
         profile = loaded
         profileValidated = true
         ClassMateAuthApi.saveNotificationIdentity(loaded)
         userId = loaded.getString("id")
         restoreWelcomeProgress(userId)
-        if (loaded.optString("role") == "teacher") startWelcomeFlow(0)
+        val isTeacher = loaded.optString("role") == "teacher"
+        if (isTeacher) startWelcomeFlow(0)
         val resumedStep=ClassMateWelcomeProgress.resume(welcomeStep,profileComplete(loaded),notificationsEnabled())
         if(resumedStep!=welcomeStep) startWelcomeFlow(resumedStep)
         if (loaded.optString("verification_status") == "active") {
-            val role = loaded.optString("role")
-            if (role == "admin" || role == "teacher") {
+            if (isServerOwner || isTeacher) {
                 if (selectedBatchId.isBlank()) {
                     showBatchPicker()
                     return
                 } else {
+                    if (selectedBatchLabel.isBlank()) resolveBatchLabel(selectedBatchId)
                     if (!homeShown) showHome()
                     renderHomeTab(selectedTab)
                 }
             } else {
                 selectedBatchId = loaded.optString("batch_id").takeUnless { it == "null" }.orEmpty()
                 if (selectedBatchId.isBlank()) error("Active student has no assigned batch")
+                if (selectedBatchLabel.isBlank()) resolveBatchLabel(selectedBatchId)
                 if (!homeShown) showHome()
                 renderHomeTab(selectedTab)
             }
@@ -560,6 +569,55 @@ class ClassMateAuthActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    suspend fun resolveBatchLabel(id: String) {
+        if (id.isBlank()) return
+        runCatching {
+            val batch = ClassMateAuthApi.rows("batches", "select=batch_number,academic_session,department_id,departments(code)&id=eq.$id&limit=1").optJSONObject(0)
+            if (batch != null) {
+                val deptCode = batch.optJSONObject("departments")?.optString("code")?.uppercase() ?: "MBSTU"
+                val bNum = batch.optInt("batch_number")
+                val sess = ClassMateAcademicSession.format(batch.optInt("academic_session"))
+                selectedBatchLabel = "$deptCode Batch $bNum · Session $sess"
+                profile?.let { ClassMateAcademicCache.saveHome(this, it, selectedBatchId, selectedBatchLabel) }
+            }
+        }
+    }
+
+    fun updatePersonalProfileFromScreen(updated: JSONObject) {
+        if(updated.optString("id")!=userId) return
+        profile=updated
+        ClassMateAuthApi.saveNotificationIdentity(updated)
+        ClassMateAcademicCache.saveHome(this,updated,selectedBatchId,selectedBatchLabel)
+    }
+
+    fun updateSelectedBatchLabel(label: String) {
+        if (label.isNotBlank()) {
+            selectedBatchLabel = label
+            profile?.let { ClassMateAcademicCache.saveHome(this, it, selectedBatchId, selectedBatchLabel) }
+        }
+    }
+
+    fun refreshProfileFromScreen(onComplete: (Boolean) -> Unit) {
+        lifecycleScope.launch {
+            try {
+                val loaded = ClassMateAuthApi.initializeProfile()
+                if (loaded.optString("id") == userId) {
+                    profile = loaded
+                    ClassMateAuthApi.saveNotificationIdentity(loaded)
+                    val targetBatchId = selectedBatchId.ifBlank { loaded.optString("batch_id") }
+                    if (targetBatchId.isNotBlank()) {
+                        selectedBatchId = targetBatchId
+                        resolveBatchLabel(targetBatchId)
+                    }
+                    ClassMateAcademicCache.saveHome(this@ClassMateAuthActivity, loaded, selectedBatchId, selectedBatchLabel)
+                }
+                onComplete(true)
+            } catch (e: Exception) {
+                onComplete(false)
+            }
+        }
+    }
+
     private fun updatePersonalProfile(updated: JSONObject) {
         if(updated.optString("id")!=userId) return
         profile=updated
@@ -621,7 +679,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) },{profile?.optString("role")=="teacher"})
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
-        nav.menu.findItem(R.id.nav_friends).title=if(profile?.optString("role")=="teacher") "Students" else "Friends"
+        nav.menu.findItem(R.id.nav_friends).title=if(profile?.optString("role")=="teacher") "Students" else "Batch"
         nav.menu.findItem(R.id.nav_manage).isVisible = false
         if(nav.menu.findItem(selectedTab)?.isVisible!=true) selectedTab=R.id.nav_timetable
         nav.selectedItemId = selectedTab
@@ -656,14 +714,20 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private fun showBatchPicker() {
+        val role = profile?.optString("role")
+        val isTeacher = role == "teacher"
+        val isServerOwner = profile?.optBoolean("is_server_owner") == true
+        if (!isServerOwner && !isTeacher) {
+            return
+        }
         homeShown = false
         val ui = ClassMateWelcomeUi(this)
         welcomeUi = ui
         content = ui.content
         ui.orbit(true)
-        ui.text(if (profile?.optString("role") == "teacher") "TEACHER WORKSPACE" else "ADMIN WORKSPACE", 11f)
+        ui.text(if (isTeacher) "TEACHER WORKSPACE" else "ADMIN WORKSPACE", 11f)
         ui.title("Choose your\nclassroom.")
-        ui.text(if(profile?.optString("role")=="teacher") "Choose your classroom. Your assigned batches appear below." else "Choose a running batch.")
+        ui.text(if (isTeacher) "Choose your classroom. Your assigned batches appear below." else "Choose a running batch.")
         status = ui.text("Finding your batches…")
         status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         profileView = ui.text("").apply { visibility = View.GONE }
@@ -825,7 +889,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
         val tabs = android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled=false }
         val tabRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         tabs.addView(tabRow); actions.addView(tabs)
-        val sections=if(role=="admin") listOf("courses" to "Courses", "catalog" to "Catalog", "teachers" to "Teachers", "people" to "People", "overrides" to "Overrides", "structure" to "Structure", "health" to "Health") else listOf("courses" to "Courses")
+        val isServerOwner = profile?.optBoolean("is_server_owner") == true
+        val sections=if(isServerOwner) listOf("courses" to "Courses", "catalog" to "Catalog", "teachers" to "Teachers", "people" to "People", "overrides" to "Overrides", "structure" to "Structure", "health" to "Health") else listOf("courses" to "Courses")
         if(sections.none { it.first==manageSection }) manageSection="courses"
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
         actions.addView(panel)
@@ -1311,6 +1376,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         if (::academicScreens.isInitialized) academicScreens.onResume()
         unreadActivity?.refresh()
         if(homeShown && selectedTab==R.id.nav_profile) renderHomeTab(selectedTab)
+        if(homeShown && ClassMateAuthApi.hasSavedSession()) lifecycleScope.launch { runCatching { ClassMateAuthApi.rpc("touch_presence", JSONObject()) } }
         // Profile setup belongs to explicit sign-in, never ordinary app resumes.
         if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) {
             val offered=offerNotificationPermission(); registerFcmToken()

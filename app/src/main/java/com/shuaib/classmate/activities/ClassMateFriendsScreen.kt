@@ -1,10 +1,17 @@
 package com.shuaib.classmate.activities
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -37,10 +44,30 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
     private val currentBatch: ()->String,private val onCall: (String)->Unit,private val teacher: ()->Boolean = {false}) {
     private var cachedBatch=""
     private var cachedRoot: LinearLayout?=null
+    private var tvToggleBatchFund: TextView?=null
     private val pages=linkedMapOf<String,List<JSONObject>>()
     private fun dp(n: Int)=(n*activity.resources.displayMetrics.density).toInt()
     private fun text(value: String,size: Float=14f,primary: Boolean=false)=TextView(activity).apply {
         text=value; textSize=size; setTextColor(activity.getColor(if(primary) R.color.cm_text_primary else R.color.cm_text_secondary))
+    }
+
+    private fun updateBatchFundBalance() {
+        val batch = currentBatch()
+        val btn = tvToggleBatchFund ?: return
+        if (batch.isNotBlank() && !teacher()) {
+            scope.launch {
+                try {
+                    val summary = ClassMateAuthApi.rpc("batch_fund_summary", JSONObject().put("target_batch", batch))
+                    val bal = summary.optDouble("current_balance", 0.0)
+                    if (bal > 0) {
+                        val formatted = if (bal == bal.toLong().toDouble()) String.format("%,d", bal.toLong()) else String.format("%,.2f", bal)
+                        btn.text = "Batch Fund (৳$formatted)"
+                    } else {
+                        btn.text = "Batch Fund"
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun render(host: LinearLayout,batchLabel: String) {
@@ -49,31 +76,160 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         cachedRoot?.let { root ->
             (root.parent as? ViewGroup)?.removeView(root)
             host.addView(root,LinearLayout.LayoutParams(-1,-1))
+            updateBatchFundBalance()
             return
         }
         val root=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(activity.getColor(R.color.cm_background)) }
+        root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) { updateBatchFundBalance() }
+            override fun onViewDetachedFromWindow(v: View) {}
+        })
         cachedRoot=root
         host.addView(root,LinearLayout.LayoutParams(-1,-1))
-        val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(8),dp(16),dp(4)) }
-        val titleRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
-        titleRow.addView(text(if(teacher()) "Students" else "Friends",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
-        titleRow.addView(ClassMateFeatureUi.button(activity,"Blood requests") { activity.startActivity(Intent(activity,ClassMateBloodActivity::class.java).putExtra("batch_id",batch)) }.apply { textSize=13f; minHeight=dp(48); icon=androidx.core.content.ContextCompat.getDrawable(activity,R.drawable.ic_blood_drop); iconTint=android.content.res.ColorStateList.valueOf(0xFFD94B55.toInt()); iconSize=dp(20); setTextColor(0xFFD94B55.toInt()); strokeWidth=dp(1); strokeColor=android.content.res.ColorStateList.valueOf(0x66D94B55); cornerRadius=dp(16); backgroundTintList=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) })
-        header.addView(titleRow)
-        header.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(8)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
-        val searchBox=TextInputLayout(activity).apply {
-            isHintEnabled=false; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_FILLED
-            boxBackgroundColor=activity.getColor(R.color.cm_surface)
-            boxStrokeWidth=0; boxStrokeWidthFocused=0
-            setBoxCornerRadii(dp(14).toFloat(),dp(14).toFloat(),dp(14).toFloat(),dp(14).toFloat())
-            setStartIconDrawable(R.drawable.ic_search_modern); endIconMode=TextInputLayout.END_ICON_CLEAR_TEXT
+        val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(2),dp(16),dp(4)) }
+        val titleContainer = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        val titleRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        titleRow.addView(text(if(teacher()) "Students" else "Batch",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
+
+        val btnSearch = ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            setImageResource(R.drawable.ic_search_modern)
+            imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
+            setBackgroundResource(R.drawable.bg_settings_icon)
+            setPadding(dp(9), dp(9), dp(9), dp(9))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Search batch"
         }
-        val input=TextInputEditText(searchBox.context).apply {
-            setSingleLine(true); setTextColor(activity.getColor(R.color.cm_text_primary))
-            hint=if(teacher()) "Search students by name or ID" else "Search name or student ID"; textSize=13f; minHeight=dp(48); setPadding(dp(12),dp(8),dp(12),dp(8))
-            filters=arrayOf(android.text.InputFilter.LengthFilter(100))
-            inputType=android.text.InputType.TYPE_CLASS_TEXT
+        titleRow.addView(btnSearch)
+        titleContainer.addView(titleRow)
+        titleContainer.addView(text(batchLabel.ifBlank { "People in your batch" },11f).apply { setPadding(0,dp(2),0,dp(6)); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END })
+        header.addView(titleContainer)
+
+        val searchHeader = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, dp(44)).apply {
+                bottomMargin = dp(6)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(22).toFloat()
+                setColor(activity.getColor(R.color.cm_surface))
+                setStroke(dp(1), activity.getColor(R.color.cm_border))
+            }
+            setPadding(dp(6), 0, dp(8), 0)
         }
-        searchBox.addView(input,LinearLayout.LayoutParams(-1,dp(48))); header.addView(searchBox)
+
+        val btnBack = ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+            setImageResource(R.drawable.ic_arrow_back)
+            imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = activity.getDrawable(android.R.drawable.list_selector_background)
+            contentDescription = "Back to Batch"
+        }
+        searchHeader.addView(btnBack)
+
+        val input = TextInputEditText(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, -1, 1f).apply {
+                marginStart = dp(6)
+                marginEnd = dp(6)
+            }
+            background = null
+            setSingleLine(true)
+            setTextColor(activity.getColor(R.color.cm_text_primary))
+            setHintTextColor(activity.getColor(R.color.cm_text_secondary))
+            hint = if (teacher()) "Search name, ID, or blood group" else "Search name, ID, or blood group (e.g. O+)"
+            textSize = 13.5f
+            filters = arrayOf(android.text.InputFilter.LengthFilter(100))
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        searchHeader.addView(input)
+
+        val btnClear = ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+            setImageResource(R.drawable.ic_close)
+            imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_secondary))
+            setPadding(dp(7), dp(7), dp(7), dp(7))
+            visibility = View.GONE
+            contentDescription = "Clear search"
+        }
+        searchHeader.addView(btnClear)
+        header.addView(searchHeader)
+
+        btnSearch.setOnClickListener {
+            titleContainer.visibility = View.GONE
+            searchHeader.visibility = View.VISIBLE
+            input.requestFocus()
+            val imm = activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+
+        btnBack.setOnClickListener {
+            input.setText("")
+            searchHeader.visibility = View.GONE
+            titleContainer.visibility = View.VISIBLE
+            val imm = activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.hideSoftInputFromWindow(input.windowToken, 0)
+        }
+
+        btnClear.setOnClickListener {
+            input.setText("")
+        }
+
+        // Segmented Toggle: [ Batchmates | Batch Fund ]
+        val toggleContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(-1, dp(38)).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(8)
+            }
+            background = activity.getDrawable(R.drawable.bg_toggle_container)
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+        }
+
+        val btnToggleBatchmates = TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+            gravity = Gravity.CENTER
+            text = "Batchmates"
+            textSize = 12.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = activity.getDrawable(R.drawable.bg_toggle_item_selected)
+            isClickable = true
+            isFocusable = true
+        }
+
+        val btnToggleBatchFund = TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+            gravity = Gravity.CENTER
+            text = "Batch Fund"
+            textSize = 12.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(activity.getColor(R.color.cm_text_secondary))
+            setBackgroundColor(Color.TRANSPARENT)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                activity.startActivity(
+                    Intent(activity, ClassMateBatchFundActivity::class.java)
+                        .putExtra("batch_id", batch)
+                        .putExtra("batch_label", batchLabel)
+                )
+            }
+        }
+        tvToggleBatchFund = btnToggleBatchFund
+
+        toggleContainer.addView(btnToggleBatchmates)
+        toggleContainer.addView(btnToggleBatchFund)
+
+        if (!teacher()) {
+            header.addView(toggleContainer)
+            updateBatchFundBalance()
+        }
+
         val status=text("Loading your batch…",12f).apply { setPadding(0,dp(10),0,dp(4)); accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         header.addView(status)
         val retry=MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply { text="Try again"; visibility=View.GONE }
@@ -137,11 +293,21 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                 if(dy>0 && (view.layoutManager as LinearLayoutManager).findLastVisibleItemPosition()>=adapter.itemCount-8) load(false)
             }
         })
+        var presenceJob: Job? = null
+        fun startPresence() {
+            presenceJob?.cancel()
+            presenceJob = scope.launch {
+                while (root.isAttachedToWindow) {
+                    runCatching { ClassMateAuthApi.rpc("touch_presence", JSONObject()) }
+                    delay(30_000)
+                }
+            }
+        }
         root.addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(view: View) { load(true) }
-            override fun onViewDetachedFromWindow(view: View) { loadJob?.cancel(); detailJob?.cancel(); detailsDialog?.dismiss() }
+            override fun onViewAttachedToWindow(view: View) { load(true); startPresence() }
+            override fun onViewDetachedFromWindow(view: View) { loadJob?.cancel(); detailJob?.cancel(); detailsDialog?.dismiss(); presenceJob?.cancel() }
         })
-        if(root.isAttachedToWindow) load(true)
+        if(root.isAttachedToWindow) { load(true); startPresence() }
     }
 
     private inner class FriendsAdapter(val click: (JSONObject)->Unit): ListAdapter<JSONObject,FriendHolder>(object: DiffUtil.ItemCallback<JSONObject>() {
@@ -155,40 +321,106 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                 isClickable=true; isFocusable=true
             }
             val row=LinearLayout(activity).apply { gravity=Gravity.CENTER_VERTICAL; setPadding(dp(14),dp(12),dp(14),dp(12)) }
+            val avatarContainer=FrameLayout(activity)
             val avatar=ImageView(activity).apply { scaleType=ImageView.ScaleType.CENTER_CROP; importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-            row.addView(avatar,LinearLayout.LayoutParams(dp(48),dp(48)))
+            avatarContainer.addView(avatar,FrameLayout.LayoutParams(dp(48),dp(48)))
+            val onlineDot=View(activity).apply {
+                setBackgroundResource(R.drawable.bg_online_dot_border)
+                visibility=View.GONE
+            }
+            avatarContainer.addView(onlineDot,FrameLayout.LayoutParams(dp(12),dp(12)).apply {
+                gravity=Gravity.BOTTOM or Gravity.END
+                marginEnd=dp(1); bottomMargin=dp(1)
+            })
+            row.addView(avatarContainer,LinearLayout.LayoutParams(dp(48),dp(48)))
+
             val labels=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,dp(8),0) }
             val name=text("",16f,true).apply { setTypeface(null,1) }
+            val badgeRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; setPadding(0,dp(4),0,0) }
             val badge=text("Admin",11f,true).apply {
                 setPadding(dp(8),dp(3),dp(8),dp(3)); setTextColor(activity.getColor(R.color.cm_primary))
                 background=android.graphics.drawable.GradientDrawable().apply { setColor(activity.getColor(R.color.cm_primary_soft)); cornerRadius=dp(8).toFloat() }
             }
+            badgeRow.addView(badge,LinearLayout.LayoutParams(-2,-2))
             val id=text("",12f).apply { setPadding(0,dp(4),0,0) }
-            labels.addView(name); labels.addView(badge,LinearLayout.LayoutParams(-2,-2).apply { topMargin=dp(4) }); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
+            labels.addView(name); labels.addView(badgeRow); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
             row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO },LinearLayout.LayoutParams(dp(18),dp(18)))
             card.addView(row)
-            return FriendHolder(card,avatar,name,id,badge)
+            return FriendHolder(card,avatar,onlineDot,name,id,badge)
         }
         override fun onBindViewHolder(holder: FriendHolder,position: Int) {
             val member=getItem(position)
             holder.badge.visibility=if(member.optString("role")=="admin") View.VISIBLE else View.GONE
+            holder.onlineDot.visibility=if(member.optBoolean("is_online")) View.VISIBLE else View.GONE
             holder.name.text=member.optString("full_name").ifBlank { "ClassMate member" }
-            holder.studentId.text=when(member.optString("role")) { "admin" -> member.optString("student_id").takeUnless {it=="null"}.orEmpty(); else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ") }
-            holder.studentId.setTextColor(activity.getColor(if(member.optString("role")=="admin") R.color.cm_primary else R.color.cm_text_secondary))
+            val isCr = member.optBoolean("is_cr") && member.optString("role") != "admin"
+            val idStr = member.optString("student_id").takeUnless { it == "null" || it.isBlank() }
+            val bloodStr = member.optString("blood_group").takeUnless { it == "null" || it.isBlank() || it == "Unknown" }
+            when (member.optString("role")) {
+                "admin" -> {
+                    holder.studentId.text = member.optString("student_id").takeUnless { it == "null" }.orEmpty()
+                    holder.studentId.setTextColor(activity.getColor(R.color.cm_primary))
+                }
+                "teacher" -> {
+                    holder.studentId.text = "Teacher"
+                    holder.studentId.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                }
+                else -> {
+                    val full = SpannableStringBuilder()
+                    if (idStr != null) {
+                        full.append(idStr)
+                    }
+                    if (bloodStr != null) {
+                        if (full.isNotEmpty()) full.append(" · ")
+                        val start = full.length
+                        full.append(bloodStr)
+                        full.setSpan(
+                            android.text.style.ForegroundColorSpan(0xFFD94B55.toInt()),
+                            start,
+                            start + bloodStr.length,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+                    if (isCr) {
+                        val crTitle = "Class representative"
+                        if (full.isNotEmpty()) full.append(" · ")
+                        val start = full.length
+                        full.append(crTitle)
+                        full.setSpan(
+                            android.text.style.ForegroundColorSpan(0xFF0284C7.toInt()),
+                            start,
+                            start + crTitle.length,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+                    holder.studentId.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    holder.studentId.text = if (full.isNotEmpty()) full else ""
+                }
+            }
             Glide.with(activity).load(member.optString("avatar_url").takeUnless { it=="null" || it.isBlank() }).circleCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(holder.avatar)
             holder.itemView.setOnClickListener { if(member.optString("role")=="admin") ClassMateFeatureUi.developer(activity) else click(member) }
             holder.itemView.contentDescription="${holder.name.text}, ${holder.studentId.text}. Open profile"
         }
     }
-    private class FriendHolder(view: View,val avatar: ImageView,val name: TextView,val studentId: TextView,val badge: TextView): RecyclerView.ViewHolder(view)
+    private class FriendHolder(view: View,val avatar: ImageView,val onlineDot: View,val name: TextView,val studentId: TextView,val badge: TextView): RecyclerView.ViewHolder(view)
 
     private fun showDetails(member: JSONObject): AlertDialog {
         val panel=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(4),dp(18),dp(8)) }
         val scroll=android.widget.ScrollView(activity).apply { isFillViewport=true; addView(panel) }
 
         val header=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,dp(4),0,dp(12)) }
+        val avatarContainer=FrameLayout(activity)
         val avatar=ImageView(activity).apply { importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-        header.addView(avatar,LinearLayout.LayoutParams(dp(48),dp(48)))
+        avatarContainer.addView(avatar,FrameLayout.LayoutParams(dp(48),dp(48)))
+        val onlineDot=View(activity).apply {
+            setBackgroundResource(R.drawable.bg_online_dot_border)
+            visibility=if(member.optBoolean("is_online")) View.VISIBLE else View.GONE
+        }
+        avatarContainer.addView(onlineDot,FrameLayout.LayoutParams(dp(12),dp(12)).apply {
+            gravity=Gravity.BOTTOM or Gravity.END
+            marginEnd=dp(1); bottomMargin=dp(1)
+        })
+        header.addView(avatarContainer,LinearLayout.LayoutParams(dp(48),dp(48)))
         Glide.with(activity).load(member.optString("avatar_url").takeUnless { it=="null" || it.isBlank() }).circleCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar)
 
         val titles=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,0,0) }

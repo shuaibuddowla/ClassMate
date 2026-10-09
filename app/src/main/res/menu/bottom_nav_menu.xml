@@ -14,6 +14,6 @@
         android:title="@string/nav_library" />
     <item
         android:id="@+id/nav_profile"
-        android:icon="@drawable/sl_nav_profile"
-        android:title="@string/nav_profile" />
+        android:icon="@drawable/sl_nav_settings"
+        android:title="@string/nav_settings" />
 </menu>

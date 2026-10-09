@@ -40,6 +40,17 @@ class AppPreferences(context: Context) {
     fun setDarkMode(enabled: Boolean) {
         prefs.edit()
             .putBoolean("dark_mode", enabled)
+            .putString("theme_mode", if (enabled) "dark" else "light")
+            .apply()
+    }
+
+    fun getThemeMode(): String =
+        prefs.getString("theme_mode", if (prefs.contains("dark_mode")) (if (isDarkMode()) "dark" else "light") else "system") ?: "system"
+
+    fun setThemeMode(mode: String) {
+        prefs.edit()
+            .putString("theme_mode", mode)
+            .putBoolean("dark_mode", mode == "dark")
             .apply()
     }
 

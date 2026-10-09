@@ -37,7 +37,9 @@
     <string name="nav_timetable">Timetable</string>
     <string name="nav_notices">Notices</string>
     <string name="nav_library">Library</string>
+    <string name="nav_batch">Batch</string>
     <string name="nav_profile">Profile</string>
+    <string name="nav_settings">Settings</string>
 
     <!-- Notices home -->
     <string name="notice_home_loading">Fetching the latest…</string>

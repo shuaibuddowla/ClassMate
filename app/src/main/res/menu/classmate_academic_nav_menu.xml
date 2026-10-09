@@ -3,7 +3,7 @@
     <item android:id="@+id/nav_timetable" android:icon="@drawable/sl_nav_timetable" android:title="@string/nav_timetable" />
     <item android:id="@+id/nav_notices" android:icon="@drawable/sl_nav_notices" android:title="@string/nav_notices" />
     <item android:id="@+id/nav_pdf" android:icon="@drawable/sl_nav_library" android:title="@string/nav_library" />
-    <item android:id="@+id/nav_friends" android:icon="@drawable/ic_batch_friends" android:title="Friends" />
-    <item android:id="@+id/nav_profile" android:icon="@drawable/sl_nav_profile" android:title="@string/nav_profile" />
+    <item android:id="@+id/nav_friends" android:icon="@drawable/ic_batch_friends" android:title="@string/nav_batch" />
+    <item android:id="@+id/nav_profile" android:icon="@drawable/sl_nav_settings" android:title="@string/nav_settings" />
     <item android:id="@+id/nav_manage" android:icon="@drawable/ic_nav_manage_grid" android:title="Manage" />
 </menu>

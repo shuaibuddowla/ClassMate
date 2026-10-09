@@ -1,126 +1,232 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/dialog_edit_profile.xml -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/cm_background"
-    android:padding="24dp">
+    android:background="@color/cm_surface"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="32dp">
+
+        <!-- Bottom Sheet Drag Handle -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_handle"
+            android:alpha="0.4" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Edit Profile"
+            android:text="Edit Profile Details"
             android:textColor="@color/cm_text_primary"
             android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="24dp" />
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="20dp"
+            android:text="Your contact and academic details are shared with your batch."
+            android:textColor="@color/cm_text_secondary"
+            android:textSize="12sp" />
+
+        <!-- Full Name -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Full Name"
-            android:textColorHint="@color/cm_text_secondary"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
-            app:hintTextColor="@color/cm_primary">
+            app:hintTextColor="@color/cm_primary"
+            app:startIconDrawable="@drawable/ic_edit"
+            app:startIconTint="@color/cm_primary">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textPersonName"
-                android:textColor="@color/cm_text_primary" />
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Student ID -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:hint="Student ID"
-            android:textColorHint="@color/cm_text_secondary"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
-            app:hintTextColor="@color/cm_primary">
+            app:hintTextColor="@color/cm_primary"
+            app:startIconDrawable="@drawable/ic_badge"
+            app:startIconTint="@color/cm_primary">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditStudentId"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="text"
-                android:textColor="@color/cm_text_primary" />
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Phone Number -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="Phone Number"
-            android:textColorHint="@color/cm_text_secondary"
+            android:hint="Mobile Number"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
-            app:hintTextColor="@color/cm_primary">
+            app:hintTextColor="@color/cm_primary"
+            app:startIconDrawable="@drawable/ic_phone"
+            app:startIconTint="@color/cm_primary">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditPhone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="phone"
-                android:textColor="@color/cm_text_primary" />
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Blood Group (Exposed Dropdown) -->
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:hint="Blood Group"
-            android:textColorHint="@color/cm_text_secondary"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
-            app:hintTextColor="@color/cm_primary">
-            <com.google.android.material.textfield.TextInputEditText
+            app:hintTextColor="@color/cm_primary"
+            app:startIconDrawable="@drawable/ic_blood_drop"
+            app:startIconTint="@color/cm_cancel_red">
+
+            <com.google.android.material.textfield.MaterialAutoCompleteTextView
                 android:id="@+id/etEditBlood"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapCharacters"
-                android:textColor="@color/cm_text_primary" />
+                android:inputType="none"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Home District -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="Home District"
-            android:textColorHint="@color/cm_text_secondary"
+            android:hint="Home District / Town"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
-            app:hintTextColor="@color/cm_primary">
+            app:hintTextColor="@color/cm_primary"
+            app:startIconDrawable="@drawable/ic_location"
+            app:startIconTint="@color/cm_primary">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditDistrict"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapSentences"
-                android:textColor="@color/cm_text_primary" />
+                android:inputType="textCapWords"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Address / Mess / Flat -->
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="Address"
-            android:textColorHint="@color/cm_text_secondary"
+            android:hint="Current Residence (Mess / Flat / Hall)"
+            app:boxCornerRadiusBottomEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusTopStart="14dp"
             app:boxStrokeColor="@color/cm_primary"
             app:hintTextColor="@color/cm_primary">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etEditAddress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapSentences"
-                android:textColor="@color/cm_text_primary" />
+                android:inputType="textPostalAddress"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancelProfile"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Cancel"
+                android:textColor="@color/cm_text_secondary"
+                app:cornerRadius="14dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveProfile"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Save Changes"
+                android:textColor="@color/cm_on_primary"
+                android:backgroundTint="@color/cm_primary"
+                app:cornerRadius="14dp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/pbSavingProfile"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            android:indeterminateTint="@color/cm_primary" />
+
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

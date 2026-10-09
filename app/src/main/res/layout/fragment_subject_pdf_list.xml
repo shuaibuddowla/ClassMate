@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:background="@color/cm_bg">
 
-
     <com.shuaib.classmate.ui.StarfieldView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -17,68 +16,59 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- Top Navigation Bar -->
         <LinearLayout
-            android:id="@+id/headerSubject"
+            android:id="@+id/topBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="10dp">
+            android:paddingHorizontal="14dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp">
 
             <FrameLayout
                 android:id="@+id/btnBack"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_library_icon_button">
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_library_icon_button"
+                android:clickable="true"
+                android:focusable="true">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/back"
                     android:src="@drawable/ic_chevron_left"
                     app:tint="@color/cm_text_primary" />
             </FrameLayout>
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvScreenTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
                 android:layout_marginEnd="12dp"
                 android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvSubjectTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    tools:text="Structured Programming" />
-
-                <TextView
-                    android:id="@+id/tvSubjectCode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="12sp"
-                    tools:text="CSE-112 - 8 resources" />
-            </LinearLayout>
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="Course Materials"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
             <FrameLayout
                 android:id="@+id/btnFavorite"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_library_icon_button">
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_library_icon_button"
+                android:clickable="true"
+                android:focusable="true">
 
                 <ImageView
+                    android:id="@+id/ivFavoriteIcon"
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:layout_gravity="center"
@@ -88,6 +78,95 @@
             </FrameLayout>
         </LinearLayout>
 
+        <!-- Course Hero Card Banner -->
+        <LinearLayout
+            android:id="@+id/cardHero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="14dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_course_hero_banner"
+            android:elevation="2dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Course code badge -->
+            <TextView
+                android:id="@+id/tvCourseCodeBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_course_badge"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textColor="@color/cm_primary"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="CSE-112 • THEORY" />
+
+            <!-- Course title -->
+            <TextView
+                android:id="@+id/tvSubjectTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="Structured Programming Language" />
+
+            <!-- Instructor info row -->
+            <LinearLayout
+                android:id="@+id/layoutInstructor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="Instructor"
+                    android:src="@drawable/ic_person"
+                    app:tint="@color/cm_text_secondary" />
+
+                <TextView
+                    android:id="@+id/tvInstructorName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="12.5sp"
+                    tools:text="Prof. Md. Al Amin" />
+            </LinearLayout>
+
+            <!-- Stats pill -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_course_badge"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp">
+
+                <TextView
+                    android:id="@+id/tvResourceStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/cm_primary_dark"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    tools:text="8 resources available" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Category Filter Chips -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -100,11 +179,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:paddingVertical="8dp" />
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp" />
         </HorizontalScrollView>
 
+        <!-- Content Area: RecyclerView and Empty State inside SwipeRefreshLayout -->
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipeRefresh"
             android:layout_width="match_parent"
@@ -115,54 +194,120 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
+                <!-- Files RecyclerView -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvSubjectPdfs"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="20dp"
-                    tools:listitem="@layout/item_pdf" />
+                    android:overScrollMode="never"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="84dp"
+                    tools:listitem="@layout/item_course_file" />
 
-                <TextView
-                    android:id="@+id/tvEmptyState"
+                <!-- Illustrated Empty State -->
+                <LinearLayout
+                    android:id="@+id/layoutEmptyState"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginHorizontal="24dp"
-                    android:background="@drawable/bg_library_card"
+                    android:layout_marginHorizontal="28dp"
                     android:gravity="center"
-                    android:padding="18dp"
-                    android:text="No resources found for this filter."
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <FrameLayout
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:background="@drawable/bg_empty_illustration_circle">
+
+                        <ImageView
+                            android:id="@+id/ivEmptyIllustration"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="Empty"
+                            android:src="@drawable/ic_folder_outline"
+                            app:tint="@color/cm_primary" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/tvEmptyTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:text="No resources found"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvEmptySubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:text="No files have been added to this category yet."
+                        android:textColor="@color/cm_text_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/btnEmptyUpload"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_library_add_file"
+                        android:drawableStart="@drawable/ic_add"
+                        android:drawablePadding="6dp"
+                        android:gravity="center"
+                        android:paddingHorizontal="16dp"
+                        android:text="Upload resource"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:drawableTint="@color/cm_primary"
+                        tools:visibility="visible" />
+                </LinearLayout>
             </FrameLayout>
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </LinearLayout>
 
-    <!-- Shimmer loading state -->
+    <!-- Floating Action Button for Admins / CRs -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabUploadFile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="24dp"
+        android:contentDescription="Upload File"
+        android:src="@drawable/ic_add"
+        android:visibility="gone"
+        app:backgroundTint="@color/cm_primary"
+        app:elevation="6dp"
+        app:fabSize="normal"
+        app:tint="@color/cm_on_primary"
+        tools:visibility="visible" />
+
+    <!-- Shimmer loading state overlay -->
     <com.facebook.shimmer.ShimmerFrameLayout
         android:id="@+id/shimmerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="120dp"
+        android:layout_marginTop="56dp"
         android:visibility="gone"
-        app:shimmer_auto_start="true"
+        app:shimmer_auto_start="false"
         app:shimmer_base_alpha="0.4"
         app:shimmer_duration="1000"
         app:shimmer_highlight_alpha="0.8"
         app:shimmer_intensity="0.15">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-            <include layout="@layout/shimmer_item_pdf" />
-            <include layout="@layout/shimmer_item_pdf" />
-            <include layout="@layout/shimmer_item_pdf" />
-            <include layout="@layout/shimmer_item_pdf" />
-            <include layout="@layout/shimmer_item_pdf" />
-        </LinearLayout>
+
+        <include layout="@layout/shimmer_subject_pdf_list" />
     </com.facebook.shimmer.ShimmerFrameLayout>
 
     <ProgressBar
@@ -172,4 +317,5 @@
         android:layout_gravity="center"
         android:indeterminateTint="@color/cm_primary"
         android:visibility="gone" />
+
 </FrameLayout>

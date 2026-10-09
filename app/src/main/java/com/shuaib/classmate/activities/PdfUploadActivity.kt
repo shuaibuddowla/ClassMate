@@ -87,8 +87,22 @@ class PdfUploadActivity : AppCompatActivity() {
         }
         currentUserName = auth.currentUser?.displayName.orEmpty().ifBlank { "ClassMate user" }
 
-        courseListener = CoursePicker.bind(this, binding.dropdownSubject, binding.etCourseCode) {
-            availableCourses = it
+        val preselectedSubject = intent.getStringExtra("subject").orEmpty()
+        val preselectedCourseCode = intent.getStringExtra("courseCode").orEmpty()
+        courseListener = CoursePicker.bind(this, binding.dropdownSubject, binding.etCourseCode) { courses ->
+            availableCourses = courses
+            if (preselectedSubject.isNotBlank() && binding.dropdownSubject.text.isNullOrBlank()) {
+                val matched = courses.firstOrNull { c -> c.name.equals(preselectedSubject, ignoreCase = true) }
+                if (matched != null) {
+                    binding.dropdownSubject.setText(matched.name, false)
+                    binding.etCourseCode.setText(matched.code)
+                } else {
+                    binding.dropdownSubject.setText(preselectedSubject, false)
+                    if (preselectedCourseCode.isNotBlank()) {
+                        binding.etCourseCode.setText(preselectedCourseCode)
+                    }
+                }
+            }
         }
 
         binding.toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->

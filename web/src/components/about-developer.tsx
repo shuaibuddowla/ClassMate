@@ -31,11 +31,8 @@ export function AboutDeveloper({
                 url={profile.data.avatar_url}
               />
               <h3>{profile.data.full_name}</h3>
-              <p>ClassMate creator · {profile.data.department || "MBSTU"}</p>
+              <p>{profile.data.department || "Computer Science and Engineering"}</p>
               <div className="developer-identity">
-                {profile.data.student_id && (
-                  <span>{profile.data.student_id}</span>
-                )}
                 {profile.data.batch_number && (
                   <span>Batch {profile.data.batch_number}</span>
                 )}

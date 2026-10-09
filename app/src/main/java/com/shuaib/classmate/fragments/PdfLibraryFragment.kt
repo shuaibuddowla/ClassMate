@@ -258,7 +258,16 @@ class PdfLibraryFragment : Fragment() {
             binding.swipeRefresh.isRefreshing = false
             return
         }
-        if (showSpinner) binding.swipeRefresh.isRefreshing = true
+        if (showSpinner) {
+            val isSwipe = binding.swipeRefresh.isRefreshing
+            if (!isSwipe && allPdfs.isEmpty()) {
+                binding.shimmerView.isVisible = true
+                binding.shimmerView.startShimmer()
+                binding.nestedScrollView.isVisible = false
+            } else {
+                binding.swipeRefresh.isRefreshing = true
+            }
+        }
 
         fetchFavoritePdfIds()
 
@@ -276,9 +285,15 @@ class PdfLibraryFragment : Fragment() {
                 otherSubjects = allSubjects.filter { it.type == "syllabus" }
                 allPdfs = resources.sortedByDescending { it.timestamp ?: it.createdAt }
                 updateLibraryView()
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                binding.nestedScrollView.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
             }, { e ->
                 if (_binding == null) return@load
+                binding.shimmerView.stopShimmer()
+                binding.shimmerView.isVisible = false
+                binding.nestedScrollView.isVisible = true
                 binding.swipeRefresh.isRefreshing = false
                 binding.tvRecentEmpty.isVisible = true
                 binding.rvRecent.isVisible = false
@@ -1010,6 +1025,7 @@ class PdfLibraryFragment : Fragment() {
     override fun onDestroyView() {
         courseListener?.remove()
         courseListener = null
+        _binding?.shimmerView?.stopShimmer()
         super.onDestroyView()
         _binding = null
     }

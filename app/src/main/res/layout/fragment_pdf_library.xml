@@ -50,18 +50,19 @@
             android:id="@+id/btnUploadPdf"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:background="@drawable/bg_library_add_file"
+            android:background="@drawable/bg_btn_primary_pill"
             android:drawableStart="@drawable/ic_add"
             android:drawablePadding="6dp"
+            android:elevation="3dp"
             android:gravity="center"
-            android:minWidth="90dp"
-            android:paddingHorizontal="14dp"
+            android:minWidth="96dp"
+            android:paddingHorizontal="16dp"
             android:text="Add file"
-            android:textColor="@color/cm_primary"
+            android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:textStyle="bold"
             android:visibility="gone"
-            app:drawableTint="@color/cm_primary"
+            app:drawableTint="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -81,6 +82,20 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
+
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/shimmerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"
+                app:shimmer_auto_start="false"
+                app:shimmer_base_alpha="0.4"
+                app:shimmer_duration="1000"
+                app:shimmer_highlight_alpha="0.8"
+                app:shimmer_intensity="0.15">
+
+                <include layout="@layout/shimmer_library_home" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
 
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/nestedScrollView"

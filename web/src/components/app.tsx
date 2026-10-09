@@ -23,6 +23,7 @@ import {
   BookOpen,
   Users,
   User,
+  Settings,
   LogOut,
   WifiOff,
   ArrowRight,
@@ -41,7 +42,7 @@ import {
 import { Avatar, ErrorBox, Form, Modal, Skeleton } from "./ui";
 import { Schedule } from "./schedule";
 import { useAcademic } from "@/lib/queries";
-import { Notices } from "./notices";
+import { Notices, NoticeDetailModal } from "./notices";
 import { Library } from "./library";
 import { Friends } from "./friends";
 import { Profile, ProfileForm } from "./profile";
@@ -1006,6 +1007,7 @@ function Home({
     let live = true;
     const navigate = async () => {
       const [hash, id] = location.hash.slice(1).split("/");
+      const targetTab = hash === "batch" ? "friends" : hash === "settings" ? "profile" : hash;
       if (
         [
           "timetable",
@@ -1015,9 +1017,9 @@ function Home({
           "profile",
           "manage",
           "ai",
-        ].includes(hash)
+        ].includes(targetTab)
       )
-        setTab(hash);
+        setTab(targetTab);
       if (!id || !["notices", "library"].includes(hash) || !navigator.onLine)
         return;
       if (!/^[0-9a-f-]{36}$/i.test(id)) return;
@@ -1078,13 +1080,13 @@ function Home({
     ["timetable", "Timetable", CalendarDays],
     ["notices", "Notices", Bell],
     ["library", "Library", BookOpen],
-    ["friends", profile.role==="teacher" ? "Students" : "Friends", Users],
-    ["profile", "Profile", User],
+    ["friends", profile.role==="teacher" ? "Students" : "Batch", Users],
+    ["profile", "Settings", Settings],
   ] as const;
   const select = (value: string) => {
     if (value === tab) return;
     setTab(value);
-    history.replaceState({}, "", `/#${value}`);
+    history.replaceState({}, "", `/#${value === "friends" ? "batch" : value === "profile" ? "settings" : value}`);
   };
   const navigationTab = tab === "ai" ? "profile" : desktop && tab === "notices" ? "timetable" : tab;
   if(profile.role==="teacher" && !teacherEntered) return <main className="teacher-batch-picker"><section className="card">
@@ -1208,31 +1210,10 @@ function Home({
         </main>
       </div>
       {linked && (
-        <Modal title={linked.title} close={() => setLinked(null)}>
-          {linked.body && <p className="notice-body">{linked.body}</p>}
-          {(linked.linkKind === "library" || linked.resource_id) && (
-            <button
-              className="primary"
-              onClick={() =>
-                openFile(linked.resource_id || linked.id).catch(setLinkError)
-              }
-            >
-              Open resource
-            </button>
-          )}
-          {linked.body && (
-            <button
-              className="secondary"
-              onClick={() =>
-                navigator.clipboard
-                  .writeText(`${linked.title}\n\n${linked.body}`)
-                  .catch(setLinkError)
-              }
-            >
-              Copy notice
-            </button>
-          )}
-        </Modal>
+        <NoticeDetailModal
+          notice={linked}
+          close={() => setLinked(null)}
+        />
       )}
       {androidDownload && (
         <AndroidDownload close={() => setAndroidDownload(false)} />

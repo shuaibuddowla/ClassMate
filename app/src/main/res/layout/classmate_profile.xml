@@ -1,106 +1,1153 @@
-<?xml version="1.0" ?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="@color/cm_background">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:paddingBottom="140dp">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Profile" android:textSize="24sp" android:textColor="@color/cm_text_primary" android:textStyle="bold" android:layout_marginTop="4dp"/>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Your account and preferences" android:textSize="12sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="3dp" android:layout_marginBottom="14dp"/>
-        <com.google.android.material.card.MaterialCardView android:id="@+id/cardPersonalInfo" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="24dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface" android:clickable="true" android:focusable="true">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="12dp" android:gravity="center_vertical" android:orientation="horizontal">
-                <de.hdodenhof.circleimageview.CircleImageView android:id="@+id/ivProfile" android:layout_width="42dp" android:layout_height="42dp" android:src="@drawable/ic_default_avatar" android:contentDescription="Your profile photo"/>
-                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:orientation="vertical">
-                    <TextView android:id="@+id/tvProfileName" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold" android:maxLines="2" android:ellipsize="end" android:textColor="@color/cm_text_primary"/>
-                    <TextView android:id="@+id/tvUserSubInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:textColor="@color/cm_text_secondary"/>
-                    <TextView android:id="@+id/tvRoleBadge" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:paddingHorizontal="8dp" android:paddingVertical="2dp" android:textSize="9sp" android:textStyle="bold" android:textColor="@color/cm_primary"/>
-                    <TextView android:id="@+id/tvProfileAcademic" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" android:textColor="@color/cm_text_secondary"/>
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeProfile"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollProfile"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingBottom="150dp"
+        android:clipToPadding="false">
+
+        <!-- Settings Header with Top-Right Profile Launcher -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="18dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvProfileHeaderTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Settings"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_text_primary"
+                    android:fontFamily="sans-serif"
+                    android:includeFontPadding="false" />
+
+                <TextView
+                    android:id="@+id/tvProfileHeaderSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Preferences, management and system controls"
+                    android:textSize="12.5sp"
+                    android:textColor="@color/cm_text_secondary"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Top Right Profile Launcher Button -->
+            <LinearLayout
+                android:id="@+id/btnHeaderProfile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="View Profile">
+
+                <FrameLayout
+                    android:layout_width="48dp"
+                    android:layout_height="48dp">
+
+                    <View
+                        android:id="@+id/ivHeaderProfileBorder"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_profile_picture_border" />
+
+                    <de.hdodenhof.circleimageview.CircleImageView
+                        android:id="@+id/ivHeaderProfileAvatar"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_default_avatar"
+                        android:contentDescription="Profile photo" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvHeaderProfileLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Profile"
+                    android:textSize="11sp"
+                    android:textColor="@color/cm_primary"
+                    android:fontFamily="sans-serif-medium"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 3. ACCOUNT & MANAGEMENT Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ACCOUNT &amp; MANAGEMENT"
+            android:textColor="@color/cm_primary"
+            android:textSize="11.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            app:cardBackgroundColor="@color/cm_surface"
+            app:cardCornerRadius="22dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/cm_border">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <!-- Edit Profile Information -->
+                <LinearLayout
+                    android:id="@+id/btnEditPersonal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#203B82F6"
+                        android:src="@drawable/ic_edit"
+                        app:tint="#3B82F6"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Edit Profile Information"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Update contact number, blood group, and hometown"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
                 </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp" />
+
+                <!-- Switch Active Batch -->
+                <LinearLayout
+                    android:id="@+id/btnSwitchBatch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#208B5CF6"
+                            android:src="@drawable/ic_academic_cap"
+                            app:tint="#8B5CF6"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:id="@+id/tvSwitchBatchTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Switch Active Batch"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvSwitchBatchSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Active workspace and notice scope"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_segmented_container"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="12dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvSwitchBatchBadge"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:singleLine="true"
+                            android:maxLines="1"
+                            android:ellipsize="end"
+                            tools:text="CSE 22 | 24-25" />
+
+                        <ImageView
+                            android:id="@+id/ivSwitchBatchChevron"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_down"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Batch Administration (CR/Admin/Teacher) -->
+                <View
+                    android:id="@+id/dividerProfileManage"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/cardProfileManage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#2010B981"
+                        android:src="@drawable/ic_nav_manage_grid"
+                        app:tint="#10B981"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:id="@+id/tvBatchAdminTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Batch Administration"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvBatchAdminSub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Manage timetable, members and batch settings"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+
+                <!-- ClassMate AI Assistant -->
+                <View
+                    android:id="@+id/dividerProfileAi"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/cardProfileAi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#20F59E0B"
+                        android:src="@drawable/ic_ai_logo"
+                        app:tint="#F59E0B"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ClassMate AI Assistant"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Ask questions, compose notices and organize study days"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnEditPersonal" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="12dp" android:text="Edit information" app:icon="@drawable/ic_edit" app:cornerRadius="14dp"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnSwitchBatch" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="8dp" android:text="Switch batch" app:cornerRadius="14dp"/>
-        <com.google.android.material.card.MaterialCardView android:id="@+id/cardProfileManage" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:visibility="gone" android:clickable="true" android:focusable="true" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp" android:padding="14dp" android:gravity="center_vertical">
-                <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="12dp" android:src="@drawable/ic_nav_manage_grid" app:tint="@color/cm_primary" android:importantForAccessibility="no"/>
-                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Manage" android:textSize="16sp" android:fontFamily="sans-serif-medium" android:textColor="@color/cm_text_primary"/>
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Courses, people and batch settings" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+
+        <!-- 4. PREFERENCES & APPEARANCE Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PREFERENCES &amp; APPEARANCE"
+            android:textColor="@color/cm_primary"
+            android:textSize="11.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            app:cardBackgroundColor="@color/cm_surface"
+            app:cardCornerRadius="22dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/cm_border">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <!-- Theme Appearance (Segmented 3-Way Picker) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/ivThemeIcon"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#206366F1"
+                            android:src="@drawable/ic_dark_mode"
+                            app:tint="#6366F1"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Theme Appearance"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvThemeAppearanceSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Comfortable dark palette"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Segmented Control [ Light | Dark | System ] -->
+                    <LinearLayout
+                        android:id="@+id/themeSegmentedControl"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_segmented_container"
+                        android:padding="3.5dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/btnThemeLight"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/ivThemeLightIcon"
+                                android:layout_width="15dp"
+                                android:layout_height="15dp"
+                                android:src="@drawable/ic_sun"
+                                app:tint="@color/cm_text_secondary"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:id="@+id/tvThemeLightText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Light"
+                                android:textSize="12.5sp"
+                                android:textColor="@color/cm_text_secondary" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/btnThemeDark"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/ivThemeDarkIcon"
+                                android:layout_width="15dp"
+                                android:layout_height="15dp"
+                                android:src="@drawable/ic_dark_mode"
+                                app:tint="@color/cm_text_secondary"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:id="@+id/tvThemeDarkText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Dark"
+                                android:textSize="12.5sp"
+                                android:textColor="@color/cm_text_secondary" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/btnThemeSystem"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/ivThemeSystemIcon"
+                                android:layout_width="15dp"
+                                android:layout_height="15dp"
+                                android:src="@drawable/ic_monitor"
+                                app:tint="@color/cm_text_secondary"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:id="@+id/tvThemeSystemText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="System"
+                                android:textSize="12.5sp"
+                                android:textColor="@color/cm_text_secondary" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
-                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" android:importantForAccessibility="no"/>
+
+                <!-- Notice Read Receipts (Admin / Owner only) -->
+                <View
+                    android:id="@+id/dividerReadReceipts"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/rowReadReceipts"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="68dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#2006B6D4"
+                        android:src="@drawable/ic_eye_outline"
+                        app:tint="#06B6D4"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Notice Read Receipts"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvReadReceiptsStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Recording your reads on notices"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchReadReceipts"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:trackTint="@color/cm_switch_track_tint"
+                        app:thumbTint="@color/cm_switch_thumb_tint"
+                        android:contentDescription="Notice read receipts" />
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="PREFERENCES" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
-        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-                <LinearLayout android:id="@+id/rowDark" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Dark appearance" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Use a darker, comfortable palette" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+
+        <!-- 5. NOTIFICATIONS & CONNECTIVITY Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NOTIFICATIONS &amp; CONNECTIVITY"
+            android:textColor="@color/cm_primary"
+            android:textSize="11.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            app:cardBackgroundColor="@color/cm_surface"
+            app:cardCornerRadius="22dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/cm_border">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <!-- Push Notifications -->
+                <LinearLayout
+                    android:id="@+id/rowNotifications"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="68dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#20F59E0B"
+                        android:src="@drawable/ic_bell_outline"
+                        app:tint="#F59E0B"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Push Notifications"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvPushStatusPill"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ACTIVE"
+                                android:textColor="#10B981"
+                                android:background="@drawable/bg_status_pill_active"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="1.5dp"
+                                android:textSize="9.5sp"
+                                android:textStyle="bold"
+                                android:layout_marginStart="8dp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvNotificationStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Instant notifications for academic notices and reminders"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
                     </LinearLayout>
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchDarkMode" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Dark appearance"/>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchNotifications"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:trackTint="@color/cm_switch_track_tint"
+                        app:thumbTint="@color/cm_switch_thumb_tint"
+                        android:contentDescription="Push notifications" />
                 </LinearLayout>
-                <LinearLayout android:id="@+id/rowNotifications" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Push notifications" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:id="@+id/tvNotificationStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="32dp" android:layout_marginTop="4dp" android:text="Notices and academic updates" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
-                    </LinearLayout>
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchNotifications" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Push notifications"/>
-                </LinearLayout>
-                <LinearLayout android:id="@+id/rowReadReceipts" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground" android:visibility="gone">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Notice read receipts" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:id="@+id/tvReadReceiptsStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Record when you read batch notices" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
-                    </LinearLayout>
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchReadReceipts" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Notice read receipts"/>
-                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="APP UPDATES" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
-        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-                <LinearLayout android:id="@+id/rowAuto" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Automatic updates" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Check for new releases in the background" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+
+        <!-- 6. UTILITIES & STORAGE Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UTILITIES &amp; STORAGE"
+            android:textColor="@color/cm_primary"
+            android:textSize="11.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            app:cardBackgroundColor="@color/cm_surface"
+            app:cardCornerRadius="22dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/cm_border">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <!-- Offline Cache & Storage -->
+                <LinearLayout
+                    android:id="@+id/rowOfflineStorage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#2064748B"
+                            android:src="@drawable/ic_storage"
+                            app:tint="#64748B"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Offline Cache &amp; Storage"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvCacheStorageSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Local timetable, notices, and offline resources"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
                     </LinearLayout>
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchAutoUpdates" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Automatic updates"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearCache"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="12dp"
+                        android:text="Clear Cache"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp"
+                        app:strokeColor="@color/cm_border" />
                 </LinearLayout>
-                <LinearLayout android:id="@+id/rowWifi" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Download on Wi-Fi only" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Manage mobile data usage" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
-                    </LinearLayout>
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/switchWifiOnlyUpdates" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="Download on Wi-Fi only"/>
-                </LinearLayout>
-                <LinearLayout android:id="@+id/layoutCheckUpdates" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Check for updates" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="" android:textSize="12sp" android:textColor="@color/cm_text_secondary" android:id="@+id/tvAppVersion"/>
-                    </LinearLayout>
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" android:importantForAccessibility="no"/>
-                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="DEVICE STORAGE" android:textSize="13sp" android:textColor="@color/cm_text_primary" android:layout_marginTop="24dp" android:layout_marginBottom="10dp"/>
-        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="20dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass" app:cardBackgroundColor="@color/cm_surface">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-                <LinearLayout android:id="@+id/layoutDeleteOfflineCache" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72dp" android:padding="16dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear temporary files" android:textSize="16sp" android:textColor="@color/cm_text_primary" android:fontFamily="sans-serif-medium"/>
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Remove cached downloads from this device" android:textSize="12sp" android:textColor="@color/cm_text_secondary"/>
+
+        <!-- 7. SYSTEM & UPDATES Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SYSTEM &amp; UPDATES"
+            android:textColor="@color/cm_primary"
+            android:textSize="11.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardAppUpdates"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardBackgroundColor="@color/cm_surface"
+            app:cardCornerRadius="22dp"
+            app:cardElevation="1dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/cm_border">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingVertical="4dp">
+
+                <!-- Check for Updates -->
+                <LinearLayout
+                    android:id="@+id/layoutCheckUpdates"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#202563EB"
+                        android:src="@drawable/ic_download_outline"
+                        app:tint="#2563EB"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Check for updates"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvAppVersion"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="1.1.30 (31)"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
                     </LinearLayout>
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_text_secondary" android:importantForAccessibility="no"/>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
                 </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp" />
+
+                <!-- Automatic updates -->
+                <LinearLayout
+                    android:id="@+id/rowAuto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#202563EB"
+                        android:src="@drawable/ic_refresh"
+                        app:tint="#2563EB"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Automatic updates"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Check for new releases in the background"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchAutoUpdates"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:trackTint="@color/cm_switch_track_tint"
+                        app:thumbTint="@color/cm_switch_thumb_tint"
+                        android:contentDescription="Automatic updates" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp" />
+
+                <!-- Download on Wi-Fi only -->
+                <LinearLayout
+                    android:id="@+id/rowWifi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp">
+
+                    <ImageView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:padding="9dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#202563EB"
+                        android:src="@drawable/ic_wifi"
+                        app:tint="#2563EB"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Download on Wi-Fi only"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Manage mobile data usage"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchWifiOnlyUpdates"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:trackTint="@color/cm_switch_track_tint"
+                        app:thumbTint="@color/cm_switch_thumb_tint"
+                        android:contentDescription="Download on Wi-Fi only" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/cm_border"
+                    android:layout_marginHorizontal="16dp" />
+
+                <!-- About Developer -->
+                <LinearLayout
+                    android:id="@+id/cardAboutDeveloper"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#206366F1">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:text="&lt;/&gt;"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="#6366F1" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="About Developer"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Designed &amp; built by Shuaib Uddowla · MBSTU"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <com.google.android.material.button.MaterialButton android:id="@+id/cardProfileAi" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="16dp" android:text="ClassMate AI" android:visibility="gone" app:cornerRadius="14dp" />
-        <com.google.android.material.card.MaterialCardView android:id="@+id/cardAboutDeveloper" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:clickable="true" android:focusable="true" android:contentDescription="Meet the ClassMate developer" app:cardBackgroundColor="@color/cm_surface" app:cardCornerRadius="22dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/cm_border">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="18dp" android:gravity="center_vertical">
-                <TextView android:layout_width="44dp" android:layout_height="44dp" android:gravity="center" android:text="&lt;/&gt;" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/cm_primary" />
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Behind ClassMate" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/cm_text_primary" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Meet the developer &amp; explore his work" android:textSize="12sp" android:textColor="@color/cm_text_secondary" />
-                </LinearLayout>
-                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" app:tint="@color/cm_primary" android:importantForAccessibility="no" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnLogout" style="?attr/materialButtonOutlinedStyle" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="24dp" android:text="Sign out" app:cornerRadius="14dp"/>
+
+        <!-- 8. Sign Out Button (Outlined Red Button with Logout Icon) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLogout"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="32dp"
+            android:text="Sign Out of ClassMate"
+            android:textColor="@color/cm_cancel_red"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="16dp"
+            app:strokeColor="@color/cm_cancel_red"
+            app:strokeWidth="1dp"
+            app:icon="@drawable/ic_logout"
+            app:iconTint="@color/cm_cancel_red"
+            app:iconGravity="textStart" />
+
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

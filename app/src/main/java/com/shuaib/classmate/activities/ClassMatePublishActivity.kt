@@ -219,6 +219,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
         if (courses.isEmpty()) { form.label("No active subject is available for uploading."); return }
         val (_, category) = dropdown("Category", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
         val (_, subject) = dropdown("Subject", courses.map { it.second })
+        val defaultCourseId = intent.getStringExtra("course_id")
+        if (editingFile == null && !defaultCourseId.isNullOrBlank()) {
+            courses.firstOrNull { it.first == defaultCourseId }?.let { subject.setText(it.second, false) }
+        }
         name = form.field("File name").apply { setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') }) }
         picker = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
             text = if (uri == null) "Choose file" else "Change file · $selectedFileLabel"; isAllCaps = false; cornerRadius = dp(14)

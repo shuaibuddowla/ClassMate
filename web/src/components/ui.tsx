@@ -6,10 +6,12 @@ export function Avatar({
   url,
   name = "",
   small = false,
+  online = false,
 }: {
   url?: string | null;
   name?: string;
   small?: boolean;
+  online?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   return (
@@ -26,6 +28,7 @@ export function Avatar({
       ) : (
         <User size={18} />
       )}
+      {online && <span className="avatar-online-dot" aria-label="Online" />}
     </span>
   );
 }
@@ -65,31 +68,83 @@ export function Modal({
   title,
   children,
   close,
+  className = "",
+  ariaLabel,
+  ariaLabelledBy,
+  triggerRef,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   close: () => void;
+  className?: string;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
-    const dialog = ref.current!;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
+    previouslyFocusedElement.current = (triggerRef?.current || document.activeElement) as HTMLElement | null;
+    const dialog = ref.current;
+    if (!dialog) return;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const focusable = dialog.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable) {
+      focusable.focus();
+    } else {
+      dialog.focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+    };
+    dialog.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      dialog.removeEventListener("keydown", handleKeyDown);
+      if (dialog.open) {
+        dialog.close();
+      }
+      if (previouslyFocusedElement.current && typeof previouslyFocusedElement.current.focus === "function") {
+        previouslyFocusedElement.current.focus();
+      }
+    };
+  }, [close, triggerRef]);
+
   return (
     <dialog
       ref={ref}
-      onCancel={close}
+      className={className || undefined}
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy || (title ? "modal-title" : undefined)}
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}
     >
-      <header>
-        <h2>{title}</h2>
-        <button className="icon" aria-label="Close" onClick={close}>
-          <X />
-        </button>
-      </header>
+      {title ? (
+        <header>
+          <h2 id="modal-title">{title}</h2>
+          <button className="icon" aria-label="Close" onClick={close}>
+            <X />
+          </button>
+        </header>
+      ) : null}
       {children}
     </dialog>
   );
@@ -206,5 +261,34 @@ export function Confirm({
         }}
       />
     </Modal>
+  );
+}
+
+export function Switch({
+  checked,
+  onChange,
+  disabled = false,
+  label,
+  id,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+  id?: string;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="switch"
+      aria-label={label}
+      aria-checked={checked}
+      disabled={disabled}
+      className="theme-switch cm-switch"
+      onClick={() => !disabled && onChange(!checked)}
+    >
+      <span className="cm-switch-thumb" />
+    </button>
   );
 }

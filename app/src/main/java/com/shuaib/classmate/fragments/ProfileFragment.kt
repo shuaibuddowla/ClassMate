@@ -31,6 +31,10 @@ import kotlinx.coroutines.launch
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import org.json.JSONObject
+import java.util.Locale
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -39,6 +43,7 @@ import com.shuaib.classmate.activities.LoginActivity
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.AdminPanelActivity
 import com.shuaib.classmate.activities.AiSettingsActivity
+import com.shuaib.classmate.activities.ClassMateBloodActivity
 import com.shuaib.classmate.activities.UserManagementActivity
 import com.shuaib.classmate.activities.MainActivity
 import com.shuaib.classmate.activities.PostNoticeActivity
@@ -78,13 +83,6 @@ class ProfileFragment : Fragment() {
     private lateinit var firestore: FirebaseFirestore
     private var currentUser: User? = null
     private var tempImageUri: Uri? = null
-    private lateinit var subjectAdapter: SubjectAdapter
-    private lateinit var pdfAdapter: PdfAdapter
-    private var favoriteSubjects = emptyList<Subject>()
-    private var favoritePdfIdsSet = emptySet<String>()
-    private var pdfCounts = emptyMap<String, Int>()
-    private var isSubjectsExpanded = false
-    private var isPdfsExpanded = false
     private var profileListener: ListenerRegistration? = null
     private var configListener: ListenerRegistration? = null
     private var isFriendsPublic = false
@@ -125,22 +123,50 @@ class ProfileFragment : Fragment() {
         setupShakeToTorchToggle()
         setupAiSettings()
         setupSemesterManagement()
-        setupSavedResources()
+        updateOfflineCacheSize()
         listenToFriendsConfig()
         fetchUserProfile()
 
         GlowHelper.pulseGlow(binding.profileBorder, ThemeColors.primary(requireContext()))
 
-        binding.fabEditPhoto.setOnClickListener {
-            showPhotoOptions()
-        }
-
         binding.cardPersonalInfo.applyClickAnimation {
             currentUser?.let { showEditProfileDialog(it) }
         }
 
-        binding.cardSeeFriends.applyClickAnimation {
-            (activity as? MainActivity)?.openChildDestination(R.id.nav_profile, R.id.nav_friends)
+        binding.cardBloodEmergency.applyClickAnimation {
+            val batchId = currentUser?.batchId.orEmpty().ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
+            val intent = Intent(requireContext(), ClassMateBloodActivity::class.java).apply {
+                if (batchId.isNotBlank()) putExtra("batch_id", batchId)
+            }
+            startActivity(intent)
+        }
+
+        binding.layoutSubInfo.setOnClickListener {
+            copyIdentifierToClipboard()
+        }
+
+        binding.ivCopyId.setOnClickListener {
+            copyIdentifierToClipboard()
+        }
+
+        binding.tileBloodGroup.applyClickAnimation {
+            val batchId = currentUser?.batchId.orEmpty().ifBlank { com.shuaib.classmate.utils.AppContextManager.getBatchId() }
+            val intent = Intent(requireContext(), ClassMateBloodActivity::class.java).apply {
+                if (batchId.isNotBlank()) putExtra("batch_id", batchId)
+            }
+            startActivity(intent)
+        }
+
+        binding.tileBatchSession.applyClickAnimation {
+            currentUser?.let { showEditProfileDialog(it) }
+        }
+
+        binding.tileHomeDistrict.applyClickAnimation {
+            currentUser?.let { showEditProfileDialog(it) }
+        }
+
+        binding.tileContactPhone.applyClickAnimation {
+            currentUser?.let { showEditProfileDialog(it) }
         }
 
         binding.cardAdminPanel.applyClickAnimation {
@@ -203,6 +229,7 @@ class ProfileFragment : Fragment() {
                         com.shuaib.classmate.storage.LibraryDownloadManager.deleteDownload(context, pdf.id)
                     }
                     Toast.makeText(context, "Offline cache cleared", Toast.LENGTH_SHORT).show()
+                    updateOfflineCacheSize()
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -287,8 +314,33 @@ class ProfileFragment : Fragment() {
         }
     }
 
+    private fun copyIdentifierToClipboard() {
+        val user = currentUser ?: return
+        val idToCopy = user.studentId.ifBlank { user.email }
+        if (idToCopy.isBlank()) return
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Student Identifier", idToCopy)
+        clipboard?.setPrimaryClip(clip)
+        Toast.makeText(requireContext(), "Copied: $idToCopy", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateOfflineCacheSize() {
+        val ctx = context ?: return
+        val offlineFiles = com.shuaib.classmate.storage.LibraryDownloadManager.getDownloadedFiles(ctx)
+        val totalBytes = offlineFiles.sumOf { it.sizeBytes }
+        val sizeText = when {
+            totalBytes <= 0 -> "0 KB cached"
+            totalBytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB cached", totalBytes / 1024.0)
+            else -> String.format(Locale.US, "%.1f MB cached", totalBytes / (1024.0 * 1024.0))
+        }
+        binding.tvCacheStorageSize.text = sizeText
+    }
+
     private fun showEditProfileDialog(user: User) {
+        val dialog = BottomSheetDialog(requireContext(), R.style.Theme_ClassMate_Dialog)
         val dialogBinding = DialogEditProfileBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
 
         dialogBinding.etEditName.setText(user.name)
         dialogBinding.etEditStudentId.setText(user.studentId)
@@ -297,33 +349,69 @@ class ProfileFragment : Fragment() {
         dialogBinding.etEditDistrict.setText(user.homeDistrict)
         dialogBinding.etEditAddress.setText(user.address)
 
-        MaterialAlertDialogBuilder(requireContext(), R.style.Theme_ClassMate_Dialog)
-            .setView(dialogBinding.root)
-            .setPositiveButton("Update") { _, _ ->
-                val updatedData = mapOf(
-                    "name" to dialogBinding.etEditName.text.toString().trim(),
-                    "studentId" to dialogBinding.etEditStudentId.text.toString().trim(),
-                    "phone" to dialogBinding.etEditPhone.text.toString().trim(),
-                    "bloodGroup" to dialogBinding.etEditBlood.text.toString().trim(),
-                    "homeDistrict" to dialogBinding.etEditDistrict.text.toString().trim(),
-                    "address" to dialogBinding.etEditAddress.text.toString().trim()
-                )
-                updateUserInFirestore(updatedData)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
+        val bloodGroups = listOf("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown")
+        val bloodAdapter = android.widget.ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, bloodGroups)
+        dialogBinding.etEditBlood.setAdapter(bloodAdapter)
 
-    private fun updateUserInFirestore(data: Map<String, Any>) {
-        val uid = auth.currentUser?.uid ?: return
-        firestore.collection("users").document(uid).update(data)
-            .addOnSuccessListener {
-                Toast.makeText(context, "Profile updated!", Toast.LENGTH_SHORT).show()
-                fetchUserProfile()
+        dialogBinding.btnCancelProfile.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialogBinding.btnSaveProfile.setOnClickListener {
+            val name = dialogBinding.etEditName.text.toString().trim()
+            val studentId = dialogBinding.etEditStudentId.text.toString().trim()
+            val phone = dialogBinding.etEditPhone.text.toString().trim()
+            val blood = dialogBinding.etEditBlood.text.toString().trim()
+            val district = dialogBinding.etEditDistrict.text.toString().trim()
+            val address = dialogBinding.etEditAddress.text.toString().trim()
+
+            dialogBinding.btnSaveProfile.isEnabled = false
+            dialogBinding.btnCancelProfile.isEnabled = false
+            dialogBinding.pbSavingProfile.isVisible = true
+
+            val updatedData = mapOf(
+                "name" to name,
+                "fullName" to name,
+                "studentId" to studentId,
+                "phone" to phone,
+                "bloodGroup" to blood,
+                "homeDistrict" to district,
+                "address" to address
+            )
+
+            val uid = auth.currentUser?.uid
+            if (uid != null) {
+                firestore.collection("users").document(uid).update(updatedData)
+                    .addOnSuccessListener {
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            runCatching {
+                                ClassMateAuthApi.rpc(
+                                    "save_profile_details",
+                                    JSONObject().apply {
+                                        put("target_mobile", phone)
+                                        put("target_town", district)
+                                        put("target_blood", blood)
+                                        put("target_residence", address)
+                                    }
+                                )
+                            }
+                        }
+                        Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        fetchUserProfile()
+                    }
+                    .addOnFailureListener { e ->
+                        dialogBinding.btnSaveProfile.isEnabled = true
+                        dialogBinding.btnCancelProfile.isEnabled = true
+                        dialogBinding.pbSavingProfile.isVisible = false
+                        Toast.makeText(context, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } else {
+                dialog.dismiss()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(context, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        }
+
+        dialog.show()
     }
 
     private fun showPhotoOptions() {
@@ -372,12 +460,24 @@ class ProfileFragment : Fragment() {
         val prefs = AppPreferences(requireContext())
         val isNotificationsEnabled = prefs.isNotificationsEnabled()
         binding.switchNotifications.isChecked = isNotificationsEnabled
+        updatePushStatusPill(isNotificationsEnabled)
 
         binding.switchNotifications.setOnCheckedChangeListener { _, isChecked ->
             prefs.setNotificationsEnabled(isChecked)
+            updatePushStatusPill(isChecked)
             if (isChecked) OneSignal.User.pushSubscription.optIn()
             else OneSignal.User.pushSubscription.optOut()
         }
+    }
+
+    private fun updatePushStatusPill(enabled: Boolean) {
+        binding.tvPushStatusPill.text = if (enabled) "Active" else "Disabled"
+        binding.tvPushStatusPill.setBackgroundResource(
+            if (enabled) R.drawable.bg_status_pill_active else R.drawable.bg_status_pill_inactive
+        )
+        binding.tvPushStatusPill.setTextColor(
+            if (enabled) Color.parseColor("#10B981") else Color.parseColor("#94A3B8")
+        )
     }
 
     private fun setupAutoMuteToggle() {
@@ -427,142 +527,7 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    private fun setupSavedResources() {
-        subjectAdapter = SubjectAdapter(emptyList(), onItemClick = { subject ->
-            (activity as? MainActivity)?.openChildDestination(
-                R.id.nav_pdf,
-                R.id.fragment_subject_pdf_list,
-                Bundle().apply {
-                    putString("subjectName", subject.name)
-                }
-            )
-        })
-        binding.rvSavedResources.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
-            adapter = subjectAdapter
-        }
 
-        pdfAdapter = PdfAdapter(emptyList(), false, emptySet())
-        pdfAdapter.onItemClick = { pdf -> LibraryUrlOpener.open(requireContext(), pdf) }
-        pdfAdapter.onFavoriteClick = { pdf -> togglePdfFavorite(pdf) }
-        binding.rvSavedFiles.apply {
-            layoutManager = LinearLayoutManager(context)
-            adapter = pdfAdapter
-        }
-
-        binding.rowSavedSubjects.setOnClickListener {
-            isSubjectsExpanded = !isSubjectsExpanded
-            binding.containerSavedSubjects.visibility = if (isSubjectsExpanded) View.VISIBLE else View.GONE
-            val rotation = if (isSubjectsExpanded) 90f else 0f
-            binding.ivSavedSubjectsChevron.animate().rotation(rotation).setDuration(150).start()
-        }
-
-        binding.rowSavedPdfs.setOnClickListener {
-            isPdfsExpanded = !isPdfsExpanded
-            binding.containerSavedPdfs.visibility = if (isPdfsExpanded) View.VISIBLE else View.GONE
-            val rotation = if (isPdfsExpanded) 90f else 0f
-            binding.ivSavedPdfsChevron.animate().rotation(rotation).setDuration(150).start()
-        }
-    }
-
-    private fun fetchSavedResources(favoriteNames: List<String>, favoritePdfIds: List<String>) {
-        favoritePdfIdsSet = favoritePdfIds.toSet()
-
-        val hasSubjects = favoriteNames.isNotEmpty()
-        val hasPdfs = favoritePdfIds.isNotEmpty()
-
-        if (hasSubjects || hasPdfs) {
-            binding.savedResourcesTagSection.visibility = View.VISIBLE
-
-            // Subjects Row Visibility
-            binding.rowSavedSubjects.visibility = if (hasSubjects) View.VISIBLE else View.GONE
-            binding.containerSavedSubjects.visibility = if (hasSubjects && isSubjectsExpanded) View.VISIBLE else View.GONE
-            binding.tvSavedSubjectsTitle.text = "Saved Subjects (${favoriteNames.size})"
-            binding.ivSavedSubjectsChevron.rotation = if (isSubjectsExpanded) 90f else 0f
-
-            // PDFs Row Visibility
-            binding.rowSavedPdfs.visibility = if (hasPdfs) View.VISIBLE else View.GONE
-            binding.containerSavedPdfs.visibility = if (hasPdfs && isPdfsExpanded) View.VISIBLE else View.GONE
-            binding.tvSavedPdfsTitle.text = "Saved PDFs (${favoritePdfIds.size})"
-            binding.ivSavedPdfsChevron.rotation = if (isPdfsExpanded) 90f else 0f
-
-            // Divider visibility
-            binding.dividerSavedResources.visibility = if (hasSubjects && hasPdfs) View.VISIBLE else View.GONE
-        } else {
-            binding.savedResourcesTagSection.visibility = View.GONE
-        }
-
-        // Fetch Subjects
-        if (hasSubjects) {
-            favoriteSubjects = SubjectList.subjects.filter { it.name in favoriteNames }
-            if (favoriteSubjects.isNotEmpty() && !hasPdfs) {
-                updateSubjectCountsOnly()
-            }
-        }
-
-        // Fetch Files
-        if (hasPdfs) {
-            fetchFavoritePdfs(favoritePdfIds)
-        }
-    }
-
-    private fun updateSubjectCountsOnly() {
-        loadArchiveProfileResources { files ->
-                if (_binding == null || !isAdded) return@loadArchiveProfileResources
-                pdfCounts = files.groupBy { it.subject }.mapValues { it.value.size }
-                subjectAdapter.updateList(favoriteSubjects, pdfCounts)
-        }
-    }
-
-    private fun fetchFavoritePdfs(favoritePdfIds: List<String>) {
-        loadArchiveProfileResources { allFiles ->
-                if (_binding == null || !isAdded) return@loadArchiveProfileResources
-                pdfCounts = allFiles.groupBy { it.subject }.mapValues { it.value.size }
-
-                val favoritePdfs = allFiles.filter { it.id in favoritePdfIds }
-
-                if (favoriteSubjects.isNotEmpty()) {
-                    subjectAdapter.updateList(favoriteSubjects, pdfCounts)
-                }
-
-                if (favoritePdfs.isNotEmpty()) {
-                    pdfAdapter.updateList(favoritePdfs, favoritePdfIdsSet)
-                    binding.tvSavedPdfsTitle.text = "Saved PDFs (${favoritePdfs.size})"
-                }
-        }
-    }
-
-    private fun loadArchiveProfileResources(onSuccess: (List<PdfFile>) -> Unit) {
-        val batchId = com.shuaib.classmate.utils.AppContextManager.getBatchId()
-        val semesterId = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
-        ArchiveLibraryRepository.load(batchId, semesterId, { _, files -> onSuccess(files) }, { })
-    }
-
-    private fun togglePdfFavorite(pdf: PdfFile) {
-        val uid = auth.currentUser?.uid ?: return
-        val isNowFavorite = !favoritePdfIdsSet.contains(pdf.id)
-        val wasFavoritePdfIds = favoritePdfIdsSet
-
-        if (isNowFavorite) {
-            favoritePdfIdsSet = favoritePdfIdsSet + pdf.id
-            firestore.collection("users").document(uid)
-                .update("favoritePdfIds", com.google.firebase.firestore.FieldValue.arrayUnion(pdf.id))
-                .addOnFailureListener {
-                    favoritePdfIdsSet = wasFavoritePdfIds
-                    Toast.makeText(context, "Save failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            favoritePdfIdsSet = favoritePdfIdsSet - pdf.id
-            firestore.collection("users").document(uid)
-                .update("favoritePdfIds", com.google.firebase.firestore.FieldValue.arrayRemove(pdf.id))
-                .addOnFailureListener {
-                    favoritePdfIdsSet = wasFavoritePdfIds
-                    Toast.makeText(context, "Remove failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                }
-        }
-
-        fetchUserFavorites()
-    }
 
     private fun fetchUserProfile() {
         val uid = auth.currentUser?.uid ?: return
@@ -607,14 +572,34 @@ class ProfileFragment : Fragment() {
         binding.tvRoleBadge.text = user.role.uppercase()
         applyRoleBadge(binding.tvRoleBadge, user.role)
 
-        fetchUserFavorites()
+        binding.cardBloodEmergency.isVisible = user.role.lowercase() != "teacher"
 
         // Update summary info under Personal Information
         binding.tvUserSubInfo.text = if (!user.studentId.isNullOrEmpty()) {
-            "${user.studentId} - ${user.email}"
+            "${user.studentId} • ${user.email}"
         } else {
             user.email
         }
+
+        // Update Identity Metric Tiles
+        val blood = user.bloodGroup.ifBlank { "Not set" }
+        binding.tvMetricBlood.text = blood
+        binding.tvMetricBloodSub.text = if (user.bloodGroup.isNotBlank()) "Tap for Blood Network" else "Add to help batchmates"
+
+        val batchName = com.shuaib.classmate.models.Batch.formatName(user.batchId).ifBlank {
+            user.batchId.ifBlank { "Batch N/A" }
+        }
+        val dept = user.department.ifBlank { "MBSTU" }.uppercase()
+        binding.tvMetricBatch.text = "$dept · $batchName"
+        binding.tvMetricBatchSub.text = "Academic Program"
+
+        val district = user.homeDistrict.ifBlank { "Not set" }
+        binding.tvMetricDistrict.text = district
+        binding.tvMetricDistrictSub.text = if (user.address.isNotBlank()) user.address else if (user.homeDistrict.isNotBlank()) "District origin" else "Tap to set"
+
+        val phone = user.phone.ifBlank { "Not set" }
+        binding.tvMetricPhone.text = phone
+        binding.tvMetricPhoneSub.text = if (user.phone.isNotBlank()) "Shared with batch directory" else "Tap to set" 
 
         val isAdmin = user.isAdmin()
         binding.adminSection.isVisible = isAdmin
@@ -654,7 +639,6 @@ class ProfileFragment : Fragment() {
     private fun uploadProfilePicture(uri: Uri) {
         val uid = auth.currentUser?.uid ?: return
         binding.pbUpload.isVisible = true
-        binding.fabEditPhoto.isEnabled = false
 
         CloudinaryUploader.uploadImage(
             context = requireContext(),
@@ -666,7 +650,6 @@ class ProfileFragment : Fragment() {
                     .addOnSuccessListener {
                         if (_binding == null || !isAdded) return@addOnSuccessListener
                         binding.pbUpload.isVisible = false
-                        binding.fabEditPhoto.isEnabled = true
                         fetchUserProfile()
                         Toast.makeText(context, "Profile picture updated!", Toast.LENGTH_SHORT).show()
                     }
@@ -674,48 +657,8 @@ class ProfileFragment : Fragment() {
             onFailure = { error ->
                 if (_binding == null || !isAdded) return@uploadImage
                 binding.pbUpload.isVisible = false
-                binding.fabEditPhoto.isEnabled = true
                 Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
             }
-        )
-    }
-
-    private fun fetchUserFavorites() {
-        val uid = auth.currentUser?.uid ?: return
-        firestore.collection("users").document(uid).get()
-            .addOnSuccessListener { doc ->
-                if (_binding == null || !isAdded) return@addOnSuccessListener
-                val favoriteNames = doc.get("favoriteSubjects") as? List<String> ?: emptyList()
-                val favoritePdfIds = doc.get("favoritePdfIds") as? List<String> ?: emptyList()
-                fetchSavedResources(favoriteNames, favoritePdfIds)
-            }
-    }
-
-    private fun com.google.firebase.firestore.DocumentSnapshot.toPdfFile(): PdfFile {
-        return PdfFile(
-            id = id,
-            title = getString("title") ?: "No Title",
-            subject = getString("subject") ?: "",
-            description = getString("description") ?: "",
-            uploadedBy = getString("uploadedByName") ?: getString("uploadedBy") ?: "",
-            telegramUrl = getString("telegramUrl") ?: "",
-            driveUrl = getString("driveUrl") ?: "",
-            fileId = getString("fileId") ?: "",
-            timestamp = getTimestamp("timestamp") ?: getTimestamp("createdAt"),
-            courseCode = getString("courseCode") ?: "",
-            courseType = getString("courseType") ?: "",
-            fileType = getString("fileType") ?: "other",
-            mimeType = getString("mimeType") ?: "application/octet-stream",
-            sizeBytes = getLong("sizeBytes") ?: 0L,
-            provider = getString("provider") ?: "",
-            downloadUrl = getString("downloadUrl") ?: "",
-            githubAssetId = getLong("githubAssetId") ?: 0L,
-            githubAssetName = getString("githubAssetName") ?: getString("title") ?: "",
-            createdAt = getTimestamp("createdAt"),
-            updatedAt = getTimestamp("updatedAt"),
-            downloadCount = getLong("downloadCount") ?: 0L,
-            isDeleted = getBoolean("isDeleted") ?: false,
-            semester = getString("semester") ?: "2nd"
         )
     }
 
@@ -736,9 +679,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun updateSeeFriendsVisibility(user: User) {
-        val showSeeFriends = user.role == "superadmin" || isFriendsPublic
-        binding.cardSeeFriends.isVisible = showSeeFriends
-        binding.dividerSeeFriends.isVisible = showSeeFriends
+        // Redundant friends card removed from profile
     }
 
     override fun onResume() {

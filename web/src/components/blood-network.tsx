@@ -112,7 +112,7 @@ export function BloodNetwork({
       <div className="page-heading">
         <div>
           <button className="text-button" onClick={close}>
-            <ArrowLeft size={17} /> Friends
+            <ArrowLeft size={17} /> Batch
           </button>
           <h1>Blood requests</h1>
           <p>Verified help, when every minute matters.</p>

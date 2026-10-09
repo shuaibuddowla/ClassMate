@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeProfilePage"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollProfilePage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:paddingBottom="48dp"
+            android:clipToPadding="false">
+
+            <!-- Top Navigation Bar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
+
+                <FrameLayout
+                    android:id="@+id/btnProfileBack"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_settings_icon"
+                    android:backgroundTint="@color/cm_surface_elevated"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Back to Settings">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_arrow_back"
+                        app:tint="@color/cm_text_primary"
+                        android:importantForAccessibility="no" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="14dp">
+
+                    <TextView
+                        android:id="@+id/tvProfileEyebrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="YOUR ACCOUNT"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08" />
+
+                    <TextView
+                        android:id="@+id/tvProfileHeaderTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Profile"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/cm_text_primary"
+                        android:fontFamily="sans-serif-medium"
+                        android:layout_marginTop="1dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 1. Hero Identity Card (Exact Web Match) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardPersonalInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="26dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                android:clickable="true"
+                android:focusable="true">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="20dp">
+
+                    <!-- Header Gradient Banner -->
+                    <View
+                        android:id="@+id/headerBanner"
+                        android:layout_width="match_parent"
+                        android:layout_height="115dp"
+                        android:background="@drawable/bg_profile_mesh_gradient"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent" />
+
+                    <!-- Quick Edit Button (Banner top-right) -->
+                    <FrameLayout
+                        android:id="@+id/btnHeroEdit"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#33FFFFFF"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_edit"
+                            app:tint="#FFFFFF"
+                            android:importantForAccessibility="no" />
+                    </FrameLayout>
+
+                    <!-- Centered Profile Photo Container -->
+                    <FrameLayout
+                        android:id="@+id/profilePhotoContainer"
+                        android:layout_width="104dp"
+                        android:layout_height="104dp"
+                        android:layout_marginTop="58dp"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent">
+
+                        <View
+                            android:id="@+id/profileBorder"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_profile_picture_border" />
+
+                        <de.hdodenhof.circleimageview.CircleImageView
+                            android:id="@+id/ivProfile"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_default_avatar"
+                            android:contentDescription="Profile photo" />
+
+                        <ProgressBar
+                            android:id="@+id/pbUpload"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:layout_gravity="center"
+                            android:visibility="gone"
+                            android:indeterminateTint="@color/cm_primary" />
+                    </FrameLayout>
+
+                    <!-- User Name -->
+                    <TextView
+                        android:id="@+id/tvProfileName"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginHorizontal="20dp"
+                        android:gravity="center"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="22sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textStyle="bold"
+                        app:layout_constraintTop_toBottomOf="@id/profilePhotoContainer"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        tools:text="Mohammad Shuaib-Ud-Dowla" />
+
+                    <!-- Role Badge -->
+                    <TextView
+                        android:id="@+id/tvRoleBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="@color/cm_text_inverse"
+                        android:textSize="10.5sp"
+                        android:textAllCaps="true"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05"
+                        android:background="@drawable/bg_role_badge_admin"
+                        app:layout_constraintTop_toBottomOf="@id/tvProfileName"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        tools:text="ADMIN" />
+
+                    <!-- Sub Info (Student ID & Email) -->
+                    <LinearLayout
+                        android:id="@+id/layoutSubInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:layout_constraintTop_toBottomOf="@id/tvRoleBadge"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent">
+
+                        <TextView
+                            android:id="@+id/tvUserSubInfo"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="12.5sp"
+                            tools:text="ce25045@mbstu.ac.bd" />
+
+                        <ImageView
+                            android:id="@+id/ivCopyId"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:src="@drawable/ic_copy"
+                            app:tint="@color/cm_primary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <!-- 2x2 Inset Grid inside Hero Card -->
+                    <LinearLayout
+                        android:id="@+id/layoutMetricGrid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginHorizontal="14dp"
+                        app:layout_constraintTop_toBottomOf="@id/layoutSubInfo"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent">
+
+                        <!-- Row 1: Blood Group & Department/Batch -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <!-- Blood Group Tile -->
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tileBloodGroup"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="5dp"
+                                app:cardBackgroundColor="@color/cm_surface"
+                                app:cardCornerRadius="16dp"
+                                app:cardElevation="0dp"
+                                app:strokeWidth="1dp"
+                                app:strokeColor="#33D94B55"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="12dp">
+
+                                    <ImageView
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
+                                        android:padding="6dp"
+                                        android:background="@drawable/bg_settings_icon"
+                                        android:backgroundTint="#20D94B55"
+                                        android:src="@drawable/ic_blood_drop"
+                                        app:tint="#D94B55"
+                                        android:importantForAccessibility="no" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginStart="8dp">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="BLOOD GROUP"
+                                            android:textColor="@color/cm_text_muted"
+                                            android:textSize="9sp"
+                                            android:fontFamily="sans-serif-medium"
+                                            android:textStyle="bold"
+                                            android:letterSpacing="0.05" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricBlood"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Not set"
+                                            android:textColor="@color/cm_text_primary"
+                                            android:textSize="13.5sp"
+                                            android:textStyle="bold"
+                                            android:layout_marginTop="1dp" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricBloodSub"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Tap for Blood Network"
+                                            android:textColor="@color/cm_text_secondary"
+                                            android:textSize="10sp"
+                                            android:ellipsize="end"
+                                            android:maxLines="2" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <!-- Department & Batch Tile -->
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tileBatchSession"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                app:cardBackgroundColor="@color/cm_surface"
+                                app:cardCornerRadius="16dp"
+                                app:cardElevation="0dp"
+                                app:strokeWidth="1dp"
+                                app:strokeColor="@color/cm_border"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="12dp">
+
+                                    <ImageView
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
+                                        android:padding="6dp"
+                                        android:background="@drawable/bg_settings_icon"
+                                        android:backgroundTint="#206366F1"
+                                        android:src="@drawable/ic_academic_cap"
+                                        app:tint="#6366F1"
+                                        android:importantForAccessibility="no" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginStart="8dp">
+
+                                        <TextView
+                                            android:id="@+id/tvMetricBatchTitle"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="DEPARTMENT"
+                                            android:textColor="@color/cm_text_muted"
+                                            android:textSize="9sp"
+                                            android:fontFamily="sans-serif-medium"
+                                            android:textStyle="bold"
+                                            android:letterSpacing="0.05"
+                                            android:ellipsize="end"
+                                            android:maxLines="1" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricBatch"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="CSE · 22"
+                                            android:textColor="@color/cm_text_primary"
+                                            android:textSize="13.5sp"
+                                            android:textStyle="bold"
+                                            android:layout_marginTop="1dp" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricBatchSub"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Session 24-25"
+                                            android:textColor="@color/cm_text_secondary"
+                                            android:textSize="10sp"
+                                            android:ellipsize="end"
+                                            android:maxLines="2" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+                        </LinearLayout>
+
+                        <!-- Row 2: Home Town & Mobile Number -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <!-- Home Town Tile -->
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tileHomeDistrict"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="5dp"
+                                app:cardBackgroundColor="@color/cm_surface"
+                                app:cardCornerRadius="16dp"
+                                app:cardElevation="0dp"
+                                app:strokeWidth="1dp"
+                                app:strokeColor="@color/cm_border"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="12dp">
+
+                                    <ImageView
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
+                                        android:padding="6dp"
+                                        android:background="@drawable/bg_settings_icon"
+                                        android:backgroundTint="#2010B981"
+                                        android:src="@drawable/ic_location"
+                                        app:tint="#10B981"
+                                        android:importantForAccessibility="no" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginStart="8dp">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="HOME TOWN"
+                                            android:textColor="@color/cm_text_muted"
+                                            android:textSize="9sp"
+                                            android:fontFamily="sans-serif-medium"
+                                            android:textStyle="bold"
+                                            android:letterSpacing="0.05" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricDistrict"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Not set"
+                                            android:textColor="@color/cm_text_primary"
+                                            android:textSize="13.5sp"
+                                            android:textStyle="bold"
+                                            android:layout_marginTop="1dp" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricDistrictSub"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="District origin"
+                                            android:textColor="@color/cm_text_secondary"
+                                            android:textSize="10sp"
+                                            android:lineSpacingMultiplier="1.2"
+                                            android:ellipsize="end"
+                                            android:maxLines="2" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+
+                            <!-- Mobile Number Tile -->
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/tileContactPhone"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                app:cardBackgroundColor="@color/cm_surface"
+                                app:cardCornerRadius="16dp"
+                                app:cardElevation="0dp"
+                                app:strokeWidth="1dp"
+                                app:strokeColor="@color/cm_border"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="12dp">
+
+                                    <ImageView
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
+                                        android:padding="6dp"
+                                        android:background="@drawable/bg_settings_icon"
+                                        android:backgroundTint="#20F59E0B"
+                                        android:src="@drawable/ic_phone"
+                                        app:tint="#F59E0B"
+                                        android:importantForAccessibility="no" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginStart="8dp">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="MOBILE NUMBER"
+                                            android:textColor="@color/cm_text_muted"
+                                            android:textSize="9sp"
+                                            android:fontFamily="sans-serif-medium"
+                                            android:textStyle="bold"
+                                            android:letterSpacing="0.05" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricPhone"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Not set"
+                                            android:textColor="@color/cm_text_primary"
+                                            android:textSize="12.5sp"
+                                            android:fontFamily="sans-serif"
+                                            android:textStyle="bold"
+                                            android:singleLine="true"
+                                            android:maxLines="1"
+                                            android:layout_marginTop="1dp" />
+
+                                        <TextView
+                                            android:id="@+id/tvMetricPhoneSub"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="Shared with batch directory"
+                                            android:textColor="@color/cm_text_secondary"
+                                            android:textSize="10sp"
+                                            android:ellipsize="end"
+                                            android:maxLines="2" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </com.google.android.material.card.MaterialCardView>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Blood Emergency Requests Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardBloodEmergency"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#40D94B55"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <ImageView
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:padding="10dp"
+                        android:background="@drawable/bg_settings_icon"
+                        android:backgroundTint="#20D94B55"
+                        android:src="@drawable/ic_blood_drop"
+                        app:tint="#D94B55"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Blood Emergency Requests"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Campus Network"
+                            android:textColor="#D94B55"
+                            android:textSize="9.5sp"
+                            android:textStyle="bold"
+                            android:singleLine="true"
+                            android:maxLines="1"
+                            android:background="@drawable/bg_role_badge"
+                            android:backgroundTint="#20D94B55"
+                            android:paddingStart="7dp"
+                            android:paddingEnd="7dp"
+                            android:paddingTop="2dp"
+                            android:paddingBottom="2dp"
+                            android:layout_marginTop="3dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Find donors across batches or create an urgent blood request"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Incomplete Profile Nudge -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardProfileNudge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#40F59E0B">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:padding="6dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#20F59E0B"
+                            android:src="@drawable/ic_badge"
+                            app:tint="#D97706"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="10dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Complete your profile details"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Add your blood group and mobile number to connect with your batchmates."
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCompleteProfileNudge"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="10dp"
+                        android:text="Complete Profile"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        app:cornerRadius="12dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

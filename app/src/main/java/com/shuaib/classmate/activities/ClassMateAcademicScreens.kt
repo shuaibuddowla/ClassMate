@@ -449,8 +449,7 @@ internal class ClassMateAcademicScreens(
         root.v<TextView>(R.id.tvRoleBadge).setBackgroundResource(R.drawable.bg_role_badge)
         text(root, R.id.tvUserSubInfo, listOf(account.optString("student_id").takeUnless { it == "null" },
             account.optString("email")).filterNotNull().joinToString(" · "))
-        listOf(R.id.cardSeeFriends, R.id.savedResourcesTagSection, R.id.adminSection,
-            R.id.fabEditPhoto, R.id.cardAiSettings, R.id.layoutAddWidget)
+        listOf(R.id.adminSection, R.id.cardAiSettings, R.id.layoutAddWidget)
             .forEach { root.v<View>(it).visibility = View.GONE }
         root.v<View>(R.id.layoutDeleteOfflineCache).setOnClickListener {
             AlertDialog.Builder(activity).setTitle("Clear offline cache")

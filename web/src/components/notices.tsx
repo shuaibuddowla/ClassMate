@@ -18,9 +18,12 @@ import {
   Search,
   ExternalLink,
   Copy,
+  Check,
   Languages,
   Sparkles,
   LoaderCircle,
+  ArrowLeft,
+  X,
 } from "lucide-react";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
@@ -43,8 +46,9 @@ export function Notices({
     [composer, setComposer] = useState(false),
     [editing, setEditing] = useState<Row | null>(null),
     [deleting, setDeleting] = useState<Row | null>(null),
-    [readers, setReaders] = useState<Row | null>(null),
+    [readers, setReaders] = useState<{ notice: Row; triggerRef?: React.RefObject<HTMLElement | null> } | null>(null),
     [comments, setComments] = useState<Row | null>(null),
+    [detailNotice, setDetailNotice] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null),
     [reminder, setReminder] = useState<Row | null>(null);
   const receiptsEnabled = useQuery({
@@ -202,12 +206,6 @@ export function Notices({
     }, {} as Row) || {};
   const refresh = () =>
     qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
-  const summaryNotice = notices.find((n) =>
-    details.authors?.some((a: Row) => a.notice_id === n.id && a.author_name),
-  );
-  const summaryAuthor = details.authors?.find(
-    (a: Row) => a.notice_id === summaryNotice?.id,
-  );
   async function reaction(n: Row, change: Row) {
     const state =
       details.engagement?.find((x: Row) => x.notice_id === n.id) || {};
@@ -266,33 +264,6 @@ export function Notices({
           aria-label="Search notices"
         />
       </label>
-      {summaryAuthor && (
-        <div className="notice-author-summary">
-          <Avatar
-            url={summaryAuthor.avatar_url}
-            name={summaryAuthor.author_name}
-          />
-          <div>
-            <strong>{summaryAuthor.author_name}</strong>
-            <small>
-              {
-                notices.filter((n) => n.author_id === summaryNotice?.author_id)
-                  .length
-              }{" "}
-              updates · Latest:{" "}
-              {new Date(summaryNotice!.published_at).toLocaleDateString(
-                "en-GB",
-                {
-                  timeZone: "Asia/Dhaka",
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                },
-              )}
-            </small>
-          </div>
-        </div>
-      )}
       <ErrorBox error={error || feed.error} retry={() => feed.refetch()} />
       {feed.isPending ? (
         <>
@@ -309,6 +280,7 @@ export function Notices({
             <NoticeCard
               key={n.id}
               notice={n}
+              ctx={ctx}
               batch={ctx.batch}
               search={search}
               state={
@@ -316,7 +288,7 @@ export function Notices({
               }
               read={details.reads?.find((x: Row) => x.notice_id === n.id) || {}}
               previews={(details.previews || [])
-                .filter((x: Row) => x.notice_id === n.id)
+                .filter((x: Row) => x.notice_id === n.id && x.profile_id !== n.author_id)
                 .filter(
                   (x: Row) =>
                     !(
@@ -335,7 +307,8 @@ export function Notices({
               }
               onEdit={() => setEditing(n)}
               onDelete={() => setDeleting(n)}
-              onReaders={() => setReaders(n)}
+              onOpenDetail={() => setDetailNotice(n)}
+              onReaders={(triggerRef) => setReaders({ notice: n, triggerRef })}
               onComments={() => setComments(n)}
               onLike={(liked) =>
                 reaction(n, { liked }).catch((e) => {
@@ -451,14 +424,21 @@ export function Notices({
       )}
       {readers && (
         <ReaderList
-          notice={readers}
+          notice={readers.notice}
           ctx={ctx}
           receiptsEnabled={receiptsEnabled.data !== false}
+          triggerRef={readers.triggerRef}
           close={() => setReaders(null)}
         />
       )}{" "}
       {comments && (
         <Comments notice={comments} ctx={ctx} close={() => setComments(null)} />
+      )}{" "}
+      {detailNotice && (
+        <NoticeDetailModal
+          notice={detailNotice}
+          close={() => setDetailNotice(null)}
+        />
       )}{" "}
       {reminder && (
         <Modal title="Set a reminder" close={() => setReminder(null)}>
@@ -641,8 +621,18 @@ function Highlight({ text, search }: { text: string; search: string }) {
   parts.push(text.slice(pos));
   return <>{parts}</>;
 }
+
+export function canViewNoticeReaders(notice: Row, ctx: Context): boolean {
+  if (ctx.owner) return true;
+  if (ctx.profile.role === "admin" || ctx.profile.role === "teacher") return true;
+  if (ctx.profile.is_cr) return true;
+  if (notice.author_id === ctx.user) return true;
+  return false;
+}
+
 function NoticeCard({
   notice: n,
+  ctx,
   batch,
   state,
   read,
@@ -653,11 +643,13 @@ function NoticeCard({
   onReminder,
   onComments,
   onReaders,
+  onOpenDetail,
   onEdit,
   onDelete,
   markRead,
 }: {
   notice: Row;
+  ctx: Context;
   batch: string;
   state: Row;
   read: Row;
@@ -667,7 +659,8 @@ function NoticeCard({
   onLike: (liked: boolean) => Promise<void>;
   onReminder: () => void;
   onComments: () => void;
-  onReaders: () => void;
+  onReaders: (triggerRef?: React.RefObject<HTMLElement | null>) => void;
+  onOpenDetail: () => void;
   onEdit: () => void;
   onDelete: () => void;
   markRead: () => void;
@@ -689,10 +682,12 @@ function NoticeCard({
     translationRequest.current = null;
   }, [n.id, n.title, n.body, batch]);
   const ref = useRef<HTMLElement>(null);
+  const seenBtnRef = useRef<HTMLButtonElement>(null);
+  const canViewReaders = canViewNoticeReaders(n, ctx);
   const seen = useRef(false);
   useEffect(() => setLiked(!!state.is_liked), [state.is_liked]);
   useEffect(() => {
-    if (!ref.current || read.read_by_me) return;
+    if (!ref.current || read.read_by_me || n.author_id === ctx.user) return;
     let timer: ReturnType<typeof setTimeout>;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -712,7 +707,7 @@ function NoticeCard({
       clearTimeout(timer);
       observer.disconnect();
     };
-  }, [read.read_by_me, markRead]);
+  }, [read.read_by_me, markRead, n.author_id, ctx.user]);
   useEffect(() => {
     if (!state.reminder_at) return;
     const due = new Date(state.reminder_at).getTime();
@@ -730,7 +725,40 @@ function NoticeCard({
       ? "cancelled"
       : "general";
   const body = String((showTranslation ? translated?.body : n.body) || "");
-  const text = expanded || body.length <= 280 ? body : body.slice(0, 280) + "…";
+  const rawLines = body.split("\n");
+  const hasLineOverflow = rawLines.length > 6;
+  const isCharOverflow = body.length > 180;
+  const isOverflow = hasLineOverflow || isCharOverflow;
+  const text = (() => {
+    if (expanded || !isOverflow) return body;
+    if (hasLineOverflow) {
+      const preview = rawLines.slice(0, 6).join("\n");
+      return preview.length > 200 ? preview.slice(0, 200) + "…" : preview + "…";
+    }
+    return body.slice(0, 200) + "…";
+  })();
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleBodyClick = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return;
+    }
+    if (isOverflow) {
+      setExpanded(!expanded);
+    }
+  };
+
+  const urlRegex =
+    /((?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|(?!\/)))/gi;
+
+  const isUrl = (s: string) =>
+    /^(?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]$/i.test(s) ||
+    /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-])?$/i.test(s);
+
   return (
     <article ref={ref} className={`notice-card ${kind}`}>
       <span className="notice-accent" />
@@ -768,16 +796,35 @@ function NoticeCard({
         </div>
       )}
       <div className="notice-content">
-        <h2>
+        <h2
+          className={isOverflow ? "clickable" : ""}
+          onClick={() => {
+            if (isOverflow) setExpanded(!expanded);
+          }}
+          title={isOverflow ? "Click to expand or collapse notice" : undefined}
+        >
           <Highlight
             text={showTranslation ? translated?.title || n.title : n.title}
             search={search}
           />
         </h2>
-        <div className="notice-body">
-          {text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-            /^https?:\/\//.test(part) ? (
-              <a key={i} href={part} target="_blank" rel="noopener noreferrer">
+        <div
+          className={`notice-body ${expanded ? "expanded" : ""} ${isOverflow ? "clickable" : ""}`}
+          onClick={handleBodyClick}
+        >
+          {text.split(urlRegex).map((part, i) =>
+            isUrl(part) ? (
+              <a
+                key={i}
+                href={
+                  part.startsWith("http://") || part.startsWith("https://")
+                    ? part
+                    : `https://${part}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleLinkClick}
+              >
                 <Highlight text={part} search={search} />
               </a>
             ) : (
@@ -785,12 +832,13 @@ function NoticeCard({
             ),
           )}
         </div>
-        {body.length > 280 && (
+        {isOverflow && (
           <button
-            className="inline accent"
+            type="button"
+            className="inline accent notice-inline-toggle"
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? "Show less" : "See more"}
+            {expanded ? "see less" : "… see more"}
           </button>
         )}
         <div className="timestamp">
@@ -870,19 +918,54 @@ function NoticeCard({
             {state.reminder_at ? <BellRing size={20} /> : <Bell size={20} />}
           </span>
         </button>
-        <button className="seen" onClick={onReaders}>
-          <span className="avatars">
-            {previews.map((p) => (
-              <Avatar
-                small
-                key={p.profile_id}
-                name={p.reader_name}
-                url={p.avatar_url}
-              />
-            ))}
-          </span>
-          <small>{read.read_count || 0} seen</small>
-        </button>
+        {(() => {
+          const authorRead =
+            (previews || []).some(
+              (x: Row) => x.notice_id === n.id && x.profile_id === n.author_id,
+            ) || (read.read_by_me && n.author_id === ctx.user);
+          const effectiveSeenCount = Math.max(0, (read.read_count || 0) - (authorRead ? 1 : 0));
+          const avatarPreviews = previews.filter((x: Row) => x.profile_id !== n.author_id);
+
+          return canViewReaders ? (
+            <button
+              ref={seenBtnRef}
+              type="button"
+              className="seen"
+              aria-label="View readers"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onReaders(seenBtnRef);
+              }}
+            >
+              <span className="avatars">
+                {avatarPreviews.map((p) => (
+                  <Avatar
+                    small
+                    key={p.profile_id}
+                    name={p.reader_name}
+                    url={p.avatar_url}
+                  />
+                ))}
+              </span>
+              <small>{effectiveSeenCount} seen</small>
+            </button>
+          ) : (
+            <div className="seen not-clickable" aria-label="Seen count">
+              <span className="avatars">
+                {avatarPreviews.map((p) => (
+                  <Avatar
+                    small
+                    key={p.profile_id}
+                    name={p.reader_name}
+                    url={p.avatar_url}
+                  />
+                ))}
+              </span>
+              <small>{effectiveSeenCount} seen</small>
+            </div>
+          );
+        })()}
         <div className="reactions">
           <button
             aria-label={liked ? "Unlike" : "Like"}
@@ -920,20 +1003,120 @@ function NoticeCard({
     </article>
   );
 }
+function DoubleCheckIcon({
+  size = 15,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  const width = size;
+  const height = Math.round((size * 11) / 16);
+  return (
+    <svg
+      width={width}
+      height={height}
+      className={`wa-double-check-svg ${className}`}
+      viewBox="0 0 20 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        maxWidth: `${width}px`,
+        maxHeight: `${height}px`,
+        flexShrink: 0,
+        display: "inline-block",
+        verticalAlign: "middle",
+      }}
+    >
+      <path d="M1 7.5L5 11.5L14 2.5" />
+      <path d="M6 7.5L10 11.5L19 2.5" />
+    </svg>
+  );
+}
+
+const AVATAR_PALETTE = [
+  "#00A884",
+  "#3B82F6",
+  "#8B5CF6",
+  "#EC4899",
+  "#F59E0B",
+  "#10B981",
+  "#06B6D4",
+  "#F97316",
+];
+
+function getAvatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
+function getInitialLetter(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "C";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return (parts[0].slice(0, 1) + parts[1].slice(0, 1)).toUpperCase();
+}
+
+function ReaderAvatar({
+  src,
+  name,
+}: {
+  src?: string | null;
+  name: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initial = getInitialLetter(name);
+  const initialBg = getAvatarColor(name);
+
+  if (!src || !src.startsWith("https://") || failed) {
+    return (
+      <div
+        className="wa-avatar-initial"
+        style={{ backgroundColor: initialBg }}
+        aria-hidden="true"
+      >
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      className="wa-reader-avatar"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function ReaderList({
   notice,
   ctx,
   receiptsEnabled,
+  triggerRef,
   close,
 }: {
   notice: Row;
   ctx: Context;
   receiptsEnabled: boolean;
+  triggerRef?: React.RefObject<HTMLElement | null>;
   close: () => void;
 }) {
+  const canView = canViewNoticeReaders(notice, ctx);
   const readers = useInfiniteQuery({
     queryKey: [ctx.user, ctx.batch, "readers", notice.id],
     initialPageParam: null as Row | null,
+    enabled: canView,
     queryFn: ({ pageParam }) =>
       rpc<Row[]>("notice_readers_page", {
         target_notice: notice.id,
@@ -943,40 +1126,247 @@ function ReaderList({
       }),
     getNextPageParam: (last) => (last.length === 50 ? last.at(-1) : undefined),
   });
+
+  const allReaders = (readers.data?.pages.flat() || []).filter(
+    (p) =>
+      p.profile_id !== notice.author_id &&
+      !(
+        ctx.owner &&
+        !receiptsEnabled &&
+        p.profile_id === ctx.user
+      ),
+  );
+
+  const seenCount = allReaders.length;
+
+  const bubbleTime = (() => {
+    try {
+      return formatStamp(notice.published_at || notice.created_at || new Date().toISOString());
+    } catch {
+      return "—";
+    }
+  })();
+
   return (
-    <Modal title="Seen by" close={close}>
-      <ErrorBox error={readers.error} />
-      {readers.isPending ? (
-        <Skeleton />
-      ) : (
-        readers.data?.pages
-          .flat()
-          .filter(
-            (p) =>
-              !(
-                ctx.owner &&
-                !receiptsEnabled &&
-                p.profile_id === ctx.user
-              ),
-          )
-          .map((p) => (
-            <div className="person" key={p.profile_id}>
-              <Avatar name={p.reader_name} url={p.avatar_url} />
-              <span>
-                <strong>{p.reader_name}</strong>
-                <small>{formatStamp(p.read_at)}</small>
-              </span>
+    <Modal
+      className="receipts-modal"
+      ariaLabelledBy="receipts-modal-title"
+      triggerRef={triggerRef}
+      close={close}
+    >
+      <div className="wa-message-info-shell">
+        {/* Header: WhatsApp Message Info */}
+        <div className="wa-message-info-header">
+          <div className="wa-message-info-header-title">
+            <button
+              type="button"
+              onClick={close}
+              className="wa-header-back-btn"
+              aria-label="Back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <span id="receipts-modal-title">Message info</span>
+          </div>
+          <button
+            type="button"
+            onClick={close}
+            className="wa-header-close-btn"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Pinned Notice Preview Card */}
+        <div className="wa-notice-preview-container">
+          <div
+            className={`wa-notice-preview-card ${
+              notice.class_change_id
+                ? "cancelled"
+                : notice.resource_id
+                  ? "resource"
+                  : "general"
+            }`}
+          >
+            <div className="wa-notice-preview-tag">
+              {notice.class_change_id
+                ? "Class Cancellation"
+                : notice.resource_id
+                  ? "Resource Notice"
+                  : "General Notice"}
             </div>
-          ))
-      )}
-      {readers.hasNextPage && (
-        <button
-          disabled={readers.isFetching}
-          onClick={() => readers.fetchNextPage()}
-        >
-          Load 50 more
-        </button>
-      )}
+            {notice.title && (
+              <div className="wa-notice-preview-title">{notice.title}</div>
+            )}
+            {notice.body && (
+              <div className="wa-notice-preview-body">{notice.body}</div>
+            )}
+            <div className="wa-notice-preview-meta">
+              <span>{bubbleTime}</span>
+              <div className="wa-seen-indicator">
+                <DoubleCheckIcon size={15} />
+                <span>Seen by {seenCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Container */}
+        <div className="wa-message-info-body">
+          {/* "Read by" Section Card */}
+          <div className="wa-read-by-section">
+            <div className="wa-read-by-header">
+              <span>Seen by {seenCount}</span>
+              <div className="wa-read-by-badge">
+                <DoubleCheckIcon size={15} />
+              </div>
+            </div>
+
+            <ErrorBox error={readers.error} />
+
+            {readers.isPending ? (
+              <div style={{ padding: "20px" }}>
+                <Skeleton />
+              </div>
+            ) : allReaders.length === 0 ? (
+              <div className="wa-empty-readers">
+                No one has read this notice yet
+              </div>
+            ) : (
+              <div className="wa-readers-list">
+                {allReaders.map((p) => {
+                  return (
+                    <div className="wa-reader-item" key={p.profile_id}>
+                      <ReaderAvatar src={p.avatar_url} name={p.reader_name} />
+                      <div className="wa-reader-meta">
+                        <span className="wa-reader-name truncate" title={p.reader_name}>
+                          {p.reader_name}
+                        </span>
+                        <span className="wa-reader-time">
+                          {p.read_at ? formatStamp(p.read_at) : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {readers.hasNextPage && (
+              <div className="wa-load-more">
+                <button
+                  type="button"
+                  disabled={readers.isFetching}
+                  onClick={() => readers.fetchNextPage()}
+                  className="wa-load-more-btn"
+                >
+                  {readers.isFetching ? "Loading..." : "Load 50 more"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+
+export function NoticeDetailModal({
+  notice,
+  close,
+}: {
+  notice: Row;
+  close: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyNotice = () => {
+    const text = `${notice.title || ""}\n\n${notice.body || ""}`.trim();
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  };
+
+  return (
+    <Modal title={notice.title || "Notice"} close={close}>
+      <div className="notice-detail-modal-shell">
+        <div className="notice-detail-header">
+          <h2 className="notice-detail-title">{notice.title || "Notice"}</h2>
+        </div>
+
+        <div className="notice-detail-body-scroll">
+          {notice.body && (
+            <div className="notice-detail-content">
+              {notice.body.split(/((?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;]*[a-zA-Z0-9+&@#/%=~_|])/g).map((part: string, i: number) =>
+                /^(?:https?:\/\/|www\.)/.test(part) ? (
+                  <a
+                    key={i}
+                    href={part.startsWith("www.") ? `https://${part}` : part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {part}
+                  </a>
+                ) : (
+                  part
+                ),
+              )}
+            </div>
+          )}
+
+          {notice.resource_id && (
+            <div className="notice-detail-resource-card">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <FileText size={22} style={{ color: "var(--primary)" }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                    Attached Resource
+                  </div>
+                  <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                    Available in batch library
+                  </small>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="secondary"
+                style={{ padding: "6px 14px", fontSize: "0.8rem" }}
+                onClick={() =>
+                  openFile(notice.resource_id).catch(() =>
+                    alert("This file is unavailable or your access has changed."),
+                  )
+                }
+              >
+                Open <ExternalLink size={14} style={{ marginLeft: 4 }} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="notice-detail-footer">
+          <button
+            type="button"
+            className="notice-detail-dismiss-btn"
+            onClick={close}
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            className={`notice-detail-copy-btn ${copied ? "copied" : ""}`}
+            onClick={copyNotice}
+          >
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+            <span>{copied ? "Copied!" : "Copy"}</span>
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

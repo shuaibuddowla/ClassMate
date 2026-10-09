@@ -39,11 +39,27 @@ internal object ClassMateFeatureUi {
         hero.addView(TextView(activity).apply { text="DESIGNED & BUILT BY"; textSize=10f; letterSpacing=.18f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_primary)) })
         val photo=ImageView(activity).apply { contentDescription="Developer profile photo"; setImageResource(R.drawable.ic_default_avatar) }
         hero.addView(photo,LinearLayout.LayoutParams(dp(activity,76),dp(activity,76)).apply { topMargin=dp(activity,20); bottomMargin=dp(activity,16) })
-        val heading=TextView(activity).apply { text="ClassMate developer"; gravity=android.view.Gravity.CENTER; textSize=22f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) }
-        hero.addView(heading)
-        val details=TextView(activity).apply { text="Loading developer profile…"; gravity=android.view.Gravity.CENTER; textSize=13f; setPadding(0,dp(activity,10),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) }
-        hero.addView(details)
-        hero.addView(TextView(activity).apply { text="A student-built space for a more connected campus."; gravity=android.view.Gravity.CENTER; textSize=13f; setPadding(0,dp(activity,14),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) })
+        val heading=TextView(activity).apply { text="ClassMate developer"; gravity=android.view.Gravity.CENTER; textAlignment=View.TEXT_ALIGNMENT_CENTER; textSize=22f; setTypeface(null,1); setTextColor(activity.getColor(R.color.cm_text_primary)) }
+        hero.addView(heading, LinearLayout.LayoutParams(-1,-2))
+        val tvDepartment=TextView(activity).apply {
+            text="Loading developer profile…"
+            gravity=android.view.Gravity.CENTER
+            textAlignment=View.TEXT_ALIGNMENT_CENTER
+            textSize=13.5f
+            setPadding(0,dp(activity,10),0,0)
+            setTextColor(activity.getColor(R.color.cm_text_secondary))
+        }
+        hero.addView(tvDepartment, LinearLayout.LayoutParams(-1,-2))
+        val tvBatchSession=TextView(activity).apply {
+            gravity=android.view.Gravity.CENTER
+            textAlignment=View.TEXT_ALIGNMENT_CENTER
+            textSize=12.5f
+            setPadding(0,dp(activity,4),0,0)
+            setTextColor(activity.getColor(R.color.cm_text_secondary))
+            visibility=View.GONE
+        }
+        hero.addView(tvBatchSession, LinearLayout.LayoutParams(-1,-2))
+        hero.addView(TextView(activity).apply { text="A student-built space for a more connected campus."; gravity=android.view.Gravity.CENTER; textAlignment=View.TEXT_ALIGNMENT_CENTER; textSize=13f; setPadding(0,dp(activity,14),0,0); setTextColor(activity.getColor(R.color.cm_text_secondary)) }, LinearLayout.LayoutParams(-1,-2))
         for((label,url) in listOf("Explore my work" to "https://shuaibuddowla.github.io", "Find me on GitHub" to "https://github.com/shuaibuddowla")) {
             val row=LinearLayout(activity).apply {
                 orientation=LinearLayout.HORIZONTAL; gravity=android.view.Gravity.CENTER_VERTICAL
@@ -79,11 +95,21 @@ internal object ClassMateFeatureUi {
                 if(!dialog.isShowing) return@launch
                 heading.text=p.optString("full_name","ClassMate developer")
                 fun value(key:String)=p.optString(key).takeUnless {it.isBlank() || it=="null"}
-                details.text=listOfNotNull(value("department"),value("student_id"),value("batch_number")?.let {"Batch $it"},value("academic_session")?.let {"Session ${ClassMateAcademicSession.format(it)}"}).joinToString(" · ")
+                val dept=value("department") ?: "Computer Science and Engineering"
+                val batch=value("batch_number")?.let {"Batch $it"}
+                val session=value("academic_session")?.let {"Session ${ClassMateAcademicSession.format(it)}"}
+                val batchSession=listOfNotNull(batch, session).joinToString(" · ")
+                tvDepartment.text=dept
+                if(batchSession.isNotBlank()) {
+                    tvBatchSession.text=batchSession
+                    tvBatchSession.visibility=View.VISIBLE
+                } else {
+                    tvBatchSession.visibility=View.GONE
+                }
                 p.optString("avatar_url").takeIf { it.startsWith("https://") }?.let {
                     com.bumptech.glide.Glide.with(activity).load(it).circleCrop().into(photo)
                 }
-            } catch(e:Exception) { if(dialog.isShowing) { details.text="Could not load profile. Tap to retry."; details.setOnClickListener { load() } } }
+            } catch(e:Exception) { if(dialog.isShowing) { tvDepartment.text="Could not load profile. Tap to retry."; tvDepartment.setOnClickListener { load() } } }
         } }
         load()
     }

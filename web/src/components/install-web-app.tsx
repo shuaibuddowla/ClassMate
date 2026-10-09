@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Download, Check } from "lucide-react";
+import { Download, Check, ChevronRight } from "lucide-react";
 import { ErrorBox, Modal } from "./ui";
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -70,7 +70,7 @@ export function InstallProvider({ children }: { children: ReactNode }) {
     </InstallContext.Provider>
   );
 }
-export function InstallWebApp() {
+export function InstallWebApp({ inSettingsRow = false }: { inSettingsRow?: boolean } = {}) {
   const { prompt, installed, clear } = useContext(InstallContext),
     [guide, setGuide] = useState(false),
     [busy, setBusy] = useState(false),
@@ -113,18 +113,45 @@ export function InstallWebApp() {
       setBusy(false);
     }
   }
-  if (installed)
+  if (installed) {
+    if (inSettingsRow) {
+      return (
+        <div className="settings-row">
+          <div className="setting-icon-box emerald">
+            <Check size={18} />
+          </div>
+          <div className="settings-row-text">
+            <span>Web App Installed</span>
+            <small>Active and running on this device</small>
+          </div>
+        </div>
+      );
+    }
     return (
       <span className="web-installed">
         <Check size={17} /> Web app installed
       </span>
     );
+  }
   return (
     <>
-      <button className="install-web-app" disabled={busy} onClick={install}>
-        <Download size={18} />
-        <span>Install web app</span>
-      </button>
+      {inSettingsRow ? (
+        <button className="settings-row" disabled={busy} onClick={install}>
+          <div className="setting-icon-box blue">
+            <Download size={18} />
+          </div>
+          <div className="settings-row-text">
+            <span>Install Web App</span>
+            <small>Add ClassMate to your home screen</small>
+          </div>
+          <ChevronRight size={18} className="chevron" />
+        </button>
+      ) : (
+        <button className="install-web-app" disabled={busy} onClick={install}>
+          <Download size={18} />
+          <span>Install web app</span>
+        </button>
+      )}
       {guide && (
         <Modal title="Install ClassMate" close={() => setGuide(false)}>
           <div className="install-guide">

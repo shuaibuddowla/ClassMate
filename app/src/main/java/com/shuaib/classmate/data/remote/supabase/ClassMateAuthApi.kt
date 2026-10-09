@@ -101,8 +101,17 @@ object ClassMateAuthApi {
 
     suspend fun initializeProfile(): JSONObject = rpc("create_or_initialize_profile", JSONObject())
 
-    suspend fun rpc(name: String, args: JSONObject): JSONObject =
-        JSONObject(request("POST", "/rest/v1/rpc/$name", args, classmate = true))
+    suspend fun rpc(name: String, args: JSONObject): JSONObject {
+        val text = request("POST", "/rest/v1/rpc/$name", args, classmate = true).trim()
+        if (text.isEmpty()) return JSONObject()
+        if (text.startsWith("{")) return JSONObject(text)
+        if (text.startsWith("[")) return JSONObject().put("data", JSONArray(text))
+        return JSONObject().put("result", text.removeSurrounding("\""))
+    }
+
+    suspend fun rpcVoid(name: String, args: JSONObject) {
+        request("POST", "/rest/v1/rpc/$name", args, classmate = true)
+    }
 
     suspend fun rpcText(name: String, args: JSONObject): String =
         request("POST", "/rest/v1/rpc/$name", args, classmate = true)
