@@ -273,42 +273,13 @@ export function AttendanceTeacherModal({
     }
   };
 
-  // 7. Export to Excel (.xlsx) via Edge Function
+  // 7. Export to Excel (.xlsx) client-side
   const handleExport = async () => {
     if (!sessionId) return;
     setExporting(true);
     try {
-      const session = (await client.auth.getSession()).data.session;
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cbskpifgbdbgdmnnxfrh.supabase.co"}/functions/v1/export-attendance`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token || ""}`,
-          },
-          body: JSON.stringify({ session_id: sessionId }),
-        }
-      );
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || "Failed to generate Excel file");
-      }
-
-      const blob = await res.blob();
-      const filename =
-        res.headers.get("x-file-name") ||
-        `Attendance_${courseCode || "Class"}_${new Date().toISOString().split("T")[0]}.xlsx`;
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
+      const { downloadSessionExcel } = await import("@/lib/attendance-excel");
+      await downloadSessionExcel(sessionId, courseCode || "Class");
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Export failed");
     } finally {

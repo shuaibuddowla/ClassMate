@@ -67,53 +67,8 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
   const handleExportCourseMatrix = async (course: TeacherCourse) => {
     try {
       setExportingCourseId(course.semester_course_id);
-      const res = await fetch("/api/export-attendance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${(await ctx.profile)?.id ? "" : ""}`,
-        },
-        body: JSON.stringify({
-          semester_course_id: course.semester_course_id,
-        }),
-      }).catch(async () => {
-        // Fallback directly to edge function url via direct supabase client
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        const { data: session } = await (await import("@/lib/api")).supabase().auth.getSession();
-        const token = session?.session?.access_token || "";
-
-        return fetch(`${supabaseUrl}/functions/v1/export-attendance`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            apikey: supabaseKey || "",
-          },
-          body: JSON.stringify({
-            semester_course_id: course.semester_course_id,
-          }),
-        });
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || "Failed to generate course Excel file");
-      }
-
-      const blob = await res.blob();
-      const filename =
-        res.headers.get("x-file-name") ||
-        `Attendance_Matrix_${course.course_code}_${new Date().toISOString().split("T")[0]}.xlsx`;
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
+      const { downloadCourseMatrixExcel } = await import("@/lib/attendance-excel");
+      await downloadCourseMatrixExcel(course.semester_course_id);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Export failed");
     } finally {
