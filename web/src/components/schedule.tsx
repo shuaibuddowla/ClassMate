@@ -17,6 +17,7 @@ import {
 import { supabase, rpc, rows, type Row } from "@/lib/api";
 import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import { AttendanceScannerModal } from "./attendance-scanner-modal";
+import StudentAttendanceDashboard from "./student-attendance";
 import { useAcademic } from "@/lib/queries";
 import {
   busKind,
@@ -289,6 +290,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
         <div className="segment modes">
           {[
             ["routine", "Class Routine"],
+            ...(ctx.profile.role === "student" ? [["attendance", "My Attendance"]] : []),
             ["bus", "Bus Schedule"],
             ["calendar", "Calendar"],
           ].map(([id, label]) => (
@@ -301,7 +303,9 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </button>
           ))}
         </div>
-        {mode !== "calendar" && (
+        {mode === "attendance" ? (
+          <StudentAttendanceDashboard ctx={ctx} />
+        ) : mode !== "calendar" && (
           <div className="week">
             <button
               className="icon"
@@ -341,7 +345,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
         )}
       </div>
       <ErrorBox error={calendar.error} retry={() => calendar.refetch()} />
-      {mode === "calendar" ? (
+      {mode === "attendance" ? null : mode === "calendar" ? (
         <>
           <CalendarPanel
             month={month}

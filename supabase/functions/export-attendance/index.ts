@@ -33,8 +33,68 @@ Deno.serve(request => withWebCors(request, async (request) => {
 
   const body = await request.json().catch(() => ({}));
   const sessionId = typeof body.session_id === "string" ? body.session_id.trim() : null;
+  const courseOfferingId = typeof body.semester_course_id === "string" ? body.semester_course_id.trim() : null;
+
+  // MODE 1: Full Cumulative Long-Term Course Matrix Export
+  if (courseOfferingId) {
+    const { data: matrix, error: matrixError } = await caller.rpc("course_attendance_matrix", {
+      target_semester_course: courseOfferingId,
+    });
+
+    if (matrixError || !matrix) {
+      return new Response(JSON.stringify({ error: matrixError?.message ?? "Course matrix not found" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const courseCode = matrix.course_code || "Course";
+    const courseTitle = matrix.course_title || "Class";
+    const sessions = matrix.sessions || [];
+    const students = matrix.students || [];
+
+    // Construct flat row objects for SheetJS
+    const rows = students.map((s: any, idx: number) => {
+      const row: Record<string, any> = {
+        "SL": idx + 1,
+        "Student ID / Roll": s.roll || "—",
+        "Student Name": s.full_name || "—",
+      };
+
+      // Add each session date as a column
+      sessions.forEach((sess: any) => {
+        const colHeader = sess.date || sess.session_id.slice(0, 8);
+        const status = s.records?.[sess.session_id];
+        row[colHeader] = status === "present" ? "P" : "A";
+      });
+
+      row["Total Present"] = s.present_count ?? 0;
+      row["Total Classes"] = s.total_sessions ?? sessions.length;
+      row["Percentage %"] = `${s.percentage ?? 0}%`;
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${courseCode} Attendance`);
+
+    const xlsxBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+    const filename = `Attendance_Matrix_${courseCode}_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    return new Response(xlsxBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "x-file-name": filename,
+      },
+    });
+  }
+
+  // MODE 2: Single Session Export
   if (!sessionId) {
-    return new Response(JSON.stringify({ error: "Missing session_id" }), {
+    return new Response(JSON.stringify({ error: "Missing session_id or semester_course_id" }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     });
@@ -86,7 +146,6 @@ Deno.serve(request => withWebCors(request, async (request) => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
 
-  // Generate buffer
   const xlsxBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
   const filename = `Attendance_${courseCode}_${batchName}_${dateStr}.xlsx`;
 

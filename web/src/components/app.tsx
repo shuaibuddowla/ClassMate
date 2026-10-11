@@ -30,6 +30,7 @@ import {
   Smartphone,
   Info,
   Lock,
+  QrCode,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -49,6 +50,7 @@ import { Profile, ProfileForm } from "./profile";
 import { enablePush, removePush, restorePush, syncPushIdentity } from "@/lib/push";
 const ClassMateAI = lazy(() => import("./classmate-ai"));
 const Manage = lazy(() => import("./manage"));
+const TeacherAttendance = lazy(() => import("./teacher-attendance"));
 export type Context = {
   user: string;
   profile: Row;
@@ -860,6 +862,12 @@ function TabDeck({
           <ClassMateAI ctx={active} />
         </Suspense>
       );
+    if (value === "attendance")
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <TeacherAttendance ctx={active} />
+        </Suspense>
+      );
     return value === "timetable" ? (
       <Schedule ctx={active} />
     ) : value === "notices" ? (
@@ -1011,6 +1019,7 @@ function Home({
       if (
         [
           "timetable",
+          "attendance",
           "notices",
           "library",
           "friends",
@@ -1076,11 +1085,13 @@ function Home({
       }
     },
   };
+  const isTeacherOrAdmin = profile.role === "teacher" || owner || profile.role === "admin";
   const destinations = [
     ["timetable", "Timetable", CalendarDays],
+    ...(isTeacherOrAdmin ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
     ["library", "Library", BookOpen],
-    ["friends", profile.role==="teacher" ? "Students" : "Batch", Users],
+    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
     ["profile", "Settings", Settings],
   ] as const;
   const select = (value: string) => {

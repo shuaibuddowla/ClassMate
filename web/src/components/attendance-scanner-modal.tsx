@@ -27,6 +27,41 @@ interface PendingScan {
 
 const PENDING_STORAGE_KEY = "classmate_pending_attendance_scans";
 
+// Synthesize pleasant two-tone confirmation chime using Web Audio API
+function playSuccessChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // Harmonic chord: C5 (523Hz) -> E5 (659Hz) -> G5 (784Hz)
+    const tones = [523.25, 659.25, 783.99];
+    tones.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+      gain.gain.setValueAtTime(0, now + idx * 0.08);
+      gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.08);
+      osc.stop(now + idx * 0.08 + 0.35);
+    });
+
+    // Mobile vibration confirmation
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate([60, 40, 100]);
+    }
+  } catch (e) {
+    console.debug("Web audio chime note:", e);
+  }
+}
+
 export function AttendanceScannerModal({
   initialSessionId,
   courseTitle,
@@ -156,11 +191,13 @@ export function AttendanceScannerModal({
       const res = await submitScan(sessionId, timeWindow, qrToken);
 
       if (res.offline) {
+        playSuccessChime();
         setScanResult({
           status: "offline_saved",
           message: "📡 Saved — will sync automatically when back online",
         });
       } else if (res.success) {
+        playSuccessChime();
         setScanResult({
           status: "success",
           message: "✓ Marked present successfully!",
