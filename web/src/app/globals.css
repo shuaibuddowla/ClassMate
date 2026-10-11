@@ -7318,3 +7318,767 @@ dialog:has(.notice-detail-modal-shell) > header {
   transform: translateX(2px);
   color: #dc2626;
 }
+
+/* ==========================================================================
+   Class Card Attendance Bottom Strip & Modal Styles
+   ========================================================================== */
+.routine-card-container {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden;
+  text-align: left;
+}
+
+.routine-card-container > .schedule-row {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  width: 100%;
+}
+
+.attendance-bottom-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 18px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.attendance-bottom-strip .strip-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attendance-bottom-strip .strip-icon {
+  flex-shrink: 0;
+}
+
+.attendance-bottom-strip .strip-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.attendance-bottom-strip .strip-hint {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+/* Teacher Start: Actionable Purple */
+.attendance-bottom-strip.strip-teacher_start {
+  background: rgba(124, 58, 237, 0.08);
+  border-top: 1px solid rgba(124, 58, 237, 0.18);
+  color: #7c3aed;
+}
+
+.attendance-bottom-strip.strip-teacher_start:hover {
+  background: rgba(124, 58, 237, 0.14);
+}
+
+[data-theme="dark"] .attendance-bottom-strip.strip-teacher_start {
+  background: rgba(139, 92, 246, 0.14);
+  border-top-color: rgba(139, 92, 246, 0.24);
+  color: #c4b5fd;
+}
+
+/* Teacher Live: Pulsing Green */
+.attendance-bottom-strip.strip-teacher_live {
+  background: rgba(16, 185, 129, 0.08);
+  border-top: 1px solid rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.attendance-bottom-strip.strip-teacher_live:hover {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+[data-theme="dark"] .attendance-bottom-strip.strip-teacher_live {
+  background: rgba(16, 185, 129, 0.14);
+  border-top-color: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.strip-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: stripPulse 1.8s infinite;
+}
+
+@keyframes stripPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Student Scan: Actionable Blue */
+.attendance-bottom-strip.strip-student_scan {
+  background: rgba(37, 99, 235, 0.08);
+  border-top: 1px solid rgba(37, 99, 235, 0.18);
+  color: #2563eb;
+}
+
+.attendance-bottom-strip.strip-student_scan:hover {
+  background: rgba(37, 99, 235, 0.14);
+}
+
+[data-theme="dark"] .attendance-bottom-strip.strip-student_scan {
+  background: rgba(59, 130, 246, 0.14);
+  border-top-color: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+/* Attendance Modals Overlay & Shell */
+.attendance-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 15, 29, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.attendance-modal-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.attendance-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.attendance-header-meta h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 6px 0 2px;
+}
+
+.attendance-header-meta p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.attendance-badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.attendance-badge-student {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: stripPulse 1.5s infinite;
+}
+
+.icon-close {
+  background: none;
+  border: none;
+  padding: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.icon-close:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.attendance-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  font-size: 13px;
+}
+
+.attendance-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* QR View */
+.attendance-qr-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.qr-wrapper-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 330px;
+}
+
+.qr-svg-canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 280px;
+  border-radius: 8px;
+}
+
+.qr-loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.qr-rotation-indicator {
+  width: 100%;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qr-countdown-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.qr-countdown-text strong {
+  color: #2563eb;
+}
+
+.qr-progress-track {
+  width: 100%;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.qr-progress-bar {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.9s linear;
+}
+
+.attendance-live-counter-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--soft);
+  padding: 12px 18px;
+  border-radius: 16px;
+}
+
+.counter-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.counter-main .check-icon {
+  color: #10b981;
+}
+
+.counter-main strong {
+  font-size: 16px;
+}
+
+.counter-main span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.attendance-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.attendance-secondary-btn:hover {
+  background: var(--blue-soft);
+  color: var(--primary);
+}
+
+.attendance-actions-footer {
+  width: 100%;
+}
+
+.attendance-close-btn {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 13px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.attendance-close-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+/* Summary & Roster View */
+.attendance-summary-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.summary-stats-banner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  background: var(--soft);
+  padding: 14px;
+  border-radius: 16px;
+}
+
+.summary-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.summary-stat-box .stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.summary-stat-box .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.text-green { color: #10b981; }
+.text-red { color: #ef4444; }
+
+.roster-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.roster-tabs {
+  display: flex;
+  background: var(--soft);
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.roster-tabs button {
+  background: none;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.roster-tabs button.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rejoin-qr-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roster-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px;
+}
+
+.roster-empty {
+  text-align: center;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  transition: background 0.15s;
+}
+
+.roster-row:hover {
+  background: var(--soft);
+}
+
+.roster-student-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.roster-roll {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.roster-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.roster-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roster-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.badge-present {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.badge-absent {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.override-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.override-toggle-btn:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.summary-footer-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.export-excel-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.export-excel-btn:hover {
+  background: #047857;
+}
+
+.attendance-done-btn {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 13px 24px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Scanner Modal Elements */
+.scanner-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.viewfinder-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  height: 320px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewfinder-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewfinder-reticle {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+}
+
+.reticle-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #3b82f6;
+  border-style: solid;
+}
+
+.reticle-corner.top-left { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+.reticle-corner.top-right { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+.reticle-corner.bottom-left { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+.reticle-corner.bottom-right { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+.scanning-laser-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  box-shadow: 0 0 8px #3b82f6;
+  animation: scanLaser 2s infinite ease-in-out;
+}
+
+@keyframes scanLaser {
+  0% { transform: translateY(10px); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(210px); opacity: 0; }
+}
+
+.viewfinder-tip {
+  position: absolute;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.scan-result-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 30px 16px;
+  width: 100%;
+}
+
+.result-icon-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.status-success .result-icon-circle {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.status-offline .result-icon-circle {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.status-error .result-icon-circle {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.result-actions {
+  margin-top: 16px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.retry-scan-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.camera-fallback-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 20px;
+  width: 100%;
+}
+
+.manual-input-area {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--soft);
+  color: var(--text);
+  resize: none;
+}
+
+.manual-submit-btn {
+  width: 100%;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+

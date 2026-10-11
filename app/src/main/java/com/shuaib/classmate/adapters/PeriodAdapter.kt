@@ -54,6 +54,7 @@ class PeriodAdapter(
         b.root.animate().cancel()
         b.root.scaleX = 1f
         b.root.scaleY = 1f
+        b.layoutAttendanceStrip.visibility = View.GONE
 
         val accent = ContextCompat.getColor(context, R.color.cm_primary_light)
         val isLabSession = period.classKind.equals("lab", true) ||

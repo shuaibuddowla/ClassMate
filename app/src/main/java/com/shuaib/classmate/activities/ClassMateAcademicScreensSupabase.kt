@@ -559,9 +559,10 @@ internal class ClassMateAcademicScreensSupabase(
                             profile().optString("role") == "teacher" -> rows(ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.$accountId&active=eq.true")).map { it.getString("semester_course_id") }
                             else -> emptyList()
                         } }
+                        val openAttendance = async { runCatching { ClassMateAuthApi.rows("attendance_sessions", "status=eq.open") }.getOrDefault(JSONArray()) }
                         val names = JSONObject(); val catalog = courses.await()
                         offerings.forEach { names.put(it.getString("id"), catalog[it.getString("course_id")]?.optString("course_title") ?: "Course") }
-                        JSONObject().put("entries", routines.await()).put("names", names).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("saved_at", System.currentTimeMillis())
+                        JSONObject().put("entries", routines.await()).put("names", names).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("attendance", openAttendance.await()).put("saved_at", System.currentTimeMillis())
                     }
                     snapshot = bundle
                 }
@@ -583,6 +584,7 @@ internal class ClassMateAcademicScreensSupabase(
                 detail.getString("semester_course_id") to JSONObject(detail.toString()).put("cancelled", detail.getString("semester_course_id") in cancellations)
             }
             val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
+            val openSessionsMap = rows(data.optJSONArray("attendance") ?: JSONArray()).associateBy { it.optString("routine_slot_id") }
             if (!active(root) || request != timetableRequest || day != selectedDay ||
                 calendarMode || requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
@@ -683,6 +685,79 @@ internal class ClassMateAcademicScreensSupabase(
                 if (item.optString("semester_course_id") in editableCourses) {
                     card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddPeriod(item, day); true }
                     card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddPeriod(item, day) }
+                }
+
+                val slotId = item.optString("id")
+                val slotSession = openSessionsMap[slotId]
+                val hasOpenSession = slotSession != null
+
+                val role = profile().optString("role")
+                val isTeacherViewer = (role == "teacher" && courseId in editableCourses)
+                val isAdminViewer = role == "admin"
+                val isStudentViewer = role == "student"
+
+                val strip = card.findViewById<View>(R.id.layoutAttendanceStrip)
+                val stripText = card.findViewById<TextView>(R.id.tvAttendanceStripText)
+                val stripIcon = card.findViewById<ImageView>(R.id.ivAttendanceStripIcon)
+                val stripAction = card.findViewById<TextView>(R.id.tvAttendanceStripAction)
+
+                if (strip != null && stripText != null && stripIcon != null) {
+                    if (isAdminViewer || isTeacherViewer) {
+                        if (hasOpenSession) {
+                            strip.visibility = View.VISIBLE
+                            strip.setBackgroundColor(android.graphics.Color.parseColor("#1410B981"))
+                            stripText.setTextColor(android.graphics.Color.parseColor("#10B981"))
+                            stripText.text = "Attendance Live · Tap to manage"
+                            stripAction?.setTextColor(android.graphics.Color.parseColor("#10B981"))
+                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#10B981"))
+                            strip.setOnClickListener {
+                                val intent = Intent(activity, ClassMateTeacherLiveAttendanceActivity::class.java).apply {
+                                    putExtra("EXTRA_SLOT_ID", slotId)
+                                    putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
+                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
+                                    putExtra("EXTRA_COURSE_CODE", "")
+                                }
+                                activity.startActivity(intent)
+                            }
+                        } else if (isLive) {
+                            strip.visibility = View.VISIBLE
+                            strip.setBackgroundColor(android.graphics.Color.parseColor("#147C3AED"))
+                            stripText.setTextColor(android.graphics.Color.parseColor("#7C3AED"))
+                            stripText.text = "Take Attendance"
+                            stripAction?.setTextColor(android.graphics.Color.parseColor("#7C3AED"))
+                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#7C3AED"))
+                            strip.setOnClickListener {
+                                val intent = Intent(activity, ClassMateTeacherLiveAttendanceActivity::class.java).apply {
+                                    putExtra("EXTRA_SLOT_ID", slotId)
+                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
+                                    putExtra("EXTRA_COURSE_CODE", "")
+                                }
+                                activity.startActivity(intent)
+                            }
+                        } else {
+                            strip.visibility = View.GONE
+                        }
+                    } else if (isStudentViewer) {
+                        if (hasOpenSession) {
+                            strip.visibility = View.VISIBLE
+                            strip.setBackgroundColor(android.graphics.Color.parseColor("#142563EB"))
+                            stripText.setTextColor(android.graphics.Color.parseColor("#2563EB"))
+                            stripText.text = "Scan Attendance"
+                            stripAction?.setTextColor(android.graphics.Color.parseColor("#2563EB"))
+                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#2563EB"))
+                            strip.setOnClickListener {
+                                val intent = Intent(activity, ClassMateStudentAttendanceScannerActivity::class.java).apply {
+                                    putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
+                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
+                                }
+                                activity.startActivity(intent)
+                            }
+                        } else {
+                            strip.visibility = View.GONE
+                        }
+                    } else {
+                        strip.visibility = View.GONE
+                    }
                 }
             }
             if (!requestedBusMode && effectiveDate == LocalDate.now() && entries.isNotEmpty()) {

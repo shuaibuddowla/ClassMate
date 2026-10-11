@@ -20,9 +20,14 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:minHeight="88dp"
-        android:orientation="horizontal">
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="88dp"
+            android:orientation="horizontal">
 
         <!-- Status Indicator Pill -->
         <FrameLayout
@@ -275,4 +280,43 @@
 
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Conditional Attendance Bottom Strip -->
+    <LinearLayout
+        android:id="@+id/layoutAttendanceStrip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="9dp"
+        android:background="#147C3AED"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ivAttendanceStripIcon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_qr_code" />
+
+        <TextView
+            android:id="@+id/tvAttendanceStripText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Take Attendance"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
+            android:textColor="#7C3AED" />
+
+        <TextView
+            android:id="@+id/tvAttendanceStripAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to open →"
+            android:textSize="11sp"
+            android:textColor="#7C3AED" />
+    </LinearLayout>
+</LinearLayout>
 </com.google.android.material.card.MaterialCardView>

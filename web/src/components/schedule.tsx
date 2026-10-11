@@ -11,8 +11,12 @@ import {
   Trash2,
   Clock3,
   Building2,
+  QrCode,
+  ScanLine,
 } from "lucide-react";
-import { rpc, rows, type Row } from "@/lib/api";
+import { supabase, rpc, rows, type Row } from "@/lib/api";
+import { AttendanceTeacherModal } from "./attendance-teacher-modal";
+import { AttendanceScannerModal } from "./attendance-scanner-modal";
 import { useAcademic } from "@/lib/queries";
 import {
   busKind,
@@ -44,8 +48,80 @@ export function Schedule({ ctx }: { ctx: Context }) {
     [currentTime, setCurrentTime] = useState(dhakaNowTime),
     [editing, setEditing] = useState<Row | null>(null),
     [event, setEvent] = useState<Row | null>(null),
-    [deleting, setDeleting] = useState<Row | null>(null);
+    [deleting, setDeleting] = useState<Row | null>(null),
+    [teacherAttendance, setTeacherAttendance] = useState<{
+      slotId: string;
+      sessionId?: string;
+      courseTitle: string;
+      courseCode?: string;
+    } | null>(null),
+    [studentScanner, setStudentScanner] = useState<{
+      sessionId?: string;
+      courseTitle: string;
+    } | null>(null);
   const qc = useQueryClient();
+
+  const attendanceSessions = useQuery({
+    queryKey: [ctx.user, ctx.batch, "attendance-sessions"],
+    queryFn: async () => {
+      const { data, error } = await supabase()
+        .schema("classmate")
+        .from("attendance_sessions")
+        .select("id, routine_slot_id, started_by, started_at, status")
+        .eq("status", "open");
+      if (error) return {};
+      const map: Record<string, Row> = {};
+      for (const item of data || []) {
+        map[item.routine_slot_id] = item;
+      }
+      return map;
+    },
+    refetchInterval: 12000,
+  });
+
+  const sessionCounts = useQuery({
+    queryKey: [ctx.user, ctx.batch, "attendance-counts", attendanceSessions.data],
+    enabled: Boolean(
+      attendanceSessions.data && Object.keys(attendanceSessions.data).length > 0,
+    ),
+    queryFn: async () => {
+      const sessionIds = Object.values(attendanceSessions.data || {}).map(
+        (s: Row) => s.id,
+      );
+      if (!sessionIds.length) return {};
+      const { data } = await supabase()
+        .schema("classmate")
+        .from("attendance_records")
+        .select("session_id")
+        .in("session_id", sessionIds);
+      const counts: Record<string, number> = {};
+      for (const r of data || []) {
+        counts[r.session_id] = (counts[r.session_id] || 0) + 1;
+      }
+      return counts;
+    },
+    refetchInterval: 5000,
+  });
+
+  useEffect(() => {
+    const channel = supabase()
+      .channel("web:attendance-listener")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "attendance_sessions" },
+        () => attendanceSessions.refetch(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "attendance_records" },
+        () => sessionCounts.refetch(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase().removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     let lastToday = dhakaToday();
@@ -413,99 +489,182 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             s.start_time.slice(0, 5) <= currentTime &&
                             currentTime < s.end_time.slice(0, 5),
                         );
+
+                      const isTeacher =
+                        ctx.profile.role === "teacher" &&
+                        (Boolean(editable.data?.[s.semester_course_id]) || ctx.owner);
+                      const isAdmin = Boolean(ctx.owner || ctx.profile.role === "admin");
+                      const isStudent = ctx.profile.role === "student";
+
+                      const slotSession = attendanceSessions.data?.[s.id];
+                      const hasOpenSession = Boolean(slotSession);
+                      const presentCount = slotSession
+                        ? sessionCounts.data?.[slotSession.id] || 0
+                        : 0;
+
+                      let showAttendanceStrip = false;
+                      let stripType: "teacher_start" | "teacher_live" | "student_scan" =
+                        "teacher_start";
+                      let stripText = "";
+
+                      if (isAdmin || isTeacher) {
+                        if (hasOpenSession) {
+                          showAttendanceStrip = true;
+                          stripType = "teacher_live";
+                          stripText = `Attendance Live · ${presentCount} present`;
+                        } else if (isLive) {
+                          showAttendanceStrip = true;
+                          stripType = "teacher_start";
+                          stripText = "Take Attendance";
+                        }
+                      } else if (isStudent) {
+                        if (hasOpenSession) {
+                          showAttendanceStrip = true;
+                          stripType = "student_scan";
+                          stripText = "Scan Attendance";
+                        }
+                      }
+
+                      if (mode === "bus") {
+                        return (
+                          <button
+                            className="card schedule-row bus-row"
+                            disabled={!canEdit}
+                            key={s.id}
+                            onClick={() => setEditing(s)}
+                          >
+                            <span className="bus-icon">
+                              <Bus />
+                            </span>
+                            <div>
+                              <small>Campus → City</small>
+                              <strong>{formatTime(s.departure_time)}</strong>
+                            </div>
+                            <div>
+                              <small>City → Campus</small>
+                              <strong>
+                                {formatTime(s.city_departure_time)}
+                              </strong>
+                            </div>
+                          </button>
+                        );
+                      }
+
                       return (
-                        <button
-                          className={`card schedule-row ${mode === "routine" ? "routine-row" : "bus-row"} ${detail?.cancelled && mode === "routine" ? "cancelled" : ""}`}
-                          disabled={!canEdit}
+                        <div
+                          className={`card routine-card-container ${detail?.cancelled ? "cancelled" : ""}`}
                           key={s.id}
-                          onClick={() => setEditing(s)}
                         >
-                          {mode === "bus" ? (
-                            <>
-                              <span className="bus-icon">
-                                <Bus />
-                              </span>
-                              <div>
-                                <small>Campus → City</small>
-                                <strong>{formatTime(s.departure_time)}</strong>
-                              </div>
-                              <div>
-                                <small>City → Campus</small>
-                                <strong>
-                                  {formatTime(s.city_departure_time)}
-                                </strong>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="period-time">
-                                <strong>
-                                  <Clock3
-                                    className="period-start-icon"
-                                    size={16}
-                                  />
-                                  <span className="desktop-schedule-label">
-                                    {formatTime(s.start_time)}
-                                  </span>
-                                  <span className="mobile-schedule-label">
-                                    {formatTime(s.start_time).replace(
-                                      /\s*[AP]M$/,
-                                      "",
-                                    )}
-                                  </span>
-                                </strong>
-                                <small>
-                                  <i className="period-end-dot" />
-                                  {formatTime(s.end_time)}
-                                </small>
-                              </div>
-                              <div className="period-course">
-                                <h3>{s.course?.course_title || "Course"}</h3>
-                                <p>
-                                  {detail?.teacher_name &&
-                                  detail.teacher_name !== "null" ? (
-                                    <span>
-                                      <UserRound size={14} />
-                                      {detail.teacher_name}
-                                    </span>
-                                  ) : null}
-                                  {s.room && s.room !== "null" ? (
-                                    <span>
-                                      <Building2 size={14} />
-                                      {/^[0-9]/.test(s.room)
-                                        ? `Room ${s.room}`
-                                        : s.room}
-                                    </span>
-                                  ) : null}
-                                </p>
-                              </div>
-                              <div className="period-status">
-                                <span
-                                  className={`period-tag ${detail?.cancelled ? "red" : isLive ? "live" : ""}`}
-                                >
-                                  {detail?.cancelled
-                                    ? "Cancelled"
-                                    : isLive
-                                      ? "Live now"
-                                      : s.type === "lab"
-                                        ? "Lab"
-                                        : "Class"}
+                          <div
+                            role="button"
+                            tabIndex={canEdit ? 0 : undefined}
+                            className="schedule-row routine-row"
+                            onClick={() => canEdit && setEditing(s)}
+                          >
+                            <div className="period-time">
+                              <strong>
+                                <Clock3
+                                  className="period-start-icon"
+                                  size={16}
+                                />
+                                <span className="desktop-schedule-label">
+                                  {formatTime(s.start_time)}
                                 </span>
-                                <small className="period-duration">
-                                  <Clock3 size={13} />
-                                  {Math.max(
-                                    0,
-                                    Number(s.end_time?.slice(0, 2)) * 60 +
-                                      Number(s.end_time?.slice(3, 5)) -
-                                      (Number(s.start_time?.slice(0, 2)) * 60 +
-                                        Number(s.start_time?.slice(3, 5))),
-                                  )}{" "}
-                                  min
-                                </small>
-                              </div>
-                            </>
+                                <span className="mobile-schedule-label">
+                                  {formatTime(s.start_time).replace(
+                                    /\s*[AP]M$/,
+                                    "",
+                                  )}
+                                </span>
+                              </strong>
+                              <small>
+                                <i className="period-end-dot" />
+                                {formatTime(s.end_time)}
+                              </small>
+                            </div>
+                            <div className="period-course">
+                              <h3>{s.course?.course_title || "Course"}</h3>
+                              <p>
+                                {detail?.teacher_name &&
+                                detail.teacher_name !== "null" ? (
+                                  <span>
+                                    <UserRound size={14} />
+                                    {detail.teacher_name}
+                                  </span>
+                                ) : null}
+                                {s.room && s.room !== "null" ? (
+                                  <span>
+                                    <Building2 size={14} />
+                                    {/^[0-9]/.test(s.room)
+                                      ? `Room ${s.room}`
+                                      : s.room}
+                                  </span>
+                                ) : null}
+                              </p>
+                            </div>
+                            <div className="period-status">
+                              <span
+                                className={`period-tag ${detail?.cancelled ? "red" : isLive ? "live" : ""}`}
+                              >
+                                {detail?.cancelled
+                                  ? "Cancelled"
+                                  : isLive
+                                    ? "Live now"
+                                    : s.type === "lab"
+                                      ? "Lab"
+                                      : "Class"}
+                              </span>
+                              <small className="period-duration">
+                                <Clock3 size={13} />
+                                {Math.max(
+                                  0,
+                                  Number(s.end_time?.slice(0, 2)) * 60 +
+                                    Number(s.end_time?.slice(3, 5)) -
+                                    (Number(s.start_time?.slice(0, 2)) * 60 +
+                                      Number(s.start_time?.slice(3, 5))),
+                                )}{" "}
+                                min
+                              </small>
+                            </div>
+                          </div>
+
+                          {showAttendanceStrip && (
+                            <button
+                              type="button"
+                              className={`attendance-bottom-strip strip-${stripType}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (stripType === "student_scan") {
+                                  setStudentScanner({
+                                    sessionId: slotSession?.id,
+                                    courseTitle: s.course?.course_title || "Class",
+                                  });
+                                } else {
+                                  setTeacherAttendance({
+                                    slotId: s.id,
+                                    sessionId: slotSession?.id,
+                                    courseTitle: s.course?.course_title || "Class",
+                                    courseCode: s.course?.course_code,
+                                  });
+                                }
+                              }}
+                            >
+                              <span className="strip-content">
+                                {stripType === "teacher_start" && (
+                                  <QrCode size={15} className="strip-icon" />
+                                )}
+                                {stripType === "teacher_live" && (
+                                  <span className="strip-live-dot" />
+                                )}
+                                {stripType === "student_scan" && (
+                                  <ScanLine size={15} className="strip-icon" />
+                                )}
+                                <strong className="strip-title">{stripText}</strong>
+                              </span>
+                              <span className="strip-hint">Tap to open →</span>
+                            </button>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -707,6 +866,25 @@ export function Schedule({ ctx }: { ctx: Context }) {
             else await rpc("delete_routine_slot", { target_id: deleting.id });
             await invalidate();
           }}
+        />
+      )}
+      {teacherAttendance && (
+        <AttendanceTeacherModal
+          slotId={teacherAttendance.slotId}
+          sessionId={teacherAttendance.sessionId}
+          courseTitle={teacherAttendance.courseTitle}
+          courseCode={teacherAttendance.courseCode}
+          onClose={() => {
+            setTeacherAttendance(null);
+            attendanceSessions.refetch();
+          }}
+        />
+      )}
+      {studentScanner && (
+        <AttendanceScannerModal
+          initialSessionId={studentScanner.sessionId}
+          courseTitle={studentScanner.courseTitle}
+          onClose={() => setStudentScanner(null)}
         />
       )}
     </div>

@@ -35,6 +35,8 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         var identity = ClassMateAuthApi.notificationIdentity()
         val release = inputData.getString("kind") == "app_update"
         val blood = inputData.getString("kind") == "blood_request"
+        val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update")
+        val attendance = inputData.getString("kind") == "attendance_open"
         if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
@@ -77,8 +79,17 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     "Tap to review the latest update.", UpdateActionActivity.ACTION_PROMPT, notificationId = 3902)
             } else {
                 val key = inputData.getString("record_id") ?: id.toString()
-                val intent = if(blood) Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)
-                    else Intent(context,ClassMateAuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("OPEN_TAB","notices")
+                val intent = when {
+                    attendance -> Intent(context, com.shuaib.classmate.activities.ClassMateStudentAttendanceScannerActivity::class.java).apply {
+                        putExtra("EXTRA_SESSION_ID", inputData.getString("session_id"))
+                        putExtra("EXTRA_COURSE_TITLE", inputData.getString("title"))
+                    }
+                    blood -> Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)
+                    fund -> Intent(context,com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java).apply {
+                        putExtra("batch_id", inputData.getString("batch_id") ?: identity.optString("batch_id"))
+                    }
+                    else -> Intent(context,ClassMateAuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("OPEN_TAB","notices")
+                }
                 val pending = PendingIntent.getActivity(context,key.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 val body = inputData.getString("body") ?: "New class update available"
                 val builder = NotificationCompat.Builder(context,channel).setSmallIcon(R.drawable.ic_classmate_notification)

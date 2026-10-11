@@ -182,7 +182,7 @@ object ClassMateAuthApi {
         semesterCourseId: String?, title: String, mimeType: String, size: Long,
         category: String,
     ): String = withContext(Dispatchers.IO) {
-        require(size in 1..100_000_000) { "File must be between 1 byte and 100 MB" }
+        require(size in 1..500_000_000L) { "File must be between 1 byte and 500 MB" }
         val start = JSONObject(request("POST", "/functions/v1/upload-classmate-resource",
             JSONObject().put("action", "start").put("batch_id", batchId)
                 .put("semester_course_id", semesterCourseId ?: JSONObject.NULL)
