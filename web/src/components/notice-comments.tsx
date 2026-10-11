@@ -54,7 +54,7 @@ export function Comments({
   const commentsQuery = useInfiniteQuery({
     queryKey: [ctx.user, ctx.batch, "comments", notice.id, "root"],
     initialPageParam: null as Row | null,
-    refetchInterval: 15000,
+    refetchInterval: 45000,
     queryFn: ({ pageParam }) =>
       rpc<Row[]>("comment_page", {
         target_notice: notice.id,

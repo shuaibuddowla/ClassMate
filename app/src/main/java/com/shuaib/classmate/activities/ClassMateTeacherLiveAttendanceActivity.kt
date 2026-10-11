@@ -181,7 +181,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                 if (currentSessionId != null) {
                     refreshSummary(currentSessionId)
                 }
-                delay(4000)
+                delay(8000)
             }
         }
     }

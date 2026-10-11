@@ -76,7 +76,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
       }
       return map;
     },
-    refetchInterval: 12000,
+    refetchInterval: 60_000,
   });
 
   const sessionCounts = useQuery({
@@ -100,7 +100,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
       }
       return counts;
     },
-    refetchInterval: 5000,
+    refetchInterval: 60_000,
   });
 
   useEffect(() => {

@@ -85,7 +85,7 @@ Deno.serve(async request=>{
     }
     const completed=await db.rpc("complete_notification_events");
     if(completed.error) throw new Error("Completion unavailable");
-    console.log(JSON.stringify({accepted,failed,cancelled,sent,duration_ms:Date.now()-started,mock}));
+    if(sent>0 || failed>0) console.log(JSON.stringify({accepted,failed,cancelled,sent,duration_ms:Date.now()-started,mock}));
     return Response.json({inspected:prepared.data,delivered:completed.data,accepted,failed,cancelled,sent,completed:completed.data,duration_ms:Date.now()-started,mock});
   } catch { return new Response("Notification service temporarily unavailable",{status:503}); }
 });
