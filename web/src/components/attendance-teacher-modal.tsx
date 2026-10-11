@@ -521,19 +521,9 @@ export function AttendanceTeacherModal({
                   <Download size={16} />
                   <span>{exporting ? "Generating Excel..." : "Export to Excel (.xlsx)"}</span>
                 </button>
-                {status === "open" ? (
-                  <button
-                    className="attendance-close-btn"
-                    onClick={handleCloseSession}
-                    disabled={loading}
-                  >
-                    Close Attendance
-                  </button>
-                ) : (
-                  <button className="attendance-done-btn" onClick={onClose}>
-                    Done
-                  </button>
-                )}
+                <button className="attendance-done-btn" onClick={onClose}>
+                  Done
+                </button>
               </div>
             </div>
           )}

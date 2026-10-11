@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rpc, type Row } from "@/lib/api";
 import { type Context } from "./app";
@@ -12,7 +13,18 @@ import {
   TrendingUp,
   Percent,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+
+interface SessionHistoryItem {
+  session_id: string;
+  date: string;
+  time?: string;
+  room?: string;
+  status: "present" | "absent";
+  marked_at?: string;
+}
 
 interface StudentCourseAttendance {
   semester_course_id: string;
@@ -22,12 +34,9 @@ interface StudentCourseAttendance {
   classes_held: number;
   classes_attended: number;
   percentage: number;
-  recent_history: Array<{
-    session_id: string;
-    date: string;
-    time: string;
-    status: "present" | "absent";
-  }>;
+  attendance_enabled?: boolean;
+  history?: SessionHistoryItem[];
+  recent_history?: SessionHistoryItem[];
 }
 
 interface StudentAttendanceResponse {
@@ -38,6 +47,12 @@ interface StudentAttendanceResponse {
 }
 
 export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
+  const [expandedCourseIds, setExpandedCourseIds] = useState<Record<string, boolean>>({});
+
+  const toggleCourse = (id: string) => {
+    setExpandedCourseIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const query = useQuery({
     queryKey: [ctx.user, ctx.batch, "student-my-attendance"],
     queryFn: () =>
@@ -118,51 +133,105 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
             {courses.map((c) => {
               const isCourseHealthy = c.percentage >= 75;
               const hasClasses = c.classes_held > 0;
+              const isExpanded = Boolean(expandedCourseIds[c.semester_course_id]);
+              const historyList = c.history || c.recent_history || [];
 
               return (
-                <div key={c.semester_course_id} className="course-attendance-card card">
-                  <div className="card-top-row">
-                    <div>
-                      <span className="course-code-tag">{c.course_code}</span>
-                      <h4>{c.course_title}</h4>
+                <div
+                  key={c.semester_course_id}
+                  className={`course-attendance-card card ${isExpanded ? "expanded" : ""}`}
+                >
+                  <div
+                    className="card-clickable-header"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleCourse(c.semester_course_id)}
+                    aria-expanded={isExpanded}
+                  >
+                    <div className="card-top-row">
+                      <div>
+                        <span className="course-code-tag">{c.course_code}</span>
+                        <h4>{c.course_title}</h4>
+                      </div>
+                      <div className="percentage-badge">
+                        <span className={`pct-number ${isCourseHealthy ? "good" : "low"}`}>
+                          {c.percentage}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="percentage-badge">
-                      <span className={`pct-number ${isCourseHealthy ? "good" : "low"}`}>
-                        {c.percentage}%
+
+                    {/* Progress bar */}
+                    <div className="progress-bar-track">
+                      <div
+                        className={`progress-bar-fill ${isCourseHealthy ? "good" : "low"}`}
+                        style={{ width: `${Math.min(100, c.percentage)}%` }}
+                      />
+                    </div>
+
+                    <div className="card-metrics-row">
+                      <span>
+                        Attended: <strong>{c.classes_attended}</strong> / {c.classes_held} classes
+                      </span>
+                      <span className="course-expand-hint">
+                        {isExpanded ? "Hide log" : "View by date"}
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </span>
                     </div>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="progress-bar-track">
-                    <div
-                      className={`progress-bar-fill ${isCourseHealthy ? "good" : "low"}`}
-                      style={{ width: `${Math.min(100, c.percentage)}%` }}
-                    />
-                  </div>
-
-                  <div className="card-metrics-row">
-                    <span>
-                      Attended: <strong>{c.classes_attended}</strong> / {c.classes_held} classes
-                    </span>
-                    <span className="course-type-label">{c.course_type?.toUpperCase()}</span>
-                  </div>
-
-                  {/* Recent session history chips */}
-                  {c.recent_history.length > 0 && (
-                    <div className="recent-history-row">
-                      <small>Recent sessions:</small>
-                      <div className="recent-chips">
-                        {c.recent_history.slice(0, 5).map((h) => (
-                          <span
-                            key={h.session_id}
-                            className={`history-chip ${h.status}`}
-                            title={`${h.date}: ${h.status}`}
-                          >
-                            {h.date.slice(5)}: {h.status === "present" ? "✓" : "✗"}
-                          </span>
-                        ))}
+                  {/* Expandable Date-by-Date Attendance Log */}
+                  {isExpanded && (
+                    <div className="course-history-expanded">
+                      <div className="history-expanded-header">
+                        <span>Attendance by Date ({historyList.length} classes recorded)</span>
                       </div>
+                      {historyList.length === 0 ? (
+                        <p className="history-empty">No class sessions recorded yet for this course.</p>
+                      ) : (
+                        <div className="history-sessions-list">
+                          {historyList.map((h, idx) => {
+                            const isPresent = h.status === "present";
+                            const dObj = new Date(h.date);
+                            const dateStr = !isNaN(dObj.getTime())
+                              ? dObj.toLocaleDateString("en-GB", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })
+                              : h.date;
+
+                            return (
+                              <div
+                                key={h.session_id || idx}
+                                className={`history-session-item ${h.status}`}
+                              >
+                                <div className="session-item-date">
+                                  <Calendar size={14} className="session-icon" />
+                                  <strong>{dateStr}</strong>
+                                  {h.time && <span className="session-item-time">{h.time}</span>}
+                                  {h.room && h.room !== "null" && (
+                                    <span className="session-item-room">· Room {h.room}</span>
+                                  )}
+                                </div>
+                                <div className="session-item-status">
+                                  <span
+                                    className={`status-pill ${
+                                      isPresent ? "pill-present" : "pill-absent"
+                                    }`}
+                                  >
+                                    {isPresent ? (
+                                      <CheckCircle2 size={13} />
+                                    ) : (
+                                      <AlertTriangle size={13} />
+                                    )}
+                                    {isPresent ? "Present" : "Absent"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

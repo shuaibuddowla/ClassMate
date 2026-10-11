@@ -221,6 +221,13 @@ export function Schedule({ ctx }: { ctx: Context }) {
   const kind = busKind(date, events),
     day = parseDate(date).getDay(),
     closed = classesClosed(date, events);
+
+  const isTeacherViewer = ctx.profile.role === "teacher";
+  const rawRoutineEntries = (routine.data || []).filter((s) => s.day_of_week === day);
+  const teacherAssignedEntries = isTeacherViewer
+    ? rawRoutineEntries.filter((s) => Boolean(editable.data?.[s.semester_course_id]))
+    : rawRoutineEntries;
+
   const entries =
     mode === "bus"
       ? (buses.data || []).filter((s) =>
@@ -228,7 +235,38 @@ export function Schedule({ ctx }: { ctx: Context }) {
             ? s.schedule_kind === kind
             : s.weekdays?.includes(day),
         )
-      : (routine.data || []).filter((s) => s.day_of_week === day);
+      : teacherAssignedEntries;
+
+  const isSlotLive = (s: Row) => {
+    if (mode !== "routine" || date !== dhakaToday() || closed) return false;
+    const detail = details.data?.find((d) => d.semester_course_id === s.semester_course_id);
+    if (detail?.cancelled) return false;
+    return Boolean(
+      s.start_time &&
+        s.end_time &&
+        s.start_time.slice(0, 5) <= currentTime &&
+        currentTime < s.end_time.slice(0, 5)
+    );
+  };
+
+  const sortedEntries =
+    mode === "routine" && date === dhakaToday() && !closed
+      ? [
+          ...entries.filter(isSlotLive),
+          ...entries.filter((s) => !isSlotLive(s)),
+        ]
+      : entries;
+
+  const showCalendar = ctx.batchInfo?.calendar_in_timetable !== false;
+  useEffect(() => {
+    if (!showCalendar && mode === "calendar") {
+      setMode("routine");
+    }
+    if (isTeacherViewer && (mode === "bus" || mode === "attendance")) {
+      setMode("routine");
+    }
+  }, [showCalendar, mode, isTeacherViewer]);
+
   const start = parseDate(date);
   start.setDate(start.getDate() - start.getDay());
   const week = Array.from({ length: 7 }, (_, i) => {
@@ -291,8 +329,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
           {[
             ["routine", "Class Routine"],
             ...(ctx.profile.role === "student" ? [["attendance", "My Attendance"]] : []),
-            ["bus", "Bus Schedule"],
-            ["calendar", "Calendar"],
+            ...(ctx.profile.role === "student" ? [["bus", "Bus Schedule"]] : []),
+            ...(showCalendar ? [["calendar", "Calendar"]] : []),
           ].map(([id, label]) => (
             <button
               className={mode === id ? "selected" : ""}
@@ -423,7 +461,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
               </span>
             </h3>
             <span>
-              {entries.length}{" "}
+              {sortedEntries.length}{" "}
               {mode === "bus" ? (
                 "departures"
               ) : (
@@ -436,7 +474,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
           </div>
           {mode === "routine" && closed ? (
             <Empty
-              title={ctx.profile.role === "teacher" ? (date === dhakaToday() ? "You have no classes to take today" : "You have no classes to take on this day") : "No classes today"}
+              title={isTeacherViewer ? (date === dhakaToday() ? "You have no classes today for the selected batch" : "You have no classes on this day for the selected batch") : "No classes today"}
               body={
                 events
                   .filter(
@@ -462,18 +500,28 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   <Skeleton />
                   <Skeleton />
                 </>
-              ) : entries.length === 0 ? (
+              ) : sortedEntries.length === 0 ? (
                 <Empty
-                  title={mode === "routine" && ctx.profile.role === "teacher" ? (date === dhakaToday() ? "You have no classes to take today" : "You have no classes to take on this day") : "Nothing scheduled"}
-                  body={mode === "routine" && ctx.profile.role === "teacher" ? "Your assigned teaching schedule will appear here." : "Schedules will appear here once configured."}
+                  title={
+                    mode === "routine" && isTeacherViewer
+                      ? (date === dhakaToday()
+                          ? "You have no classes today for the selected batch"
+                          : "You have no classes on this day for the selected batch")
+                      : "Nothing scheduled"
+                  }
+                  body={
+                    mode === "routine" && isTeacherViewer
+                      ? "Your assigned courses have no routine slots scheduled on this day."
+                      : "Schedules will appear here once configured."
+                  }
                 />
               ) : (
                 <>
                   {mode === "bus" && (
-                    <BusHero entries={entries} date={date} kind={kind} />
+                    <BusHero entries={sortedEntries} date={date} kind={kind} />
                   )}
                   <div className="schedule-list">
-                    {entries.map((s) => {
+                    {sortedEntries.map((s) => {
                       const detail = details.data?.find(
                         (d) => d.semester_course_id === s.semester_course_id,
                       );
@@ -506,26 +554,32 @@ export function Schedule({ ctx }: { ctx: Context }) {
                         ? sessionCounts.data?.[slotSession.id] || 0
                         : 0;
 
+                      const isAttendanceEnabled = Boolean(
+                        s.course?.attendance_enabled ?? detail?.attendance_enabled
+                      );
+
                       let showAttendanceStrip = false;
                       let stripType: "teacher_start" | "teacher_live" | "student_scan" =
                         "teacher_start";
                       let stripText = "";
 
-                      if (isAdmin || isTeacher) {
-                        if (hasOpenSession) {
-                          showAttendanceStrip = true;
-                          stripType = "teacher_live";
-                          stripText = `Attendance Live · ${presentCount} present`;
-                        } else if (isLive) {
-                          showAttendanceStrip = true;
-                          stripType = "teacher_start";
-                          stripText = "Take Attendance";
-                        }
-                      } else if (isStudent) {
-                        if (hasOpenSession) {
-                          showAttendanceStrip = true;
-                          stripType = "student_scan";
-                          stripText = "Scan Attendance";
+                      if (isAttendanceEnabled) {
+                        if (isAdmin || isTeacher) {
+                          if (hasOpenSession) {
+                            showAttendanceStrip = true;
+                            stripType = "teacher_live";
+                            stripText = `Attendance Live · ${presentCount} present`;
+                          } else if (isLive) {
+                            showAttendanceStrip = true;
+                            stripType = "teacher_start";
+                            stripText = "Take Attendance";
+                          }
+                        } else if (isStudent) {
+                          if (hasOpenSession) {
+                            showAttendanceStrip = true;
+                            stripType = "student_scan";
+                            stripText = "Scan Attendance";
+                          }
                         }
                       }
 
@@ -556,9 +610,15 @@ export function Schedule({ ctx }: { ctx: Context }) {
 
                       return (
                         <div
-                          className={`card routine-card-container ${detail?.cancelled ? "cancelled" : ""}`}
+                          className={`card routine-card-container ${detail?.cancelled ? "cancelled" : ""} ${isLive ? "live-pinned-card" : ""}`}
                           key={s.id}
                         >
+                          {isLive && (
+                            <div className="live-pinned-banner">
+                              <span className="pulse-dot" />
+                              <span>LIVE NOW · Ongoing Period</span>
+                            </div>
+                          )}
                           <div
                             role="button"
                             tabIndex={canEdit ? 0 : undefined}
