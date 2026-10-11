@@ -35,7 +35,7 @@ Deno.serve(request => withWebCors(request, async (request) => {
     const { batch_id, semester_course_id, title, file_type, mime_type, size_bytes, category } = body;
     if (typeof batch_id !== "string" || typeof title !== "string" || !title.trim()
       || typeof file_type !== "string" || typeof mime_type !== "string"
-      || !Number.isSafeInteger(size_bytes) || size_bytes < 1 || size_bytes > 100_000_000
+      || !Number.isSafeInteger(size_bytes) || size_bytes < 1 || size_bytes > 500_000_000
       || !["notes", "slides", "questions", "syllabus", "other"].includes(category)) {
       return new Response("Invalid upload metadata", { status: 400 });
     }
@@ -75,8 +75,8 @@ Deno.serve(request => withWebCors(request, async (request) => {
     if (error || !resource) return new Response("Metadata creation failed", { status: 400 });
     const signedUrl = await getSignedUrl(s3, new PutObjectCommand({
       Bucket: bucket, Key: key, ContentType: mime_type,
-    }), { expiresIn: 120 });
-    return Response.json({ resource_id: resource.id, upload_url: signedUrl, expires_in: 120 },
+    }), { expiresIn: 900 });
+    return Response.json({ resource_id: resource.id, upload_url: signedUrl, expires_in: 900 },
       { headers: { "Cache-Control": "no-store" } });
   }
 

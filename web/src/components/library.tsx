@@ -421,7 +421,7 @@ function UploadForm({
         <label className="upload-area">
           <Upload />
           <strong>{file?.name || "Choose a file"}</strong>
-          <small>Up to 100 MB · shared with your batch</small>
+          <small>Up to 500 MB · shared with your batch</small>
           <input
             type="file"
             required
@@ -431,8 +431,8 @@ function UploadForm({
       }
       submit={async (d) => {
         if (!file) throw new Error("Choose a file.");
-        if (file.size < 1 || file.size > 100_000_000)
-          throw new Error("Choose a file smaller than 100 MB.");
+        if (file.size < 1 || file.size > 500_000_000)
+          throw new Error("Choose a file smaller than 500 MB.");
         await uploadFile(file, {
           batch_id: ctx.batch,
           semester_course_id: d.course || null,

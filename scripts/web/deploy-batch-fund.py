@@ -15,6 +15,7 @@ migrations = [
     ('202610080003', 'batch_fund_profile_link'),
     ('202610080004', 'search_blood_group'),
     ('202610090001', 'batch_fund_aliases'),
+    ('202610100001', 'batch_fund_deposit_notifications'),
 ]
 
 for ref in targets:

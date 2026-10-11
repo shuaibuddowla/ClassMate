@@ -183,12 +183,23 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const kind = event.notification.data?.kind;
+  const isFund = kind === "batch_fund_deposit" || kind === "batch_fund_update";
   const path =
-    kind === "blood_request" ? "friends/blood" : ["release","app_update"].includes(kind) ? "profile" : kind === "file" ? "library" : "notices";
+    kind === "blood_request"
+      ? "friends/blood"
+      : isFund
+        ? "friends/fund"
+        : ["release", "app_update"].includes(kind)
+          ? "profile"
+          : kind === "file"
+            ? "library"
+            : "notices";
   const target =
-    ["release","app_update"].includes(kind)
+    ["release", "app_update"].includes(kind)
       ? "/#profile"
-      : `/#${path}/${encodeURIComponent(event.notification.data?.record || "")}`;
+      : isFund
+        ? "/#friends/fund"
+        : `/#${path}/${encodeURIComponent(event.notification.data?.record || "")}`;
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
