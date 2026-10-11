@@ -212,7 +212,7 @@ begin
   set status = 'closed', closed_at = now()
   where routine_slot_id = target_slot and status = 'open';
 
-  sec := coalesce(nullif(trim(client_secret), ''), encode(gen_random_bytes(24), 'hex'));
+  sec := coalesce(nullif(trim(client_secret), ''), encode(extensions.gen_random_bytes(24), 'hex'));
 
   insert into classmate.attendance_sessions (routine_slot_id, started_by, session_secret, status)
   values (target_slot, auth.uid(), sec, 'open')

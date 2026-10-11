@@ -142,9 +142,15 @@ export function AttendanceTeacherModal({
             setStatus(sessRow.status as "open" | "closed");
           }
         }
-      } catch (err: unknown) {
+      } catch (err: any) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Failed to start attendance session");
+          console.error("Attendance session init error:", err);
+          const msg =
+            err?.message ||
+            err?.details ||
+            err?.error_description ||
+            (typeof err === "string" ? err : "Failed to start attendance session");
+          setError(msg);
         }
       } finally {
         if (active) setLoading(false);
