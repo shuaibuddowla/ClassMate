@@ -10,6 +10,22 @@ alter table classmate.semester_courses
   add column if not exists attendance_enabled boolean not null default false;
 
 -- ============================================================================
+-- 1.5 Batch Management Permission Helper
+-- ============================================================================
+create or replace function classmate.can_manage_batch(target_batch uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select classmate.is_owner() or exists (
+    select 1 from classmate.profiles p
+    where p.id = (select auth.uid()) and p.verification_status = 'active'
+      and ((p.role = 'student' and p.is_cr and p.batch_id = target_batch
+        and (p.cr_valid_until is null or p.cr_valid_until > now()))
+      or p.role = 'admin')
+  );
+$$;
+revoke all on function classmate.can_manage_batch(uuid) from public, anon;
+grant execute on function classmate.can_manage_batch(uuid) to authenticated;
+
+-- ============================================================================
 -- 2. Batch Timetable Calendar Toggle RPC
 -- ============================================================================
 create or replace function classmate.toggle_batch_calendar_in_timetable(

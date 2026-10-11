@@ -1,6 +1,7 @@
 "use client";
 import { academicSession } from "@/lib/academic-session";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Shield,
   Bell,
@@ -113,6 +114,7 @@ export function Profile({
   setTheme: (s: string) => void;
   signOut: () => Promise<void>;
 }) {
+  const qc = useQueryClient();
   const [editing, setEditing] = useState(false),
     [developerOpen, setDeveloperOpen] = useState(false),
     [receiptsEnabled, setReceiptsEnabled] = useState(true),
@@ -634,6 +636,10 @@ export function Profile({
                     enabled: next,
                   });
                   setCalendarInTimetable(next);
+                  if (ctx.batchInfo) {
+                    ctx.batchInfo.calendar_in_timetable = next;
+                  }
+                  qc.invalidateQueries({ queryKey: [ctx.user, "account", "batches"] });
                   ctx.refreshProfile(ctx.profile);
                 } catch (e) {
                   alert(e instanceof Error ? e.message : "Failed to update calendar toggle");

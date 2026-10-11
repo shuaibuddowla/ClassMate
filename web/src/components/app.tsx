@@ -863,7 +863,7 @@ function TabDeck({
         </Suspense>
       );
     if (value === "attendance") {
-      if (ctx.profile.role !== "teacher" && ctx.profile.role !== "admin") {
+      if (ctx.profile.role !== "teacher") {
         return <Schedule ctx={active} />;
       }
       return (
@@ -1032,7 +1032,7 @@ function Home({
           "ai",
         ].includes(targetTab)
       ) {
-        if (targetTab === "attendance" && profile.role !== "teacher" && profile.role !== "admin") {
+        if (targetTab === "attendance" && profile.role !== "teacher") {
           setTab("timetable");
         } else {
           setTab(targetTab);
@@ -1094,10 +1094,10 @@ function Home({
       }
     },
   };
-  const isTeacherOrAdmin = profile.role === "teacher" || profile.role === "admin";
+  const isTeacher = profile.role === "teacher";
   const destinations = [
     ["timetable", "Timetable", CalendarDays],
-    ...(isTeacherOrAdmin ? [["attendance", "Attendance", QrCode] as const] : []),
+    ...(isTeacher ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
     ["library", "Library", BookOpen],
     ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
