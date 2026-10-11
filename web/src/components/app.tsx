@@ -862,12 +862,16 @@ function TabDeck({
           <ClassMateAI ctx={active} />
         </Suspense>
       );
-    if (value === "attendance")
+    if (value === "attendance") {
+      if (ctx.profile.role !== "teacher" && ctx.profile.role !== "admin") {
+        return <Schedule ctx={active} />;
+      }
       return (
         <Suspense fallback={<Skeleton />}>
           <TeacherAttendance ctx={active} />
         </Suspense>
       );
+    }
     return value === "timetable" ? (
       <Schedule ctx={active} />
     ) : value === "notices" ? (
@@ -1027,8 +1031,13 @@ function Home({
           "manage",
           "ai",
         ].includes(targetTab)
-      )
-        setTab(targetTab);
+      ) {
+        if (targetTab === "attendance" && profile.role !== "teacher" && profile.role !== "admin") {
+          setTab("timetable");
+        } else {
+          setTab(targetTab);
+        }
+      }
       if (!id || !["notices", "library"].includes(hash) || !navigator.onLine)
         return;
       if (!/^[0-9a-f-]{36}$/i.test(id)) return;
@@ -1085,7 +1094,7 @@ function Home({
       }
     },
   };
-  const isTeacherOrAdmin = profile.role === "teacher" || owner || profile.role === "admin";
+  const isTeacherOrAdmin = profile.role === "teacher" || profile.role === "admin";
   const destinations = [
     ["timetable", "Timetable", CalendarDays],
     ...(isTeacherOrAdmin ? [["attendance", "Attendance", QrCode] as const] : []),
