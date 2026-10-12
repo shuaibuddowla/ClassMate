@@ -146,8 +146,26 @@
                     android:gravity="center"
                     android:text="Class Routine"
                     android:textColor="#FFFFFF"
-                    android:textSize="12.5sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:clickable="true"
+                    android:focusable="true"/>
+
+                <TextView
+                    android:id="@+id/btnToggleAttendance"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:gravity="center"
+                    android:text="My Attendance"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:clickable="true"
                     android:focusable="true"/>
 
@@ -160,17 +178,27 @@
                     android:gravity="center"
                     android:text="Bus Schedule"
                     android:textColor="@color/cm_text_secondary"
-                    android:textSize="12.5sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:clickable="true"
                     android:focusable="true"/>
 
                 <TextView
                     android:id="@+id/btnToggleCalendar"
-                    android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-                    android:gravity="center" android:text="Calendar" android:textSize="12.5sp"
-                    android:textStyle="bold" android:textColor="@color/cm_text_secondary"
-                    android:clickable="true" android:focusable="true" />
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Calendar"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textColor="@color/cm_text_secondary"
+                    android:clickable="true"
+                    android:focusable="true" />
 
             </LinearLayout>
 

@@ -11,7 +11,7 @@ interface SessionHistoryItem {
   date: string;
   time?: string;
   room?: string;
-  status: "present" | "absent";
+  status: "present" | "absent" | "late";
   marked_at?: string;
 }
 
@@ -42,6 +42,7 @@ function healthColor(pct: number): string {
 
 export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [showAllHistory, setShowAllHistory] = useState<Record<string, boolean>>({});
 
   const query = useQuery({
     queryKey: [ctx.user, ctx.batch, "student-my-attendance"],
@@ -68,19 +69,34 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
   const overallPercentage = data?.overall_percentage ?? 0;
   const totalHeld = data?.total_classes_held ?? 0;
   const totalAttended = data?.total_classes_attended ?? 0;
-  const overallColor = healthColor(overallPercentage);
+
+  const activeCourse =
+    courses.length === 1
+      ? courses[0]
+      : courses.find((c) => c.semester_course_id === selectedCourseId);
+
+  const displayPct = activeCourse ? activeCourse.percentage : overallPercentage;
+  const displayColor = healthColor(displayPct);
+
+  const summaryText = activeCourse
+    ? activeCourse.classes_held === 0
+      ? `No classes held yet in ${activeCourse.course_code}`
+      : `${activeCourse.classes_attended} of ${activeCourse.classes_held} classes attended in ${activeCourse.course_code}`
+    : courses.length > 1
+    ? totalHeld === 0
+      ? `No classes held yet across ${courses.length} tracked courses`
+      : `${totalAttended} of ${totalHeld} classes attended across ${courses.length} tracked courses`
+    : `${totalAttended} of ${totalHeld} classes attended`;
 
   return (
     <div className="attendance-student-section">
       {/* Top strip: one line, big bold number */}
       <div className="attendance-summary-strip">
-        <span className="attendance-big-pct" style={{ color: overallColor }}>
-          {overallPercentage}%
+        <span className="attendance-big-pct" style={{ color: displayColor }}>
+          {displayPct}%
         </span>
         <span className="attendance-summary-sep">·</span>
-        <span className="attendance-summary-text">
-          {totalAttended} of {totalHeld} classes attended
-        </span>
+        <span className="attendance-summary-text">{summaryText}</span>
       </div>
 
       {/* Plain list of course cards */}
@@ -143,40 +159,64 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                     {history.length === 0 ? (
                       <p className="attendance-history-empty">No class sessions recorded yet.</p>
                     ) : (
-                      history.map((h, idx) => {
-                        const dObj = new Date(h.date);
-                        const dateStr = !isNaN(dObj.getTime())
-                          ? dObj.toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : h.date;
-                        const timeStr = h.time ? ` · ${h.time}` : "";
-                        const isPresent = h.status === "present";
+                      <>
+                        {(showAllHistory[c.semester_course_id]
+                          ? history
+                          : history.slice(0, 4)
+                        ).map((h, idx) => {
+                          const dObj = new Date(h.date);
+                          const dateStr = !isNaN(dObj.getTime())
+                            ? dObj.toLocaleDateString("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : h.date;
+                          const timeStr = h.time ? ` · ${h.time}` : "";
+                          const isPresent = h.status === "present";
+                          const isLate = h.status === "late";
 
-                        return (
-                          <div
-                            key={h.session_id || idx}
-                            className="attendance-history-row"
-                          >
-                            <span className="attendance-history-date">
-                              {dateStr}
-                              {timeStr}
-                            </span>
-                            <span
-                              className="attendance-history-status"
-                              style={{
-                                color: isPresent
-                                  ? "var(--green, #22c55e)"
-                                  : "var(--red, #ef4444)",
-                              }}
+                          return (
+                            <div
+                              key={h.session_id || idx}
+                              className="attendance-history-row"
                             >
-                              {isPresent ? "✓ Present" : "✗ Absent"}
-                            </span>
-                          </div>
-                        );
-                      })
+                              <span className="attendance-history-date">
+                                {dateStr}
+                                {timeStr}
+                              </span>
+                              <span
+                                className="attendance-history-status"
+                                style={{
+                                  color: isPresent
+                                    ? "var(--green, #22c55e)"
+                                    : isLate
+                                    ? "var(--amber, #f59e0b)"
+                                    : "var(--red, #ef4444)",
+                                }}
+                              >
+                                {isPresent ? "✓ Present" : isLate ? "⏰ Late" : "✗ Absent"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {history.length > 4 && (
+                          <button
+                            type="button"
+                            className="attendance-view-all-btn"
+                            onClick={() =>
+                              setShowAllHistory((prev) => ({
+                                ...prev,
+                                [c.semester_course_id]: !prev[c.semester_course_id],
+                              }))
+                            }
+                          >
+                            {showAllHistory[c.semester_course_id]
+                              ? "Show less"
+                              : `View all (${history.length} sessions)`}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

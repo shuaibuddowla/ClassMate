@@ -71,6 +71,7 @@ internal class ClassMateAcademicScreensSupabase(
     private var lastTimetableSetupDate = LocalDate.now()
     private var busMode = false
     private var calendarMode = false
+    private var attendanceMode = false
     private val calendarData = ClassMateCalendarData(activity) { profile().optString("id") }
     private fun busDayKind() = calendarData.kindFor(selectedScheduleDate())
     private var timetableRequest = 0
@@ -166,6 +167,8 @@ internal class ClassMateAcademicScreensSupabase(
                             setupTimetable(root)
                         } else if(calendarMode) {
                             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show()
+                        } else if(attendanceMode) {
+                            (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)?.show()
                         } else {
                             loadTimetable(root)
                         }
@@ -254,6 +257,9 @@ internal class ClassMateAcademicScreensSupabase(
         }
         if (tab == R.id.nav_timetable) {
             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
+                react(y - oldY, y == 0)
+            }
+            (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
                 react(y - oldY, y == 0)
             }
         }
@@ -391,41 +397,56 @@ internal class ClassMateAcademicScreensSupabase(
         }
         updateDayPills(root)
         val routine = root.v<TextView>(R.id.btnToggleRoutine)
+        val attendance = root.v<TextView>(R.id.btnToggleAttendance)
         val bus = root.v<TextView>(R.id.btnToggleBus)
         val calendar = root.v<TextView>(R.id.btnToggleCalendar)
+        val isTeacher = profile().optString("role") == "teacher"
+        attendance.visibility = if (isTeacher) View.GONE else View.VISIBLE
         val calendarUi = (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)
             ?: ClassMateCalendarUi(activity, scope, calendarData) { profile().optString("role") == "admin" }.also {
                 root.setTag(R.id.btnToggleCalendar, it)
                 (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
             }
+        val attendanceUi = (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)
+            ?: ClassMateStudentAttendanceUi(activity, scope, batchId).also {
+                root.setTag(R.id.btnToggleAttendance, it)
+                (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            }
         fun updateToggle() {
-            val special = calendarMode || busMode
-            text(root, R.id.tvUserName, if (calendarMode) "Academic calendar" else if (busMode) "Campus buses" else name)
-            text(root, R.id.tvGreeting, if (calendarMode) "Your university, month by month" else if (busMode) "Student transport" else greetings[LocalDate.now().dayOfYear % greetings.size])
+            val special = calendarMode || busMode || attendanceMode
+            text(root, R.id.tvUserName, if (calendarMode) "Academic calendar" else if (busMode) "Campus buses" else if (attendanceMode) "My Attendance" else name)
+            text(root, R.id.tvGreeting, if (calendarMode) "Your university, month by month" else if (busMode) "Student transport" else if (attendanceMode) "Academic eligibility" else greetings[LocalDate.now().dayOfYear % greetings.size])
             root.v<View>(R.id.tvGreetingWave).visibility = if (special) View.GONE else View.VISIBLE
             root.v<View>(R.id.busSummary).visibility = View.GONE
-            root.v<View>(R.id.daySelector).visibility = if (calendarMode) View.GONE else View.VISIBLE
-            root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode) View.GONE else View.VISIBLE
+            root.v<View>(R.id.daySelector).visibility = if (calendarMode || attendanceMode) View.GONE else View.VISIBLE
+            root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode || attendanceMode) View.GONE else View.VISIBLE
             calendarUi.scroll.visibility = if (calendarMode) View.VISIBLE else View.GONE
+            attendanceUi.scroll.visibility = if (attendanceMode) View.VISIBLE else View.GONE
+            val isRoutine = !busMode && !calendarMode && !attendanceMode
+            routine.setBackgroundResource(if (isRoutine) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            routine.setTextColor(activity.getColor(if (isRoutine) android.R.color.white else R.color.cm_text_secondary))
+            attendance.setBackgroundResource(if (attendanceMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            attendance.setTextColor(activity.getColor(if (attendanceMode) android.R.color.white else R.color.cm_text_secondary))
+            bus.setBackgroundResource(if (busMode && !calendarMode && !attendanceMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            bus.setTextColor(activity.getColor(if (busMode && !calendarMode && !attendanceMode) android.R.color.white else R.color.cm_text_secondary))
             calendar.setBackgroundResource(if (calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             calendar.setTextColor(activity.getColor(if (calendarMode) android.R.color.white else R.color.cm_text_secondary))
-            routine.setBackgroundResource(if (busMode || calendarMode) android.R.color.transparent else R.drawable.bg_toggle_item_selected)
-            bus.setBackgroundResource(if (busMode && !calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
-            routine.setTextColor(activity.getColor(if (busMode || calendarMode) R.color.cm_text_secondary else android.R.color.white))
-            bus.setTextColor(activity.getColor(if (busMode && !calendarMode) android.R.color.white else R.color.cm_text_secondary))
             val timetable = com.shuaib.classmate.databinding.FragmentTimetableBinding.bind(root)
             timetable.tvAddPeriod.text = if (busMode) "Add Bus" else "Add Period"
             timetable.btnAddPeriod.apply {
                 val canEdit = if (busMode) canEditBus()
                     else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
-                visibility = if (canEdit && !calendarMode) View.VISIBLE else View.GONE
+                visibility = if (canEdit && !calendarMode && !attendanceMode) View.VISIBLE else View.GONE
                 setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
             }
-            if (calendarMode) { timetableRequest++; calendarUi.show() } else loadTimetable(root)
+            if (calendarMode) { timetableRequest++; calendarUi.show() }
+            else if (attendanceMode) { attendanceUi.show() }
+            else loadTimetable(root)
         }
-        routine.setOnClickListener { if(busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; updateToggle() }
-        bus.setOnClickListener { if(!busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = true; calendarMode = false; updateToggle() }
-        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); calendarMode = true; updateToggle() }
+        routine.setOnClickListener { if(busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; attendanceMode = false; updateToggle() }
+        attendance.setOnClickListener { if(!attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); attendanceMode = true; busMode = false; calendarMode = false; updateToggle() }
+        bus.setOnClickListener { if(!busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = true; calendarMode = false; attendanceMode = false; updateToggle() }
+        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); calendarMode = true; busMode = false; attendanceMode = false; updateToggle() }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
     }
@@ -2108,15 +2129,24 @@ internal class ClassMateAcademicScreensSupabase(
         val semesters = if (batchId().isBlank()) JSONArray() else ClassMateAuthApi.rows("semesters",
             "select=semester_number&batch_id=eq.${batchId()}&status=eq.active&limit=1")
         if (!root.isAttachedToWindow) return@launch
-        val details = listOf(
-            "Email: ${account.optString("email")}",
-            "Role: ${account.optString("role")}",
-            "Department: $department",
-            "Assigned batch: $batch",
-            "Current semester: ${semesters.optJSONObject(0)?.optInt("semester_number") ?: "None"}",
-            "CR: ${if (account.optBoolean("is_cr")) "Yes" else "No"}",
-            "Verification: ${account.optString("verification_status")}",
-        ).joinToString("\n")
+        val isTeacher = account.optString("role") == "teacher"
+        val details = if (isTeacher) {
+            listOf(
+                "Email: ${account.optString("email")}",
+                "Role: Teacher",
+                "Verification: ${account.optString("verification_status")}",
+            ).joinToString("\n")
+        } else {
+            listOf(
+                "Email: ${account.optString("email")}",
+                "Role: ${account.optString("role")}",
+                "Department: $department",
+                "Assigned batch: $batch",
+                "Current semester: ${semesters.optJSONObject(0)?.optInt("semester_number") ?: "None"}",
+                "CR: ${if (account.optBoolean("is_cr")) "Yes" else "No"}",
+                "Verification: ${account.optString("verification_status")}",
+            ).joinToString("\n")
+        }
         AlertDialog.Builder(activity).setTitle("Profile details").setMessage(details)
             .setPositiveButton("Close", null)
             .apply {
