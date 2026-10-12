@@ -319,6 +319,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "YOUR UNIVERSITY, MONTH BY MONTH"
               ) : mode === "bus" ? (
                 "STUDENT TRANSPORT"
+              ) : mode === "attendance" ? (
+                "ACADEMIC ELIGIBILITY"
               ) : isTeacherViewer ? (
                 teacherGreeting.eyebrow
               ) : (
@@ -335,6 +337,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "Academic calendar"
               ) : mode === "bus" ? (
                 "Campus buses"
+              ) : mode === "attendance" ? (
+                "My Attendance"
               ) : isTeacherViewer ? (
                 <>
                   {teacherGreeting.greeting}
@@ -362,6 +366,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </h1>
           </div>
           {mode !== "calendar" &&
+            mode !== "attendance" &&
             (mode === "bus"
               ? busPermission.data
               : Object.values(editable.data || {}).some(Boolean)) && (
@@ -387,9 +392,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </button>
           ))}
         </div>
-        {mode === "attendance" ? (
-          <StudentAttendanceDashboard ctx={ctx} />
-        ) : mode !== "calendar" && (
+        {mode !== "calendar" && mode !== "attendance" && (
           <div className="week">
             <button
               className="icon"
@@ -429,7 +432,9 @@ export function Schedule({ ctx }: { ctx: Context }) {
         )}
       </div>
       <ErrorBox error={calendar.error} retry={() => calendar.refetch()} />
-      {mode === "attendance" ? null : mode === "calendar" ? (
+      {mode === "attendance" ? (
+        <StudentAttendanceDashboard ctx={ctx} />
+      ) : mode === "calendar" ? (
         <>
           <CalendarPanel
             month={month}

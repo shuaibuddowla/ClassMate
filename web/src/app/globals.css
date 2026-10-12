@@ -8197,6 +8197,18 @@ dialog:has(.notice-detail-modal-shell) > header {
    Simplified Attendance UI (Student & Teacher) — Matching Timetable
    ============================================================================ */
 
+.attendance-student-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+}
+
+@media (max-width: 700px) {
+  .attendance-student-section {
+    margin: 14px 4px 0;
+  }
+}
+
 /* Top summary strip: one line, big bold number */
 .attendance-summary-strip {
   display: flex;
