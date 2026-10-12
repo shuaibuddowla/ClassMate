@@ -234,15 +234,17 @@ function SessionApp() {
               };
           }
         }
-        if (sessionStorage.getItem("classmate:sign-in-mode") === "teacher" && p.role !== "teacher") {
-          sessionStorage.removeItem("classmate:sign-in-mode");
-          await client.auth.signOut({scope:"local"});
-          throw new Error("This email is not approved as a teacher. Ask your administrator to approve your email and assign a course.");
-        }
-        if (sessionStorage.getItem("classmate:sign-in-mode") === "student" && !p.email?.toLowerCase().endsWith("@mbstu.ac.bd")) {
-          sessionStorage.removeItem("classmate:sign-in-mode");
-          await client.auth.signOut({scope:"local"});
-          throw new Error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.");
+        if (p.role !== "admin") {
+          if (sessionStorage.getItem("classmate:sign-in-mode") === "teacher" && p.role !== "teacher") {
+            sessionStorage.removeItem("classmate:sign-in-mode");
+            await client.auth.signOut({scope:"local"});
+            throw new Error("This email is not approved as a teacher. Ask your administrator to approve your email and assign a course.");
+          }
+          if (sessionStorage.getItem("classmate:sign-in-mode") === "student" && !p.email?.toLowerCase().endsWith("@mbstu.ac.bd")) {
+            sessionStorage.removeItem("classmate:sign-in-mode");
+            await client.auth.signOut({scope:"local"});
+            throw new Error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.");
+          }
         }
         sessionStorage.removeItem("classmate:sign-in-mode");
         if (!live) return;
@@ -333,7 +335,6 @@ function SessionApp() {
         options: {
           redirectTo: `${location.origin}/auth/callback`,
           queryParams: {
-            ...(roleMode === "student" ? { hd: "mbstu.ac.bd" } : {}),
             prompt: "select_account",
           },
         },
