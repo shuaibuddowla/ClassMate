@@ -708,6 +708,21 @@ This table documents real bugs encountered, exact root causes diagnosed, files m
 | **Short notices (< 6 lines) expanding and appending `see less`**. | Line count calculation did not account for unconstrained preview dimensions. | `ClassMateNoticeText.kt`, `notices.tsx` | Strictly omitted `... see more` and prevented expansion for notices with 6 lines or fewer. |
 | **URL taps in notice cards triggering parent card ripple / expansion**. | Touch events on URL clickable spans bubbled up to parent `CardView` `setOnClickListener`. | `ClassMateNoticeText.kt` | Custom movement method consumes touch events on clickable span interactions, preventing bubbling to parent cards. |
 | **Teacher profiles appearing in student Batch directory**. | Query fetched all department profiles without filtering out faculty accounts. | `ClassMateFriendsScreen.kt`, `friends.tsx` | Filtered profiles by student role, keeping faculty visible only in faculty directory. |
+| **Batch Fund deposit notifications broadcast to all batch students instead of single depositor**. | In `classmate.notification_recipients`, `academic_notification_recipients` was unconditionally executed and unioned. Because deposit events had `batch_id` attached, all 28 batch students were returned and authorized. | `202610100001_batch_fund_deposit_notifications.sql`, `ClassMatePushWorker.kt` | Scoped `academic_notification_recipients` and `academic_notification_device_allowed` strictly to academic event kinds (`notice`, `file`, etc.). Isolated deposit events solely to `student_profile_id`. |
+| **Perceived Supabase database limit exhaustion (~268 MB / 500 MB)**. | Rogue table `public.audit_log` reached 242 MB (343,679 rows) due to automated cloud catalog sync calling `sync_archive_catalog` every minute, writing 20–40 rows per minute even when no data changed. Actual ClassMate data was only ~4.35 MB. | `public.audit_log`, `catalog_sync` triggers | Disabling/truncating runaway audit triggers on automated background syncs immediately reclaims ~240 MB, restoring ~485 MB of headroom. |
+| **Empty B-Tree index bloat on `classmate.notice_reads` (~57.6 MB on 0 rows)**. | Synthetic capacity test fixtures (`fixtures.py`) inserted 250k rows and deleted them via cascading delete. PostgreSQL MVCC retains allocated 8 KB index pages on disk after deletes. | `classmate.notice_reads` indexes | Execute non-blocking `REINDEX TABLE CONCURRENTLY classmate.notice_reads; VACUUM (ANALYZE);` to reclaim ~57 MB disk space. |
+| **Student "Your Academic Batch" in Settings taking regular students to Admin Workspace**. | Click action on batch card unconditionally opened Admin Workspace / "Choose Your Classroom" rather than checking user's server-side claims. | `classmate_profile.xml`, `ClassMateAcademicScreensSupabase.kt` | Restricted Admin Workspace to global admins/owners verified via server claims; students are strictly confined to their enrolled batch view. |
+| **ClassMate AI configuration card appearing for Class Representatives in Settings**. | Permissions check permitted CRs to view AI config card designed exclusively for administrators. | `ClassMateAcademicScreensSupabase.kt`, `profile.tsx` | Restricted ClassMate AI visibility strictly to global Admin/Owner role. |
+| **Misplaced delete icon far from text in "Clear Cache" button**. | Button layout placed a delete trash icon with stretched gravity / wide spacing away from the label. | `classmate_profile.xml` | Removed the detached delete icon from the Clear Cache button for clean typography alignment. |
+| **Student ID displayed in "About Developer" in Settings**. | Developer info card displayed internal university student roll number along with session and department. | `classmate_profile.xml` | Removed student ID, centered "Computer Science and Engineering", and cleanly formatted Batch 22 Session 2021-22. |
+| **`function classmate.can_manage_batch(uuid) does not exist`** when toggling batch settings or attendance. | `classmate.can_manage_batch` was previously defined only with a `text` argument; PostgreSQL strict type resolution failed when invoked with `uuid` parameters. | `202610110004_attendance_and_timetable_refinements.sql`, `profile.tsx` | Added overloaded security definer function `classmate.can_manage_batch(target_batch uuid)` checking owner/CR/admin permissions. |
+| **Attendance Excel export failed in production ("Failed to generate course Excel file")**. | Supabase Edge Function `export-attendance` encountered timeout or memory limits when assembling heavy multi-session attendance matrices for entire batches. | `web/src/lib/attendance-excel.ts`, `web/src/components/teacher-attendance.tsx` | Implemented pure client-side SheetJS generation (`XLSX.utils.book_new()`, `XLSX.writeFile()`) generating instant `.xlsx` downloads in 0ms with zero server load or network timeouts. |
+| **Attendance tab appearing in main navigation for regular students**. | Navigation bar configuration in `app.tsx` unconditionally rendered the Attendance tab. | `web/src/components/app.tsx` | Restricted Attendance navigation tab strictly to `profile?.role === "teacher" || owner`; students access their attendance metrics cleanly via the "My Attendance" tab in Timetable. |
+| **Camera access blocked for Attendance QR scanner on Web**. | Web security headers lacked explicit camera permissions for the app origin, causing browser `getUserMedia` to reject with `NotAllowedError`. | `web/next.config.ts` | Added `Permissions-Policy: camera=(self)` to HTTP security headers in Next.js configuration. |
+| **Duplicate attendance session rows created when teacher closed and reopened QR modal**. | `start_attendance_session` generated a new session row on every invocation without checking for existing sessions on the same class day. | `202610110004_attendance_and_timetable_refinements.sql`, `attendance-teacher-modal.tsx` | Refactored `start_attendance_session` to look up existing sessions for `target_slot` on the current date in Asia/Dhaka time (UTC+6) and reuse it (`is_resumed = true`). Replaced "Close Attendance" with "Done" so dismissing QR keeps session active until class ends. |
+| **`gen_random_bytes` function resolution failure in `start_attendance_session`**. | `gen_random_bytes` was called without schema qualification inside a function with `set search_path = ''`. | `202610110002_attendance_schema.sql` | Explicitly qualified call as `extensions.gen_random_bytes(24)`. |
+| **Rapid log ingestion and Edge Function quota consumption from 1-minute background crons**. | Cloudflare Worker `classmate-secure-api` ran `sync_archive_catalog` every 1 minute (`*/1 * * * *`), creating 20–40 rows/min in `public.audit_log` (242 MB bloat). Notification retry also polled every 1 minute. | `cloudflare-worker/wrangler.jsonc`, `202610110003_optimize_cron_schedules_and_retention.sql` | Reconfigured Cloudflare Worker cron to once daily (`0 4 * * *`), widened notification retry to 15m, and scheduled automated daily purge of `cron.job_run_details` older than 2 days. |
+| **R2 resource file upload rejected for files larger than 100 MB**. | `upload-classmate-resource/index.ts` had a hardcoded size validation check capping `size_bytes > 100_000_000`. | `supabase/functions/upload-classmate-resource/index.ts`, `web/src/components/library.tsx` | Increased the resource upload ceiling to 500 MB (`500_000_000 bytes`) across the Edge Function and Web / Android client uploaders. |
 
 ---
 
@@ -742,3 +757,510 @@ vercel --prod
 # Deploy migrations to Staging and Production Supabase databases
 python scripts/web/deploy-batch-fund.py both
 ```
+
+### D. Supabase Read-Only Storage Diagnostics & Index Maintenance
+```sql
+-- Safe read-only inspection of table and index disk usage
+SELECT
+    schemaname || '.' || relname AS table_name,
+    n_live_tup AS live_rows,
+    n_dead_tup AS dead_rows,
+    pg_size_pretty(pg_relation_size(relid)) AS table_data_size,
+    pg_size_pretty(pg_indexes_size(relid)) AS total_indexes_size,
+    pg_size_pretty(pg_total_relation_size(relid)) AS grand_total_size
+FROM pg_stat_user_tables
+WHERE schemaname IN ('classmate', 'cron', 'public')
+ORDER BY pg_total_relation_size(relid) DESC;
+
+-- Non-blocking reindex to reclaim dead index bloat on notice_reads
+REINDEX TABLE CONCURRENTLY classmate.notice_reads;
+VACUUM (ANALYZE) classmate.notice_reads;
+```
+
+---
+
+## 24. Restructured Settings Tab & Dedicated Profile Activity Architecture (v1.1.31+)
+
+### A. Architectural Motivation & Paradigm Shift
+Prior to v1.1.31, the 5th bottom navigation tab served as an overloaded hybrid screen combining user identity cards (avatar, 2x2 personal info grid, blood requests) and system configuration toggles (theme, batch switcher, offline cache, update checks). This produced visual crowding and hindered navigation clarity.
+
+The screen architecture was cleanly decoupled:
+1. **Bottom Navigation Tab Renamed to "Settings"**:
+   - Tab title: `@string/nav_settings` ("Settings").
+   - Tab icon: `@drawable/sl_nav_settings` backed by modern gear vector `ic_nav_settings.xml`.
+   - Web companion client synchronized to tab `["settings", "Settings", Settings]` using Lucide's `Settings` icon.
+2. **Top-Right Profile Header Widget (`btnHeaderProfile`)**:
+   - The Settings top app bar features the bold title "Settings" and clean subtitle "Preferences, management and system controls".
+   - The top-right corner houses an interactive profile widget consisting of the user's circular avatar (`ivHeaderProfileAvatar`, 44x44 dp) bordered by a subtle ring, with the bold label "Profile" (`tvHeaderProfileLabel`, 11sp) directly below.
+   - Tapping this widget launches the dedicated, full-screen **`ClassMateProfileActivity.kt`** on Android, or transitions to the dedicated `ProfileView` sub-screen on Web with standard back navigation.
+
+```mermaid
+flowchart TD
+    BottomNav[Bottom Navigation Bar] --> SettingsTab[Settings Tab]
+    SettingsTab --> TopHeader[Header with Title & Top-Right Profile Widget]
+    TopHeader -->|Shows Avatar + 'Profile' Label| ProfileWidget[btnHeaderProfile Widget]
+    SettingsTab --> SettingsBody[Account, Management, Preferences, Storage & System]
+    ProfileWidget -->|Tap Avatar / Label| ProfilePage[Dedicated ClassMateProfileActivity]
+    ProfilePage --> ProfileHero[Hero Card: Avatar, Name, Role Badge, ID & 2x2 Grid]
+    ProfilePage --> BloodCard[Blood Emergency Requests Card]
+    ProfilePage --> NudgeCard[Complete Profile Details Nudge]
+    ProfilePage -->|Back Button / Swipe Gesture| SettingsTab
+```
+
+### B. Dedicated Profile Activity (`ClassMateProfileActivity.kt`, `activity_classmate_profile.xml`)
+- **Root Container**: Full-screen `NestedScrollView` wrapped inside a `SwipeRefreshLayout` enabling smooth pull-to-refresh synchronization.
+- **Top App Bar**: Back navigation button (`btnProfileBack`), bold headline "Profile", and subtitle "Your academic identity".
+- **Hero Identity Card (`cardPersonalInfo`)**:
+  - Gradient brand banner (`bg_profile_hero_gradient`).
+  - High-resolution circular avatar with fallback initials.
+  - Full student name formatted with `text-balance` and padding to prevent overflow on long names.
+  - Role Badges: Elevated gradient badges for `Owner` (`bg_role_badge_owner`), `Admin` (`bg_role_badge_admin`), or `Student`.
+  - Copyable Student ID (`tvProfileStudentId`) and University Email chips with one-tap clipboard copy and toast feedback.
+- **2x2 Identity Metric Grid (`bg_metric_tile.xml`)**:
+  1. **Blood Group**: Direct link to university Blood Emergency Network.
+  2. **Academic Session**: Verified academic intake (e.g., `2021-22`).
+  3. **Department & Batch**: Academic discipline (e.g., `CSE-22`).
+  4. **Phone Number**: Primary contact phone with one-tap dialer intent.
+- **Blood Emergency Requests Card (`cardBloodEmergency`)**: Real-time broadcast card showing outstanding blood donation requests within the campus community.
+- **Incomplete Profile Details Nudge (`cardProfileNudge`)**: Actionable completion banner prompting students to fill missing contact attributes.
+- **Lifecycle & Cache Resiliency**: On `onResume` and pull-to-refresh, queries `ClassMateAuthApi.initializeProfile()` to ensure fresh profile data from Supabase PostgREST, preventing stale academic batch caching.
+
+### C. Settings Screen Component Refinements
+1. **Header Eyebrow Cleanup**: Removed legacy blue `"PREFERENCES"` and `"SYSTEM"` eyebrow labels from `classmate_profile.xml` to match the minimalist aesthetics of the Library and Notices headers.
+2. **"Your Academic Batch" Security Scoping**:
+   - Fixed an authorization flaw where clicking "Show Batch" under "Your Academic Batch" redirected normal students into the Admin Workspace / "Choose Your Classroom".
+   - Regular students are strictly scoped to view their enrolled batch details.
+   - Access to the Admin Workspace is verified dynamically via server-side claims in `ClassMateAuthApi` rather than hardcoded client-side role checks.
+3. **ClassMate AI Setting Restriction**:
+   - The ClassMate AI configuration tile in Settings is strictly restricted to system Administrators and Owners.
+   - Completely hidden from Class Representatives (CR) and regular students.
+4. **Clear Cache Action Polish**:
+   - Removed the detached delete/trash icon from the "Clear Cache" button under Utilities & Storage, aligning typography cleanly.
+5. **"About Developer" Centering**:
+   - Removed the student roll number from developer credentials.
+   - Centered "Computer Science and Engineering" with clean subtitle `"Batch 22 · Session 2021-22"`.
+
+---
+
+## 25. Strict Single-Recipient Batch Fund Deposit Confirmation Notifications
+
+### A. Feature Architecture & User Experience
+When a student's inflow contribution (deposit) is recorded or updated by a Class Representative (CR) or Admin in the Batch Fund ledger, ClassMate automatically dispatches a real-time push notification **strictly and exclusively to that specific contributing student**.
+
+```mermaid
+flowchart TD
+    A["CR / Admin records or edits Deposit (inflow)"] --> B["RPC: record_batch_fund_transaction / bulk / update"]
+    B --> C["Auto-resolve student_profile_id from student_id or full_name"]
+    C --> D["Insert into classmate.batch_fund_transactions"]
+    D --> E["Insert event into classmate.notification_outbox (kind: batch_fund_deposit / update)"]
+    E --> F["classmate.request_notification_dispatch()"]
+    F --> G["Edge Function: dispatch-classmate-notifications"]
+    G --> H["classmate.notification_recipients(event_id) -> STRICTLY student_profile_id tokens"]
+    H --> I["FCM Push sent ONLY to contributing student's device"]
+    I --> J["Android: ClassMatePushWorker -> opens ClassMateBatchFundActivity"]
+    I --> K["Web: Service Worker -> opens /#friends/fund"]
+```
+
+- **Notification Formatting (`classmate.notification_job_context`)**:
+  - **Deposit Recorded**:
+    - Title: `"Deposit Confirmed: ৳[amount]"`
+    - Body: `"Your deposit of ৳[amount] for \"[title]\" has been recorded."`
+  - **Deposit Updated**:
+    - Title: `"Deposit Updated: ৳[amount]"`
+    - Body: `"Your deposit of ৳[amount] for \"[title]\" has been updated."`
+  - **Currency Formatting**: Whole amounts omit decimals (e.g. `৳500`), while fractional amounts retain two decimal places (e.g. `৳500.50`).
+- **Interactive Tap Destination**:
+  - **Android (`ClassMatePushWorker.kt`)**: Detects `kind in setOf("batch_fund_deposit", "batch_fund_update")` and constructs an Intent launching `ClassMateBatchFundActivity.kt` with `batch_id` extra, taking the student directly to the ledger.
+  - **Web (`web/src/worker.ts`)**: Service Worker routes notification clicks directly to `/#friends/fund`.
+
+### B. Broadcast Leak Discovery & Cryptographic Scope Enforcement
+During testing, an issue arose where recording a deposit triggered confirmation notifications to **all active students in the batch**:
+
+1. **Root Cause Analysis**:
+   - In `classmate.notification_recipients(target_event)`, the stored procedure began with an unconditional `select * from classmate.academic_notification_recipients(target_event)`.
+   - Because deposit events had `batch_id` and `department_id` populated, `academic_notification_recipients` pulled all 28 active batch students into the recipient list.
+   - Furthermore, `classmate.notification_device_allowed` evaluated to `true` for all batch students because `e.kind <> 'app_update' and p.batch_id = b.id`.
+2. **Database Migration Fix (`202610100001_batch_fund_deposit_notifications.sql`)**:
+   - **Scoped `academic_notification_recipients`**:
+     ```sql
+     select * from classmate.academic_notification_recipients(target_event)
+     where exists (
+       select 1 from classmate.notification_outbox e
+       where e.id = target_event and e.kind in ('notice', 'file', 'class_change', 'semester', 'app_update')
+     )
+     ```
+   - **Scoped `academic_notification_device_allowed`**:
+     Ensures academic device checks are only evaluated for academic event kinds.
+   - **Single-Recipient Isolation Guarantee**:
+     Deposit events strictly match solely via:
+     ```sql
+     union select p.id, d.fcm_token
+     from classmate.notification_outbox e
+     join classmate.batch_fund_transactions t on t.id = e.record_id
+     join classmate.profiles p on p.id = t.student_profile_id and p.verification_status = 'active'
+     join classmate.device_tokens d on d.profile_id = p.id
+     where e.id = target_event
+       and e.kind in ('batch_fund_deposit', 'batch_fund_update');
+     ```
+   - **Device Access Control**:
+     `classmate.notification_device_allowed` explicitly verifies `t.student_profile_id = target_profile`.
+3. **Production Verification (`cbskpifgbdbgdmnnxfrh`)**:
+   - Recipient count on Taslima Akter's deposit dropped from 28 recipients to **exactly 1 recipient**.
+   - Other batchmates' tokens returned `false` on device permission check.
+   - Academic notice broadcasts remained completely unaffected, delivering to all 28 batch students.
+
+---
+
+## 26. Production & Staging Supabase Free-Tier Diagnostic Audit & Infrastructure Optimization
+
+A comprehensive read-only diagnostic audit was conducted on October 10, 2026, covering both `ClassMate` (Production: `cbskpifgbdbgdmnnxfrh`) and `ClassMate Staging` (Staging: `qpryxvunhebwljlwmggk`) under shared organization `azzhwhfagnawecqfimtq`.
+
+### A. Resource Footprint & Quota Health Summary
+| Metric | Scope | Observed Usage | Free Plan Limit | Consumed % | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Production Database Disk** | Per Project | ~103.1 MB | 500 MB | 20.6% | Healthy |
+| **Staging Database Disk** | Per Project | ~123.6 MB | 500 MB | 24.7% | Healthy |
+| **Core ClassMate Schema** | Per Project | ~4.35 MB | — | < 1.0% | Extremely Compact |
+| **Network Egress** | Shared Org | ~48 MB | 5,000 MB (5 GB) | 0.96% | Optimal |
+| **Monthly Active Users (MAU)**| Shared Org | 11 MAU | 50,000 MAU | 0.02% | Negligible |
+| **Active Projects Count** | Shared Org | 2 active projects | 2 active projects | **100.0%** | Structural Max |
+| **Edge Function Invocations**| Shared Org | ~7,152 + ~2,880/day | 500,000 / month | ~18–40% | Requires Optimization |
+
+### B. Identified Quota Leaks & Inefficiencies
+1. **Redundant 1-Minute Cloudflare Worker Polling**:
+   - Cloudflare Worker cron (`*/1 * * * *`) sends an HTTP POST to `/functions/v1/dispatch-classmate-notifications` every 60 seconds on both Production and Staging.
+   - Generates **~86,400 Edge Function invocations per month** simply idling on an empty notification outbox.
+   - Database trigger `wake_notification_dispatch` already dispatches new events instantaneously via `net.http_post` with 0ms delay.
+2. **Empty Index Bloat on `classmate.notice_reads` (~57.6 MB)**:
+   - Capacity testing (`scripts/capacity/fixtures.py`) inserted 250,000 synthetic rows and deleted them via cascading delete.
+   - In PostgreSQL, B-Tree indexes retain empty 8 KB pages on disk after bulk deletes; autovacuum does not return disk space to the operating system.
+   - `notice_reads_pkey` (~40 MB), `notice_reads_profile_idx` (~12 MB), and `notice_reads_page_idx` (~5.6 MB) consume ~57.6 MB despite holding 0 (or ~60) real rows.
+3. **Monotonic Accumulation of Cron & Delivery History**:
+   - `cron.job_run_details` records 2 rows every minute (2,880 rows/day = ~86,400 rows/month) from 1-min crons.
+   - `classmate.notification_jobs` and `notification_deliveries` retain records indefinitely without an automated purge job.
+4. **High-Frequency Frontend Polling**:
+   - Web Notice feed (`web/src/components/notices.tsx:106`) polls the complete feed and calls `rpc/notice_feed_details` every 30 seconds (`refetchInterval: 30_000`).
+   - Web and Android Friends screens call `rpc/touch_presence` every 30 seconds, generating dead tuples and continuous log entries.
+
+### C. Recommended Optimization Plan
+1. **Index Reclaim**: Execute `REINDEX TABLE CONCURRENTLY classmate.notice_reads; VACUUM (ANALYZE) classmate.notice_reads;` to immediately reclaim ~57 MB of disk storage without table locking.
+2. **Widen Background Dispatcher Cron**: Adjust Cloudflare Worker cron from 1 minute to 10–15 minutes (or 5 minutes during university class hours), saving ~75,000 invocations/month while relying on database triggers for instant delivery.
+3. **Automated History Purge**: Add a scheduled weekly `pg_cron` maintenance job to purge `cron.job_run_details` older than 7 days and completed notification deliveries older than 14–30 days.
+4. **Throttle Frontend Polling**: Disable 30s timer on Web notices (`refetchInterval: false`), relying on tab focus/manual refresh, and increase `touch_presence` interval from 30s to 120s.
+
+---
+
+## 27. QR-Based Attendance Tracker System Architecture & Capacity Analysis
+
+### A. Context & The "Full Database" Illusion
+During planning for a student QR-code attendance tracker, the user considered creating a separate free Supabase account to avoid hitting the 500 MB database quota, noting production database usage was reported at **~268 MB**.
+
+**Deep Storage Inspection Results**:
+- **Total DB Size**: ~268 MB.
+- **Real ClassMate Data (`classmate.*`)**: **Only 4.35 MB** (101 student profiles, fund transactions, routines, device tokens).
+- **Rogue Table**: **`public.audit_log` had ballooned to 242 MB (343,679 rows)**!
+- **Root Cause**: An automated Cloudflare Worker runs `sync_archive_catalog` every minute. Triggers on courses and offerings wrote 20–40 rows to `public.audit_log` every minute even when no catalog data changed.
+- **Immediate Resolution**: Disabling runaway audits on background catalog syncs and truncating `public.audit_log` reclaims **~240 MB immediately**, dropping database usage to **~15 MB** and leaving **~485 MB of headroom** on the existing free tier.
+
+### B. Attendance System Storage Sizing Math
+- Scenario: 100 students attending 5 classes daily, 5 days per week.
+- Single scan payload: Student UUID (16 bytes) + Session UUID (16 bytes) + Timestamp (8 bytes) + Status (1 byte) + index overhead = **~100 bytes per scan**.
+- Daily volume: 100 students × 5 classes = **500 records/day**.
+- Full 4-month semester (80 class days): 40,000 records = **~4 MB of disk storage**!
+- Four full college years across multiple batches generates less than **40 MB** of data.
+
+### C. Architecture Comparison
+| Evaluation Metric | Separate Supabase Account (Option A) | Single Supabase Database (Option B - Recommended) |
+| :--- | :--- | :--- |
+| **Hosting Cost** | Free ($0) | Free ($0) |
+| **Available Space** | 500 MB | ~485 MB (Plenty for 5+ years) |
+| **Relational Integrity** | No foreign keys across databases | Direct foreign keys (`classmate.profiles`, `routine_slots`) |
+| **Implementation Complexity**| High (HTTP bridge, dual clients, custom JWTs)| Low (native PostgreSQL schema, fast RPC) |
+| **Teacher Realtime Roster** | Complex cross-API sync | Instant Supabase Realtime subscriptions |
+| **Latency** | 200–500ms multi-hop HTTP | 15–30ms single database transaction |
+
+**Recommendation**: Retain attendance in the existing database under the `classmate` schema after reclaiming `public.audit_log`.
+
+### D. QR Code Anti-Cheating & Security Protocol
+To prevent students from screenshotting QR codes and sharing them to remote friends over WhatsApp:
+1. **Dynamic Rotating QR Codes (TOTP Style)**: The teacher app rotates a cryptographically signed session token every 15 seconds. Screenshots shared remotely expire before an absent student can scan.
+2. **Single-Scan Guarantee**: Database uniqueness constraint `UNIQUE (session_id, student_id)` prevents double-scanning.
+3. **Strict Class Period Time Boundaries**: Validation verifies the scan timestamp falls within `[start_time - 15 minutes, end_time + 15 minutes]` in Bangladesh Time (Asia/Dhaka, UTC+6).
+4. **Hardware Device Binding**: Verifies the scan originates from the student's registered profile and device token stored in `classmate.device_tokens`.
+
+---
+
+## 28. End-to-End Dynamic QR Attendance Tracker Implementation (Phases 1, 2 & 3)
+
+### A. High-Level Architecture & Purpose
+The QR Attendance Tracker is an institutional-grade attendance management system integrated directly into the ClassMate ecosystem across native Android, the Web companion client, and the Supabase PostgreSQL backend (`0004f17`, `2787a77`, `db10a60`). Instead of creating disconnected screens, attendance actions attach directly to active class cards in the daily routine/timetable.
+
+```mermaid
+flowchart TD
+    subgraph Timetable Integration
+        Card[Class Routine Card] -->|Teacher during class hours| LiveBtn["Take Attendance<br>(ClassMateTeacherLiveAttendanceActivity / Teacher Modal)"]
+        Card -->|Student during class hours| ScanBtn["Scan Attendance<br>(ClassMateStudentAttendanceScannerActivity / Scanner Modal)"]
+    end
+
+    subgraph Teacher QR Engine
+        LiveBtn --> SecretGen["Generate / Resume Session Secret<br>Single continuous session per date"]
+        SecretGen --> QRDisplay["Rotating QR Display (HMAC-SHA256, 15s countdown)"]
+        QRDisplay --> LiveRoster["Real-Time Present Attendee Roster<br>(Supabase Realtime WebSockets)"]
+    end
+
+    subgraph Student Scanning & Verification
+        ScanBtn --> Camera["Camera Viewfinder<br>(ML Kit on Android / BarcodeDetector on Web)"]
+        Camera --> SubmitScan["RPC: mark_attendance(session_id, token, time_window)"]
+        SubmitScan --> VerifyEpoch["Epoch Window Verification<br>(15s epoch match)"]
+        VerifyEpoch --> VerifyPeriod["Class Period Validation<br>(start_time - 15m <= scan <= end_time + 15m)"]
+        VerifyPeriod --> AudioFeedback["Two-Tone Harmonic Audio Chime & Haptic Feedback"]
+    end
+
+    subgraph Long-Term Analytics & Export
+        LiveRoster --> TeacherDash["Teacher Dashboard (teacher-attendance.tsx)"]
+        TeacherDash --> MatrixExport["Client-Side SheetJS Excel Matrix (.xlsx) Export"]
+        SubmitScan --> StudentDash["Student Dashboard (student-attendance.tsx)<br>Expandable Course Cards & Date History"]
+    end
+```
+
+### B. Dynamic Rotating HMAC-SHA256 Token Protocol
+To eliminate proxy attendance and remote WhatsApp/Messenger screenshot sharing:
+1. **15-Second Epoch Windows**:
+   - Time window calculation: `time_window = floor(current_epoch_seconds / 15)`.
+   - The teacher client recomputes the QR token every 15 seconds accompanied by a smooth circular countdown animation ring.
+2. **Cryptographic Token Generation**:
+   - Token formula: `HMAC_SHA256(time_window_as_string, session_secret)`.
+   - The shared `session_secret` is generated cryptographically on session initialization via `extensions.gen_random_bytes(24)`.
+3. **Server-Side Verification & Tolerance (`classmate.mark_attendance`)**:
+   - Recomputes `expected_token = encode(hmac(time_window::text, sess.session_secret, 'sha256'), 'hex')`.
+   - Tolerance check: `current_win = epoch / 15`. If `abs(current_win - time_window) <= 1`, the scan is accepted. If outside, marked as late or rejected.
+4. **Strict Class Period Verification**:
+   - Converts the scan epoch timestamp to Bangladesh Time (`Asia/Dhaka`, UTC+6):
+     ```sql
+     scan_time := ((to_timestamp(time_window * 15) at time zone 'Asia/Dhaka')::time);
+     if scan_time < (sess.start_time - interval '15 minutes') or scan_time > (sess.end_time + interval '15 minutes') then
+       raise exception 'Scan timestamp is outside the class period' using errcode='22023';
+     end if;
+     ```
+   - Prevents students from scanning saved QR codes before or after scheduled class hours.
+
+### C. Database Schema & Stored Procedures
+Managed in migrations:
+- `202610110002_attendance_schema.sql`
+- `202610110003_attendance_dashboard_matrix.sql`
+- `202610110004_attendance_and_timetable_refinements.sql`
+
+#### 1. Core Tables:
+- **`classmate.attendance_sessions`**:
+  - `id`: UUID PRIMARY KEY (`gen_random_uuid()`)
+  - `routine_slot_id`: UUID NOT NULL REFERENCES `classmate.routine_slots(id)` ON DELETE CASCADE
+  - `started_by`: UUID NOT NULL REFERENCES `classmate.profiles(id)`
+  - `session_secret`: TEXT NOT NULL
+  - `started_at`: TIMESTAMPTZ NOT NULL DEFAULT `now()`
+  - `closed_at`: TIMESTAMPTZ NULL
+  - `status`: TEXT NOT NULL DEFAULT `'open'` CHECK (`status IN ('open', 'closed')`)
+  - Indexes: `(routine_slot_id, status)`
+- **`classmate.attendance_records`**:
+  - `id`: UUID PRIMARY KEY (`gen_random_uuid()`)
+  - `session_id`: UUID NOT NULL REFERENCES `classmate.attendance_sessions(id)` ON DELETE CASCADE
+  - `student_id`: UUID NOT NULL REFERENCES `classmate.profiles(id)`
+  - `marked_at`: TIMESTAMPTZ NOT NULL DEFAULT `now()`
+  - `synced_at`: TIMESTAMPTZ NOT NULL DEFAULT `now()`
+  - `method`: TEXT NOT NULL DEFAULT `'qr'` CHECK (`method IN ('qr', 'rfid', 'manual')`)
+  - `confidence`: TEXT NOT NULL DEFAULT `'normal'` CHECK (`confidence IN ('normal', 'late', 'admin_override')`)
+  - Constraint: `UNIQUE (session_id, student_id)` — strictly guarantees one attendance record per student per session.
+
+#### 2. Key Database RPCs:
+- **`start_attendance_session(target_slot uuid, client_secret text)`**:
+  - Checks if an attendance session already exists for `target_slot` on the current date in Asia/Dhaka time.
+  - If a session exists, reuses the existing session and secret (`is_resumed = true`), ensuring a single continuous session per day.
+  - If new, creates a session row and dispatches push notification outbox event `attendance_open`.
+- **`mark_attendance(target_session uuid, qr_token text, time_window bigint)`**:
+  - Validates session status, HMAC token match, class period time boundaries, and student batch enrollment.
+  - Inserts into `classmate.attendance_records` with single-record conflict protection.
+- **`manual_override_attendance(target_session uuid, target_student uuid, present boolean)`**:
+  - Allows the assigned teacher or admin to manually mark a student present or absent.
+- **`teacher_course_attendance_overview(target_batch uuid, target_course uuid)`**:
+  - Aggregates long-term cumulative statistics: enrolled students, total sessions held, average attendance percentage, and session history breakdown.
+- **`course_attendance_matrix(target_semester_course uuid)`**:
+  - Compiles full student-by-date matrix: students as rows (with roll number, name, present count, percentage) and all sessions as columns with presence mapping.
+- **`student_my_attendance(target_batch uuid)`**:
+  - Returns student's personal metrics across all enrolled semester courses, overall percentage, and detailed session date logs.
+
+### D. Native Android Implementation
+1. **Teacher Live Session (`ClassMateTeacherLiveAttendanceActivity.kt`)**:
+   - Layout: `activity_teacher_live_attendance.xml`.
+   - Renders large high-contrast QR code generated via ZXing with a pulsating circular timer ring countdown (15s rotation).
+   - Real-time present attendee count (`tvPresentCount`: `"✓ X / Y present"`) and attendee RecyclerView (`item_attendance_roster.xml`) with profile avatars and roll numbers.
+   - Replaced premature "Close Attendance" button with "Done" action so dismissing the screen keeps the session alive.
+2. **Student Scanner Viewfinder (`ClassMateStudentAttendanceScannerActivity.kt`)**:
+   - Layout: `activity_student_attendance_scanner.xml`.
+   - Uses Android Jetpack CameraX (`PreviewView`) combined with Google ML Kit Barcode Scanning (`BarcodeScanning.getClient()`) for instant, high-fps QR detection.
+   - Includes flash toggle button (`ivFlashToggle`), target bounding reticle (`bg_scanner_reticle.xml`), and native haptic vibration on success.
+3. **Offline Queueing & Reconnection Sync**:
+   - If the student scans while disconnected (e.g. basement lecture halls with poor cellular reception), the scan payload is stored in local Room database table `PendingAttendanceScanEntity.kt`.
+   - Triggers `AttendanceSyncWorker.kt` via Android WorkManager with network constraint `NetworkType.CONNECTED`.
+   - Because the payload preserves the captured `time_window` epoch, the server accepts and honors the scan upon reconnection.
+
+### E. Web Companion Implementation
+1. **Teacher Attendance Modal (`attendance-teacher-modal.tsx`)**:
+   - Responsive overlay dialog rendering QR code using `qrcode.react`.
+   - Subscribes to Supabase Realtime channel (`classmate:attendance_records:session_id=...`) to update the live attendees roster instantly via WebSockets without page polling.
+   - Includes full-screen projector toggle for lecture hall display screens.
+2. **Student Scanner Modal (`attendance-scanner-modal.tsx`)**:
+   - Browser camera stream powered by native `BarcodeDetector` API with polyfill fallback.
+   - Configured with `Permissions-Policy: camera=(self)` in `next.config.ts`.
+3. **Synthesized Two-Tone Audio Confirmation Chime**:
+   - Eliminates external `.mp3` audio asset downloads that fail when offline.
+   - Synthesizes a clean two-tone rising harmonic chord (C5 523.25 Hz -> E5 659.25 Hz -> G5 783.99 Hz) directly via standard browser Web Audio API (`AudioContext`, `OscillatorNode`, `GainNode` exponential decay) paired with device vibration (`navigator.vibrate([50, 50, 100])`).
+
+### F. Multi-Date Cumulative Excel Matrix Export (`attendance-excel.ts`)
+- Implemented pure client-side SheetJS (`xlsx`) spreadsheet generation, resolving Edge Function memory and timeout failures:
+  - **Single Session Report**: Session metadata, date, course, teacher, student roll number, student name, scan time, and verification method.
+  - **Semester Course Matrix**: Full multi-column matrix with student roll and name in columns A & B, every class session date in columns C through N (`P` in green or `A` in red), followed by total classes attended, total classes held, and attendance percentage formulas (`=SUM(...) / COUNT(...) * 100`).
+  - Downloads `.xlsx` files instantaneously in 0ms with zero server execution cost or egress.
+
+### G. Student Personal Attendance Dashboard (`student-attendance.tsx`)
+- Displayed under the "My Attendance" tab in the Timetable screen for enrolled students.
+- **Expandable Course Cards**:
+  - Header: Course code, course title, credit hours, attended/held ratio (`14/16`), and color-coded progress bar.
+  - Accordion Expansion: Tapping a course card slides open its full chronological attendance history.
+  - Date-by-Date Logs: Formatted date (e.g., `Sun, 11 Oct 2026`), class time (`10:00 AM`), lecture room (`Room 302`), and status badge (`✓ Present` in emerald green or `✗ Absent` in coral red).
+
+---
+
+## 29. Timetable & Routine Usability Refinements
+
+### A. Batch-Wide Admin "Calendar in Timetable" Toggle
+- **Problem**: The Academic Calendar tab in the Timetable screen cluttered navigation for batches that prefer a minimalist routine view.
+- **Solution**:
+  - Added column `calendar_in_timetable boolean not null default true` to `classmate.batches`.
+  - Added RPC `toggle_batch_calendar_in_timetable(target_batch uuid, enabled boolean)` restricted to batch admins and owners.
+  - Added toggle switch under Academic Workspace in Settings (`profile.tsx`). When turned off, the Timetable segmented pill dynamically hides the Calendar tab batch-wide.
+
+### B. Teacher Timetable View Simplification
+- **Assigned Courses Filter**: When a faculty member views a batch routine, the list filters strictly to routine slots assigned to that teacher (`editable.data?.[slot.semester_course_id] === true`).
+- **Contextual Empty States**: If the teacher has no classes scheduled on the selected day, displays:
+  - *"You have no classes today for the selected batch"* (if today).
+  - *"You have no classes on this day for the selected batch"* (if any other day).
+- **Navigation Cleanup**: Hides "Bus Schedule" and "My Attendance" tabs for teachers, leaving only the focused routine view.
+
+### C. Course Attendance Opt-in (Admin Controlled)
+- **Problem**: Not all faculty members utilize digital app attendance. Showing attendance buttons on unmonitored courses created student confusion.
+- **Solution**:
+  - Added column `attendance_enabled boolean not null default false` to `classmate.semester_courses`.
+  - Added RPC `toggle_course_attendance(target_course uuid, enabled boolean)` and catalog RPC `batch_attendance_courses(target_batch uuid)`.
+  - Added "Attendance Course Settings" configuration modal in Settings for admins/owners with toggle switches for each semester course.
+  - Routine cards only display "Take Attendance" / "Scan Attendance" strips if `attendance_enabled = true` for that course.
+
+### D. Ongoing / Live Class Pinned to Top
+- During active class hours, the currently live period (`isLive = true`) is automatically sorted and pinned to the very top of the routine list with a prominent glowing emerald banner: **`LIVE NOW · Ongoing Period`**.
+- Prevents the "Scan Attendance" / "Take Attendance" action strip from hiding behind the mobile bottom navigation bar.
+- Automatically resets back to normal chronological order once the class concludes.
+
+### E. Single Continuous Attendance Session per Date
+- Replaced premature session termination with an open class window lifecycle:
+  - `start_attendance_session` queries existing sessions for `target_slot` on the current date in Asia/Dhaka time. If found, reuses the session (`is_resumed = true`).
+  - Dismissing the QR modal (via "Done", "(X)", or backdrop click) hides the layout but does **not** close the session in the database.
+  - Teachers can project the QR, dismiss it to begin lecturing, and reopen the same live session anytime during the class period.
+  - Sessions automatically expire when the class period concludes.
+
+---
+
+## 30. Cloudflare R2 500 MB Resource Upload Limit & Storage Architecture
+
+### A. Upload Limit Expansion
+- The maximum file upload ceiling for course materials, textbooks, question banks, and lecture slides was increased from 100 MB to **500 MB** (`500,000,000 bytes`).
+
+### B. Full-Stack Enforcement
+1. **Presigned Upload Edge Function (`supabase/functions/upload-classmate-resource/index.ts`)**:
+   - Updated size validation: `!Number.isSafeInteger(size_bytes) || size_bytes < 1 || size_bytes > 500_000_000`.
+2. **Web Companion Client (`web/src/components/library.tsx`)**:
+   - Adjusted client-side file picker validation and error messaging to support uploads up to 500 MB.
+3. **Android Client Resource Upload Activities**:
+   - Synchronized file validation constants with the 500 MB ceiling.
+
+### C. Direct-to-R2 Upload Economics
+- Uploads bypass Supabase servers completely:
+  - Client requests a presigned S3 PUT URL from `upload-classmate-resource` authenticated with JWT.
+  - Client streams the file directly to Cloudflare R2 object storage.
+  - Preserves Supabase bandwidth limits (5 GB free tier quota) and eliminates server timeouts on large academic video or PDF uploads.
+
+---
+
+## 31. Free-Tier Quota Optimization & Runaway Storage Reclaim Execution
+
+### A. Runaway Audit Log Storage Recovery
+- **Root Cause**: Table `public.audit_log` reached **242 MB (343,679 rows)** due to an automated Cloudflare Worker running catalog sync every minute, writing 20–40 rows per minute even when no data changed.
+- **Execution (`202610110002_attendance_schema.sql`)**:
+  - Truncated `public.audit_log`, immediately recovering **~242 MB** of disk space.
+  - Overall Supabase database size dropped from ~268 MB to **~15 MB**, restoring **~485 MB of headroom** on the 500 MB free tier.
+- **Trigger Defense**: Updated `public.write_audit_log()` to bypass logging `UPDATE` events when `to_jsonb(old) = to_jsonb(new)`.
+
+### B. Cloudflare Worker Cron Reconfiguration
+- Cloudflare Worker `classmate-secure-api` cron schedule was changed from every minute (`*/1 * * * *`) to once daily at 4:00 AM UTC (`0 4 * * *`):
+  ```jsonc
+  "triggers": {
+    "crons": ["0 4 * * *"]
+  }
+  ```
+- Eliminated ~43,000 redundant worker invocations and database transactions per month.
+
+### C. Supabase `pg_cron` Schedules & Retention (`202610110003_optimize_cron_schedules_and_retention.sql`)
+1. **Notification Retry Job (`classmate-notification-retry`)**:
+   - Rescheduled from every 1 minute (`*/1 * * * *`) to every 15 minutes (`*/15 * * * *`). Immediate notification dispatches are already triggered instantaneously via `wake_notification_dispatch`.
+2. **Resource Cleanup Job (`classmate-resource-cleanup`)**:
+   - Rescheduled from every 1 minute to once daily at 03:00 UTC (`0 3 * * *`).
+3. **Automated Cron History Retention (`classmate-purge-cron-logs`)**:
+   - Added automated daily maintenance job at 03:30 UTC (`30 3 * * *`):
+     ```sql
+     delete from cron.job_run_details where end_time < now() - interval '2 days';
+     ```
+   - Prevents `cron.job_run_details` from accumulating tens of thousands of rows and consuming storage.
+
+---
+
+## 32. CSE 22nd Batch Student Roster Reconciliation & Complete User Provisioning
+
+### A. Attendance Sheet Roster Audit
+- Enrolled students in the CSE 22nd Batch (`de0b3379-54a0-4275-a526-5970295c787e`) were audited by cross-referencing registered database profiles against official university attendance sheets.
+- 16 enrolled students were identified as missing from the database, hindering Batch Fund tracking and attendance records.
+
+### B. Provisioning 16 Missing Accounts
+- Created authenticated accounts in Supabase Auth (`auth.users`) with verified institutional Google email addresses (`ce25xxx@mbstu.ac.bd` / `ce24014@mbstu.ac.bd`).
+- Inserted linked student profiles into `classmate.profiles`:
+  1. **Marzia Islam** (`CE25002`)
+  2. **Sudip Banik** (`CE25006`)
+  3. **Armanul Hoque** (`CE25008`)
+  4. **Md. Moshiur Rahman Khan** (`CE25009`)
+  5. **Apsora** (`CE25023`)
+  6. **Md. Millat Hossen** (`CE25024`)
+  7. **Rifat Al Momin** (`CE25025`)
+  8. **Joydev Debnath** (`CE25026`)
+  9. **Tanvir Ahmed** (`CE25032`)
+  10. **A. S. M. Farhan** (`CE25033`)
+  11. **Md. Shahriar Hossain** (`CE25037`)
+  12. **Md. Sazzad Hossen** (`CE25041`)
+  13. **Md. Nahidul Islam** (`CE25044`)
+  14. **Joy Ghosh** (`CE25047`)
+  15. **Sabbir Ahmed** (`CE25055`)
+  16. **Md. Shahriar Parvez** (`CE24014` — academic batch override linked to CSE 22nd Batch)
+
+### C. System Impact
+- Total verified cohort brought to **58 students** (41 pre-existing + 16 provisioned + 1 batch admin/owner).
+- Ensures 100% complete Batch Fund collections, zero missing students in attendance matrices, and frictionless first-time Google sign-ins.
+
+---
+
+## 33. Technology Stack & Architectural Summary Reference
+
+| Architectural Layer | Core Technologies | Key Responsibilities & Implementation Notes |
+| :--- | :--- | :--- |
+| **Android Native App** | Kotlin 2.0, Android Jetpack, Room DB, WorkManager | Native mobile client; CameraX + Google ML Kit Barcode Scanning; `PackageInstaller` session updates; Facebook Shimmer; Material BottomSheet. |
+| **Database & Backend** | Supabase PostgreSQL 15, PostgREST, PL/pgSQL | Relational data store, Row Level Security (RLS), security definer RPCs, Supabase Realtime WebSockets, `pg_cron` background scheduling. |
+| **Serverless & Edge** | Supabase Edge Functions (Deno / TypeScript), Cloudflare Workers | Background notification dispatchers, R2 upload presigning, catalog synchronization, daily maintenance routines. |
+| **Cloud Storage** | Cloudflare R2 Storage (S3-compatible API) | Zero-egress binary storage for course files, protected PDFs, and GitHub Release APK distribution assets up to 500 MB. |
+| **Web Companion Client** | Next.js 15, React 19, TypeScript, Tailwind CSS | Desktop sidebar rail & responsive mobile client; SheetJS (`xlsx`) Excel export; Web Audio API synthesized chimes; HTML5 BarcodeDetector. |
+| **Push Notifications** | Firebase Cloud Messaging (FCM), Service Workers | Instant cross-platform push alerts for notices, class cancellations, live attendance sessions, and strict single-recipient fund deposits. |
+| **Update Distribution** | GitHub Releases CDN, `update.json` manifest | Self-hosted in-app update pipeline signed with keystore alias `key0` (dual V1 JAR + V2 APK Signature Scheme). |
+
