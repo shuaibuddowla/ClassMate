@@ -7786,6 +7786,64 @@ dialog:has(.notice-detail-modal-shell) > header {
   color: var(--primary);
 }
 
+.attendance-live-scanned-panel {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-scanned-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.live-scanned-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+}
+
+.live-scanned-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--soft);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  border-left: 3px solid #10b981;
+  min-width: 0;
+}
+
+.live-scanned-item .live-roll {
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.live-scanned-item .live-name {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .attendance-actions-footer {
   width: 100%;
 }
@@ -8643,6 +8701,42 @@ dialog:has(.notice-detail-modal-shell) > header {
 }
 
 /* Roster tab plain table */
+.attendance-roster-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.roster-sort-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.roster-sort-btn {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roster-sort-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.roster-sort-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
 .attendance-roster-table {
   padding: 0;
   overflow: hidden;

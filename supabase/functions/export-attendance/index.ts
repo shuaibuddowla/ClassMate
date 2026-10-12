@@ -2,6 +2,42 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import * as XLSX from "npm:xlsx@0.18.5";
 import { withWebCors } from "../_shared/web-cors.ts";
 
+function compareStudentRolls(aRoll?: string | null, bRoll?: string | null): number {
+  const a = (aRoll || "").trim().toUpperCase();
+  const b = (bRoll || "").trim().toUpperCase();
+
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  const aParts = a.split(/(\d+)/).filter(Boolean);
+  const bParts = b.split(/(\d+)/).filter(Boolean);
+
+  const len = Math.min(aParts.length, bParts.length);
+  for (let i = 0; i < len; i++) {
+    const partA = aParts[i];
+    const partB = bParts[i];
+
+    const isNumA = /^\d+$/.test(partA);
+    const isNumB = /^\d+$/.test(partB);
+
+    if (isNumA && isNumB) {
+      const numA = parseInt(partA, 10);
+      const numB = parseInt(partB, 10);
+      if (numA !== numB) {
+        return numA - numB;
+      }
+      if (partA.length !== partB.length) {
+        return partA.localeCompare(partB);
+      }
+    } else if (partA !== partB) {
+      return partA.localeCompare(partB);
+    }
+  }
+
+  return a.localeCompare(b);
+}
+
 Deno.serve(request => withWebCors(request, async (request) => {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -51,7 +87,9 @@ Deno.serve(request => withWebCors(request, async (request) => {
     const courseCode = matrix.course_code || "Course";
     const courseTitle = matrix.course_title || "Class";
     const sessions = matrix.sessions || [];
-    const students = matrix.students || [];
+    const students = [...(matrix.students || [])].sort((a: any, b: any) =>
+      compareStudentRolls(a.roll, b.roll) || (a.full_name || "").localeCompare(b.full_name || "")
+    );
 
     // Construct flat row objects for SheetJS
     const rows = students.map((s: any, idx: number) => {
@@ -131,7 +169,9 @@ Deno.serve(request => withWebCors(request, async (request) => {
   const dateStr = summary.started_at ? new Date(summary.started_at).toISOString().split("T")[0] : "Session";
 
   // Build rows for SheetJS
-  const roster = summary.roster ?? [];
+  const roster = [...(summary.roster ?? [])].sort((a: any, b: any) =>
+    compareStudentRolls(a.roll_number, b.roll_number) || (a.full_name || "").localeCompare(b.full_name || "")
+  );
   const rows = roster.map((s: { roll_number: string; full_name: string; status: string; marked_at: string; method: string; confidence: string }, idx: number) => ({
     "SL": idx + 1,
     "Roll Number": s.roll_number || "—",

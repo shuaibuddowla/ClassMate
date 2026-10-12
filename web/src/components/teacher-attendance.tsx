@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/lib/api";
+import { compareStudentRolls } from "@/lib/attendance-excel";
 import { type Context } from "./app";
 import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import { ErrorBox, Skeleton } from "./ui";
@@ -65,6 +66,7 @@ function healthColor(pct: number): string {
 export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"sessions" | "roster">("sessions");
+  const [rosterSortBy, setRosterSortBy] = useState<"roll" | "risk">("roll");
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [inspectSession, setInspectSession] = useState<{
@@ -183,10 +185,13 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
     );
   }
 
-  // Sorted lowest % first for the roster tab
-  const sortedStudents = [...(matrixQuery.data?.students || [])].sort(
-    (a, b) => a.percentage - b.percentage
-  );
+  // Sorted by natural roll number (CE25001...) or lowest % first for the roster tab
+  const sortedStudents = [...(matrixQuery.data?.students || [])].sort((a, b) => {
+    if (rosterSortBy === "roll") {
+      return compareStudentRolls(a.roll, b.roll) || a.full_name.localeCompare(b.full_name);
+    }
+    return (a.percentage - b.percentage) || compareStudentRolls(a.roll, b.roll);
+  });
 
   const activeAvgColor = activeCourse ? healthColor(activeCourse.average_percentage) : "inherit";
 
@@ -337,7 +342,25 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
                   <p>No student roster found for this course.</p>
                 </div>
               ) : (
-                <div className="attendance-roster-table card">
+                <>
+                  <div className="attendance-roster-sort-bar">
+                    <span className="roster-sort-label">Sort:</span>
+                    <button
+                      type="button"
+                      className={`roster-sort-btn ${rosterSortBy === "roll" ? "active" : ""}`}
+                      onClick={() => setRosterSortBy("roll")}
+                    >
+                      Roll (CE25001...)
+                    </button>
+                    <button
+                      type="button"
+                      className={`roster-sort-btn ${rosterSortBy === "risk" ? "active" : ""}`}
+                      onClick={() => setRosterSortBy("risk")}
+                    >
+                      At-Risk (Lowest %)
+                    </button>
+                  </div>
+                  <div className="attendance-roster-table card">
                   {sortedStudents.map((st) => {
                     const isEligible = st.percentage >= 75;
                     const statusText = isEligible ? "Eligible" : "At Risk";
@@ -357,7 +380,8 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
                     );
                   })}
                 </div>
-              )}
+              </>
+            )}
             </div>
           )}
         </div>

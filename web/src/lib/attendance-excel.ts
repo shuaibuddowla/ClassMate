@@ -41,6 +41,48 @@ export interface SessionSummaryResponse {
 }
 
 /**
+ * Natural sorting for student roll numbers (e.g. CE25001, CE25002, CE25032... CE25060)
+ * Extracts numeric chunks naturally so 1 < 2 < 10 < 32 < 60 regardless of prefix/padding.
+ */
+export function compareStudentRolls(aRoll?: string | null, bRoll?: string | null): number {
+  const a = (aRoll || "").trim().toUpperCase();
+  const b = (bRoll || "").trim().toUpperCase();
+
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  // Split into chunks of digits and non-digits
+  const aParts = a.split(/(\d+)/).filter(Boolean);
+  const bParts = b.split(/(\d+)/).filter(Boolean);
+
+  const len = Math.min(aParts.length, bParts.length);
+  for (let i = 0; i < len; i++) {
+    const partA = aParts[i];
+    const partB = bParts[i];
+
+    const isNumA = /^\d+$/.test(partA);
+    const isNumB = /^\d+$/.test(partB);
+
+    if (isNumA && isNumB) {
+      const numA = parseInt(partA, 10);
+      const numB = parseInt(partB, 10);
+      if (numA !== numB) {
+        return numA - numB;
+      }
+      // If numeric values are identical, preserve zero-padding difference
+      if (partA.length !== partB.length) {
+        return partA.localeCompare(partB);
+      }
+    } else if (partA !== partB) {
+      return partA.localeCompare(partB);
+    }
+  }
+
+  return a.localeCompare(b);
+}
+
+/**
  * Generates and downloads a multi-date cumulative attendance matrix spreadsheet (.xlsx)
  * entirely client-side using SheetJS. Zero edge-function dependency, zero network lag.
  */
@@ -55,9 +97,11 @@ export async function downloadCourseMatrixExcel(semesterCourseId: string) {
 
   const courseCode = matrix.course_code || "Course";
   const sessions = matrix.sessions || [];
-  const students = matrix.students || [];
+  const students = [...(matrix.students || [])].sort((a, b) =>
+    compareStudentRolls(a.roll, b.roll) || a.full_name.localeCompare(b.full_name)
+  );
 
-  // Build matrix rows
+  // Build matrix rows sorted cleanly CE25001 -> CE25060
   const rows = students.map((s, idx) => {
     const row: Record<string, any> = {
       "SL": idx + 1,
@@ -103,7 +147,11 @@ export async function downloadSessionExcel(
     throw new Error("Session summary data not available");
   }
 
-  const rows = summary.roster.map((s, idx) => ({
+  const sortedRoster = [...summary.roster].sort((a, b) =>
+    compareStudentRolls(a.roll_number, b.roll_number) || a.full_name.localeCompare(b.full_name)
+  );
+
+  const rows = sortedRoster.map((s, idx) => ({
     "SL": idx + 1,
     "Roll Number": s.roll_number || "—",
     "Student Name": s.full_name || "—",

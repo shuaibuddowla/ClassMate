@@ -181,7 +181,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                 if (currentSessionId != null) {
                     refreshSummary(currentSessionId)
                 }
-                delay(8000)
+                delay(2500)
             }
         }
     }
@@ -210,6 +210,12 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                         method = obj.optString("method")
                     )
                 )
+            }
+
+            // Natural roll sorting: CE25001 < CE25002 < ... < CE25032 < ... < CE25060
+            members.sortWith { a, b ->
+                val rollCmp = compareRolls(a.rollNumber, b.rollNumber)
+                if (rollCmp != 0) rollCmp else a.fullName.compareTo(b.fullName, ignoreCase = true)
             }
 
             rosterList = members
@@ -338,6 +344,45 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         super.onDestroy()
         qrRotationJob?.cancel()
         livePollJob?.cancel()
+    }
+
+    companion object {
+        /**
+         * Natural sort comparison for student rolls (e.g. CE25001 < CE25002 < ... < CE25032 < ... < CE25060)
+         */
+        fun compareRolls(aRoll: String?, bRoll: String?): Int {
+            val a = (aRoll ?: "").trim().uppercase()
+            val b = (bRoll ?: "").trim().uppercase()
+            if (a.isEmpty() && b.isEmpty()) return 0
+            if (a.isEmpty()) return 1
+            if (b.isEmpty()) return -1
+
+            val regex = Regex("(\\d+)|(\\D+)")
+            val aParts = regex.findAll(a).map { it.value }.toList()
+            val bParts = regex.findAll(b).map { it.value }.toList()
+
+            val len = minOf(aParts.size, bParts.size)
+            for (i in 0 until len) {
+                val partA = aParts[i]
+                val partB = bParts[i]
+                val isNumA = partA.all { it.isDigit() }
+                val isNumB = partB.all { it.isDigit() }
+
+                if (isNumA && isNumB) {
+                    val numA = partA.toLongOrNull() ?: 0L
+                    val numB = partB.toLongOrNull() ?: 0L
+                    if (numA != numB) {
+                        return numA.compareTo(numB)
+                    }
+                    if (partA.length != partB.length) {
+                        return partA.compareTo(partB)
+                    }
+                } else if (partA != partB) {
+                    return partA.compareTo(partB)
+                }
+            }
+            return a.compareTo(b)
+        }
     }
 
     inner class RosterAdapter : RecyclerView.Adapter<RosterAdapter.ViewHolder>() {

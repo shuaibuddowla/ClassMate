@@ -14,6 +14,7 @@ import {
   RefreshCw,
   AlertCircle
 } from "lucide-react";
+import { compareStudentRolls } from "@/lib/attendance-excel";
 
 interface TeacherModalProps {
   sessionId?: string;
@@ -287,15 +288,23 @@ export function AttendanceTeacherModal({
     }
   };
 
-  const presentCount = summary?.roster.filter((r) => r.status === "present").length ?? 0;
-  const totalCount = summary?.roster.length ?? 0;
+  const sortedRoster = (summary?.roster ? [...summary.roster] : []).sort(
+    (a, b) =>
+      compareStudentRolls(a.roll_number, b.roll_number) ||
+      a.full_name.localeCompare(b.full_name)
+  );
+
+  const presentCount = sortedRoster.filter((r) => r.status === "present").length;
+  const totalCount = sortedRoster.length;
   const percentPresent = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
-  const filteredRoster = summary?.roster.filter((r) => {
+  const presentStudentsSorted = sortedRoster.filter((r) => r.status === "present");
+
+  const filteredRoster = sortedRoster.filter((r) => {
     if (filterRoster === "present") return r.status === "present";
     if (filterRoster === "absent") return r.status === "absent";
     return true;
-  }) ?? [];
+  });
 
   return (
     <div className="attendance-modal-overlay">
@@ -379,6 +388,23 @@ export function AttendanceTeacherModal({
                   <span>View List</span>
                 </button>
               </div>
+
+              {/* Scanned Students Instant Live Feed (Sorted CE25001 -> CE25060) */}
+              {presentCount > 0 && (
+                <div className="attendance-live-scanned-panel">
+                  <div className="live-scanned-header">
+                    <span>Scanned Students ({presentCount}) · Sorted by Roll</span>
+                  </div>
+                  <div className="live-scanned-grid">
+                    {presentStudentsSorted.map((student) => (
+                      <div key={student.student_id} className="live-scanned-item">
+                        <span className="live-roll">{student.roll_number || "—"}</span>
+                        <span className="live-name">{student.full_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="attendance-actions-footer">
