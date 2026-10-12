@@ -388,10 +388,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
           ))}
         </div>
         {mode === "attendance" ? (
-          <StudentAttendanceDashboard
-            ctx={ctx}
-            onOpenScanner={() => setStudentScanner({ courseTitle: "Live Class Attendance" })}
-          />
+          <StudentAttendanceDashboard ctx={ctx} />
         ) : mode !== "calendar" && (
           <div className="week">
             <button
