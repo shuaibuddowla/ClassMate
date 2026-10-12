@@ -289,12 +289,18 @@ internal class ClassMateStudentAttendanceUi(
         val displayPctStr: String
         val summaryText: String
         val pctColor: Int
+        val healthLabel: String
 
         if (activeCourse != null) {
             // Course-specific summary
             displayPct = activeCourse.percentage
             displayPctStr = if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
             pctColor = healthColor(displayPct)
+            healthLabel = when {
+                displayPct >= 75.0 -> "Eligible"
+                displayPct >= 60.0 -> "Warning"
+                else -> "At Risk"
+            }
 
             summaryText = if (activeCourse.classesHeld == 0) {
                 "No classes held yet in ${activeCourse.courseCode}"
@@ -306,6 +312,11 @@ internal class ClassMateStudentAttendanceUi(
             displayPct = overallPercentage
             displayPctStr = if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
             pctColor = healthColor(displayPct)
+            healthLabel = when {
+                displayPct >= 75.0 -> "Eligible"
+                displayPct >= 60.0 -> "Warning"
+                else -> "At Risk"
+            }
 
             val trackedCount = courses.size
             summaryText = if (totalHeld == 0) {
@@ -315,38 +326,115 @@ internal class ClassMateStudentAttendanceUi(
             }
         }
 
-        // Summary Top Strip
-        val summaryStrip = LinearLayout(activity).apply {
+        // 4a. Summary Overview Card (Polished, matching ClassMate hero cards)
+        val summaryCard = MaterialCardView(activity).apply {
+            radius = dp(20).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = color(R.color.cm_border_glass)
+            setCardBackgroundColor(color(R.color.cm_surface))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(14)
+            }
+        }
+
+        val summaryInner = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+        }
+
+        // Top Row: Percentage + Health Badge Pill
+        val summaryTopRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2), dp(2), dp(2), dp(14))
         }
 
         val tvBigPct = TextView(activity).apply {
             text = displayPctStr
-            textSize = 25f
+            textSize = 28f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(pctColor)
+            letterSpacing = -0.02f
         }
 
-        val tvSep = TextView(activity).apply {
-            text = "  ·  "
-            textSize = 15f
+        val tvHealthBadge = TextView(activity).apply {
+            text = healthLabel
+            textSize = 11.5f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(color(R.color.cm_text_muted))
+            setTextColor(pctColor)
+            val badgeBgColor = when {
+                displayPct >= 75.0 -> Color.parseColor("#DCFCE7") // Light green
+                displayPct >= 60.0 -> Color.parseColor("#FEF3C7") // Light amber
+                else -> Color.parseColor("#FEE2E2")               // Light red
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(badgeBgColor)
+            }
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = dp(10)
+            }
         }
 
+        summaryTopRow.addView(tvBigPct)
+        summaryTopRow.addView(tvHealthBadge)
+        summaryInner.addView(summaryTopRow)
+
+        // Subtitle text
         val tvSummaryDesc = TextView(activity).apply {
             text = summaryText
             textSize = 13.5f
             setTextColor(color(R.color.cm_text_muted))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(0, dp(6), 0, dp(10))
         }
+        summaryInner.addView(tvSummaryDesc)
 
-        summaryStrip.addView(tvBigPct)
-        summaryStrip.addView(tvSep)
-        summaryStrip.addView(tvSummaryDesc)
-        panel.addView(summaryStrip)
+        // Overview Progress Bar
+        val overviewTrack = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(7))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(99).toFloat()
+                setColor(Color.parseColor("#F1F5F9"))
+            }
+        }
+        val safeOverviewPct = displayPct.coerceIn(0.0, 100.0)
+        val overviewFill = View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, safeOverviewPct.toFloat()).apply {
+                if (safeOverviewPct <= 0.0) weight = 0.001f
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = dp(99).toFloat()
+                setColor(pctColor)
+            }
+        }
+        val overviewEmpty = View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, (100.0 - safeOverviewPct).toFloat())
+        }
+        overviewTrack.addView(overviewFill)
+        overviewTrack.addView(overviewEmpty)
+        summaryInner.addView(overviewTrack)
+
+        summaryCard.addView(summaryInner)
+        panel.addView(summaryCard)
+
+        // Section Label
+        val sectionLabel = TextView(activity).apply {
+            text = "TRACKED COURSES"
+            textSize = 11f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(color(R.color.cm_text_disabled))
+            letterSpacing = 0.12f
+            setPadding(dp(4), dp(4), dp(4), dp(8))
+        }
+        panel.addView(sectionLabel)
 
         // 5. Course Cards List
         courses.forEach { course ->
@@ -355,16 +443,16 @@ internal class ClassMateStudentAttendanceUi(
             val courseColor = healthColor(course.percentage)
 
             val courseCard = MaterialCardView(activity).apply {
-                radius = dp(20).toFloat()
+                radius = dp(18).toFloat()
                 cardElevation = 0f
                 strokeWidth = dp(1)
-                strokeColor = if (isSelected) color(R.color.cm_primary) else color(R.color.cm_border)
+                strokeColor = if (isSelected) color(R.color.cm_primary) else color(R.color.cm_border_glass)
                 setCardBackgroundColor(color(R.color.cm_surface))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    bottomMargin = dp(11)
+                    bottomMargin = dp(12)
                 }
             }
 
@@ -372,14 +460,14 @@ internal class ClassMateStudentAttendanceUi(
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            // Left colored accent bar (4dp width)
+            // Left colored accent indicator bar (4dp width)
             val accentBar = View(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(4), LinearLayout.LayoutParams.MATCH_PARENT).apply {
-                    topMargin = dp(16)
-                    bottomMargin = dp(16)
+                    topMargin = dp(14)
+                    bottomMargin = dp(14)
                 }
                 background = GradientDrawable().apply {
-                    cornerRadius = dp(2).toFloat()
+                    cornerRadius = dp(3).toFloat()
                     setColor(courseColor)
                 }
             }
@@ -412,7 +500,7 @@ internal class ClassMateStudentAttendanceUi(
                 }
             }
 
-            // Title & Code
+            // Title & Code Row with Percentage Badge
             val titleRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -429,32 +517,55 @@ internal class ClassMateStudentAttendanceUi(
             val tvPctBadge = TextView(activity).apply {
                 val pctStr = if (course.percentage % 1.0 == 0.0) "${course.percentage.toInt()}%" else "${String.format("%.1f", course.percentage)}%"
                 text = pctStr
-                textSize = 14f
+                textSize = 12.5f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(courseColor)
+                val badgeBgColor = when {
+                    course.percentage >= 75.0 -> Color.parseColor("#DCFCE7")
+                    course.percentage >= 60.0 -> Color.parseColor("#FEF3C7")
+                    else -> Color.parseColor("#FEE2E2")
+                }
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(badgeBgColor)
+                }
+                setPadding(dp(9), dp(3), dp(9), dp(3))
             }
 
             titleRow.addView(tvTitle)
             titleRow.addView(tvPctBadge)
             cardHeader.addView(titleRow)
 
-            // Instructor name
+            // Instructor name row
             if (course.teacherName.isNotBlank()) {
+                val teacherRow = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, dp(4), 0, dp(6))
+                }
+                val ivPerson = ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_person)
+                    imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.cm_text_disabled))
+                    layoutParams = LinearLayout.LayoutParams(dp(13), dp(13)).apply {
+                        marginEnd = dp(5)
+                    }
+                }
                 val tvTeacher = TextView(activity).apply {
                     text = course.teacherName
                     textSize = 12f
                     setTextColor(color(R.color.cm_text_muted))
-                    setPadding(0, dp(2), 0, dp(6))
                 }
-                cardHeader.addView(tvTeacher)
+                teacherRow.addView(ivPerson)
+                teacherRow.addView(tvTeacher)
+                cardHeader.addView(teacherRow)
             } else {
                 val spacer = View(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4))
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(6))
                 }
                 cardHeader.addView(spacer)
             }
 
-            // Progress Bar Row
+            // Progress Bar Row with classes count and chevron expand indicator
             val progressRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -463,10 +574,10 @@ internal class ClassMateStudentAttendanceUi(
 
             val progressTrack = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(dp(130), dp(6))
+                layoutParams = LinearLayout.LayoutParams(0, dp(6), 1f)
                 background = GradientDrawable().apply {
                     cornerRadius = dp(99).toFloat()
-                    setColor(Color.parseColor("#E2E8F0"))
+                    setColor(Color.parseColor("#F1F5F9"))
                 }
             }
 
@@ -490,35 +601,50 @@ internal class ClassMateStudentAttendanceUi(
             val tvClassCount = TextView(activity).apply {
                 text = "${course.classesAttended} / ${course.classesHeld} classes"
                 textSize = 11.5f
+                setTypeface(typeface, Typeface.BOLD)
                 setTextColor(color(R.color.cm_text_muted))
-                setPadding(dp(10), 0, 0, 0)
+                setPadding(dp(10), 0, dp(6), 0)
+            }
+
+            val ivChevron = ImageView(activity).apply {
+                setImageResource(R.drawable.ic_chevron_right)
+                imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.cm_text_disabled))
+                layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
+                rotation = if (isExpanded) 90f else 0f
             }
 
             progressRow.addView(progressTrack)
             progressRow.addView(tvClassCount)
+            progressRow.addView(ivChevron)
             cardHeader.addView(progressRow)
 
             cardContent.addView(cardHeader)
 
             // Expanded Session History
             if (isExpanded) {
-                val historyDivider = View(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                val historyContainer = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
                         topMargin = dp(10)
-                        bottomMargin = dp(8)
                     }
-                    setBackgroundColor(color(R.color.cm_border))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat()
+                        setColor(Color.parseColor("#F8FAFC"))
+                    }
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
                 }
-                cardContent.addView(historyDivider)
 
                 if (course.history.isEmpty()) {
                     val emptyHistText = TextView(activity).apply {
                         text = "No attendance sessions recorded yet."
                         textSize = 12f
                         setTextColor(color(R.color.cm_text_muted))
-                        setPadding(0, dp(4), 0, dp(4))
+                        setPadding(dp(4), dp(6), dp(4), dp(6))
                     }
-                    cardContent.addView(emptyHistText)
+                    historyContainer.addView(emptyHistText)
                 } else {
                     val showAll = showAllHistoryCourseIds.contains(course.semesterCourseId)
                     val displayList = if (showAll) course.history else course.history.take(4)
@@ -527,7 +653,7 @@ internal class ClassMateStudentAttendanceUi(
                         val historyRow = LinearLayout(activity).apply {
                             orientation = LinearLayout.HORIZONTAL
                             gravity = Gravity.CENTER_VERTICAL
-                            setPadding(0, dp(4.5f.toInt()), 0, dp(4.5f.toInt()))
+                            setPadding(dp(2), dp(6), dp(2), dp(6))
                         }
 
                         // Formatted date and time
@@ -545,7 +671,7 @@ internal class ClassMateStudentAttendanceUi(
                             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                         }
 
-                        // Status right aligned
+                        // Status right aligned as a refined pill badge
                         val isPresent = hist.status == "present"
                         val isLate = hist.status == "late"
                         val statusLabel = when {
@@ -554,31 +680,53 @@ internal class ClassMateStudentAttendanceUi(
                             else -> "✗ Absent"
                         }
                         val statusColor = when {
-                            isPresent -> Color.parseColor("#16A34A")
-                            isLate -> Color.parseColor("#D97706")
-                            else -> Color.parseColor("#DC2626")
+                            isPresent -> Color.parseColor("#15803D") // Rich dark green
+                            isLate -> Color.parseColor("#B45309")    // Rich dark amber
+                            else -> Color.parseColor("#B91C1C")      // Rich dark red
+                        }
+                        val statusBg = when {
+                            isPresent -> Color.parseColor("#DCFCE7") // Light green
+                            isLate -> Color.parseColor("#FEF3C7")    // Light amber
+                            else -> Color.parseColor("#FEE2E2")      // Light red
                         }
 
-                        val tvStatus = TextView(activity).apply {
+                        val tvStatusBadge = TextView(activity).apply {
                             text = statusLabel
-                            textSize = 12.5f
+                            textSize = 11.5f
                             setTypeface(typeface, Typeface.BOLD)
                             setTextColor(statusColor)
+                            background = GradientDrawable().apply {
+                                cornerRadius = dp(12).toFloat()
+                                setColor(statusBg)
+                            }
+                            setPadding(dp(9), dp(3), dp(9), dp(3))
                         }
 
                         historyRow.addView(tvDate)
-                        historyRow.addView(tvStatus)
-                        cardContent.addView(historyRow)
+                        historyRow.addView(tvStatusBadge)
+                        historyContainer.addView(historyRow)
+
+                        if (idx < displayList.size - 1) {
+                            val rowDivider = View(activity).apply {
+                                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                                    topMargin = dp(2)
+                                    bottomMargin = dp(2)
+                                }
+                                setBackgroundColor(Color.parseColor("#E2E8F0"))
+                            }
+                            historyContainer.addView(rowDivider)
+                        }
                     }
 
-                    // View all / Show less toggle if history > 4
+                    // View all / Show less toggle button if history > 4
                     if (course.history.size > 4) {
                         val toggleAllBtn = TextView(activity).apply {
-                            text = if (showAll) "Show less" else "View all (${course.history.size} sessions)"
-                            textSize = 11.5f
+                            text = if (showAll) "Show less" else "View all (${course.history.size} sessions)  ↓"
+                            textSize = 12f
                             setTypeface(typeface, Typeface.BOLD)
                             setTextColor(color(R.color.cm_primary))
-                            setPadding(0, dp(6), 0, dp(2))
+                            gravity = Gravity.CENTER
+                            setPadding(0, dp(10), 0, dp(4))
                             isClickable = true
                             isFocusable = true
                             setOnClickListener {
@@ -591,9 +739,11 @@ internal class ClassMateStudentAttendanceUi(
                                 render()
                             }
                         }
-                        cardContent.addView(toggleAllBtn)
+                        historyContainer.addView(toggleAllBtn)
                     }
                 }
+
+                cardContent.addView(historyContainer)
             }
 
             cardContainer.addView(cardContent)

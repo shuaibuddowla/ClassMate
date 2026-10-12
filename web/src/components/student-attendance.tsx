@@ -77,6 +77,12 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
 
   const displayPct = activeCourse ? activeCourse.percentage : overallPercentage;
   const displayColor = healthColor(displayPct);
+  const healthBadge =
+    displayPct >= 75
+      ? { label: "Eligible", className: "badge-eligible" }
+      : displayPct >= 60
+      ? { label: "Warning", className: "badge-warning" }
+      : { label: "At Risk", className: "badge-risk" };
 
   const summaryText = activeCourse
     ? activeCourse.classes_held === 0
@@ -90,16 +96,35 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
 
   return (
     <div className="attendance-student-section">
-      {/* Top strip: one line, big bold number */}
-      <div className="attendance-summary-strip">
-        <span className="attendance-big-pct" style={{ color: displayColor }}>
-          {displayPct}%
-        </span>
-        <span className="attendance-summary-sep">·</span>
-        <span className="attendance-summary-text">{summaryText}</span>
+      {/* Top Overview Hero Card */}
+      <div className="card attendance-hero-card">
+        <div className="attendance-hero-top">
+          <div className="attendance-hero-metric">
+            <span className="attendance-hero-pct" style={{ color: displayColor }}>
+              {displayPct}%
+            </span>
+            <span className={`attendance-hero-badge ${healthBadge.className}`}>
+              {healthBadge.label}
+            </span>
+          </div>
+          <span className="attendance-hero-sub">{summaryText}</span>
+        </div>
+        <div className="attendance-hero-track">
+          <div
+            className="attendance-hero-fill"
+            style={{
+              width: `${Math.min(100, Math.max(0, displayPct))}%`,
+              background: displayColor,
+            }}
+          />
+        </div>
       </div>
 
-      {/* Plain list of course cards */}
+      <div className="attendance-section-heading">
+        <span>TRACKED COURSES</span>
+      </div>
+
+      {/* List of course cards */}
       {courses.length === 0 ? (
         <div className="card attendance-empty-msg">
           <p>No courses are currently tracking attendance in this batch.</p>
@@ -110,12 +135,18 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
             const isSelected = selectedCourseId === c.semester_course_id;
             const pct = c.percentage ?? 0;
             const barColor = healthColor(pct);
+            const courseBadgeClass =
+              pct >= 75
+                ? "badge-eligible"
+                : pct >= 60
+                ? "badge-warning"
+                : "badge-risk";
             const history = c.history || [];
 
             return (
               <div
                 key={c.semester_course_id}
-                className="attendance-course-card"
+                className={`attendance-course-card ${isSelected ? "selected" : ""}`}
                 style={{ "--accent-color": barColor } as React.CSSProperties}
               >
                 <div
@@ -127,12 +158,25 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                   }
                 >
                   <div className="attendance-course-info">
-                    <h3 className="attendance-course-title">
-                      {c.course_code} — {c.course_title}
-                    </h3>
+                    <div className="attendance-title-row">
+                      <h3 className="attendance-course-title">
+                        {c.course_code} — {c.course_title}
+                      </h3>
+                      <span className={`attendance-pct-pill ${courseBadgeClass}`}>
+                        {pct}%
+                      </span>
+                    </div>
+
                     {c.teacher_name && c.teacher_name !== "null" && (
-                      <p className="attendance-course-teacher">{c.teacher_name}</p>
+                      <p className="attendance-course-teacher">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginRight: "4px" }}>
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        {c.teacher_name}
+                      </p>
                     )}
+
                     <div className="attendance-bar-row">
                       <div className="attendance-track">
                         <div
@@ -143,13 +187,13 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                           }}
                         />
                       </div>
-                      <span className="attendance-pct-label" style={{ color: barColor }}>
-                        {pct}%
+                      <span className="attendance-classes-count">
+                        {c.classes_attended} / {c.classes_held} classes
+                      </span>
+                      <span className={`attendance-chevron ${isSelected ? "rotated" : ""}`}>
+                        ❯
                       </span>
                     </div>
-                    <span className="attendance-classes-count">
-                      {c.classes_attended} / {c.classes_held} classes
-                    </span>
                   </div>
                 </div>
 
@@ -175,6 +219,11 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                           const timeStr = h.time ? ` · ${h.time}` : "";
                           const isPresent = h.status === "present";
                           const isLate = h.status === "late";
+                          const statusClass = isPresent
+                            ? "status-pill-present"
+                            : isLate
+                            ? "status-pill-late"
+                            : "status-pill-absent";
 
                           return (
                             <div
@@ -185,16 +234,7 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                                 {dateStr}
                                 {timeStr}
                               </span>
-                              <span
-                                className="attendance-history-status"
-                                style={{
-                                  color: isPresent
-                                    ? "var(--green, #22c55e)"
-                                    : isLate
-                                    ? "var(--amber, #f59e0b)"
-                                    : "var(--red, #ef4444)",
-                                }}
-                              >
+                              <span className={`attendance-history-status ${statusClass}`}>
                                 {isPresent ? "✓ Present" : isLate ? "⏰ Late" : "✗ Absent"}
                               </span>
                             </div>
@@ -213,7 +253,7 @@ export default function StudentAttendanceDashboard({ ctx }: { ctx: Context }) {
                           >
                             {showAllHistory[c.semester_course_id]
                               ? "Show less"
-                              : `View all (${history.length} sessions)`}
+                              : `View all (${history.length} sessions)  ↓`}
                           </button>
                         )}
                       </>

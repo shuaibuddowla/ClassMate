@@ -8209,29 +8209,103 @@ dialog:has(.notice-detail-modal-shell) > header {
   }
 }
 
-/* Top summary strip: one line, big bold number */
-.attendance-summary-strip {
+/* Student Attendance Overview Hero Card */
+.attendance-hero-card {
+  padding: 18px 20px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  background: var(--surface, var(--card));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 0 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.attendance-big-pct {
-  font-size: 26px;
+.attendance-hero-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attendance-hero-metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.attendance-hero-pct {
+  font-size: 32px;
   font-weight: 800;
   line-height: 1;
+  letter-spacing: -0.03em;
 }
 
-.attendance-summary-sep {
-  color: var(--muted);
+.attendance-hero-badge {
+  font-size: 11.5px;
   font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
 }
 
-.attendance-summary-text {
-  font-size: 14px;
+.badge-eligible {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+[data-theme="dark"] .badge-eligible {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+[data-theme="dark"] .badge-warning {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.badge-risk {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+[data-theme="dark"] .badge-risk {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+}
+
+.attendance-hero-sub {
+  font-size: 13.5px;
   color: var(--muted);
   font-weight: 500;
+}
+
+.attendance-hero-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--soft);
+  overflow: hidden;
+}
+
+.attendance-hero-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.attendance-section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  padding: 2px 4px 10px;
 }
 
 .attendance-empty-msg {
@@ -8251,22 +8325,28 @@ dialog:has(.notice-detail-modal-shell) > header {
 .attendance-course-card {
   position: relative;
   border-radius: 20px;
-  padding: 14px 18px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
   background: var(--surface, var(--card));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.attendance-course-card.selected {
+  border-color: var(--primary);
 }
 
 .attendance-course-card::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 25%;
-  bottom: 25%;
-  width: 3.5px;
-  border-radius: 3px;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
   background: var(--accent-color, var(--primary));
 }
 
@@ -8280,25 +8360,42 @@ dialog:has(.notice-detail-modal-shell) > header {
   flex-direction: column;
 }
 
+.attendance-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .attendance-course-title {
   font-size: 15px;
   font-weight: 700;
   margin: 0;
   color: var(--text);
   line-height: 1.35;
+  flex: 1;
+}
+
+.attendance-pct-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2.5px 8.5px;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
 .attendance-course-teacher {
   font-size: 12px;
   color: var(--muted);
-  margin: 3px 0 8px;
+  margin: 4px 0 10px;
+  display: flex;
+  align-items: center;
 }
 
 .attendance-bar-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
 }
 
 .attendance-track {
@@ -8315,40 +8412,97 @@ dialog:has(.notice-detail-modal-shell) > header {
   border-radius: 99px;
 }
 
-.attendance-pct-label {
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .attendance-classes-count {
   font-size: 11.5px;
+  font-weight: 600;
   color: var(--muted);
+  flex: 1;
 }
 
-/* Student Chronological Sessions List */
+.attendance-chevron {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  user-select: none;
+  display: inline-block;
+  margin-left: auto;
+}
+
+.attendance-chevron.rotated {
+  transform: rotate(90deg);
+}
+
+/* Student Chronological Sessions List Container */
 .attendance-history-list {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  gap: 4px;
+  background: color-mix(in srgb, var(--soft) 50%, var(--surface));
+  border-radius: 14px;
+  padding: 10px 14px;
+  gap: 0;
+  border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .attendance-history-list {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .attendance-history-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  padding: 8px 0;
   font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.attendance-history-row:last-of-type {
+  border-bottom: none;
 }
 
 .attendance-history-date {
   color: var(--text);
   font-weight: 500;
+  font-size: 12.5px;
 }
 
 .attendance-history-status {
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2.5px 8.5px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.status-pill-present {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+[data-theme="dark"] .status-pill-present {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+}
+
+.status-pill-late {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+[data-theme="dark"] .status-pill-late {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.status-pill-absent {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+[data-theme="dark"] .status-pill-absent {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
 }
 
 .attendance-history-empty {
@@ -8363,10 +8517,10 @@ dialog:has(.notice-detail-modal-shell) > header {
   color: var(--primary);
   font-size: 12px;
   font-weight: 700;
-  padding: 6px 0 2px;
-  text-align: left;
+  padding: 10px 0 2px;
+  text-align: center;
   cursor: pointer;
-  align-self: flex-start;
+  align-self: center;
 }
 
 .attendance-view-all-btn:hover {
