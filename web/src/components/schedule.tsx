@@ -42,6 +42,27 @@ function dhakaNowTime() {
   }).format(new Date());
 }
 
+export function dhakaHour(): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Dhaka",
+      hour: "numeric",
+      hour12: false,
+    }).formatToParts(new Date());
+    const val = parts.find((p) => p.type === "hour")?.value;
+    return val ? parseInt(val, 10) : new Date().getHours();
+  } catch {
+    return new Date().getHours();
+  }
+}
+
+export function defaultTeacherGreeting(hour = dhakaHour()): { greeting: string; eyebrow: string } {
+  if (hour >= 5 && hour <= 11) return { greeting: "Good morning, Sir", eyebrow: "TEACHING SCHEDULE" };
+  if (hour >= 12 && hour <= 14) return { greeting: "Good noon, Sir", eyebrow: "TEACHING SCHEDULE" };
+  if (hour >= 15 && hour <= 17) return { greeting: "Good afternoon, Sir", eyebrow: "TEACHING SCHEDULE" };
+  return { greeting: "Good evening, Sir", eyebrow: "TEACHING SCHEDULE" };
+}
+
 export function Schedule({ ctx }: { ctx: Context }) {
   const [mode, setMode] = useState("routine"),
     [date, setDate] = useState(dhakaToday()),
@@ -223,6 +244,18 @@ export function Schedule({ ctx }: { ctx: Context }) {
     closed = classesClosed(date, events);
 
   const isTeacherViewer = ctx.profile.role === "teacher";
+  const teacherGreetingQuery = useQuery({
+    queryKey: ["teacher_greeting", isTeacherViewer],
+    queryFn: async () => {
+      return await rpc<{ greeting: string; eyebrow: string; slot: string }>("get_teacher_greeting", {
+        client_hour: dhakaHour(),
+      });
+    },
+    enabled: isTeacherViewer,
+    staleTime: 60_000,
+  });
+  const teacherGreeting = teacherGreetingQuery.data || defaultTeacherGreeting();
+
   const rawRoutineEntries = (routine.data || []).filter((s) => s.day_of_week === day);
   const teacherAssignedEntries = isTeacherViewer
     ? rawRoutineEntries.filter((s) => Boolean(editable.data?.[s.semester_course_id]))
@@ -286,6 +319,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "YOUR UNIVERSITY, MONTH BY MONTH"
               ) : mode === "bus" ? (
                 "STUDENT TRANSPORT"
+              ) : isTeacherViewer ? (
+                teacherGreeting.eyebrow
               ) : (
                 <>
                   <span className="desktop-greeting">
@@ -300,6 +335,17 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "Academic calendar"
               ) : mode === "bus" ? (
                 "Campus buses"
+              ) : isTeacherViewer ? (
+                <>
+                  {teacherGreeting.greeting}
+                  <span
+                    className="greeting-wave"
+                    aria-hidden="true"
+                  >
+                    {" "}
+                    👋
+                  </span>
+                </>
               ) : (
                 <>
                   <span className="desktop-greeting">Welcome, </span>
@@ -328,8 +374,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
         <div className="segment modes">
           {[
             ["routine", "Class Routine"],
-            ...(ctx.profile.role === "student" ? [["attendance", "My Attendance"]] : []),
-            ...(ctx.profile.role === "student" ? [["bus", "Bus Schedule"]] : []),
+            ...(!isTeacherViewer ? [["attendance", "My Attendance"]] : []),
+            ...(!isTeacherViewer ? [["bus", "Bus Schedule"]] : []),
             ...(showCalendar ? [["calendar", "Calendar"]] : []),
           ].map(([id, label]) => (
             <button
@@ -564,7 +610,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                       let stripText = "";
 
                       if (isAttendanceEnabled) {
-                        if (isAdmin || isTeacher) {
+                        if (isTeacherViewer) {
                           if (hasOpenSession) {
                             showAttendanceStrip = true;
                             stripType = "teacher_live";
@@ -574,11 +620,15 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             stripType = "teacher_start";
                             stripText = "Take Attendance";
                           }
-                        } else if (isStudent) {
+                        } else {
                           if (hasOpenSession) {
                             showAttendanceStrip = true;
                             stripType = "student_scan";
                             stripText = "Scan Attendance";
+                          } else if (isAdmin && isLive) {
+                            showAttendanceStrip = true;
+                            stripType = "teacher_start";
+                            stripText = "Take Attendance";
                           }
                         }
                       }
@@ -725,7 +775,27 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                 )}
                                 <strong className="strip-title">{stripText}</strong>
                               </span>
-                              <span className="strip-hint">Tap to open →</span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                {hasOpenSession && isAdmin && !isTeacherViewer && (
+                                  <span
+                                    role="button"
+                                    className="strip-manage-chip"
+                                    title="View / Manage Attendance Session"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTeacherAttendance({
+                                        slotId: s.id,
+                                        sessionId: slotSession?.id,
+                                        courseTitle: s.course?.course_title || "Class",
+                                        courseCode: s.course?.course_code,
+                                      });
+                                    }}
+                                  >
+                                    Live QR ({presentCount})
+                                  </span>
+                                )}
+                                <span className="strip-hint">Tap to open →</span>
+                              </div>
                             </button>
                           )}
                         </div>

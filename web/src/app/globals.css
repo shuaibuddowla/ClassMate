@@ -7464,6 +7464,32 @@ dialog:has(.notice-detail-modal-shell) > header {
   color: #93c5fd;
 }
 
+.strip-manage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #059669;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.strip-manage-chip:hover {
+  background: rgba(16, 185, 129, 0.25);
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .strip-manage-chip {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
 /* Attendance Modals Overlay & Shell */
 .attendance-modal-overlay {
   position: fixed;
