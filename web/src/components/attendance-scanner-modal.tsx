@@ -167,15 +167,16 @@ export function AttendanceScannerModal({
       let timeWindow = 0;
       let qrToken = "";
 
+      const trimmed = rawText.trim();
       // Try parsing JSON format
-      if (rawText.startsWith("{")) {
-        const parsed = JSON.parse(rawText);
+      if (trimmed.startsWith("{")) {
+        const parsed = JSON.parse(trimmed);
         sessionId = parsed.s;
         timeWindow = Number(parsed.w);
         qrToken = parsed.t;
-      } else if (rawText.startsWith("cm:")) {
+      } else if (trimmed.startsWith("cm:")) {
         // Fallback compact colon format: cm:sessionId:window:token
-        const parts = rawText.split(":");
+        const parts = trimmed.split(":");
         sessionId = parts[1];
         timeWindow = Number(parts[2]);
         qrToken = parts[3];
@@ -262,6 +263,9 @@ export function AttendanceScannerModal({
             };
 
             animId = requestAnimationFrame(scanFrame);
+          } else {
+            // Browser lacks native BarcodeDetector
+            if (active) setHasCamera(false);
           }
         }
       } catch (err) {

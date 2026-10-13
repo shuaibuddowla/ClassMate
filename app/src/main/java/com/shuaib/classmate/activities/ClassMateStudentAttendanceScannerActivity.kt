@@ -140,17 +140,18 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
 
     private fun handleBarcodeDetected(raw: String) {
         try {
+            val trimmed = raw.trim()
             var sessionId = ""
             var timeWindow: Long = 0
             var qrToken = ""
 
-            if (raw.startsWith("{")) {
-                val json = JSONObject(raw)
+            if (trimmed.startsWith("{")) {
+                val json = JSONObject(trimmed)
                 sessionId = json.getString("s")
                 timeWindow = json.getLong("w")
                 qrToken = json.getString("t")
-            } else if (raw.startsWith("cm:")) {
-                val parts = raw.split(":")
+            } else if (trimmed.startsWith("cm:")) {
+                val parts = trimmed.split(":")
                 sessionId = parts[1]
                 timeWindow = parts[2].toLong()
                 qrToken = parts[3]
@@ -182,9 +183,10 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
                         ClassMateAuthApi.rpc("mark_attendance", params)
                     }
 
+                    val isLate = result.optString("status") == "late_recorded"
                     showSuccessUi(
-                        title = "Marked Present",
-                        message = "Your attendance has been recorded successfully.",
+                        title = if (isLate) "Marked Late" else "Marked Present",
+                        message = if (isLate) "Your attendance has been recorded (Late)." else "Your attendance has been recorded successfully.",
                         isOffline = false
                     )
                 } catch (e: Exception) {
@@ -227,6 +229,10 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
         binding.cardResult.visibility = View.VISIBLE
         binding.tvResultTitle.text = title
         binding.tvResultMessage.text = message
+        binding.btnDone.text = "Done"
+        binding.btnDone.setOnClickListener { finish() }
+
+        runCatching { com.shuaib.classmate.ui.ClassMateHaptics.selection(binding.root) }
 
         if (isOffline) {
             binding.ivResultIcon.setImageResource(R.drawable.ic_clock)
