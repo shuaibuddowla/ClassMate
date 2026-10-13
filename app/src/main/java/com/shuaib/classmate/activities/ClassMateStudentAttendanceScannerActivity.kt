@@ -183,10 +183,9 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
                         ClassMateAuthApi.rpc("mark_attendance", params)
                     }
 
-                    val isLate = result.optString("status") == "late_recorded"
                     showSuccessUi(
-                        title = if (isLate) "Marked Late" else "Marked Present",
-                        message = if (isLate) "Your attendance has been recorded (Late)." else "Your attendance has been recorded successfully.",
+                        title = "Marked Present",
+                        message = "Your attendance has been recorded successfully.",
                         isOffline = false
                     )
                 } catch (e: Exception) {
