@@ -8625,7 +8625,37 @@ dialog:has(.notice-detail-modal-shell) > header {
 }
 
 .attendance-course-tabs {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.attendance-course-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  border-radius: 999px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.course-code-tag {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.course-title-sep {
+  opacity: 0.6;
+}
+
+.course-name-tag {
+  font-weight: 500;
+  opacity: 0.92;
 }
 
 .attendance-teacher-top-strip {
@@ -8634,7 +8664,31 @@ dialog:has(.notice-detail-modal-shell) > header {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  padding: 4px 2px;
+}
+
+.attendance-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.attendance-big-pct {
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.attendance-summary-sep {
+  color: var(--border);
+  font-weight: 700;
+}
+
+.attendance-summary-text {
+  font-weight: 500;
 }
 
 .attendance-export-wrapper {
@@ -8642,36 +8696,45 @@ dialog:has(.notice-detail-modal-shell) > header {
 }
 
 .attendance-export-btn {
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
   font-size: 13px;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 12px;
+  transition: all 0.15s ease;
 }
 
 .attendance-export-menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   background: var(--surface, var(--card));
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  min-width: 170px;
+  min-width: 190px;
   z-index: 20;
   overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
 }
 
 .attendance-export-menu button {
-  padding: 9px 12px;
-  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
   text-align: left;
   background: transparent;
   border: none;
   color: var(--text);
   cursor: pointer;
   border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
 }
 
 .attendance-export-menu button:last-child {
@@ -8689,7 +8752,48 @@ dialog:has(.notice-detail-modal-shell) > header {
 
 .attendance-subtabs {
   width: fit-content;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+/* Empty State Card */
+.attendance-empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 44px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface, var(--card));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+.empty-state-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.attendance-empty-state-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.attendance-empty-state-card p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 420px;
+  line-height: 1.5;
 }
 
 /* Sessions tab plain rows */
@@ -8703,21 +8807,46 @@ dialog:has(.notice-detail-modal-shell) > header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-radius: 14px;
+  padding: 13px 18px;
+  border-radius: 16px;
   cursor: pointer;
   border: 1px solid var(--border);
   background: var(--surface, var(--card));
+  transition: all 0.15s ease;
 }
 
 .attendance-plain-row:hover {
   background: var(--soft);
+  border-color: rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+.session-left-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .session-date-time {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text);
+}
+
+.session-room-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.session-right-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .session-counts-text {
@@ -8725,11 +8854,29 @@ dialog:has(.notice-detail-modal-shell) > header {
   color: var(--muted);
 }
 
+.session-counts-text strong {
+  color: var(--text);
+}
+
 .session-live-tag {
   font-size: 11px;
   font-weight: 700;
-  color: var(--green, #22c55e);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--green, #16a34a);
   text-transform: uppercase;
+}
+
+.session-chevron {
+  color: var(--muted);
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+}
+
+.attendance-plain-row:hover .session-chevron {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 /* Roster tab plain table */

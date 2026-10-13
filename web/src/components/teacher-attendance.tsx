@@ -7,6 +7,7 @@ import { compareStudentRolls } from "@/lib/attendance-excel";
 import { type Context } from "./app";
 import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import { ErrorBox, Skeleton } from "./ui";
+import { Download, FileSpreadsheet, Calendar, Users, ChevronRight } from "lucide-react";
 
 interface SessionInfo {
   session_id: string;
@@ -197,18 +198,27 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
 
   return (
     <div className="attendance-teacher-section">
-      {/* 1. Course selector: plain horizontal tabs, text only */}
+      {/* 1. Course selector: horizontal tabs showing course code and title */}
       <div className="segment modes attendance-course-tabs">
-        {courses.map((c) => (
-          <button
-            key={c.semester_course_id}
-            type="button"
-            className={activeCourse?.semester_course_id === c.semester_course_id ? "selected" : ""}
-            onClick={() => setSelectedCourseId(c.semester_course_id)}
-          >
-            {c.course_code}
-          </button>
-        ))}
+        {courses.map((c) => {
+          const isSelected = activeCourse?.semester_course_id === c.semester_course_id;
+          return (
+            <button
+              key={c.semester_course_id}
+              type="button"
+              className={`attendance-course-tab-btn ${isSelected ? "selected" : ""}`}
+              onClick={() => setSelectedCourseId(c.semester_course_id)}
+            >
+              <strong className="course-code-tag">{c.course_code}</strong>
+              {c.course_title && (
+                <>
+                  <span className="course-title-sep">·</span>
+                  <span className="course-name-tag">{c.course_title}</span>
+                </>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {activeCourse && (
@@ -216,8 +226,16 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
           {/* 2. Top numbers strip & single Export Excel button */}
           <div className="attendance-teacher-top-strip">
             <div className="attendance-summary-strip">
-              <span className="attendance-big-pct" style={{ color: activeAvgColor }}>
-                {activeCourse.average_percentage}% avg
+              <span
+                className="attendance-big-pct"
+                style={{
+                  color: activeCourse.total_sessions > 0 ? activeAvgColor : "var(--muted)",
+                }}
+              >
+                {activeCourse.total_sessions > 0
+                  ? `${activeCourse.average_percentage}%`
+                  : "0%"}{" "}
+                avg
               </span>
               <span className="attendance-summary-sep">·</span>
               <span className="attendance-summary-text">
@@ -236,20 +254,23 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={exporting}
               >
-                {exporting ? "Exporting..." : "Export Excel"}
+                <Download size={14} />
+                <span>{exporting ? "Exporting..." : "Export Excel"}</span>
               </button>
 
               {showExportMenu && (
                 <div className="attendance-export-menu">
                   <button type="button" onClick={handleExportMatrix}>
-                    Semester Matrix (.xlsx)
+                    <FileSpreadsheet size={14} />
+                    <span>Semester Matrix (.xlsx)</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleExportLatestSession}
                     disabled={!activeCourse.sessions.length}
                   >
-                    Latest Session (.xlsx)
+                    <FileSpreadsheet size={14} />
+                    <span>Latest Session (.xlsx)</span>
                   </button>
                 </div>
               )}
@@ -278,14 +299,21 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
           {activeTab === "sessions" && (
             <div className="attendance-sessions-plain-list">
               {activeCourse.sessions.length === 0 ? (
-                <div className="card attendance-empty-msg">
-                  <p>No class sessions held yet for this course.</p>
+                <div className="card attendance-empty-state-card">
+                  <div className="empty-state-icon-wrap">
+                    <Calendar size={28} />
+                  </div>
+                  <h3>No class sessions held yet</h3>
+                  <p>
+                    When attendance is taken from the Timetable, completed session records and student turnout will appear here.
+                  </p>
                 </div>
               ) : (
                 activeCourse.sessions.map((sess) => {
                   const dObj = new Date(sess.started_at);
                   const dateStr = !isNaN(dObj.getTime())
                     ? dObj.toLocaleDateString("en-US", {
+                        weekday: "short",
                         month: "short",
                         day: "numeric",
                       })
@@ -312,15 +340,24 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
                         })
                       }
                     >
-                      <span className="session-date-time">
-                        {dateStr}, {timeStr}
-                      </span>
-                      <span className="session-counts-text">
-                        {sess.present_count} / {sess.total_count} present
-                      </span>
-                      {sess.status === "open" && (
-                        <span className="session-live-tag">Live</span>
-                      )}
+                      <div className="session-left-meta">
+                        <span className="session-date-time">
+                          {dateStr} · {timeStr}
+                        </span>
+                        {sess.room && (
+                          <span className="session-room-tag">Room {sess.room}</span>
+                        )}
+                      </div>
+                      <div className="session-right-meta">
+                        <span className="session-counts-text">
+                          <strong>{sess.present_count}</strong> / {sess.total_count} present
+                        </span>
+                        {sess.status === "open" ? (
+                          <span className="session-live-tag">Live</span>
+                        ) : (
+                          <ChevronRight size={16} className="session-chevron" />
+                        )}
+                      </div>
                     </div>
                   );
                 })
@@ -338,8 +375,12 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
               ) : matrixQuery.isError ? (
                 <ErrorBox error={matrixQuery.error} retry={() => matrixQuery.refetch()} />
               ) : sortedStudents.length === 0 ? (
-                <div className="card attendance-empty-msg">
-                  <p>No student roster found for this course.</p>
+                <div className="card attendance-empty-state-card">
+                  <div className="empty-state-icon-wrap">
+                    <Users size={28} />
+                  </div>
+                  <h3>No student roster found</h3>
+                  <p>Students enrolled in this batch will appear here once verified.</p>
                 </div>
               ) : (
                 <>
