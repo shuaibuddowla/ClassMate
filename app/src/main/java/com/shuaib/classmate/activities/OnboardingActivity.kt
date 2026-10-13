@@ -37,6 +37,11 @@ class OnboardingActivity : AppCompatActivity() {
                 R.drawable.ic_classmate_logo_mark,
                 "Study Library",
                 "Lecture files, polls, and academic records stay organized for everyday use."
+            ),
+            OnboardingSlide(
+                R.drawable.ic_camera,
+                "Instant QR Attendance",
+                "Scan your teacher's live QR code in class to record attendance instantly and securely."
             )
         )
 

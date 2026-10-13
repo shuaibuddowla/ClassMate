@@ -8260,6 +8260,108 @@ dialog:has(.notice-detail-modal-shell) > header {
   width: 100%;
 }
 
+.camera-permission-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.camera-permission-icon-wrap.warning {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.camera-permission-icon-wrap.muted {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.camera-permission-explanation {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 320px;
+  margin: 0;
+}
+
+.camera-permission-steps {
+  width: 100%;
+  max-width: 340px;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.camera-step-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.camera-permission-steps ol {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.retry-camera-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.retry-camera-btn:hover {
+  opacity: 0.9;
+}
+
+.manual-entry-divider {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 8px 0 4px;
+}
+
+.manual-entry-divider::before,
+.manual-entry-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.manual-entry-divider span {
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .manual-input-area {
   width: 100%;
   padding: 10px;

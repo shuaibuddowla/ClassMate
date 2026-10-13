@@ -42,7 +42,7 @@ internal object ClassMateWelcomeDialogs {
             }
             else -> {
                 builder.setTitle(if(notificationsAllowed) "Notifications are enabled" else "Stay in the loop")
-                form.label(if(notificationsAllowed) "You’re ready for your batch’s alerts." else "Allow alerts for new notices and class updates in your batch.").apply { textSize=15f }
+                form.label(if(notificationsAllowed) "You’re ready for your batch’s alerts and class updates." else "Allow alerts for new notices, attendance sessions, and class updates in your batch.").apply { textSize=15f }
                 builder.setPositiveButton(if(notificationsAllowed) "Continue" else "Enable notifications") { _,_ -> enable() }
                 if(!notificationsAllowed) builder.setNegativeButton("Not now") { _,_ -> skip() }
             }

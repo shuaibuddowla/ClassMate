@@ -25,6 +25,11 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.shuaib.classmate.R
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.shuaib.classmate.data.local.ClassMateDatabase
 import com.shuaib.classmate.data.local.PendingAttendanceScanEntity
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
@@ -41,6 +46,7 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityStudentAttendanceScannerBinding
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var isScanned = false
+    private var permissionDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -48,8 +54,7 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
         if (isGranted) {
             startCamera()
         } else {
-            Toast.makeText(this, "Camera permission is required to scan attendance", Toast.LENGTH_LONG).show()
-            finish()
+            showPermissionDeniedPrompt()
         }
     }
 
@@ -75,11 +80,77 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
             insets
         }
 
+        checkAndRequestCameraPermission()
+    }
+
+    override fun onResume() {
+        super.onResume()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            permissionDialog?.dismiss()
+            permissionDialog = null
             startCamera()
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    private fun checkAndRequestCameraPermission() {
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                startCamera()
+            }
+            ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA) -> {
+                showPermissionRationalePrompt()
+            }
+            else -> {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    private fun showPermissionRationalePrompt() {
+        permissionDialog?.dismiss()
+        permissionDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.camera_permission_title)
+            .setMessage(R.string.camera_permission_rationale)
+            .setCancelable(false)
+            .setPositiveButton(R.string.grant_permission) { _, _ ->
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                finish()
+            }
+            .show()
+    }
+
+    private fun showPermissionDeniedPrompt() {
+        permissionDialog?.dismiss()
+        val showRationale = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.camera_permission_title)
+            .setCancelable(false)
+
+        if (showRationale) {
+            builder.setMessage(R.string.camera_permission_rationale)
+                .setPositiveButton(R.string.grant_permission) { _, _ ->
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                    finish()
+                }
+        } else {
+            builder.setMessage(R.string.camera_permission_settings_prompt)
+                .setPositiveButton(R.string.open_settings) { _, _ ->
+                    runCatching {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", packageName, null)
+                        }
+                        startActivity(intent)
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                    finish()
+                }
+        }
+        permissionDialog = builder.show()
     }
 
     private fun startCamera() {
@@ -266,6 +337,8 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        permissionDialog?.dismiss()
+        permissionDialog = null
         cameraExecutor.shutdown()
     }
 }

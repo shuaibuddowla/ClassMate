@@ -9,7 +9,10 @@ import {
   WifiOff,
   AlertCircle,
   RefreshCw,
-  ScanLine
+  ScanLine,
+  CameraOff,
+  ShieldAlert,
+  Info
 } from "lucide-react";
 
 interface ScannerModalProps {
@@ -17,6 +20,8 @@ interface ScannerModalProps {
   courseTitle?: string;
   onClose: () => void;
 }
+
+type CameraStatus = "initializing" | "ready" | "permission_denied" | "unsupported" | "error";
 
 interface PendingScan {
   session_id: string;
@@ -68,7 +73,8 @@ export function AttendanceScannerModal({
   onClose,
 }: ScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasCamera, setHasCamera] = useState<boolean>(true);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>("initializing");
+  const [cameraRetryCount, setCameraRetryCount] = useState<number>(0);
   const [scanning, setScanning] = useState<boolean>(true);
   const [scanResult, setScanResult] = useState<{
     status: "success" | "offline_saved" | "error";
@@ -223,6 +229,13 @@ export function AttendanceScannerModal({
     let active = true;
 
     async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (active) setCameraStatus("unsupported");
+        return;
+      }
+
+      setCameraStatus("initializing");
+
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment", width: { ideal: 1280 } },
@@ -237,6 +250,8 @@ export function AttendanceScannerModal({
             const detector = new (window as any).BarcodeDetector({
               formats: ["qr_code"],
             });
+
+            if (active) setCameraStatus("ready");
 
             const scanFrame = async () => {
               if (
@@ -265,12 +280,20 @@ export function AttendanceScannerModal({
             animId = requestAnimationFrame(scanFrame);
           } else {
             // Browser lacks native BarcodeDetector
-            if (active) setHasCamera(false);
+            if (active) setCameraStatus("unsupported");
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn("Camera init failed:", err);
-        if (active) setHasCamera(false);
+        if (!active) return;
+        const errName = err?.name || "";
+        if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
+          setCameraStatus("permission_denied");
+        } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
+          setCameraStatus("unsupported");
+        } else {
+          setCameraStatus("error");
+        }
       }
     }
 
@@ -283,7 +306,7 @@ export function AttendanceScannerModal({
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [scanning]);
+  }, [scanning, cameraRetryCount]);
 
   return (
     <div className="attendance-modal-overlay">
@@ -350,7 +373,7 @@ export function AttendanceScannerModal({
                 )}
               </div>
             </div>
-          ) : hasCamera ? (
+          ) : cameraStatus === "ready" || cameraStatus === "initializing" ? (
             <div className="viewfinder-wrapper">
               <video
                 ref={videoRef}
@@ -367,17 +390,64 @@ export function AttendanceScannerModal({
               </div>
               <div className="viewfinder-tip">
                 <ScanLine size={16} />
-                <span>Keep QR centered inside frame</span>
+                <span>
+                  {cameraStatus === "initializing"
+                    ? "Starting camera..."
+                    : "Keep QR centered inside frame"}
+                </span>
               </div>
             </div>
           ) : (
             <div className="camera-fallback-card">
-              <Camera size={36} className="text-muted" />
-              <h3>Camera Access Unavailable</h3>
-              <p>
-                Camera permissions might be disabled or not supported in this
-                browser. You can enter the QR payload text below:
-              </p>
+              {cameraStatus === "permission_denied" ? (
+                <>
+                  <div className="camera-permission-icon-wrap warning">
+                    <CameraOff size={36} />
+                  </div>
+                  <h3>Camera Permission Denied</h3>
+                  <p className="camera-permission-explanation">
+                    ClassMate needs camera access to scan your teacher’s attendance
+                    QR code in real-time. Camera access is used exclusively for
+                    scanning — no photos or videos are ever recorded.
+                  </p>
+                  <div className="camera-permission-steps card">
+                    <div className="camera-step-title">
+                      <ShieldAlert size={15} />
+                      <strong>How to enable:</strong>
+                    </div>
+                    <ol>
+                      <li>Tap the <strong>lock / permissions icon</strong> in your browser address bar.</li>
+                      <li>Set <strong>Camera</strong> to <strong>Allow</strong>.</li>
+                      <li>Tap &quot;Try Camera Again&quot; below.</li>
+                    </ol>
+                  </div>
+                  <button
+                    className="retry-camera-btn"
+                    onClick={() => {
+                      setCameraRetryCount((c) => c + 1);
+                      setScanning(true);
+                    }}
+                  >
+                    <RefreshCw size={15} /> Try Camera Again
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="camera-permission-icon-wrap muted">
+                    <Camera size={36} />
+                  </div>
+                  <h3>Camera Unavailable in Browser</h3>
+                  <p className="camera-permission-explanation">
+                    Live QR barcode scanning is not supported by your current browser
+                    or device camera. You can still paste or type the session token below:
+                  </p>
+                </>
+              )}
+
+              <div className="manual-entry-divider">
+                <span>Or Enter Session Payload</span>
+              </div>
+
               <textarea
                 className="manual-input-area"
                 placeholder='Paste QR code payload here (e.g. {"s":"...","w":...})'
