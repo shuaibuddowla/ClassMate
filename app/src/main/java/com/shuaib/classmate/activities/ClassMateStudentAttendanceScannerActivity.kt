@@ -64,6 +64,17 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnDone.setOnClickListener { finish() }
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.cardResult) { v, insets ->
+            val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val baseMargin = (16 * resources.displayMetrics.density).toInt()
+            val params = v.layoutParams as? android.widget.FrameLayout.LayoutParams
+            if (params != null) {
+                params.bottomMargin = baseMargin + navInsets.bottom
+                v.layoutParams = params
+            }
+            insets
+        }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
         } else {

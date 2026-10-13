@@ -106,6 +106,8 @@ internal class ClassMateAcademicScreensSupabase(
             ?.takeIf { it.startsWith("https://") }
     }
     private var readerDialog: AlertDialog? = null
+    private var liveOpenSessionsMap = mutableMapOf<String, JSONObject>()
+    private var attendancePollerJob: kotlinx.coroutines.Job? = null
     private var libraryCategory = "theory"
     private var libraryFilter = "All"
     private data class LibrarySnapshot(
@@ -439,16 +441,60 @@ internal class ClassMateAcademicScreensSupabase(
                 visibility = if (canEdit && !calendarMode && !attendanceMode) View.VISIBLE else View.GONE
                 setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
             }
-            if (calendarMode) { timetableRequest++; calendarUi.show() }
-            else if (attendanceMode) { attendanceUi.show() }
+            if (calendarMode) { stopAttendanceSessionsPoller(); timetableRequest++; calendarUi.show() }
+            else if (attendanceMode) { stopAttendanceSessionsPoller(); attendanceUi.show() }
             else loadTimetable(root)
         }
         routine.setOnClickListener { if(busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; attendanceMode = false; updateToggle() }
-        attendance.setOnClickListener { if(!attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); attendanceMode = true; busMode = false; calendarMode = false; updateToggle() }
-        bus.setOnClickListener { if(!busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = true; calendarMode = false; attendanceMode = false; updateToggle() }
-        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); calendarMode = true; busMode = false; attendanceMode = false; updateToggle() }
+        attendance.setOnClickListener { if(!attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); attendanceMode = true; busMode = false; calendarMode = false; updateToggle() }
+        bus.setOnClickListener { if(!busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); busMode = true; calendarMode = false; attendanceMode = false; updateToggle() }
+        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); calendarMode = true; busMode = false; attendanceMode = false; updateToggle() }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
+    }
+
+    private fun stopAttendanceSessionsPoller() {
+        attendancePollerJob?.cancel()
+        attendancePollerJob = null
+    }
+
+    private fun startAttendanceSessionsPoller(root: View, batch: String) {
+        if (attendancePollerJob?.isActive == true) return
+        attendancePollerJob = scope.launch {
+            while (active(root) && batch == batchId() && !busMode && !calendarMode && !attendanceMode) {
+                runCatching {
+                    val rpcRes = ClassMateAuthApi.rpcText("active_attendance_sessions", JSONObject().put("target_batch", batch))
+                    val arr = JSONArray(rpcRes)
+                    val latestMap = mutableMapOf<String, JSONObject>()
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val slotId = o.optString("routine_slot_id")
+                        if (slotId.isNotBlank()) {
+                            latestMap[slotId] = JSONObject().apply {
+                                put("id", o.optString("session_id"))
+                                put("routine_slot_id", slotId)
+                                put("semester_course_id", o.optString("semester_course_id"))
+                                put("status", o.optString("status"))
+                                put("present_count", o.optInt("present_count", 0))
+                            }
+                        }
+                    }
+                    val hasChanged = latestMap.keys != liveOpenSessionsMap.keys ||
+                        latestMap.values.any { cur ->
+                            val prev = liveOpenSessionsMap[cur.optString("routine_slot_id")]
+                            prev?.optString("id") != cur.optString("id") || prev?.optString("status") != cur.optString("status")
+                        }
+                    if (hasChanged) {
+                        liveOpenSessionsMap.clear()
+                        liveOpenSessionsMap.putAll(latestMap)
+                        if (active(root) && !busMode && !calendarMode && !attendanceMode) {
+                            root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
+                        }
+                    }
+                }
+                kotlinx.coroutines.delay(3000L)
+            }
+        }
     }
 
     private fun canEditBus(): Boolean {
@@ -580,7 +626,26 @@ internal class ClassMateAcademicScreensSupabase(
                             profile().optString("role") == "teacher" -> rows(ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.$accountId&active=eq.true")).map { it.getString("semester_course_id") }
                             else -> emptyList()
                         } }
-                        val openAttendance = async { runCatching { ClassMateAuthApi.rows("attendance_sessions", "status=eq.open") }.getOrDefault(JSONArray()) }
+                        val openAttendance = async {
+                            runCatching {
+                                val rpcRes = ClassMateAuthApi.rpcText("active_attendance_sessions", JSONObject().put("target_batch", selectedBatch))
+                                val arr = JSONArray(rpcRes)
+                                val res = JSONArray()
+                                for (i in 0 until arr.length()) {
+                                    val o = arr.getJSONObject(i)
+                                    res.put(JSONObject().apply {
+                                        put("id", o.optString("session_id"))
+                                        put("routine_slot_id", o.optString("routine_slot_id"))
+                                        put("semester_course_id", o.optString("semester_course_id"))
+                                        put("status", o.optString("status"))
+                                        put("present_count", o.optInt("present_count", 0))
+                                    })
+                                }
+                                res
+                            }.getOrElse {
+                                runCatching { ClassMateAuthApi.rows("attendance_sessions", "status=eq.open") }.getOrDefault(JSONArray())
+                            }
+                        }
                         val names = JSONObject(); val catalog = courses.await()
                         offerings.forEach { names.put(it.getString("id"), catalog[it.getString("course_id")]?.optString("course_title") ?: "Course") }
                         JSONObject().put("entries", routines.await()).put("names", names).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("attendance", openAttendance.await()).put("saved_at", System.currentTimeMillis())
@@ -606,6 +671,9 @@ internal class ClassMateAcademicScreensSupabase(
             }
             val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
             val openSessionsMap = rows(data.optJSONArray("attendance") ?: JSONArray()).associateBy { it.optString("routine_slot_id") }
+            if (liveOpenSessionsMap.isEmpty()) {
+                liveOpenSessionsMap.putAll(openSessionsMap)
+            }
             if (!active(root) || request != timetableRequest || day != selectedDay ||
                 calendarMode || requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
@@ -709,13 +777,14 @@ internal class ClassMateAcademicScreensSupabase(
                 }
 
                 val slotId = item.optString("id")
-                val slotSession = openSessionsMap[slotId]
+                val slotSession = liveOpenSessionsMap[slotId] ?: openSessionsMap[slotId]
                 val hasOpenSession = slotSession != null
 
                 val role = profile().optString("role")
                 val isTeacherViewer = (role == "teacher" && courseId in editableCourses)
                 val isAdminViewer = role == "admin"
-                val isStudentViewer = role == "student"
+                val isStudentViewer = role == "student" || role.isBlank()
+                val isAttendanceEnabled = detail?.optBoolean("attendance_enabled") == true || isTeacherViewer || isAdminViewer
 
                 val strip = card.findViewById<View>(R.id.layoutAttendanceStrip)
                 val stripText = card.findViewById<TextView>(R.id.tvAttendanceStripText)
@@ -740,7 +809,7 @@ internal class ClassMateAcademicScreensSupabase(
                                 }
                                 activity.startActivity(intent)
                             }
-                        } else if (isLive) {
+                        } else if (isAttendanceEnabled && (isLive || (isToday && !cancelled))) {
                             strip.visibility = View.VISIBLE
                             strip.setBackgroundColor(android.graphics.Color.parseColor("#147C3AED"))
                             stripText.setTextColor(android.graphics.Color.parseColor("#7C3AED"))
@@ -780,6 +849,11 @@ internal class ClassMateAcademicScreensSupabase(
                         strip.visibility = View.GONE
                     }
                 }
+            }
+            if (!requestedBusMode && !calendarMode && !attendanceMode) {
+                startAttendanceSessionsPoller(root, selectedBatch)
+            } else {
+                stopAttendanceSessionsPoller()
             }
             if (!requestedBusMode && effectiveDate == LocalDate.now() && entries.isNotEmpty()) {
                 val routineTick = object : Runnable {

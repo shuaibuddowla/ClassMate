@@ -524,15 +524,24 @@ internal class ClassMateAcademicScreens(
         val semesters = if (batchId().isBlank()) JSONArray() else ClassMateAuthApi.rows("semesters",
             "select=semester_number&batch_id=eq.${batchId()}&status=eq.active&limit=1")
         if (!root.isAttachedToWindow) return@launch
-        val details = listOf(
-            "Email: ${account.optString("email")}",
-            "Role: ${account.optString("role")}",
-            "Department: $department",
-            "Assigned batch: $batch",
-            "Current semester: ${semesters.optJSONObject(0)?.optInt("semester_number") ?: "None"}",
-            "CR: ${if (account.optBoolean("is_cr")) "Yes" else "No"}",
-            "Verification: ${account.optString("verification_status")}",
-        ).joinToString("\n")
+        val isTeacher = account.optString("role") == "teacher"
+        val details = if (isTeacher) {
+            listOf(
+                "Email: ${account.optString("email")}",
+                "Role: Teacher",
+                "Verification: ${account.optString("verification_status")}",
+            ).joinToString("\n")
+        } else {
+            listOf(
+                "Email: ${account.optString("email")}",
+                "Role: ${account.optString("role")}",
+                "Department: $department",
+                "Assigned batch: $batch",
+                "Current semester: ${semesters.optJSONObject(0)?.optInt("semester_number") ?: "None"}",
+                "CR: ${if (account.optBoolean("is_cr")) "Yes" else "No"}",
+                "Verification: ${account.optString("verification_status")}",
+            ).joinToString("\n")
+        }
         AlertDialog.Builder(activity).setTitle("Profile details").setMessage(details)
             .setPositiveButton("Close", null)
             .apply {

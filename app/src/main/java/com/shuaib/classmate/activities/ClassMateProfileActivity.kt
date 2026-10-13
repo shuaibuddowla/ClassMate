@@ -137,8 +137,16 @@ class ClassMateProfileActivity : AppCompatActivity() {
                 .into(findViewById(R.id.ivProfile))
         }
 
-        findViewById<View>(R.id.btnHeroEdit).setOnClickListener { openEditProfile() }
-        findViewById<View>(R.id.cardPersonalInfo).setOnClickListener { openEditProfile() }
+        findViewById<View>(R.id.btnHeroEdit).apply {
+            visibility = if (isTeacher) View.GONE else View.VISIBLE
+            setOnClickListener { openEditProfile() }
+        }
+        findViewById<View>(R.id.cardPersonalInfo).apply {
+            isClickable = !isTeacher
+            isFocusable = !isTeacher
+            setOnClickListener { if (!isTeacher) openEditProfile() }
+        }
+        findViewById<View>(R.id.layoutMetricGrid).visibility = if (isTeacher) View.GONE else View.VISIBLE
 
         // Blood Group
         val bloodGroup = account.optString("blood_group").takeUnless { it.isBlank() || it == "null" || it == "Unknown" }

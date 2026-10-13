@@ -292,7 +292,7 @@ function SessionApp() {
         .forEach((meta) =>
           meta.setAttribute(
             "content",
-            active === "dark" ? "#040a18" : "#f4f7fc",
+            active === "dark" ? "#0a0a0c" : "#f4f7fc",
           ),
         );
     };

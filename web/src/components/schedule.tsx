@@ -86,19 +86,42 @@ export function Schedule({ ctx }: { ctx: Context }) {
   const attendanceSessions = useQuery({
     queryKey: [ctx.user, ctx.batch, "attendance-sessions"],
     queryFn: async () => {
-      const { data, error } = await supabase()
-        .schema("classmate")
-        .from("attendance_sessions")
-        .select("id, routine_slot_id, started_by, started_at, status")
-        .eq("status", "open");
-      if (error) return {};
-      const map: Record<string, Row> = {};
-      for (const item of data || []) {
-        map[item.routine_slot_id] = item;
+      try {
+        const data = await rpc<Array<{
+          session_id: string;
+          routine_slot_id: string;
+          semester_course_id: string;
+          started_at: string;
+          status: string;
+          present_count: number;
+        }>>("active_attendance_sessions", { target_batch: ctx.batch });
+
+        const map: Record<string, Row> = {};
+        for (const item of data || []) {
+          map[item.routine_slot_id] = {
+            id: item.session_id,
+            routine_slot_id: item.routine_slot_id,
+            semester_course_id: item.semester_course_id,
+            started_at: item.started_at,
+            status: item.status,
+            present_count: Number(item.present_count || 0),
+          };
+        }
+        return map;
+      } catch {
+        const { data } = await supabase()
+          .schema("classmate")
+          .from("attendance_sessions")
+          .select("id, routine_slot_id, started_by, started_at, status")
+          .eq("status", "open");
+        const map: Record<string, Row> = {};
+        for (const item of data || []) {
+          map[item.routine_slot_id] = item;
+        }
+        return map;
       }
-      return map;
     },
-    refetchInterval: 60_000,
+    refetchInterval: 3_000,
   });
 
   const sessionCounts = useQuery({
@@ -107,22 +130,15 @@ export function Schedule({ ctx }: { ctx: Context }) {
       attendanceSessions.data && Object.keys(attendanceSessions.data).length > 0,
     ),
     queryFn: async () => {
-      const sessionIds = Object.values(attendanceSessions.data || {}).map(
-        (s: Row) => s.id,
-      );
-      if (!sessionIds.length) return {};
-      const { data } = await supabase()
-        .schema("classmate")
-        .from("attendance_records")
-        .select("session_id")
-        .in("session_id", sessionIds);
       const counts: Record<string, number> = {};
-      for (const r of data || []) {
-        counts[r.session_id] = (counts[r.session_id] || 0) + 1;
+      for (const sess of Object.values(attendanceSessions.data || {})) {
+        if (typeof (sess as any).present_count === "number") {
+          counts[(sess as any).id] = (sess as any).present_count;
+        }
       }
       return counts;
     },
-    refetchInterval: 60_000,
+    refetchInterval: 3_000,
   });
 
   useEffect(() => {
@@ -602,11 +618,13 @@ export function Schedule({ ctx }: { ctx: Context }) {
                       const slotSession = attendanceSessions.data?.[s.id];
                       const hasOpenSession = Boolean(slotSession);
                       const presentCount = slotSession
-                        ? sessionCounts.data?.[slotSession.id] || 0
+                        ? (typeof slotSession.present_count === "number"
+                            ? slotSession.present_count
+                            : sessionCounts.data?.[slotSession.id] || 0)
                         : 0;
 
                       const isAttendanceEnabled = Boolean(
-                        s.course?.attendance_enabled ?? detail?.attendance_enabled
+                        detail?.attendance_enabled ?? s.course?.attendance_enabled
                       );
 
                       let showAttendanceStrip = false;
@@ -620,7 +638,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             showAttendanceStrip = true;
                             stripType = "teacher_live";
                             stripText = `Attendance Live · ${presentCount} present`;
-                          } else if (isLive) {
+                          } else if (isLive || (isToday && !detail?.cancelled && !closed)) {
                             showAttendanceStrip = true;
                             stripType = "teacher_start";
                             stripText = "Take Attendance";
@@ -630,7 +648,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             showAttendanceStrip = true;
                             stripType = "student_scan";
                             stripText = "Scan Attendance";
-                          } else if (isAdmin && isLive) {
+                          } else if (isAdmin && (isLive || (isToday && !detail?.cancelled && !closed))) {
                             showAttendanceStrip = true;
                             stripType = "teacher_start";
                             stripText = "Take Attendance";

@@ -344,7 +344,7 @@ export function AttendanceTeacherModal({
                 {qrPayload ? (
                   <QRCodeSVG
                     value={qrPayload}
-                    size={280}
+                    size={230}
                     level="M"
                     includeMargin={true}
                     className="qr-svg-canvas"
@@ -405,17 +405,6 @@ export function AttendanceTeacherModal({
                   </div>
                 </div>
               )}
-
-              {/* Action Buttons */}
-              <div className="attendance-actions-footer">
-                <button
-                  className="attendance-close-btn"
-                  onClick={handleCloseSession}
-                  disabled={loading}
-                >
-                  Close Attendance
-                </button>
-              </div>
             </div>
           ) : (
             /* Summary & Roster View */
@@ -536,21 +525,42 @@ export function AttendanceTeacherModal({
                   })
                 )}
               </div>
+            </div>
+          )}
+        </div>
 
-              {/* Bottom Export and Controls */}
-              <div className="summary-footer-actions">
+        {/* Pinned Bottom Actions Bar - ALWAYS visible, never hidden behind scroll or content */}
+        <div className="attendance-modal-footer">
+          {status === "open" && !showRoster ? (
+            <button
+              className="attendance-close-btn"
+              onClick={handleCloseSession}
+              disabled={loading}
+            >
+              Close Attendance
+            </button>
+          ) : (
+            <div className="summary-footer-actions">
+              <button
+                className="export-excel-btn"
+                onClick={handleExport}
+                disabled={exporting}
+              >
+                <Download size={16} />
+                <span>{exporting ? "Generating Excel..." : "Export to Excel (.xlsx)"}</span>
+              </button>
+              {status === "open" && (
                 <button
-                  className="export-excel-btn"
-                  onClick={handleExport}
-                  disabled={exporting}
+                  className="attendance-close-btn-secondary"
+                  onClick={handleCloseSession}
+                  disabled={loading}
                 >
-                  <Download size={16} />
-                  <span>{exporting ? "Generating Excel..." : "Export to Excel (.xlsx)"}</span>
+                  Close Session
                 </button>
-                <button className="attendance-done-btn" onClick={onClose}>
-                  Done
-                </button>
-              </div>
+              )}
+              <button className="attendance-done-btn" onClick={onClose}>
+                Done
+              </button>
             </div>
           )}
         </div>

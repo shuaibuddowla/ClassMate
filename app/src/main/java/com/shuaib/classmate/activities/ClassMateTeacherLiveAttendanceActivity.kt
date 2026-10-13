@@ -102,12 +102,21 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
             exportToExcel()
         }
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.layoutBottomActions) { v, insets ->
+            val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val basePaddingBottom = (16 * resources.displayMetrics.density).toInt()
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, basePaddingBottom + navInsets.bottom)
+            insets
+        }
+
         initializeSession()
     }
 
     private fun showSummaryView(show: Boolean) {
         binding.scrollQrView.visibility = if (show) View.GONE else View.VISIBLE
         binding.layoutSummaryView.visibility = if (show) View.VISIBLE else View.GONE
+        binding.btnExportExcel.visibility = if (show) View.VISIBLE else View.GONE
+        binding.btnCloseAttendance.visibility = if (isSessionClosed) View.GONE else View.VISIBLE
     }
 
     private fun initializeSession() {
@@ -257,6 +266,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         binding.tvStatusBadge.setBackgroundResource(R.drawable.bg_badge_cancelled)
         binding.tvStatusBadge.setTextColor(getColor(R.color.cm_notice_cancel_text))
         binding.btnCloseAttendance.visibility = View.GONE
+        binding.btnExportExcel.visibility = View.VISIBLE
         binding.btnToggleView.visibility = View.GONE
     }
 

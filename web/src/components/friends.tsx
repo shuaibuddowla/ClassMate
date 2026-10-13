@@ -283,47 +283,59 @@ export function Friends({ ctx }: { ctx: Context }) {
         </>
       )}
       {person && (
-        <Modal title="Batchmate profile" close={() => setPerson(null)}>
+        <Modal title={person.role === "teacher" ? "Teacher profile" : "Batchmate profile"} close={() => setPerson(null)}>
           <div className="friend-profile-content">
             <div className="profile-header friend-profile-header">
               <Avatar url={person.avatar_url} name={person.full_name} online={Boolean(person.is_online || onlineIds.has(person.profile_id))} />
               <div>
                 <h3>{person.full_name}</h3>
-                {person.student_id && <small>{person.student_id}</small>}
+                {person.role === "teacher" ? (
+                  <small className="role cr-badge">Teacher</small>
+                ) : person.student_id ? (
+                  <small>{person.student_id}</small>
+                ) : null}
               </div>
             </div>
-            <dl className="compact-dl">
-              {[
-                ["student_id", "Student ID"],
-                ["mobile_number", "Mobile number"],
-                ["home_town", "Home town"],
-                ["blood_group", "Blood group"],
-                ["current_residence", "Current mess / flat"],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <dt>{label}</dt>
-                  <dd>{person[key] || "Not shared"}</dd>
-                </div>
-              ))}
-            </dl>
-            {person.mobile_number && (
-              <div className="contact-actions compact-actions">
-                <a
-                  className="primary"
-                  href={`tel:${person.mobile_number.replace(/[^+\d]/g, "")}`}
-                >
-                  <Phone size={16} />
-                  Call
-                </a>
-                <a
-                  className="secondary"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  href={`https://wa.me/${person.mobile_number.replace(/\D/g, "")}`}
-                >
-                  <MessageCircle size={16} />
-                  WhatsApp
-                </a>
+            {person.role !== "teacher" ? (
+              <>
+                <dl className="compact-dl">
+                  {[
+                    ["student_id", "Student ID"],
+                    ["mobile_number", "Mobile number"],
+                    ["home_town", "Home town"],
+                    ["blood_group", "Blood group"],
+                    ["current_residence", "Current mess / flat"],
+                  ].map(([key, label]) => (
+                    <div key={key}>
+                      <dt>{label}</dt>
+                      <dd>{person[key] || "Not shared"}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {person.mobile_number && (
+                  <div className="contact-actions compact-actions">
+                    <a
+                      className="primary"
+                      href={`tel:${person.mobile_number.replace(/[^+\d]/g, "")}`}
+                    >
+                      <Phone size={16} />
+                      Call
+                    </a>
+                    <a
+                      className="secondary"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={`https://wa.me/${person.mobile_number.replace(/\D/g, "")}`}
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: "10px 0 4px", fontSize: "13px", color: "var(--muted)" }}>
+                Faculty Member
               </div>
             )}
           </div>

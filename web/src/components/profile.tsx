@@ -82,20 +82,13 @@ export function ProfileForm({
             "Unknown",
           ].map((value) => ({ value, label: value })),
         },
-        {
-          name: "target_residence",
-          label: "Current mess / flat (optional)",
-          required: false,
-          value: profile.current_residence || "",
-          placeholder: "e.g. Master Para, Hall, or residential area",
-        },
       ]}
       label="Save profile"
       submit={async (d) =>
         done(
           await rpc("save_profile_details", {
             ...d,
-            target_residence: d.target_residence || profile.current_residence || null,
+            target_residence: profile.current_residence || null,
           })
         )
       }
@@ -170,6 +163,16 @@ export function Profile({
           c.offering_id === offeringId ? { ...c, attendance_enabled: !current } : c
         )
       );
+      try {
+        localStorage.removeItem(`academic:${ctx.user}:${ctx.batch}:routine`);
+        localStorage.removeItem(`academic:${ctx.user}:${ctx.batch}:timetable-details`);
+      } catch {}
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "routine"] });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "timetable-details"] });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "attendance-sessions"] });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "student-my-attendance"] });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "teacher-attendance-overview"] });
       ctx.refreshProfile(ctx.profile);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to toggle course attendance");
@@ -328,15 +331,17 @@ export function Profile({
       {/* 1. HERO IDENTITY CARD (MATCHED WITH ANDROID) */}
       <section className="card profile-hero-card-android">
         <div className="profile-hero-banner" />
-        <button
-          type="button"
-          className="profile-hero-edit-top-btn"
-          onClick={() => setEditing(true)}
-          title="Edit Profile"
-          aria-label="Edit Profile"
-        >
-          <UserRoundPen size={18} />
-        </button>
+        {ctx.profile.role !== "teacher" && (
+          <button
+            type="button"
+            className="profile-hero-edit-top-btn"
+            onClick={() => setEditing(true)}
+            title="Edit Profile"
+            aria-label="Edit Profile"
+          >
+            <UserRoundPen size={18} />
+          </button>
+        )}
 
         <div className="profile-hero-avatar-anchor">
           <div className="profile-hero-avatar-ring">
@@ -382,97 +387,99 @@ export function Profile({
         </div>
 
         {/* Unified 2x2 Inset Grid inside Hero Card */}
-        <div className="profile-hero-inset-grid">
-          {/* Blood Group Tile */}
-          <div
-            className={`hero-inset-tile blood ${!ctx.profile.blood_group || ctx.profile.blood_group === "Unknown" ? "empty" : ""}`}
-            onClick={() => {
-              if (!ctx.profile.blood_group || ctx.profile.blood_group === "Unknown") {
-                setEditing(true);
-              } else {
-                location.hash = "friends/blood";
-              }
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="hero-inset-icon blood">
-              <Droplets size={17} />
+        {ctx.profile.role !== "teacher" && (
+          <div className="profile-hero-inset-grid">
+            {/* Blood Group Tile */}
+            <div
+              className={`hero-inset-tile blood ${!ctx.profile.blood_group || ctx.profile.blood_group === "Unknown" ? "empty" : ""}`}
+              onClick={() => {
+                if (!ctx.profile.blood_group || ctx.profile.blood_group === "Unknown") {
+                  setEditing(true);
+                } else {
+                  location.hash = "friends/blood";
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="hero-inset-icon blood">
+                <Droplets size={17} />
+              </div>
+              <div className="hero-inset-info">
+                <span className="hero-inset-label">BLOOD GROUP</span>
+                <strong className="hero-inset-value">
+                  {ctx.profile.blood_group && ctx.profile.blood_group !== "Unknown"
+                    ? ctx.profile.blood_group
+                    : "Not set"}
+                </strong>
+                <small className="hero-inset-sub">
+                  {ctx.profile.blood_group && ctx.profile.blood_group !== "Unknown"
+                    ? "Tap for Blood Network"
+                    : "Add to help batchmates"}
+                </small>
+              </div>
             </div>
-            <div className="hero-inset-info">
-              <span className="hero-inset-label">BLOOD GROUP</span>
-              <strong className="hero-inset-value">
-                {ctx.profile.blood_group && ctx.profile.blood_group !== "Unknown"
-                  ? ctx.profile.blood_group
-                  : "Not set"}
-              </strong>
-              <small className="hero-inset-sub">
-                {ctx.profile.blood_group && ctx.profile.blood_group !== "Unknown"
-                  ? "Tap for Blood Network"
-                  : "Add to help batchmates"}
-              </small>
-            </div>
-          </div>
 
-          {/* Department & Batch Tile */}
-          <div
-            className="hero-inset-tile academic"
-            onClick={() => setEditing(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="hero-inset-icon academic">
-              <GraduationCap size={17} />
+            {/* Department & Batch Tile */}
+            <div
+              className="hero-inset-tile academic"
+              onClick={() => setEditing(true)}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="hero-inset-icon academic">
+                <GraduationCap size={17} />
+              </div>
+              <div className="hero-inset-info">
+                <span className="hero-inset-label">{batchLabelTitle}</span>
+                <strong className="hero-inset-value">{batchValue}</strong>
+                <small className="hero-inset-sub">{batchSession}</small>
+              </div>
             </div>
-            <div className="hero-inset-info">
-              <span className="hero-inset-label">{batchLabelTitle}</span>
-              <strong className="hero-inset-value">{batchValue}</strong>
-              <small className="hero-inset-sub">{batchSession}</small>
-            </div>
-          </div>
 
-          {/* Home Town Tile */}
-          <div
-            className="hero-inset-tile location"
-            onClick={() => setEditing(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="hero-inset-icon location">
-              <MapPin size={17} />
+            {/* Home Town Tile */}
+            <div
+              className="hero-inset-tile location"
+              onClick={() => setEditing(true)}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="hero-inset-icon location">
+                <MapPin size={17} />
+              </div>
+              <div className="hero-inset-info">
+                <span className="hero-inset-label">HOME TOWN</span>
+                <strong className="hero-inset-value">
+                  {ctx.profile.home_town || "Not specified"}
+                </strong>
+                <small className="hero-inset-sub">
+                  {ctx.profile.current_residence || (ctx.profile.home_town ? "District origin" : "Tap to add hometown")}
+                </small>
+              </div>
             </div>
-            <div className="hero-inset-info">
-              <span className="hero-inset-label">HOME TOWN</span>
-              <strong className="hero-inset-value">
-                {ctx.profile.home_town || "Not specified"}
-              </strong>
-              <small className="hero-inset-sub">
-                {ctx.profile.current_residence || (ctx.profile.home_town ? "District origin" : "Tap to add hometown")}
-              </small>
-            </div>
-          </div>
 
-          {/* Mobile Number Tile */}
-          <div
-            className="hero-inset-tile contact"
-            onClick={() => setEditing(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="hero-inset-icon contact">
-              <Phone size={17} />
-            </div>
-            <div className="hero-inset-info">
-              <span className="hero-inset-label">MOBILE NUMBER</span>
-              <strong className="hero-inset-value phone-value">
-                {ctx.profile.mobile_number || "Not specified"}
-              </strong>
-              <small className="hero-inset-sub">
-                {ctx.profile.mobile_number ? "Shared with batch directory" : "Tap to add contact"}
-              </small>
+            {/* Mobile Number Tile */}
+            <div
+              className="hero-inset-tile contact"
+              onClick={() => setEditing(true)}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="hero-inset-icon contact">
+                <Phone size={17} />
+              </div>
+              <div className="hero-inset-info">
+                <span className="hero-inset-label">MOBILE NUMBER</span>
+                <strong className="hero-inset-value phone-value">
+                  {ctx.profile.mobile_number || "Not specified"}
+                </strong>
+                <small className="hero-inset-sub">
+                  {ctx.profile.mobile_number ? "Shared with batch directory" : "Tap to add contact"}
+                </small>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* BLOOD EMERGENCY NETWORK ENTRY */}
@@ -500,7 +507,7 @@ export function Profile({
       )}
 
       {/* Incomplete profile callout nudge */}
-      {!isProfileComplete && (
+      {ctx.profile.role !== "teacher" && !isProfileComplete && (
         <div className="profile-nudge-card">
           <div className="profile-nudge-content">
             <AlertCircle size={20} className="nudge-icon" />
@@ -541,16 +548,18 @@ export function Profile({
           {/* 3. ACCOUNT ACTIONS & ACADEMIC HUB */}
           <h3 className="profile-label">ACCOUNT &amp; MANAGEMENT</h3>
       <section className="card settings-group-card">
-        <button className="settings-row" onClick={() => setEditing(true)}>
-          <div className="setting-icon-box blue">
-            <UserRoundPen size={18} />
-          </div>
-          <div className="settings-row-text">
-            <span>Edit Profile Information</span>
-            <small>Update contact number, blood group, and hometown</small>
-          </div>
-          <ChevronRight size={18} className="chevron" />
-        </button>
+        {ctx.profile.role !== "teacher" && (
+          <button className="settings-row" onClick={() => setEditing(true)}>
+            <div className="setting-icon-box blue">
+              <UserRoundPen size={18} />
+            </div>
+            <div className="settings-row-text">
+              <span>Edit Profile Information</span>
+              <small>Update contact number, blood group, and hometown</small>
+            </div>
+            <ChevronRight size={18} className="chevron" />
+          </button>
+        )}
 
         <div className="settings-row settings-batch-row">
           <div className="settings-batch-header">

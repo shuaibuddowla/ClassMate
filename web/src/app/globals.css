@@ -7670,7 +7670,7 @@ dialog:has(.notice-detail-modal-shell) > header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
 }
 
 .qr-wrapper-card {
@@ -7678,17 +7678,17 @@ dialog:has(.notice-detail-modal-shell) > header {
   flex-direction: column;
   align-items: center;
   background: #ffffff;
-  padding: 24px;
+  padding: 18px 20px;
   border-radius: 20px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   width: 100%;
-  max-width: 330px;
+  max-width: 290px;
 }
 
 .qr-svg-canvas {
   width: 100% !important;
   height: auto !important;
-  max-width: 280px;
+  max-width: 230px;
   border-radius: 8px;
 }
 
@@ -7697,14 +7697,14 @@ dialog:has(.notice-detail-modal-shell) > header {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 60px 20px;
+  padding: 50px 20px;
   color: #64748b;
   font-size: 13px;
 }
 
 .qr-rotation-indicator {
   width: 100%;
-  margin-top: 18px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -7844,8 +7844,23 @@ dialog:has(.notice-detail-modal-shell) > header {
   text-overflow: ellipsis;
 }
 
-.attendance-actions-footer {
+.attendance-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 10;
   width: 100%;
+}
+
+.attendance-modal-footer .summary-footer-actions {
+  width: 100%;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .attendance-close-btn {
@@ -7862,6 +7877,23 @@ dialog:has(.notice-detail-modal-shell) > header {
 }
 
 .attendance-close-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.attendance-close-btn-secondary {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 13px 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.attendance-close-btn-secondary:hover {
   background: rgba(239, 68, 68, 0.18);
 }
 

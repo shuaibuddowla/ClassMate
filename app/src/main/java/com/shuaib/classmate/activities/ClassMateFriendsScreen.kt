@@ -425,53 +425,63 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
 
         val titles=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,0,0) }
         titles.addView(text(member.optString("full_name").ifBlank { "ClassMate member" },16f,true).apply { setTypeface(null,1) })
+        val isTeacher = member.optString("role") == "teacher"
         val sub=when(member.optString("role")) {
             "admin" -> member.optString("student_id").takeUnless { it=="null" }.orEmpty()
+            "teacher" -> "Teacher"
             else -> listOf(member.optString("student_id").takeUnless { it=="null" || it.isBlank() },if(member.optBoolean("is_cr")) "Class representative" else null).filterNotNull().joinToString(" · ")
         }
         if(sub.isNotBlank()) titles.addView(text(sub,12f).apply { setPadding(0,dp(2),0,0) })
         header.addView(titles,LinearLayout.LayoutParams(0,-2,1f))
         panel.addView(header)
 
-        val rows=listOf(
-            "Student ID" to "student_id",
-            "Mobile number" to "mobile_number",
-            "Home town" to "home_town",
-            "Blood group" to "blood_group",
-            "Current mess / flat" to "current_residence"
-        )
-        rows.forEachIndexed { i,(label,key) ->
-            val itemVal=member.optString(key).takeUnless { it.isBlank() || it=="null" } ?: "Not provided"
-            val row=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,dp(7),0,dp(7)) }
-            row.addView(text(label,12f).apply { setTextColor(activity.getColor(R.color.cm_text_secondary)) },LinearLayout.LayoutParams(0,-2,0.42f))
-            row.addView(text(itemVal,13f,true).apply { gravity=Gravity.END; textAlignment=View.TEXT_ALIGNMENT_VIEW_END },LinearLayout.LayoutParams(0,-2,0.58f))
-            panel.addView(row)
-            if(i<rows.size-1) {
-                panel.addView(View(activity).apply { setBackgroundColor(activity.getColor(R.color.cm_border)); alpha=0.5f },LinearLayout.LayoutParams(-1,dp(1)))
+        if (isTeacher) {
+            val note = text("Faculty Member", 13f).apply {
+                setTextColor(activity.getColor(R.color.cm_text_secondary))
+                setPadding(0, dp(4), 0, dp(8))
             }
-        }
-
-        val phone=member.optString("mobile_number").takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }
-        val actions=LinearLayout(activity).apply { gravity=Gravity.CENTER; setPadding(0,dp(12),0,0) }
-        fun action(label: String,icon: Int,callback: ()->Unit) {
-            actions.addView(MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text=label; textSize=13f; setIconResource(icon); iconSize=dp(18); cornerRadius=dp(12); isEnabled=phone!=null
-                setOnClickListener { callback() }
-            },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginStart=dp(4); marginEnd=dp(4) })
-        }
-        action("Call",R.drawable.ic_phone) { phone?.let(onCall) }
-        action("WhatsApp",R.drawable.ic_whatsapp) { phone?.let {
-            try {
-                val intent=Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/${it.removePrefix("+")}"))
-                val installed=listOf("com.whatsapp","com.whatsapp.w4b").firstOrNull { packageName ->
-                    runCatching { activity.packageManager.getPackageInfo(packageName,0) }.isSuccess
+            panel.addView(note)
+        } else {
+            val rows=listOf(
+                "Student ID" to "student_id",
+                "Mobile number" to "mobile_number",
+                "Home town" to "home_town",
+                "Blood group" to "blood_group",
+                "Current mess / flat" to "current_residence"
+            )
+            rows.forEachIndexed { i,(label,key) ->
+                val itemVal=member.optString(key).takeUnless { it.isBlank() || it=="null" } ?: "Not provided"
+                val row=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,dp(7),0,dp(7)) }
+                row.addView(text(label,12f).apply { setTextColor(activity.getColor(R.color.cm_text_secondary)) },LinearLayout.LayoutParams(0,-2,0.42f))
+                row.addView(text(itemVal,13f,true).apply { gravity=Gravity.END; textAlignment=View.TEXT_ALIGNMENT_VIEW_END },LinearLayout.LayoutParams(0,-2,0.58f))
+                panel.addView(row)
+                if(i<rows.size-1) {
+                    panel.addView(View(activity).apply { setBackgroundColor(activity.getColor(R.color.cm_border)); alpha=0.5f },LinearLayout.LayoutParams(-1,dp(1)))
                 }
-                installed?.let { packageName -> intent.setPackage(packageName) }
-                activity.startActivity(intent)
             }
-            catch (_: android.content.ActivityNotFoundException) { Toast.makeText(activity,"No app can open WhatsApp",Toast.LENGTH_SHORT).show() }
-        } }
-        panel.addView(actions)
+
+            val phone=member.optString("mobile_number").takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }
+            val actions=LinearLayout(activity).apply { gravity=Gravity.CENTER; setPadding(0,dp(12),0,0) }
+            fun action(label: String,icon: Int,callback: ()->Unit) {
+                actions.addView(MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    text=label; textSize=13f; setIconResource(icon); iconSize=dp(18); cornerRadius=dp(12); isEnabled=phone!=null
+                    setOnClickListener { callback() }
+                },LinearLayout.LayoutParams(0,dp(44),1f).apply { marginStart=dp(4); marginEnd=dp(4) })
+            }
+            action("Call",R.drawable.ic_phone) { phone?.let(onCall) }
+            action("WhatsApp",R.drawable.ic_whatsapp) { phone?.let {
+                try {
+                    val intent=Intent(Intent.ACTION_VIEW,Uri.parse("https://wa.me/${it.removePrefix("+")}"))
+                    val installed=listOf("com.whatsapp","com.whatsapp.w4b").firstOrNull { packageName ->
+                        runCatching { activity.packageManager.getPackageInfo(packageName,0) }.isSuccess
+                    }
+                    installed?.let { packageName -> intent.setPackage(packageName) }
+                    activity.startActivity(intent)
+                }
+                catch (_: android.content.ActivityNotFoundException) { Toast.makeText(activity,"No app can open WhatsApp",Toast.LENGTH_SHORT).show() }
+            } }
+            panel.addView(actions)
+        }
 
         val surface=MaterialShapeDrawable(ShapeAppearanceModel.builder().setAllCornerSizes(dp(22).toFloat()).build()).apply { fillColor=android.content.res.ColorStateList.valueOf(activity.getColor(R.color.cm_surface)) }
         val dialog=MaterialAlertDialogBuilder(activity).setBackground(surface).setTitle("Profile").setView(scroll).setPositiveButton("Done",null).create()
