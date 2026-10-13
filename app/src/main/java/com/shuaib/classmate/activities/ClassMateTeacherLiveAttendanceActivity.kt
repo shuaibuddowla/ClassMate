@@ -86,13 +86,10 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         binding.rvRoster.layoutManager = LinearLayoutManager(this)
         binding.rvRoster.adapter = rosterAdapter
 
-        binding.btnViewList.setOnClickListener {
-            showSummaryView(true)
-        }
-
-        binding.btnToggleView.setOnClickListener {
-            showSummaryView(false)
-        }
+        binding.tabQrCode.setOnClickListener { switchTab(isQr = true) }
+        binding.tabLiveRoster.setOnClickListener { switchTab(isQr = false) }
+        binding.btnViewList.setOnClickListener { switchTab(isQr = false) }
+        binding.cardLiveCounter.setOnClickListener { switchTab(isQr = false) }
 
         binding.btnCloseAttendance.setOnClickListener {
             closeSession()
@@ -102,21 +99,46 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
             exportToExcel()
         }
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.layoutTopAppBar) { v, insets ->
+            val statusInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            val basePaddingTop = (12 * resources.displayMetrics.density).toInt()
+            val basePaddingBottom = (12 * resources.displayMetrics.density).toInt()
+            v.setPadding(v.paddingLeft, basePaddingTop + statusInsets.top, v.paddingRight, basePaddingBottom)
+            insets
+        }
+
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.layoutBottomActions) { v, insets ->
             val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
-            val basePaddingBottom = (16 * resources.displayMetrics.density).toInt()
-            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, basePaddingBottom + navInsets.bottom)
+            val basePaddingTop = (10 * resources.displayMetrics.density).toInt()
+            val basePaddingBottom = (14 * resources.displayMetrics.density).toInt()
+            v.setPadding(v.paddingLeft, basePaddingTop, v.paddingRight, basePaddingBottom + navInsets.bottom)
             insets
         }
 
         initializeSession()
     }
 
-    private fun showSummaryView(show: Boolean) {
-        binding.scrollQrView.visibility = if (show) View.GONE else View.VISIBLE
-        binding.layoutSummaryView.visibility = if (show) View.VISIBLE else View.GONE
-        binding.btnExportExcel.visibility = if (show) View.VISIBLE else View.GONE
-        binding.btnCloseAttendance.visibility = if (isSessionClosed) View.GONE else View.VISIBLE
+    private fun switchTab(isQr: Boolean) {
+        val primaryColor = getColor(R.color.cm_primary)
+        val mutedColor = getColor(R.color.cm_text_muted)
+
+        if (isQr) {
+            binding.tabQrCode.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
+            binding.tabQrCode.setTextColor(Color.WHITE)
+            binding.tabLiveRoster.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
+            binding.tabLiveRoster.setTextColor(mutedColor)
+
+            binding.scrollQrView.visibility = View.VISIBLE
+            binding.layoutSummaryView.visibility = View.GONE
+        } else {
+            binding.tabQrCode.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
+            binding.tabQrCode.setTextColor(mutedColor)
+            binding.tabLiveRoster.backgroundTintList = android.content.res.ColorStateList.valueOf(primaryColor)
+            binding.tabLiveRoster.setTextColor(Color.WHITE)
+
+            binding.scrollQrView.visibility = View.GONE
+            binding.layoutSummaryView.visibility = View.VISIBLE
+        }
     }
 
     private fun initializeSession() {
@@ -252,7 +274,6 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                 isSessionClosed = true
                 qrRotationJob?.cancel()
                 updateClosedUi()
-                showSummaryView(true)
                 refreshSummary(sid)
                 Toast.makeText(this@ClassMateTeacherLiveAttendanceActivity, "Attendance session closed", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -267,8 +288,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         binding.tvStatusBadge.setTextColor(getColor(R.color.cm_notice_cancel_text))
         binding.btnCloseAttendance.visibility = View.GONE
         binding.btnExportExcel.visibility = View.VISIBLE
-        binding.btnToggleView.visibility = View.GONE
-        showSummaryView(true)
+        switchTab(isQr = false)
     }
 
     private fun exportToExcel() {

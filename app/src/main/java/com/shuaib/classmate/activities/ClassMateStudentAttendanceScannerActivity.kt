@@ -64,7 +64,8 @@ class ClassMateStudentAttendanceScannerActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val courseTitle = intent.getStringExtra("EXTRA_COURSE_TITLE") ?: "Scan Attendance"
-        binding.tvCourseTitle.text = courseTitle
+        val courseCode = intent.getStringExtra("EXTRA_COURSE_CODE") ?: ""
+        binding.tvCourseTitle.text = if (courseCode.isNotBlank()) "$courseCode · $courseTitle" else courseTitle
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnDone.setOnClickListener { finish() }

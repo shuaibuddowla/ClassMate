@@ -287,19 +287,39 @@ internal class ClassMateStudentAttendanceUi(
 
         val displayPct: Double
         val displayPctStr: String
-        val summaryText: String
         val pctColor: Int
         val healthLabel: String
+        val badgeBgColor: Int
+        val badgeTextColor: Int
+        val summaryText: String
 
         if (activeCourse != null) {
             // Course-specific summary
+            val hasClasses = activeCourse.classesHeld > 0
             displayPct = activeCourse.percentage
-            displayPctStr = if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
-            pctColor = healthColor(displayPct)
-            healthLabel = when {
-                displayPct >= 75.0 -> "Eligible"
-                displayPct >= 60.0 -> "Warning"
-                else -> "At Risk"
+            displayPctStr = if (hasClasses) {
+                if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
+            } else {
+                "0%"
+            }
+            if (hasClasses) {
+                pctColor = healthColor(displayPct)
+                healthLabel = when {
+                    displayPct >= 75.0 -> "Eligible"
+                    displayPct >= 60.0 -> "Warning"
+                    else -> "At Risk"
+                }
+                badgeBgColor = when {
+                    displayPct >= 75.0 -> Color.parseColor("#DCFCE7") // Light green
+                    displayPct >= 60.0 -> Color.parseColor("#FEF3C7") // Light amber
+                    else -> Color.parseColor("#FEE2E2")               // Light red
+                }
+                badgeTextColor = pctColor
+            } else {
+                pctColor = color(R.color.cm_text_muted)
+                healthLabel = "No classes yet"
+                badgeBgColor = Color.parseColor("#F1F5F9")
+                badgeTextColor = color(R.color.cm_text_muted)
             }
 
             summaryText = if (activeCourse.classesHeld == 0) {
@@ -309,13 +329,31 @@ internal class ClassMateStudentAttendanceUi(
             }
         } else {
             // Overall summary across multiple tracked courses
+            val hasClasses = totalHeld > 0
             displayPct = overallPercentage
-            displayPctStr = if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
-            pctColor = healthColor(displayPct)
-            healthLabel = when {
-                displayPct >= 75.0 -> "Eligible"
-                displayPct >= 60.0 -> "Warning"
-                else -> "At Risk"
+            displayPctStr = if (hasClasses) {
+                if (displayPct % 1.0 == 0.0) "${displayPct.toInt()}%" else "${String.format("%.1f", displayPct)}%"
+            } else {
+                "0%"
+            }
+            if (hasClasses) {
+                pctColor = healthColor(displayPct)
+                healthLabel = when {
+                    displayPct >= 75.0 -> "Eligible"
+                    displayPct >= 60.0 -> "Warning"
+                    else -> "At Risk"
+                }
+                badgeBgColor = when {
+                    displayPct >= 75.0 -> Color.parseColor("#DCFCE7") // Light green
+                    displayPct >= 60.0 -> Color.parseColor("#FEF3C7") // Light amber
+                    else -> Color.parseColor("#FEE2E2")               // Light red
+                }
+                badgeTextColor = pctColor
+            } else {
+                pctColor = color(R.color.cm_text_muted)
+                healthLabel = "No classes yet"
+                badgeBgColor = Color.parseColor("#F1F5F9")
+                badgeTextColor = color(R.color.cm_text_muted)
             }
 
             val trackedCount = courses.size
@@ -364,12 +402,7 @@ internal class ClassMateStudentAttendanceUi(
             text = healthLabel
             textSize = 11.5f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(pctColor)
-            val badgeBgColor = when {
-                displayPct >= 75.0 -> Color.parseColor("#DCFCE7") // Light green
-                displayPct >= 60.0 -> Color.parseColor("#FEF3C7") // Light amber
-                else -> Color.parseColor("#FEE2E2")               // Light red
-            }
+            setTextColor(badgeTextColor)
             background = GradientDrawable().apply {
                 cornerRadius = dp(20).toFloat()
                 setColor(badgeBgColor)
@@ -515,19 +548,32 @@ internal class ClassMateStudentAttendanceUi(
             }
 
             val tvPctBadge = TextView(activity).apply {
-                val pctStr = if (course.percentage % 1.0 == 0.0) "${course.percentage.toInt()}%" else "${String.format("%.1f", course.percentage)}%"
+                val hasClasses = course.classesHeld > 0
+                val pctStr = if (hasClasses) {
+                    if (course.percentage % 1.0 == 0.0) "${course.percentage.toInt()}%" else "${String.format("%.1f", course.percentage)}%"
+                } else {
+                    "0%"
+                }
                 text = pctStr
                 textSize = 12.5f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(courseColor)
-                val badgeBgColor = when {
-                    course.percentage >= 75.0 -> Color.parseColor("#DCFCE7")
-                    course.percentage >= 60.0 -> Color.parseColor("#FEF3C7")
-                    else -> Color.parseColor("#FEE2E2")
-                }
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(14).toFloat()
-                    setColor(badgeBgColor)
+                if (hasClasses) {
+                    setTextColor(courseColor)
+                    val badgeBgColor = when {
+                        course.percentage >= 75.0 -> Color.parseColor("#DCFCE7")
+                        course.percentage >= 60.0 -> Color.parseColor("#FEF3C7")
+                        else -> Color.parseColor("#FEE2E2")
+                    }
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat()
+                        setColor(badgeBgColor)
+                    }
+                } else {
+                    setTextColor(color(R.color.cm_text_muted))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat()
+                        setColor(Color.parseColor("#F1F5F9"))
+                    }
                 }
                 setPadding(dp(9), dp(3), dp(9), dp(3))
             }
@@ -672,23 +718,10 @@ internal class ClassMateStudentAttendanceUi(
                         }
 
                         // Status right aligned as a refined pill badge
-                        val isPresent = hist.status == "present"
-                        val isLate = hist.status == "late"
-                        val statusLabel = when {
-                            isPresent -> "✓ Present"
-                            isLate -> "⏰ Late"
-                            else -> "✗ Absent"
-                        }
-                        val statusColor = when {
-                            isPresent -> Color.parseColor("#15803D") // Rich dark green
-                            isLate -> Color.parseColor("#B45309")    // Rich dark amber
-                            else -> Color.parseColor("#B91C1C")      // Rich dark red
-                        }
-                        val statusBg = when {
-                            isPresent -> Color.parseColor("#DCFCE7") // Light green
-                            isLate -> Color.parseColor("#FEF3C7")    // Light amber
-                            else -> Color.parseColor("#FEE2E2")      // Light red
-                        }
+                        val isAttended = hist.status == "present" || hist.status == "late"
+                        val statusLabel = if (isAttended) "✓ Present" else "✗ Absent"
+                        val statusColor = if (isAttended) Color.parseColor("#15803D") else Color.parseColor("#B91C1C")
+                        val statusBg = if (isAttended) Color.parseColor("#DCFCE7") else Color.parseColor("#FEE2E2")
 
                         val tvStatusBadge = TextView(activity).apply {
                             text = statusLabel

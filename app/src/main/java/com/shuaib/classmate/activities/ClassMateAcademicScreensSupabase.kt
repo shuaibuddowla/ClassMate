@@ -34,9 +34,11 @@ import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.update.UpdateActionActivity
 import com.shuaib.classmate.update.UpdateCoordinator
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -486,10 +488,12 @@ internal class ClassMateAcademicScreensSupabase(
                     prev?.optString("id") != cur.optString("id") || prev?.optString("status") != cur.optString("status")
                 }
             if (hasChanged) {
-                liveOpenSessionsMap.clear()
-                liveOpenSessionsMap.putAll(latestMap)
-                if (active(root) && !busMode && !calendarMode && !attendanceMode) {
-                    root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
+                withContext(Dispatchers.Main) {
+                    liveOpenSessionsMap.clear()
+                    liveOpenSessionsMap.putAll(latestMap)
+                    if (active(root) && !busMode && !calendarMode && !attendanceMode) {
+                        root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
+                    }
                 }
             }
         }
@@ -498,9 +502,11 @@ internal class ClassMateAcademicScreensSupabase(
     private fun startAttendanceSessionsPoller(root: View, batch: String) {
         if (attendancePollerJob?.isActive == true) return
         attendancePollerJob = scope.launch {
+            // Immediate check upon starting poller
+            checkActiveAttendanceSessions(root, batch)
             while (active(root) && batch == batchId() && !busMode && !calendarMode && !attendanceMode) {
+                kotlinx.coroutines.delay(6000L)
                 checkActiveAttendanceSessions(root, batch)
-                kotlinx.coroutines.delay(2000L)
             }
         }
     }
@@ -654,9 +660,14 @@ internal class ClassMateAcademicScreensSupabase(
                                 runCatching { ClassMateAuthApi.rows("attendance_sessions", "status=eq.open") }.getOrDefault(JSONArray())
                             }
                         }
-                        val names = JSONObject(); val catalog = courses.await()
-                        offerings.forEach { names.put(it.getString("id"), catalog[it.getString("course_id")]?.optString("course_title") ?: "Course") }
-                        JSONObject().put("entries", routines.await()).put("names", names).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("attendance", openAttendance.await()).put("saved_at", System.currentTimeMillis())
+                        val names = JSONObject(); val codes = JSONObject(); val catalog = courses.await()
+                        offerings.forEach {
+                            val cid = it.getString("course_id")
+                            val cat = catalog[cid]
+                            names.put(it.getString("id"), cat?.optString("course_title") ?: "Course")
+                            codes.put(it.getString("id"), cat?.optString("course_code") ?: "")
+                        }
+                        JSONObject().put("entries", routines.await()).put("names", names).put("codes", codes).put("details", teachers.await()).put("changes", changes.await()).put("editable", JSONArray(assigned.await())).put("attendance", openAttendance.await()).put("saved_at", System.currentTimeMillis())
                     }
                     snapshot = bundle
                 }
@@ -673,6 +684,8 @@ internal class ClassMateAcademicScreensSupabase(
             } else item.optInt("day_of_week") == day }
             val nameJson = data.optJSONObject("names") ?: JSONObject()
             val names = nameJson.keys().asSequence().associateWith { nameJson.optString(it) }
+            val codeJson = data.optJSONObject("codes") ?: JSONObject()
+            val codes = codeJson.keys().asSequence().associateWith { codeJson.optString(it) }
             val cancellations = rows(data.optJSONArray("changes") ?: JSONArray()).filter { it.optString("effective_date") == effectiveDate.toString() }.map { it.optString("semester_course_id") }.toSet()
             val details = rows(data.optJSONArray("details") ?: JSONArray()).associate { detail ->
                 detail.getString("semester_course_id") to JSONObject(detail.toString()).put("cancelled", detail.getString("semester_course_id") in cancellations)
@@ -812,7 +825,7 @@ internal class ClassMateAcademicScreensSupabase(
                                     putExtra("EXTRA_SLOT_ID", slotId)
                                     putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
                                     putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
-                                    putExtra("EXTRA_COURSE_CODE", "")
+                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
                                 }
                                 activity.startActivity(intent)
                             }
@@ -827,7 +840,7 @@ internal class ClassMateAcademicScreensSupabase(
                                 val intent = Intent(activity, ClassMateTeacherLiveAttendanceActivity::class.java).apply {
                                     putExtra("EXTRA_SLOT_ID", slotId)
                                     putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
-                                    putExtra("EXTRA_COURSE_CODE", "")
+                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
                                 }
                                 activity.startActivity(intent)
                             }
@@ -846,6 +859,7 @@ internal class ClassMateAcademicScreensSupabase(
                                 val intent = Intent(activity, ClassMateStudentAttendanceScannerActivity::class.java).apply {
                                     putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
                                     putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
+                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
                                 }
                                 activity.startActivity(intent)
                             }
