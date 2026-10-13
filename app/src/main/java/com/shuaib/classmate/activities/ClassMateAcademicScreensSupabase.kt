@@ -151,6 +151,10 @@ internal class ClassMateAcademicScreensSupabase(
                 if (root.isAttachedToWindow) {
                     setupTimetable(root)
                 }
+            } else if (root.isAttachedToWindow && !busMode && !calendarMode && !attendanceMode) {
+                scope.launch {
+                    checkActiveAttendanceSessions(root, batchId())
+                }
             }
         }
     }
@@ -458,41 +462,45 @@ internal class ClassMateAcademicScreensSupabase(
         attendancePollerJob = null
     }
 
+    private suspend fun checkActiveAttendanceSessions(root: View, batch: String) {
+        runCatching {
+            val rpcRes = ClassMateAuthApi.rpcText("active_attendance_sessions", JSONObject().put("target_batch", batch))
+            val arr = JSONArray(rpcRes)
+            val latestMap = mutableMapOf<String, JSONObject>()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val slotId = o.optString("routine_slot_id")
+                if (slotId.isNotBlank()) {
+                    latestMap[slotId] = JSONObject().apply {
+                        put("id", o.optString("session_id"))
+                        put("routine_slot_id", slotId)
+                        put("semester_course_id", o.optString("semester_course_id"))
+                        put("status", o.optString("status"))
+                        put("present_count", o.optInt("present_count", 0))
+                    }
+                }
+            }
+            val hasChanged = latestMap.keys != liveOpenSessionsMap.keys ||
+                latestMap.values.any { cur ->
+                    val prev = liveOpenSessionsMap[cur.optString("routine_slot_id")]
+                    prev?.optString("id") != cur.optString("id") || prev?.optString("status") != cur.optString("status")
+                }
+            if (hasChanged) {
+                liveOpenSessionsMap.clear()
+                liveOpenSessionsMap.putAll(latestMap)
+                if (active(root) && !busMode && !calendarMode && !attendanceMode) {
+                    root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
+                }
+            }
+        }
+    }
+
     private fun startAttendanceSessionsPoller(root: View, batch: String) {
         if (attendancePollerJob?.isActive == true) return
         attendancePollerJob = scope.launch {
             while (active(root) && batch == batchId() && !busMode && !calendarMode && !attendanceMode) {
-                runCatching {
-                    val rpcRes = ClassMateAuthApi.rpcText("active_attendance_sessions", JSONObject().put("target_batch", batch))
-                    val arr = JSONArray(rpcRes)
-                    val latestMap = mutableMapOf<String, JSONObject>()
-                    for (i in 0 until arr.length()) {
-                        val o = arr.getJSONObject(i)
-                        val slotId = o.optString("routine_slot_id")
-                        if (slotId.isNotBlank()) {
-                            latestMap[slotId] = JSONObject().apply {
-                                put("id", o.optString("session_id"))
-                                put("routine_slot_id", slotId)
-                                put("semester_course_id", o.optString("semester_course_id"))
-                                put("status", o.optString("status"))
-                                put("present_count", o.optInt("present_count", 0))
-                            }
-                        }
-                    }
-                    val hasChanged = latestMap.keys != liveOpenSessionsMap.keys ||
-                        latestMap.values.any { cur ->
-                            val prev = liveOpenSessionsMap[cur.optString("routine_slot_id")]
-                            prev?.optString("id") != cur.optString("id") || prev?.optString("status") != cur.optString("status")
-                        }
-                    if (hasChanged) {
-                        liveOpenSessionsMap.clear()
-                        liveOpenSessionsMap.putAll(latestMap)
-                        if (active(root) && !busMode && !calendarMode && !attendanceMode) {
-                            root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
-                        }
-                    }
-                }
-                kotlinx.coroutines.delay(3000L)
+                checkActiveAttendanceSessions(root, batch)
+                kotlinx.coroutines.delay(2000L)
             }
         }
     }
@@ -671,9 +679,8 @@ internal class ClassMateAcademicScreensSupabase(
             }
             val editableCourses = data.optJSONArray("editable")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() } ?: emptySet()
             val openSessionsMap = rows(data.optJSONArray("attendance") ?: JSONArray()).associateBy { it.optString("routine_slot_id") }
-            if (liveOpenSessionsMap.isEmpty()) {
-                liveOpenSessionsMap.putAll(openSessionsMap)
-            }
+            liveOpenSessionsMap.clear()
+            liveOpenSessionsMap.putAll(openSessionsMap)
             if (!active(root) || request != timetableRequest || day != selectedDay ||
                 calendarMode || requestedBusMode != busMode || (requestedBusMode && requestedBusKind!=busDayKind()) || selectedBatch != batchId()) return@launch
             root.v<View>(R.id.scheduleHeader).visibility = View.VISIBLE
@@ -777,7 +784,7 @@ internal class ClassMateAcademicScreensSupabase(
                 }
 
                 val slotId = item.optString("id")
-                val slotSession = liveOpenSessionsMap[slotId] ?: openSessionsMap[slotId]
+                val slotSession = liveOpenSessionsMap[slotId]
                 val hasOpenSession = slotSession != null
 
                 val role = profile().optString("role")

@@ -268,6 +268,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         binding.btnCloseAttendance.visibility = View.GONE
         binding.btnExportExcel.visibility = View.VISIBLE
         binding.btnToggleView.visibility = View.GONE
+        showSummaryView(true)
     }
 
     private fun exportToExcel() {

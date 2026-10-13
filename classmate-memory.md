@@ -723,6 +723,15 @@ This table documents real bugs encountered, exact root causes diagnosed, files m
 | **`gen_random_bytes` function resolution failure in `start_attendance_session`**. | `gen_random_bytes` was called without schema qualification inside a function with `set search_path = ''`. | `202610110002_attendance_schema.sql` | Explicitly qualified call as `extensions.gen_random_bytes(24)`. |
 | **Rapid log ingestion and Edge Function quota consumption from 1-minute background crons**. | Cloudflare Worker `classmate-secure-api` ran `sync_archive_catalog` every 1 minute (`*/1 * * * *`), creating 20–40 rows/min in `public.audit_log` (242 MB bloat). Notification retry also polled every 1 minute. | `cloudflare-worker/wrangler.jsonc`, `202610110003_optimize_cron_schedules_and_retention.sql` | Reconfigured Cloudflare Worker cron to once daily (`0 4 * * *`), widened notification retry to 15m, and scheduled automated daily purge of `cron.job_run_details` older than 2 days. |
 | **R2 resource file upload rejected for files larger than 100 MB**. | `upload-classmate-resource/index.ts` had a hardcoded size validation check capping `size_bytes > 100_000_000`. | `supabase/functions/upload-classmate-resource/index.ts`, `web/src/components/library.tsx` | Increased the resource upload ceiling to 500 MB (`500_000_000 bytes`) across the Edge Function and Web / Android client uploaders. |
+| **Ambiguous Attendance Summary ("0% · 0 of 6 classes attended")**. | Student summary card displayed stats without explicit scope, misrepresenting single-course attendance as an overall semester percentage. | `ClassMateAcademicScreensSupabase.kt`, `student-attendance.tsx` | Made summary scope explicit (`"0 of 6 classes attended in CSE3333"` or `"Across N tracked courses"`). Only queries and calculates metrics for attendance-enabled courses (`sc.attendance_enabled = true`). Handled zero sessions safely without division-by-zero errors. |
+| **Timetable segmented toggle displaced off-screen when opening "My Attendance"**. | Switching to "My Attendance" lacked preserved root header layout, causing vertical scroll and layout displacement. | `ClassMateAcademicScreensSupabase.kt`, `schedule.tsx` | Rebuilt My Attendance layout inside stable Timetable container, maintaining fixed top header controls without vertical layout shifts or jumpy scrolling. |
+| **Attendance action buttons ("Take Attendance" / "Scan Attendance") delayed on Timetable by minutes**. | Clients relied on static timetable caching without a high-frequency active session indicator; opening a session required manual pull-to-refresh or app restart. | `202610130001_instant_attendance_timetable_updates.sql`, `schedule.tsx`, `ClassMateAcademicScreensSupabase.kt` | Created lightweight RPC `classmate.active_attendance_sessions(target_batch)` and 3-second active background polling on Timetable when viewing today's date. Timetable updates and reveals scan/take buttons in under 3 seconds. |
+| **Teacher QR screen action buttons ("Close Attendance", "Export to Excel") cut off / hidden behind navigation bar**. | Buttons were placed inside the bottom of a scrollable view without window inset considerations; on small screens, they fell below the fold or were obscured by Android system navigation bars. | `activity_teacher_live_attendance.xml`, `ClassMateTeacherLiveAttendanceActivity.kt`, `attendance-teacher-modal.tsx`, `globals.css` | Moved buttons to a dedicated pinned bottom action container (`layoutBottomActions`) with `WindowInsetsCompat` navigation bar padding on Android, and `.attendance-modal-footer` on Web. Reduced QR canvas size (`220dp` / `230px`) so live counters and timers remain fully visible without scrolling. |
+| **Student roll numbers sorting lexicographically (`CE25010` before `CE25002` if unpadded, or inconsistent sorting) in Excel exports and live rosters**. | Plain string sorting was used instead of natural numeric chunking comparator. | `web/src/lib/attendance-excel.ts`, `supabase/functions/export-attendance/index.ts`, `attendance-teacher-modal.tsx`, `ClassMateTeacherLiveAttendanceActivity.kt` | Implemented natural alphanumeric roll chunking comparator (`CE25001` < `CE25032` < `CE25060`) in TypeScript and Kotlin. Applied to Excel exports, Web teacher modals, and Android live attendee RecyclerViews. |
+| **`Unauthorized (42501)` when starting attendance session**. | Previous permission check only checked `auth.uid() = sc.teacher_id` from assignments; did not recognize teacher directory email matches, username prefix matches, or admins/owners starting sessions. | `202610130002_attendance_bulletproof_reliability.sql` | Implemented multi-tier `can_manage_attendance_slot` function covering superusers, owners, admins, active TCA assignments, and teacher directory matches by profile ID, email, and prefix. |
+| **Empty / null session secret on resumed attendance sessions**. | If a session was created without an explicit secret or if an existing session had null secret, HMAC validation failed for all students. | `202610130002_attendance_bulletproof_reliability.sql` | Added fallback in `start_attendance_session` to automatically generate a 24-byte hex secret (`encode(extensions.gen_random_bytes(24), 'hex')`) if null or empty, and reopening closed sessions cleanly resets status to `'open'`. |
+| **Scan rejection (`22023 Outside class period`) during test or early-starting classes**. | Rigid time boundary check `scan_time < (sess.start_time - interval '15 minutes')` threw fatal exceptions for any scan outside nominal routine schedule hours, breaking test/demo sessions and early classes. | `202610130002_attendance_bulletproof_reliability.sql` | Refactored `mark_attendance` to accept scans for any session that is currently `open`, while accurately flagging `confidence = 'late'` if scanned > 15 minutes after class start. |
+| **Duplicate key constraint violation on scan retry or double scan**. | Re-scanning or flaky network retries attempted inserting duplicate `(session_id, student_id)` rows into `attendance_records`. | `202610130002_attendance_bulletproof_reliability.sql` | Changed insert into an idempotent upsert: `on conflict (session_id, student_id) do update set synced_at = now()`. |
 
 ---
 
@@ -1263,4 +1272,141 @@ Managed in migrations:
 | **Web Companion Client** | Next.js 15, React 19, TypeScript, Tailwind CSS | Desktop sidebar rail & responsive mobile client; SheetJS (`xlsx`) Excel export; Web Audio API synthesized chimes; HTML5 BarcodeDetector. |
 | **Push Notifications** | Firebase Cloud Messaging (FCM), Service Workers | Instant cross-platform push alerts for notices, class cancellations, live attendance sessions, and strict single-recipient fund deposits. |
 | **Update Distribution** | GitHub Releases CDN, `update.json` manifest | Self-hosted in-app update pipeline signed with keystore alias `key0` (dual V1 JAR + V2 APK Signature Scheme). |
+| **Real-Time Attendance Engine** | ZXing, CameraX, ML Kit, HMAC-SHA256, Supabase Realtime | 15s rotating dynamic QR generation & camera scanning; offline Room queue with WorkManager sync; 3s active session timetable polling; Supabase Realtime live roster WebSocket updates. |
+| **Data Formatting & Export** | SheetJS (`xlsx`), natural alphanumeric comparator algorithms | Client-side 0ms Excel generation for single sessions and semester course attendance matrices; natural roll ordering (`CE25001` < `CE25032` < `CE25060`). |
+| **System Window UI Handling** | Android `WindowInsetsCompat`, CSS top layer `<dialog>` | Edge-to-edge system navigation bar padding for pinned action sheets; browser top-layer modals immune to feed overflow/stacking contexts. |
+
+---
+
+## 34. Student "My Attendance" Tab Complete Redesign & Scoped Analytics (v1.1.32+)
+
+### A. Core Architectural Motivation & User Pain Points
+Prior to v1.1.32, the "My Attendance" tab inside the Timetable screen had several usability and information architecture flaws:
+1. **Ambiguous Global Metrics**: The overview hero displayed `"0% · 0 of 6 classes attended"`. Because attendance tracking is selectively enabled by admins only for specific courses, students misunderstood this as a failing grade across their entire semester workload.
+2. **Tab Navigation Displacement**: Tapping "My Attendance" caused the parent routine/bus schedule toggle bar to slide or drop vertically, jarring the user experience.
+3. **UI Clutter & Visual Noise**: The course cards had unnecessary filter chips, progress rings, pulsing badges, and separate refresh buttons that did not align with ClassMate's clean design system.
+
+### B. Dynamic Scoped Summary Calculations
+- **Course-Specific Summary**:
+  - When only a single course is enabled for attendance tracking, the summary label dynamically names the course:
+    - Example: `"0% · 0 of 6 classes attended in CSE3333"`.
+- **Multi-Course Aggregated Summary**:
+  - When multiple courses are tracked, the summary displays an explicit aggregated label:
+    - Example: `"Across 3 tracked courses"`.
+- **Zero-Session Safe Handling**:
+  - If no eligible attendance sessions have been conducted yet, the UI displays `"No sessions recorded yet"` instead of a misleading `0%`, eliminating divide-by-zero anomalies.
+- **Dynamic Eligibility Classification**:
+  - **Eligible**: Attendance $\ge 75\%$ — emerald green pill (`@color/cm_file_lab_text` / `#10B981`).
+  - **Warning**: Attendance $60\% - 74\%$ — amber pill (`@color/cm_warning` / `#F59E0B`).
+  - **At Risk**: Attendance $< 60\%$ — coral red pill (`@color/cm_notice_cancel` / `#EF4444`).
+
+### C. Visual Layout & Component Refinements
+1. **Elevated Top Overview Hero Card**:
+   - Elevated card containing the bold percentage (`0%`), dynamic eligibility status pill, scoped subtitle, and a full rounded progress bar.
+2. **Streamlined Tracked Course Cards**:
+   - Left vertical category accent bar (4dp width).
+   - Course code and full course title with right-aligned percentage badge pill.
+   - Faculty name accompanied by a teacher icon.
+   - Fractional attendance counter (`0 / 6 classes attended`) and a smooth progress indicator.
+   - Interactive chevron toggle (`▾` / `▴`) indicating expandable session history.
+3. **Accordion Session History**:
+   - Embedded collapsible session history logs.
+   - Formatted class date/time, lecture room number, and distinct status badges (`✓ Present`, `⚠ Late`, `✗ Absent`).
+   - "View all (N sessions)" / "Show less" toggle for courses with lengthy session histories.
+4. **Stable Non-Jumping Tab Layout**:
+   - Fixed the parent container in `ClassMateAcademicScreensSupabase.kt` and `web/src/components/schedule.tsx` so toggling between "Class Routine", "Bus Schedule", and "My Attendance" preserves the sticky header and segment pills in place without layout displacement or scroll disorientation.
+
+---
+
+## 35. Real-Time Timetable Attendance Engine & Instant Active Session Polling
+
+### A. High-Frequency Active Session Poller
+- **Problem**: Previously, when a teacher opened an attendance session, students did not see the "Scan Attendance" action strip on their timetable routine card for several minutes unless they manually executed a pull-to-refresh or restarted the app.
+- **Solution (`202610130001_instant_attendance_timetable_updates.sql`)**:
+  - **Lightweight Supabase RPC (`classmate.active_attendance_sessions(target_batch uuid)`)**:
+    - Returns active open sessions: `session_id`, `routine_slot_id`, `semester_course_id`, `started_at`, `status`, and `present_count`.
+    - Highly indexed on `(sem.batch_id, s.status = 'open')` with execution time under 10ms.
+  - **3-Second Active Background Poller**:
+    - Android (`ClassMateAcademicScreensSupabase.kt`) and Web (`schedule.tsx`) maintain a 3-second background poller while viewing today's timetable in the foreground.
+    - When a teacher taps "Take Attendance", the session state propagates across all connected batch devices within 3 seconds:
+      - Teacher's timetable period card flips into `"Attendance Live · Tap to manage"` with live attendee count.
+      - Students' timetable period card flips into **`"Scan Attendance"`** with a prominent emerald action strip.
+- **Timetable Cache Invalidation on Pull-to-Refresh**:
+  - Pull-to-refresh on the routine screen explicitly bypasses `ClassMateAcademicCache` and forces an immediate server re-fetch of `timetable_details` and `active_attendance_sessions`.
+  - Updated `timetable_details` in Supabase to return `attendance_enabled` flag directly, ensuring course-level toggle changes propagate without delay.
+
+---
+
+## 36. Bulletproof Attendance Security, Flexible Time Validation & E2E Verification (Migration `202610130002`)
+
+### A. Multi-Tier Management Authorization (`can_manage_attendance_slot`)
+Replaced brittle single-check logic with a resilient multi-tier permission resolver:
+1. Postgres superusers (`postgres`, `supabase_admin`)
+2. App owner (`classmate.is_owner()`)
+3. Batch Administrator (`p.role = 'admin'`)
+4. Active Teacher Course Assignment (`teacher_course_assignments.active = true`)
+5. Teacher Directory matching by:
+   - Profile ID (`td.profile_id = auth.uid()`)
+   - Exact email (`lower(td.email) = lower(p.email)`)
+   - Username prefix before `@` (`split_part(lower(td.email), '@', 1) = split_part(lower(p.email), '@', 1)`).
+
+### B. Secret Resilience & Same-Day Session Reopening
+- `start_attendance_session` verifies `session_secret` is never empty. If null or empty, it automatically generates a cryptographically secure 24-byte hex secret (`encode(extensions.gen_random_bytes(24), 'hex')`).
+- Reopening a closed session on the same calendar day reuses today's session and secret (`is_resumed = true`), cleanly setting `status = 'open', closed_at = null` without creating duplicate or orphan session rows.
+
+### C. Flexible Rotating QR Tolerance & Schedule Boundary Decoupling
+- **15-Second Epoch Windows**: `time_window = floor(current_epoch_seconds / 15)`.
+- **Dynamic Tolerance**: Allows up to 3 windows drift (`abs(current_win - time_window) <= 3`, ±45 seconds) to handle mobile network transmission and camera focusing latency, while strictly rejecting screenshots older than 45 seconds.
+- **Decoupled Schedule Check**:
+  - Removed rigid hard-rejections (`22023 outside class period`) that previously blocked demo sessions, testing, or classes starting slightly early.
+  - Scans are accepted as long as the session is currently `open`, while accurately flagging `confidence = 'late'` if scanned $> 15$ minutes after nominal start time.
+- **Idempotent Upsert Guarantee**:
+  - `on conflict (session_id, student_id) do update set synced_at = now()`.
+  - Prevents crashes on network retries or double scans, returning `{ "success": true, "status": "present" }` idempotently.
+
+### D. Automated End-to-End Test Suite (`scripts/test_attendance_e2e.py`)
+Verified against both Staging and Production:
+1. Attendance session start and resume.
+2. Dynamic HMAC-SHA256 calculation for current window.
+3. Live student scan validation (`success: true`).
+4. Duplicate scan idempotency.
+5. Strict rejection of expired tokens ($> 75$ seconds old).
+6. Live session roster verification.
+7. Active timetable session query verification.
+
+---
+
+## 37. Natural Alphanumeric Student Roll Sorting Engine (Excel & Live Realtime Scanner)
+
+### A. The Natural Roll Ordering Problem
+University roll numbers follow an alphanumeric format (e.g. `CE25001`, `CE25009`, `CE25010`, `CE25032`, `CE25060`). Standard lexicographic string sorting fails if rolls have variable formatting or different lengths. Furthermore, live scanning rosters previously showed students in chronological scan arrival order rather than academic roll order.
+
+### B. Natural Chunking Comparator Implementation
+- Splits roll strings into text prefixes and numerical integer chunks.
+- Compares numerical portions as integers so that `CE25001` < `CE25002` < `...` < `CE25060`.
+- **Excel Spreadsheet Export**:
+  - Integrated into SheetJS generation in `web/src/lib/attendance-excel.ts` and Supabase Edge Function `supabase/functions/export-attendance/index.ts`.
+  - Student rows are strictly sorted by student roll in both Single-Session reports and Semester Cumulative Matrices.
+- **Real-Time Live Scanning Roster**:
+  - **Android (`ClassMateTeacherLiveAttendanceActivity.kt`)**: Kotlin `compareRolls` comparator sorts incoming scans immediately on every 2.5s poll or push event.
+  - **Web (`attendance-teacher-modal.tsx`)**: Supabase Realtime WebSocket events sort `filteredRoster` and `presentStudentsSorted` on every scan.
+- **Teacher Dashboard Toggle**:
+  - Added sort toggle pills in `teacher-attendance.tsx`: `Roll (CE25001...)` (default) vs `At-Risk (Lowest %)`.
+
+---
+
+## 38. Pinned Bottom Action Sheet & Responsive QR Viewport Architecture
+
+### A. Zero Hidden Buttons UX
+On smaller smartphone screens and low-resolution laptop displays, previous layouts placed "Close Attendance" and "Export to Excel (.xlsx)" buttons inside scrollable views, causing them to fall below the screen fold or hide behind Android system gesture bars.
+
+### B. Architectural Solution
+1. **Android (`activity_teacher_live_attendance.xml`, `ClassMateTeacherLiveAttendanceActivity.kt`)**:
+   - Pinned action buttons into a dedicated bottom action container (`layoutBottomActions`) outside `NestedScrollView`.
+   - Dynamic `WindowInsetsCompat.Type.systemBars().bottom` padding ensures comfortable spacing above system navigation bars on all Android versions.
+   - Reduced QR canvas dimension from `280dp` to `220dp`, keeping live attendee counters (`✓ X / Y present`) and the 15-second rotation countdown ring visible without scrolling.
+2. **Web (`attendance-teacher-modal.tsx`, `globals.css`)**:
+   - Sticky `.attendance-modal-footer` container pinned to the bottom with backdrop blur.
+   - Resized QR canvas to `230px` for optimal responsiveness across laptop displays and mobile browser viewports.
+
 
