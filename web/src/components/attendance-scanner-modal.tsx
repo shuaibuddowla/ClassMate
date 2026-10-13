@@ -413,12 +413,18 @@ export function AttendanceScannerModal({
                   <div className="camera-permission-steps card">
                     <div className="camera-step-title">
                       <ShieldAlert size={15} />
-                      <strong>How to enable:</strong>
+                      <strong>If Chrome isn&apos;t asking or shows blocked:</strong>
                     </div>
                     <ol>
-                      <li>Tap the <strong>lock / permissions icon</strong> in your browser address bar.</li>
-                      <li>Set <strong>Camera</strong> to <strong>Allow</strong>.</li>
-                      <li>Tap &quot;Try Camera Again&quot; below.</li>
+                      <li>
+                        <strong>In the Address Bar:</strong> Tap the <strong>tune / lock icon (🔒 or 🎚️)</strong> next to the website URL &rarr; Tap <strong>Permissions</strong> or <strong>Site settings</strong> &rarr; Set <strong>Camera</strong> to <strong>Allow</strong>.
+                      </li>
+                      <li>
+                        <strong>If Chrome Site Settings were turned off globally:</strong> In Chrome, tap the <strong>⋮ (Menu)</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Site settings</strong> &rarr; <strong>Camera</strong> &rarr; Ensure <em>&quot;Sites can ask to use your camera&quot;</em> is enabled and ClassMate is not in the Blocked list.
+                      </li>
+                      <li>
+                        Return here and tap <strong>&quot;Try Camera Again&quot;</strong>.
+                      </li>
                     </ol>
                   </div>
                   <button

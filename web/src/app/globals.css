@@ -8290,9 +8290,9 @@ dialog:has(.notice-detail-modal-shell) > header {
 
 .camera-permission-steps {
   width: 100%;
-  max-width: 340px;
+  max-width: 440px;
   text-align: left;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-radius: 12px;
   background: var(--soft);
   border: 1px solid var(--border);
