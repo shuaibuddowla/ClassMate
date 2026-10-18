@@ -1020,7 +1020,7 @@ function Home({
     let live = true;
     const navigate = async () => {
       const [hash, id] = location.hash.slice(1).split("/");
-      const targetTab = hash === "batch" ? "friends" : hash === "settings" ? "profile" : hash;
+      const targetTab = hash === "batch" ? "friends" : hash === "settings" ? "profile" : hash === "courses" ? "library" : hash;
       if (
         [
           "timetable",
@@ -1039,12 +1039,12 @@ function Home({
           setTab(targetTab);
         }
       }
-      if (!id || !["notices", "library"].includes(hash) || !navigator.onLine)
+      if (!id || !["notices", "library", "courses"].includes(hash) || !navigator.onLine)
         return;
       if (!/^[0-9a-f-]{36}$/i.test(id)) return;
       try {
         const records = await rows(
-          hash === "library" ? "file_metadata" : "notices",
+          hash === "library" || hash === "courses" ? "file_metadata" : "notices",
           { id },
         );
         const record = records[0];
@@ -1099,14 +1099,14 @@ function Home({
     ["timetable", "Timetable", CalendarDays],
     ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
-    ["library", "Library", BookOpen],
+    ["library", "Courses", BookOpen],
     ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
     ["profile", "Settings", Settings],
   ] as const;
   const select = (value: string) => {
     if (value === tab) return;
     setTab(value);
-    history.replaceState({}, "", `/#${value === "friends" ? "batch" : value === "profile" ? "settings" : value}`);
+    history.replaceState({}, "", `/#${value === "friends" ? "batch" : value === "profile" ? "settings" : value === "library" ? "courses" : value}`);
   };
   const navigationTab = tab === "ai" ? "profile" : desktop && tab === "notices" ? "timetable" : tab;
   if(profile.role==="teacher" && !teacherEntered) return <main className="teacher-batch-picker"><section className="card">

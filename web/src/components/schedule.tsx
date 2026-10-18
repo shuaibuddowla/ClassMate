@@ -260,6 +260,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     closed = classesClosed(date, events);
 
   const isTeacherViewer = ctx.profile.role === "teacher";
+  const showAttendance = false;
   const teacherGreetingQuery = useQuery({
     queryKey: ["teacher_greeting", isTeacherViewer],
     queryFn: async () => {
@@ -306,19 +307,12 @@ export function Schedule({ ctx }: { ctx: Context }) {
         ]
       : entries;
 
-  const showCalendar = ctx.batchInfo?.calendar_in_timetable !== false;
-  const showAttendance = ctx.batchInfo?.attendance_enabled === true;
+  const showCalendar = true;
   useEffect(() => {
-    if (!showCalendar && mode === "calendar") {
-      setMode("routine");
-    }
-    if ((isTeacherViewer || !showAttendance) && mode === "attendance") {
-      setMode("routine");
-    }
     if (isTeacherViewer && mode === "bus") {
       setMode("routine");
     }
-  }, [showCalendar, showAttendance, mode, isTeacherViewer]);
+  }, [mode, isTeacherViewer]);
 
   const start = parseDate(date);
   start.setDate(start.getDate() - start.getDay());
@@ -339,8 +333,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "YOUR UNIVERSITY, MONTH BY MONTH"
               ) : mode === "bus" ? (
                 "STUDENT TRANSPORT"
-              ) : mode === "attendance" ? (
-                "ACADEMIC ELIGIBILITY"
               ) : isTeacherViewer ? (
                 teacherGreeting.eyebrow
               ) : (
@@ -357,8 +349,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 "Academic calendar"
               ) : mode === "bus" ? (
                 "Campus buses"
-              ) : mode === "attendance" ? (
-                "My Attendance"
               ) : isTeacherViewer ? (
                 <>
                   {teacherGreeting.greeting}
@@ -386,7 +376,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </h1>
           </div>
           {mode !== "calendar" &&
-            mode !== "attendance" &&
             (mode === "bus"
               ? busPermission.data
               : Object.values(editable.data || {}).some(Boolean)) && (
@@ -399,9 +388,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
         <div className="segment modes">
           {[
             ["routine", "Class Routine"],
-            ...(showAttendance && !isTeacherViewer ? [["attendance", "My Attendance"]] : []),
             ...(!isTeacherViewer ? [["bus", "Bus Schedule"]] : []),
-            ...(showCalendar ? [["calendar", "Calendar"]] : []),
+            ["calendar", "Calendar"],
           ].map(([id, label]) => (
             <button
               className={mode === id ? "selected" : ""}
@@ -412,7 +400,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </button>
           ))}
         </div>
-        {mode !== "calendar" && mode !== "attendance" && (
+        {mode !== "calendar" && (
           <div className="week">
             <button
               className="icon"
@@ -452,9 +440,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
         )}
       </div>
       <ErrorBox error={calendar.error} retry={() => calendar.refetch()} />
-      {mode === "attendance" ? (
-        <StudentAttendanceDashboard ctx={ctx} />
-      ) : mode === "calendar" ? (
+      {mode === "calendar" ? (
         <>
           <CalendarPanel
             month={month}

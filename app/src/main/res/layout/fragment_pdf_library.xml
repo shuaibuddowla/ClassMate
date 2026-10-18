@@ -31,7 +31,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:includeFontPadding="false"
-                android:text="Library"
+                android:text="Courses"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="29sp"
                 android:textStyle="bold" />
@@ -136,6 +136,100 @@
                             android:hint="Search files and courses" android:singleLine="true" android:inputType="text"
                             android:imeOptions="actionSearch" android:textColor="@color/cm_text_primary"
                             android:textColorHint="@color/cm_text_secondary" android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/cardAttendanceHero"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_attendance_hero"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_badge_green"
+                            android:backgroundTint="#2610B981">
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_rfid_signal"
+                                app:tint="#10B981" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-medium"
+                                    android:text="My Attendance"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="14.5sp"
+                                    android:textStyle="bold" />
+
+                                <View
+                                    android:layout_width="6dp"
+                                    android:layout_height="6dp"
+                                    android:layout_marginStart="6dp"
+                                    android:background="@drawable/ic_circle_fill"
+                                    app:backgroundTint="#10B981" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvAttendanceHeroSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="2 Courses Active for RFID Tracking · Tap to view"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_badge_green"
+                            android:backgroundTint="#2010B981"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Logs"
+                                android:textColor="#10B981"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginStart="2dp"
+                                android:src="@drawable/ic_chevron_right"
+                                app:tint="#10B981" />
+                        </LinearLayout>
                     </LinearLayout>
 
                     <HorizontalScrollView

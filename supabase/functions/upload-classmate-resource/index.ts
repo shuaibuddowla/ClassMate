@@ -124,7 +124,9 @@ Deno.serve(request => withWebCors(request, async (request) => {
       if (error) return new Response("Could not begin deletion", { status: 503 });
     }
     try {
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: resource.r2_object_key }));
+      if (resource.r2_object_key && !resource.r2_object_key.startsWith("link")) {
+        await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: resource.r2_object_key }));
+      }
     } catch {
       if (resource.status === "active") await admin.from("file_metadata")
         .update({ status: "active" }).eq("id", resource.id).eq("status", "deleting");

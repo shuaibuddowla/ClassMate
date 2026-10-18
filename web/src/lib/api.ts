@@ -75,7 +75,12 @@ export async function edge(name: string, body: Row) {
   }
   return data as Row;
 }
-export async function openFile(id: string) {
+export { openResource } from "./file-navigation";
+export async function openFile(resource: string | Row) {
+  if (typeof resource !== "string" && resource?.link_url) {
+    return openResource(() => Promise.resolve(String(resource.link_url)));
+  }
+  const id = typeof resource === "string" ? resource : String(resource?.id);
   return openResource(async () => {
     const result = await edge("signed-classmate-resource", { resource_id: id });
     return result.url;

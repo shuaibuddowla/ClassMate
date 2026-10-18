@@ -120,10 +120,6 @@ export function Profile({
     [storageInfo, setStorageInfo] = useState<string>("Calculating…"),
     [clearingStorage, setClearingStorage] = useState(false),
     [subView, setSubView] = useState<"settings" | "profile">("settings"),
-    [calendarInTimetable, setCalendarInTimetable] = useState<boolean>(
-      () => ctx.batchInfo?.calendar_in_timetable !== false
-    ),
-    [savingCalendarToggle, setSavingCalendarToggle] = useState(false),
     [globalAttendance, setGlobalAttendance] = useState<boolean>(false),
     [savingGlobalAttendanceToggle, setSavingGlobalAttendanceToggle] = useState(false),
     [managingAttendanceCourses, setManagingAttendanceCourses] = useState(false),
@@ -138,11 +134,6 @@ export function Profile({
     [loadingAttendanceCourses, setLoadingAttendanceCourses] = useState(false),
     [togglingCourseId, setTogglingCourseId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (typeof ctx.batchInfo?.calendar_in_timetable === "boolean") {
-      setCalendarInTimetable(ctx.batchInfo.calendar_in_timetable);
-    }
-  }, [ctx.batchInfo?.calendar_in_timetable]);
 
   useEffect(() => {
     if (!ctx.owner) return;
@@ -632,46 +623,6 @@ export function Profile({
           </button>
         )}
 
-        {/* Calendar in Timetable toggle (Admin/Owner only) */}
-        {(ctx.owner || ctx.profile.role === "admin") && (
-          <div className="settings-row">
-            <div className="setting-icon-box indigo">
-              <CalendarDays size={18} />
-            </div>
-            <div className="settings-row-text">
-              <span>Calendar in Timetable</span>
-              <small>
-                {calendarInTimetable
-                  ? "Academic Calendar is displayed on Timetable screen"
-                  : "Calendar hidden on Timetable screen to simplify layout"}
-              </small>
-            </div>
-            <Switch
-              label="Calendar in Timetable"
-              checked={calendarInTimetable}
-              disabled={savingCalendarToggle}
-              onChange={async (next) => {
-                setSavingCalendarToggle(true);
-                try {
-                  await rpc("toggle_batch_calendar_in_timetable", {
-                    target_batch: ctx.batch,
-                    enabled: next,
-                  });
-                  setCalendarInTimetable(next);
-                  if (ctx.batchInfo) {
-                    ctx.batchInfo.calendar_in_timetable = next;
-                  }
-                  qc.invalidateQueries({ queryKey: [ctx.user, "account", "batches"] });
-                  ctx.refreshProfile(ctx.profile);
-                } catch (e) {
-                  alert(e instanceof Error ? e.message : "Failed to update calendar toggle");
-                } finally {
-                  setSavingCalendarToggle(false);
-                }
-              }}
-            />
-          </div>
-        )}
 
         {/* Global Attendance System toggle (Owner only) */}
         {ctx.owner && (

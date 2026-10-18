@@ -128,15 +128,6 @@ internal class ClassMateAcademicScreensSupabase(
                 val res = ClassMateAuthApi.rpcText("is_attendance_feature_enabled", JSONObject().put("target_batch", currentBatch)).trim()
                 val enabled = res.equals("true", ignoreCase = true)
                 attendanceEnabledCache = Pair(currentBatch, enabled)
-                if (active(root) && batchId() == currentBatch) {
-                    val attendance = root.findViewById<TextView>(R.id.btnToggleAttendance)
-                    val isTeacher = profile().optString("role") == "teacher"
-                    attendance?.visibility = if (isTeacher || !enabled) View.GONE else View.VISIBLE
-                    if (!enabled && attendanceMode) {
-                        attendanceMode = false
-                        setupTimetable(root)
-                    }
-                }
             } catch (_: Exception) {}
         }
     }
@@ -183,7 +174,7 @@ internal class ClassMateAcademicScreensSupabase(
                 if (root.isAttachedToWindow) {
                     setupTimetable(root)
                 }
-            } else if (root.isAttachedToWindow && !busMode && !calendarMode && !attendanceMode) {
+            } else if (root.isAttachedToWindow && !busMode && !calendarMode) {
                 scope.launch {
                     checkActiveAttendanceSessions(root, batchId())
                 }
@@ -205,8 +196,6 @@ internal class ClassMateAcademicScreensSupabase(
                             setupTimetable(root)
                         } else if(calendarMode) {
                             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show()
-                        } else if(attendanceMode) {
-                            (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)?.show()
                         } else {
                             loadTimetable(root)
                         }
@@ -295,9 +284,6 @@ internal class ClassMateAcademicScreensSupabase(
         }
         if (tab == R.id.nav_timetable) {
             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
-                react(y - oldY, y == 0)
-            }
-            (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
                 react(y - oldY, y == 0)
             }
         }
@@ -435,40 +421,27 @@ internal class ClassMateAcademicScreensSupabase(
         }
         updateDayPills(root)
         val routine = root.v<TextView>(R.id.btnToggleRoutine)
-        val attendance = root.v<TextView>(R.id.btnToggleAttendance)
         val bus = root.v<TextView>(R.id.btnToggleBus)
         val calendar = root.v<TextView>(R.id.btnToggleCalendar)
-        val isTeacher = profile().optString("role") == "teacher"
-        val attendanceAllowed = isAttendanceBatchAllowed()
-        attendance.visibility = if (isTeacher || !attendanceAllowed) View.GONE else View.VISIBLE
-        syncAttendanceFeatureStatus(root)
         val calendarUi = (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)
             ?: ClassMateCalendarUi(activity, scope, calendarData) { profile().optString("role") == "admin" }.also {
                 root.setTag(R.id.btnToggleCalendar, it)
                 (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
             }
-        val attendanceUi = (root.getTag(R.id.btnToggleAttendance) as? ClassMateStudentAttendanceUi)
-            ?: ClassMateStudentAttendanceUi(activity, scope, batchId).also {
-                root.setTag(R.id.btnToggleAttendance, it)
-                (root as LinearLayout).addView(it.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-            }
         fun updateToggle() {
-            val special = calendarMode || busMode || attendanceMode
-            text(root, R.id.tvUserName, if (calendarMode) "Academic calendar" else if (busMode) "Campus buses" else if (attendanceMode) "My Attendance" else name)
-            text(root, R.id.tvGreeting, if (calendarMode) "Your university, month by month" else if (busMode) "Student transport" else if (attendanceMode) "Academic eligibility" else greetings[LocalDate.now().dayOfYear % greetings.size])
+            val special = calendarMode || busMode
+            text(root, R.id.tvUserName, if (calendarMode) "Academic calendar" else if (busMode) "Campus buses" else name)
+            text(root, R.id.tvGreeting, if (calendarMode) "Your university, month by month" else if (busMode) "Student transport" else greetings[LocalDate.now().dayOfYear % greetings.size])
             root.v<View>(R.id.tvGreetingWave).visibility = if (special) View.GONE else View.VISIBLE
             root.v<View>(R.id.busSummary).visibility = View.GONE
-            root.v<View>(R.id.daySelector).visibility = if (calendarMode || attendanceMode) View.GONE else View.VISIBLE
-            root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode || attendanceMode) View.GONE else View.VISIBLE
+            root.v<View>(R.id.daySelector).visibility = if (calendarMode) View.GONE else View.VISIBLE
+            root.v<View>(R.id.swipeRefresh).visibility = if (calendarMode) View.GONE else View.VISIBLE
             calendarUi.scroll.visibility = if (calendarMode) View.VISIBLE else View.GONE
-            attendanceUi.scroll.visibility = if (attendanceMode) View.VISIBLE else View.GONE
-            val isRoutine = !busMode && !calendarMode && !attendanceMode
+            val isRoutine = !busMode && !calendarMode
             routine.setBackgroundResource(if (isRoutine) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             routine.setTextColor(activity.getColor(if (isRoutine) android.R.color.white else R.color.cm_text_secondary))
-            attendance.setBackgroundResource(if (attendanceMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
-            attendance.setTextColor(activity.getColor(if (attendanceMode) android.R.color.white else R.color.cm_text_secondary))
-            bus.setBackgroundResource(if (busMode && !calendarMode && !attendanceMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
-            bus.setTextColor(activity.getColor(if (busMode && !calendarMode && !attendanceMode) android.R.color.white else R.color.cm_text_secondary))
+            bus.setBackgroundResource(if (busMode && !calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
+            bus.setTextColor(activity.getColor(if (busMode && !calendarMode) android.R.color.white else R.color.cm_text_secondary))
             calendar.setBackgroundResource(if (calendarMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             calendar.setTextColor(activity.getColor(if (calendarMode) android.R.color.white else R.color.cm_text_secondary))
             val timetable = com.shuaib.classmate.databinding.FragmentTimetableBinding.bind(root)
@@ -476,17 +449,15 @@ internal class ClassMateAcademicScreensSupabase(
             timetable.btnAddPeriod.apply {
                 val canEdit = if (busMode) canEditBus()
                     else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
-                visibility = if (canEdit && !calendarMode && !attendanceMode) View.VISIBLE else View.GONE
+                visibility = if (canEdit && !calendarMode) View.VISIBLE else View.GONE
                 setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
             }
             if (calendarMode) { stopAttendanceSessionsPoller(); timetableRequest++; calendarUi.show() }
-            else if (attendanceMode) { stopAttendanceSessionsPoller(); attendanceUi.show() }
             else loadTimetable(root)
         }
-        routine.setOnClickListener { if(busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; attendanceMode = false; updateToggle() }
-        attendance.setOnClickListener { if(!attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); attendanceMode = true; busMode = false; calendarMode = false; updateToggle() }
-        bus.setOnClickListener { if(!busMode || calendarMode || attendanceMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); busMode = true; calendarMode = false; attendanceMode = false; updateToggle() }
-        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); calendarMode = true; busMode = false; attendanceMode = false; updateToggle() }
+        routine.setOnClickListener { if(busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); busMode = false; calendarMode = false; updateToggle() }
+        bus.setOnClickListener { if(!busMode || calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); busMode = true; calendarMode = false; updateToggle() }
+        calendar.setOnClickListener { if(!calendarMode) com.shuaib.classmate.ui.ClassMateHaptics.selection(it); stopAttendanceSessionsPoller(); calendarMode = true; busMode = false; updateToggle() }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadTimetable(root, true) }
         updateToggle()
     }
@@ -1645,11 +1616,203 @@ internal class ClassMateAcademicScreensSupabase(
             }.show()
     }
 
+    private fun showRfidAttendanceDialog(root: View) {
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_rfid_attendance, null, false)
+        val coursesView = dialogView.findViewById<LinearLayout>(R.id.layoutCoursesView)
+        val tableView = dialogView.findViewById<LinearLayout>(R.id.layoutTableView)
+        val coursesContainer = dialogView.findViewById<LinearLayout>(R.id.coursesContainer)
+        val btnBack = dialogView.findViewById<TextView>(R.id.btnBackToCourses)
+        val tvTableTitle = dialogView.findViewById<TextView>(R.id.tvTableCourseTitle)
+        val tvTableCode = dialogView.findViewById<TextView>(R.id.tvTableCourseCode)
+        val tableContainer = dialogView.findViewById<LinearLayout>(R.id.tableRowsContainer)
+
+        val activeCourses = listOf(
+            Triple("CSE 2105", "Computer Organization & Architecture", "Theory"),
+            Triple("CSE 2102", "Data Structures & Algorithms Lab", "Lab")
+        )
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        fun renderTable(courseCode: String, courseTitle: String) {
+            tvTableTitle.text = courseTitle
+            tvTableCode.text = "$courseCode · Daily Attendance Log"
+            tableContainer.removeAllViews()
+
+            val density = activity.resources.displayMetrics.density
+            val padH = (12 * density).toInt()
+            val padV = (10 * density).toInt()
+
+            val headerRow = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(padH, padV, padH, padV)
+                setBackgroundColor(activity.getColor(R.color.cm_surface_glass))
+            }
+            val headers = listOf("Date" to 2.2f, "Class" to 1.5f, "Status" to 1.8f, "Time & Room" to 2.3f)
+            headers.forEach { (text, weight) ->
+                val tv = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight)
+                    this.text = text
+                    textSize = 10.5f
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                headerRow.addView(tv)
+            }
+            tableContainer.addView(headerRow)
+
+            val rows = listOf(
+                listOf("Oct 19, 2026\nMon", "Class #14", "Present", "10:04 AM\nRoom 304"),
+                listOf("Oct 14, 2026\nWed", "Class #13", "Present", "10:01 AM\nRoom 304"),
+                listOf("Oct 12, 2026\nMon", "Class #12", "Absent", "—"),
+                listOf("Oct 07, 2026\nWed", "Class #11", "Present", "09:58 AM\nRoom 304"),
+                listOf("Oct 05, 2026\nMon", "Class #10", "Present", "10:05 AM\nRoom 304")
+            )
+
+            rows.forEach { rowData ->
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(padH, (8 * density).toInt(), padH, (8 * density).toInt())
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                val tvDate = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.2f)
+                    text = rowData[0]
+                    textSize = 11.5f
+                    setTextColor(activity.getColor(R.color.cm_text_primary))
+                }
+                val tvClass = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.5f)
+                    text = rowData[1]
+                    textSize = 11.5f
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                }
+                val tvStatus = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
+                    text = rowData[2]
+                    textSize = 11f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    val isPresent = rowData[2] == "Present"
+                    setTextColor(if (isPresent) activity.getColor(R.color.cm_success) else activity.getColor(R.color.cm_error))
+                }
+                val tvTime = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.3f)
+                    text = rowData[3]
+                    textSize = 11f
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                }
+                row.addView(tvDate)
+                row.addView(tvClass)
+                row.addView(tvStatus)
+                row.addView(tvTime)
+                tableContainer.addView(row)
+            }
+
+            coursesView.visibility = View.GONE
+            tableView.visibility = View.VISIBLE
+        }
+
+        btnBack.setOnClickListener {
+            tableView.visibility = View.GONE
+            coursesView.visibility = View.VISIBLE
+        }
+
+        val density = activity.resources.displayMetrics.density
+        coursesContainer.removeAllViews()
+        activeCourses.forEach { (code, title, type) ->
+            val card = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (10 * density).toInt()
+                }
+                setBackgroundResource(R.drawable.bg_library_card)
+                setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
+                isClickable = true
+                isFocusable = true
+                foreground = android.util.TypedValue().let { tv ->
+                    activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                    activity.getDrawable(tv.resourceId)
+                }
+                setOnClickListener {
+                    renderTable(code, title)
+                }
+            }
+
+            val topRow = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val badge = TextView(activity).apply {
+                text = "RFID ACTIVE"
+                textSize = 9.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(activity.getColor(R.color.cm_success))
+                setBackgroundResource(R.drawable.bg_badge_green)
+                setPadding((6 * density).toInt(), (2 * density).toInt(), (6 * density).toInt(), (2 * density).toInt())
+            }
+            val tvType = TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = (8 * density).toInt()
+                }
+                text = type
+                textSize = 10.5f
+                setTextColor(activity.getColor(R.color.cm_text_secondary))
+            }
+            topRow.addView(badge)
+            topRow.addView(tvType)
+            card.addView(topRow)
+
+            val tvTitle = TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (6 * density).toInt()
+                }
+                text = title
+                textSize = 13.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(activity.getColor(R.color.cm_text_primary))
+            }
+            card.addView(tvTitle)
+
+            val bottomRow = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (6 * density).toInt()
+                }
+            }
+            val tvCode = TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                text = code
+                textSize = 11.5f
+                setTextColor(activity.getColor(R.color.cm_text_secondary))
+            }
+            val tvLog = TextView(activity).apply {
+                text = "View Daily Log ›"
+                textSize = 11.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(activity.getColor(R.color.cm_success))
+            }
+            bottomRow.addView(tvCode)
+            bottomRow.addView(tvLog)
+            card.addView(bottomRow)
+
+            coursesContainer.addView(card)
+        }
+
+        dialog.show()
+    }
+
     private fun setupLibrary(root: View) {
         root.v<View>(R.id.btnUploadPdf).apply {
             visibility = if (profile().optString("role") in setOf("admin", "teacher") ||
                 profile().optBoolean("is_cr")) View.VISIBLE else View.GONE
             setOnClickListener { onUpload() }
+        }
+        root.v<View>(R.id.cardAttendanceHero).setOnClickListener {
+            showRfidAttendanceDialog(root)
         }
         root.v<View>(R.id.btnLibrarySearch).setOnClickListener { searchLibrary(root) }
         root.v<View>(R.id.tvViewAll).setOnClickListener { showAllFiles() }
