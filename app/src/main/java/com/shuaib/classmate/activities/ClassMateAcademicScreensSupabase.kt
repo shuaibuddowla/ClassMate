@@ -110,6 +110,36 @@ internal class ClassMateAcademicScreensSupabase(
     private var readerDialog: AlertDialog? = null
     private var liveOpenSessionsMap = mutableMapOf<String, JSONObject>()
     private var attendancePollerJob: kotlinx.coroutines.Job? = null
+    private var attendanceEnabledCache: Pair<String, Boolean>? = null
+    private fun isAttendanceBatchAllowed(): Boolean {
+        val currentBatch = batchId()
+        if (currentBatch.isBlank()) return false
+        val cached = attendanceEnabledCache
+        if (cached != null && cached.first == currentBatch) {
+            return cached.second
+        }
+        return currentBatch.equals("de0b3379-54a0-4275-a526-5970295c787e", ignoreCase = true)
+    }
+    private fun syncAttendanceFeatureStatus(root: View) {
+        val currentBatch = batchId()
+        if (currentBatch.isBlank()) return
+        scope.launch {
+            try {
+                val res = ClassMateAuthApi.rpcText("is_attendance_feature_enabled", JSONObject().put("target_batch", currentBatch)).trim()
+                val enabled = res.equals("true", ignoreCase = true)
+                attendanceEnabledCache = Pair(currentBatch, enabled)
+                if (active(root) && batchId() == currentBatch) {
+                    val attendance = root.findViewById<TextView>(R.id.btnToggleAttendance)
+                    val isTeacher = profile().optString("role") == "teacher"
+                    attendance?.visibility = if (isTeacher || !enabled) View.GONE else View.VISIBLE
+                    if (!enabled && attendanceMode) {
+                        attendanceMode = false
+                        setupTimetable(root)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
     private var libraryCategory = "theory"
     private var libraryFilter = "All"
     private data class LibrarySnapshot(
@@ -409,7 +439,9 @@ internal class ClassMateAcademicScreensSupabase(
         val bus = root.v<TextView>(R.id.btnToggleBus)
         val calendar = root.v<TextView>(R.id.btnToggleCalendar)
         val isTeacher = profile().optString("role") == "teacher"
-        attendance.visibility = if (isTeacher) View.GONE else View.VISIBLE
+        val attendanceAllowed = isAttendanceBatchAllowed()
+        attendance.visibility = if (isTeacher || !attendanceAllowed) View.GONE else View.VISIBLE
+        syncAttendanceFeatureStatus(root)
         val calendarUi = (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)
             ?: ClassMateCalendarUi(activity, scope, calendarData) { profile().optString("role") == "admin" }.also {
                 root.setTag(R.id.btnToggleCalendar, it)
@@ -804,7 +836,8 @@ internal class ClassMateAcademicScreensSupabase(
                 val isTeacherViewer = (role == "teacher" && courseId in editableCourses)
                 val isAdminViewer = role == "admin"
                 val isStudentViewer = role == "student" || role.isBlank()
-                val isAttendanceEnabled = detail?.optBoolean("attendance_enabled") == true || isTeacherViewer || isAdminViewer
+                val batchAttendanceAllowed = isAttendanceBatchAllowed()
+                val isAttendanceEnabled = (detail?.optBoolean("attendance_enabled") == true || isTeacherViewer || isAdminViewer) && batchAttendanceAllowed
 
                 val strip = card.findViewById<View>(R.id.layoutAttendanceStrip)
                 val stripText = card.findViewById<TextView>(R.id.tvAttendanceStripText)
@@ -871,7 +904,7 @@ internal class ClassMateAcademicScreensSupabase(
                     }
                 }
             }
-            if (!requestedBusMode && !calendarMode && !attendanceMode) {
+            if (!requestedBusMode && !calendarMode && !attendanceMode && isAttendanceBatchAllowed()) {
                 startAttendanceSessionsPoller(root, selectedBatch)
             } else {
                 stopAttendanceSessionsPoller()

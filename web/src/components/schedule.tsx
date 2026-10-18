@@ -307,14 +307,18 @@ export function Schedule({ ctx }: { ctx: Context }) {
       : entries;
 
   const showCalendar = ctx.batchInfo?.calendar_in_timetable !== false;
+  const showAttendance = ctx.batchInfo?.attendance_enabled === true;
   useEffect(() => {
     if (!showCalendar && mode === "calendar") {
       setMode("routine");
     }
-    if (isTeacherViewer && (mode === "bus" || mode === "attendance")) {
+    if ((isTeacherViewer || !showAttendance) && mode === "attendance") {
       setMode("routine");
     }
-  }, [showCalendar, mode, isTeacherViewer]);
+    if (isTeacherViewer && mode === "bus") {
+      setMode("routine");
+    }
+  }, [showCalendar, showAttendance, mode, isTeacherViewer]);
 
   const start = parseDate(date);
   start.setDate(start.getDate() - start.getDay());
@@ -395,7 +399,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
         <div className="segment modes">
           {[
             ["routine", "Class Routine"],
-            ...(!isTeacherViewer ? [["attendance", "My Attendance"]] : []),
+            ...(showAttendance && !isTeacherViewer ? [["attendance", "My Attendance"]] : []),
             ...(!isTeacherViewer ? [["bus", "Bus Schedule"]] : []),
             ...(showCalendar ? [["calendar", "Calendar"]] : []),
           ].map(([id, label]) => (
@@ -632,7 +636,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                         "teacher_start";
                       let stripText = "";
 
-                      if (isAttendanceEnabled) {
+                      if (isAttendanceEnabled && showAttendance) {
                         if (isTeacherViewer) {
                           if (hasOpenSession) {
                             showAttendanceStrip = true;

@@ -124,6 +124,8 @@ export function Profile({
       () => ctx.batchInfo?.calendar_in_timetable !== false
     ),
     [savingCalendarToggle, setSavingCalendarToggle] = useState(false),
+    [globalAttendance, setGlobalAttendance] = useState<boolean>(false),
+    [savingGlobalAttendanceToggle, setSavingGlobalAttendanceToggle] = useState(false),
     [managingAttendanceCourses, setManagingAttendanceCourses] = useState(false),
     [attendanceCourses, setAttendanceCourses] = useState<Array<{
       offering_id: string;
@@ -141,6 +143,17 @@ export function Profile({
       setCalendarInTimetable(ctx.batchInfo.calendar_in_timetable);
     }
   }, [ctx.batchInfo?.calendar_in_timetable]);
+
+  useEffect(() => {
+    if (!ctx.owner) return;
+    rpc<{ global_enabled: boolean }>("get_attendance_feature_status", { target_batch: ctx.batch })
+      .then((res) => {
+        if (typeof res?.global_enabled === "boolean") {
+          setGlobalAttendance(res.global_enabled);
+        }
+      })
+      .catch(() => {});
+  }, [ctx.owner, ctx.batch]);
 
   useEffect(() => {
     if (!managingAttendanceCourses || !ctx.batch) return;
@@ -654,6 +667,41 @@ export function Profile({
                   alert(e instanceof Error ? e.message : "Failed to update calendar toggle");
                 } finally {
                   setSavingCalendarToggle(false);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* Global Attendance System toggle (Owner only) */}
+        {ctx.owner && (
+          <div className="settings-row">
+            <div className="setting-icon-box emerald">
+              <QrCode size={18} />
+            </div>
+            <div className="settings-row-text">
+              <span>Global Attendance System</span>
+              <small>
+                {globalAttendance
+                  ? "Attendance system is active for all batches and users"
+                  : "Attendance system is restricted to CSE-22 batch only"}
+              </small>
+            </div>
+            <Switch
+              label="Global Attendance System"
+              checked={globalAttendance}
+              disabled={savingGlobalAttendanceToggle}
+              onChange={async (next) => {
+                setSavingGlobalAttendanceToggle(true);
+                try {
+                  await rpc("toggle_attendance_feature", { enabled: next });
+                  setGlobalAttendance(next);
+                  qc.invalidateQueries({ queryKey: [ctx.user, "account", "batches"] });
+                  ctx.refreshProfile(ctx.profile);
+                } catch (e) {
+                  alert(e instanceof Error ? e.message : "Failed to toggle global attendance");
+                } finally {
+                  setSavingGlobalAttendanceToggle(false);
                 }
               }}
             />

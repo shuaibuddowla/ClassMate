@@ -863,7 +863,7 @@ function TabDeck({
         </Suspense>
       );
     if (value === "attendance") {
-      if (ctx.profile.role !== "teacher") {
+      if (ctx.profile.role !== "teacher" || active.batchInfo?.attendance_enabled !== true) {
         return <Schedule ctx={active} />;
       }
       return (
@@ -1015,6 +1015,7 @@ function Home({
       supabase().removeChannel(channel);
     };
   }, [user, batch, qc]);
+  const info = batches.data?.find((b) => b.id === batch) || {};
   useEffect(() => {
     let live = true;
     const navigate = async () => {
@@ -1032,7 +1033,7 @@ function Home({
           "ai",
         ].includes(targetTab)
       ) {
-        if (targetTab === "attendance" && profile.role !== "teacher") {
+        if (targetTab === "attendance" && (profile.role !== "teacher" || info.attendance_enabled !== true)) {
           setTab("timetable");
         } else {
           setTab(targetTab);
@@ -1066,8 +1067,7 @@ function Home({
       window.removeEventListener("hashchange", navigate);
       window.removeEventListener("popstate", navigate);
     };
-  }, [user]);
-  const info = batches.data?.find((b) => b.id === batch) || {};
+  }, [user, info.attendance_enabled]);
   const ctx: Context = {
     user,
     profile,
@@ -1097,7 +1097,7 @@ function Home({
   const isTeacher = profile.role === "teacher";
   const destinations = [
     ["timetable", "Timetable", CalendarDays],
-    ...(isTeacher ? [["attendance", "Attendance", QrCode] as const] : []),
+    ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
     ["library", "Library", BookOpen],
     ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
