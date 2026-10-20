@@ -622,12 +622,8 @@ function Highlight({ text, search }: { text: string; search: string }) {
   return <>{parts}</>;
 }
 
-export function canViewNoticeReaders(notice: Row, ctx: Context): boolean {
-  if (ctx.owner) return true;
-  if (ctx.profile.role === "admin" || ctx.profile.role === "teacher") return true;
-  if (ctx.profile.is_cr) return true;
-  if (notice.author_id === ctx.user) return true;
-  return false;
+export function canViewNoticeReaders(_notice?: Row, _ctx?: Context): boolean {
+  return true;
 }
 
 function NoticeCard({
