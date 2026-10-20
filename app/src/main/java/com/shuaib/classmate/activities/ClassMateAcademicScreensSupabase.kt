@@ -879,18 +879,18 @@ internal class ClassMateAcademicScreensSupabase(
         val tvEmoji = root.findViewById<TextView>(R.id.tvEmptyEmoji) ?: return
         val textToMatch = (closure ?: "").lowercase()
         val dayOfWeek = date.dayOfWeek
-        val isWeekend = dayOfWeek == java.time.DayOfWeek.FRIDAY || dayOfWeek == java.time.DayOfWeek.SATURDAY
+        val isWeekend = dayOfWeek == java.time.DayOfWeek.THURSDAY || dayOfWeek == java.time.DayOfWeek.FRIDAY
 
         val (animName, fallbackEmoji) = when {
             listOf("eid", "ramadan", "romjan", "fitr", "azha", "adho", "barat", "meraj", "qadr", "ashura", "hijri", "muharram", "fateha", "milad", "ঈদ", "রমজান", "মিরাজ", "বরাত", "কদর", "আশুরা", "ফাতেহা", "মিলাদুন্নবী", "সোম্বা").any { textToMatch.contains(it) } ->
                 "eid" to "🌙"
-            listOf("puja", "pooja", "durga", "saraswati", "kali", "diwali", "deepavali", "janmashtami", "dashami", "navami", "bijoya", "shivratri", "holi", "purnima", "buddha", "পূজা", "দুর্গা", "সরস্বতী", "জন্মাষ্টমী", "লক্ষ্মী", "বুদ্ধপূর্ণিমা").any { textToMatch.contains(it) } ->
+            listOf("puja", "pooja", "durga", "saraswati", "kali", "diwali", "deepavali", "janmashtami", "dashami", "navami", "bijoya", "shivratri", "purnima", "buddha", "পূজা", "দুর্গা", "সরস্বতী", "জন্মাষ্টমী", "লক্ষ্মী", "বুদ্ধপূর্ণিমা").any { textToMatch.contains(it) } ->
                 "puja" to "🪔"
             listOf("vacation", "break", "recess", "summer", "winter", "autumn", "spring", "অবকাশ", "ছুটি").any { textToMatch.contains(it) } ->
                 "vacation" to "🏖️"
             listOf("independence", "victory", "language", "ekushey", "21st february", "21 february", "mourning", "revolution", "bangabandhu", "shaheed", "national", "may day", "labor", "martyrs", "uprising", "স্বাধীনতা", "বিজয়", "মাতৃভাষা", "শহিদ", "গণঅভ্যুত্থান", "ভাসানী", "বুদ্ধিজীবী").any { textToMatch.contains(it) } ->
                 "national" to "🌺"
-            listOf("weekend", "weekly", "শুক্রবার", "শনিবার").any { textToMatch.contains(it) } || isWeekend ->
+            listOf("weekend", "weekly", "বৃহস্পতিবার", "শুক্রবার").any { textToMatch.contains(it) } || isWeekend ->
                 "weekend" to "☕"
             else ->
                 "celebration" to "🎉"

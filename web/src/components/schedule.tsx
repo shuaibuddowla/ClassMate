@@ -138,7 +138,6 @@ function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean
       "navami",
       "bijoya",
       "shivratri",
-      "holi",
       "purnima",
       "buddha",
       "পূজা",
@@ -709,7 +708,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   )
                   .map((e) => e.title)
                   .join(" · ") || "University weekly holiday";
-              const isWeekendDay = [5, 6].includes(parseDate(date).getDay());
+              const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
               const anim = getTimetableAnimation(holidayTitle, isWeekendDay);
               return (
                 <Empty
@@ -745,7 +744,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 </>
               ) : sortedEntries.length === 0 ? (
                 (() => {
-                  const isWeekendDay = [5, 6].includes(parseDate(date).getDay());
+                  const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
                   const anim =
                     mode === "routine"
                       ? getTimetableAnimation(
