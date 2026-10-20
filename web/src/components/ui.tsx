@@ -56,11 +56,20 @@ export function ErrorBox({
     </div>
   ) : null;
 }
-export function Empty({ title, body }: { title: string; body?: string }) {
+export function Empty({
+  title,
+  body,
+  illustration,
+}: {
+  title: string;
+  body?: string;
+  illustration?: React.ReactNode;
+}) {
   return (
     <div className="empty">
+      {illustration && <div className="empty-illustration">{illustration}</div>}
       <h3>{title}</h3>
-      <p>{body}</p>
+      {body && <p>{body}</p>}
     </div>
   );
 }

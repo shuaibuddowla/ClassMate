@@ -653,9 +653,21 @@
                 android:minHeight="300dp"
                 android:orientation="vertical"
                 android:gravity="center"
+                android:paddingTop="24dp"
+                android:paddingBottom="32dp"
                 android:visibility="gone">
 
+                <com.airbnb.lottie.LottieAnimationView
+                    android:id="@+id/lottieNoClasses"
+                    android:layout_width="170dp"
+                    android:layout_height="170dp"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    app:lottie_autoPlay="true"
+                    app:lottie_loop="true" />
+
                 <TextView
+                    android:id="@+id/tvEmptyEmoji"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/emoji_party"

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -28,6 +29,128 @@ import {
 } from "@/lib/calendar";
 import type { Context } from "./app";
 import { Empty, ErrorBox, Form, Modal, Skeleton, Confirm } from "./ui";
+
+const Lottie = dynamic(
+  () => import("lottie-react").then((mod) => mod.Lottie),
+  { ssr: false },
+);
+
+function HolidayLottie({
+  name,
+  fallbackEmoji,
+}: {
+  name: string;
+  fallbackEmoji: string;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <span style={{ fontSize: "3rem", display: "inline-block", lineHeight: 1 }}>
+        {fallbackEmoji}
+      </span>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: 170,
+        height: 170,
+        margin: "0 auto",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Lottie
+        src={`/animations/${name}.json`}
+        autoplay={true}
+        loop={true}
+        style={{ width: "100%", height: "100%" }}
+      />
+    </div>
+  );
+}
+
+function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean) {
+  const text = (closureTitle || "").toLowerCase();
+
+  if (
+    [
+      "eid",
+      "ramadan",
+      "romjan",
+      "fitr",
+      "azha",
+      "adho",
+      "barat",
+      "meraj",
+      "qadr",
+      "ashura",
+      "hijri",
+      "muharram",
+      "fateha",
+    ].some((k) => text.includes(k))
+  ) {
+    return { name: "eid", emoji: "🌙" };
+  }
+  if (
+    [
+      "puja",
+      "pooja",
+      "durga",
+      "saraswati",
+      "kali",
+      "diwali",
+      "deepavali",
+      "janmashtami",
+      "dashami",
+      "navami",
+      "bijoya",
+      "shivratri",
+      "holi",
+      "purnima",
+      "buddha",
+    ].some((k) => text.includes(k))
+  ) {
+    return { name: "puja", emoji: "🪔" };
+  }
+  if (
+    ["vacation", "break", "recess", "summer", "winter", "autumn", "spring"].some(
+      (k) => text.includes(k),
+    )
+  ) {
+    return { name: "vacation", emoji: "🏖️" };
+  }
+  if (
+    [
+      "independence",
+      "victory",
+      "language",
+      "ekushey",
+      "21st february",
+      "21 february",
+      "mourning",
+      "revolution",
+      "bangabandhu",
+      "shaheed",
+      "national",
+      "may day",
+      "labor",
+    ].some((k) => text.includes(k))
+  ) {
+    return { name: "national", emoji: "🌺" };
+  }
+  if (["weekend", "weekly"].some((k) => text.includes(k)) || isWeekend) {
+    return { name: "weekend", emoji: "☕" };
+  }
+  return { name: "celebration", emoji: "🎉" };
+}
+
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function dhakaNowTime() {
@@ -523,9 +646,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
             </span>
           </div>
           {mode === "routine" && closed ? (
-            <Empty
-              title={isTeacherViewer ? (date === dhakaToday() ? "You have no classes today for the selected batch" : "You have no classes on this day for the selected batch") : "No classes today"}
-              body={
+            (() => {
+              const holidayTitle =
                 events
                   .filter(
                     (e) =>
@@ -534,9 +656,28 @@ export function Schedule({ ctx }: { ctx: Context }) {
                       ["university", "classes"].includes(e.scope),
                   )
                   .map((e) => e.title)
-                  .join(" · ") || "University weekly holiday"
-              }
-            />
+                  .join(" · ") || "University weekly holiday";
+              const isWeekendDay = [5, 6].includes(parseDate(date).getDay());
+              const anim = getTimetableAnimation(holidayTitle, isWeekendDay);
+              return (
+                <Empty
+                  illustration={
+                    <HolidayLottie
+                      name={anim.name}
+                      fallbackEmoji={anim.emoji}
+                    />
+                  }
+                  title={
+                    isTeacherViewer
+                      ? date === dhakaToday()
+                        ? "You have no classes today for the selected batch"
+                        : "You have no classes on this day for the selected batch"
+                      : "No classes today"
+                  }
+                  body={holidayTitle}
+                />
+              );
+            })()
           ) : (
             <>
               <ErrorBox
@@ -551,20 +692,52 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   <Skeleton />
                 </>
               ) : sortedEntries.length === 0 ? (
-                <Empty
-                  title={
-                    mode === "routine" && isTeacherViewer
-                      ? (date === dhakaToday()
-                          ? "You have no classes today for the selected batch"
-                          : "You have no classes on this day for the selected batch")
-                      : "Nothing scheduled"
-                  }
-                  body={
-                    mode === "routine" && isTeacherViewer
-                      ? "Your assigned courses have no routine slots scheduled on this day."
-                      : "Schedules will appear here once configured."
-                  }
-                />
+                (() => {
+                  const isWeekendDay = [5, 6].includes(parseDate(date).getDay());
+                  const anim =
+                    mode === "routine"
+                      ? getTimetableAnimation(
+                          isWeekendDay ? "weekend" : "",
+                          isWeekendDay,
+                        )
+                      : null;
+                  return (
+                    <Empty
+                      illustration={
+                        mode === "routine" && anim ? (
+                          <HolidayLottie
+                            name={anim.name}
+                            fallbackEmoji={anim.emoji}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "3rem",
+                              display: "inline-block",
+                              lineHeight: 1,
+                            }}
+                          >
+                            🚌
+                          </span>
+                        )
+                      }
+                      title={
+                        mode === "routine" && isTeacherViewer
+                          ? date === dhakaToday()
+                            ? "You have no classes today for the selected batch"
+                            : "You have no classes on this day for the selected batch"
+                          : "Nothing scheduled"
+                      }
+                      body={
+                        mode === "routine" && isTeacherViewer
+                          ? "Your assigned courses have no routine slots scheduled on this day."
+                          : mode === "routine"
+                          ? "Enjoy your free day"
+                          : "Schedules will appear here once configured."
+                      }
+                    />
+                  );
+                })()
               ) : (
                 <>
                   {mode === "bus" && (

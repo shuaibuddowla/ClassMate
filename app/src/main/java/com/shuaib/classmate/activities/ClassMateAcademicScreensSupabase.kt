@@ -316,6 +316,7 @@ internal class ClassMateAcademicScreensSupabase(
     private fun setNavigationShown(show: Boolean) {
         if (navShown == show) return
         navShown = show
+        (activity as? ClassMateAuthActivity)?.composeNavVisible = show
         val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
         nav.animate().cancel()
         nav.animate().translationY(if (show) 0f else
@@ -604,6 +605,7 @@ internal class ClassMateAcademicScreensSupabase(
             root.v<View>(R.id.emptyState).visibility = View.VISIBLE
             text(root, R.id.tvNoClassesTitle, closure)
             text(root, R.id.tvNoClassesSubtitle, "${effectiveDate.format(DateTimeFormatter.ofPattern("d MMM yyyy"))} · No classes scheduled on this holiday")
+            bindHolidayLottie(root, closure, effectiveDate)
             return@launch
         }
         text(root, R.id.tvNoClassesTitle, if(!requestedBusMode && profile().optString("role")=="teacher") {
@@ -718,8 +720,21 @@ internal class ClassMateAcademicScreensSupabase(
                     root.postDelayed(tick, 60_000 - System.currentTimeMillis() % 60_000)
                 }
             }
-            root.v<View>(R.id.emptyState).visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
-            root.v<View>(R.id.rvPeriods).visibility = if (entries.isEmpty()) View.GONE else View.VISIBLE
+            val empty = entries.isEmpty()
+            root.v<View>(R.id.emptyState).visibility = if (empty) View.VISIBLE else View.GONE
+            root.v<View>(R.id.rvPeriods).visibility = if (empty) View.GONE else View.VISIBLE
+            if (empty) {
+                if (requestedBusMode) {
+                    bindBusEmptyState(root)
+                } else {
+                    bindHolidayLottie(root, calendarData.classClosure(effectiveDate), effectiveDate)
+                }
+            } else {
+                root.findViewById<com.airbnb.lottie.LottieAnimationView>(R.id.lottieNoClasses)?.let {
+                    it.visibility = View.GONE
+                    it.cancelAnimation()
+                }
+            }
             if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, entries) { card, item ->
                 val paired=item.optString("schedule_kind") in setOf("office_open","closed") && !item.isNull("city_departure_time")
                 card.v<View>(R.id.tvBusScheduleName).visibility = if (paired) View.GONE else View.VISIBLE
@@ -847,9 +862,79 @@ internal class ClassMateAcademicScreensSupabase(
                     root.v<View>(R.id.emptyState).visibility = View.VISIBLE
                     text(root, R.id.tvNoClassesTitle, "Could not load schedule")
                     text(root, R.id.tvNoClassesSubtitle, "Connect and pull to sync this batch")
+                    root.findViewById<com.airbnb.lottie.LottieAnimationView>(R.id.lottieNoClasses)?.let {
+                        it.visibility = View.GONE
+                        it.cancelAnimation()
+                    }
+                    root.findViewById<TextView>(R.id.tvEmptyEmoji)?.let {
+                        it.visibility = View.VISIBLE
+                        it.text = "📡"
+                    }
                 }
             }
         }
+    }
+
+    private fun bindHolidayLottie(root: View, closure: String?, date: LocalDate) {
+        val lottieView = root.findViewById<com.airbnb.lottie.LottieAnimationView>(R.id.lottieNoClasses) ?: return
+        val tvEmoji = root.findViewById<TextView>(R.id.tvEmptyEmoji) ?: return
+        val textToMatch = (closure ?: "").lowercase()
+        val dayOfWeek = date.dayOfWeek
+        val isWeekend = dayOfWeek == java.time.DayOfWeek.FRIDAY || dayOfWeek == java.time.DayOfWeek.SATURDAY
+
+        val (animName, fallbackEmoji) = when {
+            listOf("eid", "ramadan", "romjan", "fitr", "azha", "adho", "barat", "meraj", "qadr", "ashura", "hijri", "muharram", "fateha").any { textToMatch.contains(it) } ->
+                "eid" to "🌙"
+            listOf("puja", "pooja", "durga", "saraswati", "kali", "diwali", "deepavali", "janmashtami", "dashami", "navami", "bijoya", "shivratri", "holi", "purnima", "buddha").any { textToMatch.contains(it) } ->
+                "puja" to "🪔"
+            listOf("vacation", "break", "recess", "summer", "winter", "autumn", "spring").any { textToMatch.contains(it) } ->
+                "vacation" to "🏖️"
+            listOf("independence", "victory", "language", "ekushey", "21st february", "21 february", "mourning", "revolution", "bangabandhu", "shaheed", "national", "may day", "labor").any { textToMatch.contains(it) } ->
+                "national" to "🌺"
+            listOf("weekend", "weekly").any { textToMatch.contains(it) } || isWeekend ->
+                "weekend" to "☕"
+            else ->
+                "celebration" to "🎉"
+        }
+
+        tvEmoji.text = fallbackEmoji
+        val url = "https://classmatebd.vercel.app/animations/$animName.json"
+
+        if (lottieView.tag == animName && lottieView.isAnimating) {
+            lottieView.visibility = View.VISIBLE
+            tvEmoji.visibility = View.GONE
+            return
+        }
+
+        lottieView.tag = animName
+        lottieView.visibility = View.GONE
+        tvEmoji.visibility = View.VISIBLE
+
+        lottieView.setFailureListener {
+            lottieView.visibility = View.GONE
+            tvEmoji.visibility = View.VISIBLE
+        }
+        lottieView.removeAllLottieOnCompositionLoadedListener()
+        lottieView.addLottieOnCompositionLoadedListener {
+            if (lottieView.tag == animName) {
+                lottieView.visibility = View.VISIBLE
+                tvEmoji.visibility = View.GONE
+                lottieView.playAnimation()
+            }
+        }
+        lottieView.setAnimationFromUrl(url)
+    }
+
+    private fun bindBusEmptyState(root: View) {
+        val lottieView = root.findViewById<com.airbnb.lottie.LottieAnimationView>(R.id.lottieNoClasses)
+        val tvEmoji = root.findViewById<TextView>(R.id.tvEmptyEmoji)
+        lottieView?.visibility = View.GONE
+        lottieView?.cancelAnimation()
+        lottieView?.tag = null
+        tvEmoji?.visibility = View.VISIBLE
+        tvEmoji?.text = "🚌"
+        text(root, R.id.tvNoClassesTitle, "No bus schedules")
+        text(root, R.id.tvNoClassesSubtitle, "No trips scheduled for this date")
     }
 
     private fun setupNotices(root: View) {
@@ -1601,31 +1686,62 @@ internal class ClassMateAcademicScreensSupabase(
         val coursesView = dialogView.findViewById<LinearLayout>(R.id.layoutCoursesView)
         val tableView = dialogView.findViewById<LinearLayout>(R.id.layoutTableView)
         val coursesContainer = dialogView.findViewById<LinearLayout>(R.id.coursesContainer)
-        val btnBack = dialogView.findViewById<TextView>(R.id.btnBackToCourses)
+        val btnBack = dialogView.findViewById<View>(R.id.btnBackToCourses)
         val tvTableTitle = dialogView.findViewById<TextView>(R.id.tvTableCourseTitle)
         val tvTableCode = dialogView.findViewById<TextView>(R.id.tvTableCourseCode)
         val tableContainer = dialogView.findViewById<LinearLayout>(R.id.tableRowsContainer)
+        val btnCloseAttendance = dialogView.findViewById<View>(R.id.btnCloseAttendanceSheet)
+        val btnCloseTable = dialogView.findViewById<View>(R.id.btnCloseTableSheet)
 
-        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
-            .setView(dialogView)
-            .create()
+        val bottomSheet = com.google.android.material.bottomsheet.BottomSheetDialog(activity, R.style.Theme_ClassMate_BottomSheetDialog)
+        bottomSheet.setContentView(dialogView)
 
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        val parentView = dialogView.parent as? View
+        parentView?.setBackgroundResource(android.R.color.transparent)
+
+        val behavior = bottomSheet.behavior
+        behavior.skipCollapsed = true
+        behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+
+        btnCloseAttendance?.setOnClickListener {
+            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+            bottomSheet.dismiss()
+        }
+        btnCloseTable?.setOnClickListener {
+            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+            bottomSheet.dismiss()
+        }
 
         val density = activity.resources.displayMetrics.density
+        val displayMetrics = activity.resources.displayMetrics
+        val screenHeight = displayMetrics.heightPixels
         val padH = (12 * density).toInt()
         val padV = (10 * density).toInt()
 
         fun renderTable(course: JSONObject) {
             val courseTitle = course.optString("course_title")
             val courseCode = course.optString("course_code")
-            val attended = course.optInt("classes_attended")
-            val held = course.optInt("classes_held")
-            val percentage = course.optDouble("percentage")
 
             tvTableTitle.text = courseTitle
-            tvTableCode.text = "$courseCode · $attended/$held classes ($percentage%)"
+            tvTableCode.text = "$courseCode · Daily Attendance Log"
             tableContainer.removeAllViews()
+
+            // Smooth expand animation to full screen / expanded height
+            try {
+                android.transition.TransitionManager.beginDelayedTransition(
+                    dialogView as ViewGroup,
+                    android.transition.AutoTransition().apply { duration = 220 }
+                )
+            } catch (_: Exception) {}
+
+            val expandedHeight = (screenHeight * 0.88f).toInt()
+            dialogView.layoutParams = dialogView.layoutParams?.apply {
+                height = expandedHeight
+            } ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, expandedHeight)
+
+            coursesView.visibility = View.GONE
+            tableView.visibility = View.VISIBLE
+            behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
 
             val headerRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -1704,12 +1820,21 @@ internal class ClassMateAcademicScreensSupabase(
                     tableContainer.addView(row)
                 }
             }
-
-            coursesView.visibility = View.GONE
-            tableView.visibility = View.VISIBLE
         }
 
         btnBack.setOnClickListener {
+            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+            try {
+                android.transition.TransitionManager.beginDelayedTransition(
+                    dialogView as ViewGroup,
+                    android.transition.AutoTransition().apply { duration = 200 }
+                )
+            } catch (_: Exception) {}
+
+            dialogView.layoutParams = dialogView.layoutParams?.apply {
+                height = ViewGroup.LayoutParams.WRAP_CONTENT
+            } ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
             tableView.visibility = View.GONE
             coursesView.visibility = View.VISIBLE
         }
@@ -1762,6 +1887,7 @@ internal class ClassMateAcademicScreensSupabase(
                         activity.getDrawable(tv.resourceId)
                     }
                     setOnClickListener {
+                        com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
                         renderTable(course)
                     }
                 }
@@ -1849,7 +1975,7 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        dialog.show()
+        bottomSheet.show()
     }
 
     private fun setupLibrary(root: View) {
