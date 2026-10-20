@@ -42,9 +42,7 @@ class CourseFileAdapter(
 
             // Visuals (icon, color background, tint)
             val visuals = FileVisuals.getVisuals(pdf)
-            iconContainer.background = ContextCompat.getDrawable(root.context, visuals.backgroundRes)
-            ivFileIcon.setImageResource(visuals.iconRes)
-            ivFileIcon.setColorFilter(visuals.tint)
+            FileVisuals.applyVisuals(ivFileIcon, iconContainer, visuals)
 
             // Category & Lab Tag
             val detectedTag = detectMaterialTag(pdf)

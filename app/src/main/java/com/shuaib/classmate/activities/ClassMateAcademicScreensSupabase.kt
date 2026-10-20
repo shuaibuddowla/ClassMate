@@ -2189,22 +2189,30 @@ internal class ClassMateAcademicScreensSupabase(
         val fileId = file.getString("id")
         card.v<TextView>(R.id.tvTitle).text = ClassMateNoticeText.styled(card.v(R.id.tvTitle), file.optString("title"), root.v<EditText>(R.id.etLibrarySearch).text.toString().trim())
         text(card, R.id.tvSubject, file.optString("category").replaceFirstChar { it.uppercase() })
-        val isLink = file.optString("file_type") == "link" || file.optString("link_url").isNotBlank()
-        text(card, R.id.tvFileMeta, if (isLink) "Google Drive" else "${file.optLong("size_bytes") / 1024} KB")
+        val linkUrl = file.optString("link_url")
+        val isDrive = com.shuaib.classmate.utils.FileVisuals.isGoogleDrive(linkUrl)
+        val isLink = file.optString("file_type") == "link" || linkUrl.isNotBlank()
+        val metaText = when {
+            isDrive -> "Google Drive"
+            isLink -> "External Link"
+            file.optLong("size_bytes") > 0 -> "${file.optLong("size_bytes") / 1024} KB"
+            else -> "File"
+        }
+        text(card, R.id.tvFileMeta, metaText)
         val tempPdf = com.shuaib.classmate.models.PdfFile(
             id = fileId,
             title = file.optString("title"),
             fileType = file.optString("file_type").ifBlank { if (isLink) "link" else "pdf" },
             materialType = file.optString("category"),
             sizeBytes = file.optLong("size_bytes"),
-            driveUrl = file.optString("link_url")
+            driveUrl = linkUrl
         )
         val visuals = com.shuaib.classmate.utils.FileVisuals.getVisuals(tempPdf)
-        card.findViewById<View>(R.id.iconContainer)?.background = androidx.core.content.ContextCompat.getDrawable(card.context, visuals.backgroundRes)
-        card.findViewById<android.widget.ImageView>(R.id.ivFileIcon)?.apply {
-            setImageResource(visuals.iconRes)
-            setColorFilter(visuals.tint)
-        }
+        com.shuaib.classmate.utils.FileVisuals.applyVisuals(
+            card.findViewById<android.widget.ImageView>(R.id.ivFileIcon),
+            card.findViewById<View>(R.id.iconContainer),
+            visuals
+        )
         card.v<android.widget.ImageView>(R.id.btnFavorite).apply {
             setImageResource(if (fileId in favorites) R.drawable.ic_star_filled else R.drawable.ic_star_outline)
             setOnClickListener {

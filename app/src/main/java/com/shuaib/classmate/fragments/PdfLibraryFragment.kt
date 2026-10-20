@@ -670,7 +670,7 @@ class PdfLibraryFragment : Fragment() {
         }
         val icon = ImageView(context).apply {
             setImageResource(visuals.iconRes)
-            setColorFilter(visuals.tint)
+            if (visuals.tint != 0) setColorFilter(visuals.tint) else clearColorFilter()
             layoutParams = FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER)
         }
         iconFrame.addView(icon)

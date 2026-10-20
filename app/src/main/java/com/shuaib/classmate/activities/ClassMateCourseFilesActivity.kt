@@ -304,16 +304,15 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 driveUrl = file.optString("link_url")
             )
             val visuals = FileVisuals.getVisuals(tempPdf)
-            b.iconContainer.background = ContextCompat.getDrawable(this@ClassMateCourseFilesActivity, visuals.backgroundRes)
-            b.ivFileIcon.setImageResource(visuals.iconRes)
-            b.ivFileIcon.setColorFilter(visuals.tint)
+            FileVisuals.applyVisuals(b.ivFileIcon, b.iconContainer, visuals)
 
             b.tvLabTag.isVisible = FileVisuals.isLabResource(tempPdf)
 
             // Metadata: Size & Relative Date
             val metaParts = mutableListOf<String>()
             if (isLink) {
-                metaParts.add("Google Drive")
+                val linkUrl = file.optString("link_url")
+                metaParts.add(if (FileVisuals.isGoogleDrive(linkUrl)) "Google Drive" else "External Link")
             } else {
                 val formattedBytes = formatBytes(file.optLong("size_bytes"))
                 if (formattedBytes.isNotBlank()) metaParts.add(formattedBytes)

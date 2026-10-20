@@ -15,12 +15,16 @@ import {
   Trash2,
   BookOpen,
   ArrowLeft,
+  Presentation,
+  HelpCircle,
+  GraduationCap,
   ExternalLink,
   Link2,
   Radio,
   CheckCircle2,
   XCircle,
   Clock,
+  X,
 } from "lucide-react";
 import { rpc, supabase, edge, openFile, uploadFile, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -182,8 +186,11 @@ export function Library({ ctx }: { ctx: Context }) {
   const refresh = () =>
     qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
 
-  const isDriveLink = (url?: string) =>
-    Boolean(url && (/drive\.google\.com/i.test(url) || /docs\.google\.com/i.test(url)));
+  const isDriveLink = (url?: string, f?: Row) =>
+    Boolean(
+      (url && (/drive\.google\.com/i.test(url) || /docs\.google\.com/i.test(url) || /google\.com\/drive/i.test(url) || /drive\.link/i.test(url))) ||
+      f?.provider === "drive"
+    );
 
   const isExternal = (f: Row) =>
     Boolean(f.link_url || f.file_type === "link");
@@ -191,15 +198,42 @@ export function Library({ ctx }: { ctx: Context }) {
   const renderFiles = (items: Row[]) =>
     items.map((f) => {
       const external = isExternal(f);
-      const isDrive = isDriveLink(f.link_url);
+      const isDrive = isDriveLink(f.link_url, f);
+      const cat = (f.category || "").toLowerCase();
+      const fileIconClass = isDrive
+        ? "file-icon-drive"
+        : cat === "slides"
+        ? "file-icon-slides"
+        : cat === "questions"
+        ? "file-icon-questions"
+        : cat === "syllabus"
+        ? "file-icon-syllabus"
+        : external
+        ? "file-icon-link"
+        : "";
+
+      const fileIconNode = isDrive ? (
+        <GoogleDriveIcon size={20} />
+      ) : cat === "slides" ? (
+        <Presentation size={20} />
+      ) : cat === "questions" ? (
+        <HelpCircle size={20} />
+      ) : cat === "syllabus" ? (
+        <GraduationCap size={20} />
+      ) : external ? (
+        <ExternalLink size={20} />
+      ) : (
+        <FileText size={20} />
+      );
+
       return (
         <div className={`card file-row ${external ? "file-row-link" : ""}`} key={f.id}>
           <button
             className="file-open"
             onClick={() => openFile(f).catch(setError)}
           >
-            <span className={`file-icon ${isDrive ? "file-icon-drive" : external ? "file-icon-link" : ""}`}>
-              {isDrive ? <GoogleDriveIcon size={20} /> : external ? <ExternalLink size={20} /> : <FileText />}
+            <span className={`file-icon ${fileIconClass}`}>
+              {fileIconNode}
             </span>
             <span>
               <strong className="file-title-row">
@@ -539,142 +573,176 @@ export function Library({ ctx }: { ctx: Context }) {
         />
       )}
       {attendanceModalOpen && (
-        <Modal
-          title={
-            selectedAttendanceCourse
-              ? `${selectedAttendanceCourse.course_code} Attendance`
-              : "My Attendance"
-          }
-          close={() => {
+        <div
+          className="attendance-bottom-drawer-backdrop"
+          onClick={() => {
             setAttendanceModalOpen(false);
             setSelectedAttendanceCourse(null);
           }}
         >
-          {!selectedAttendanceCourse ? (
-            <div className="rfid-modal-body">
-              {activeRfidCourses.length === 0 ? (
-                <Empty
-                  title="No Attendance Sessions Yet"
-                  body="Attendance logs will appear here once an attendance session has been conducted."
-                />
-              ) : (
-                <div className="rfid-course-list">
-                  {activeRfidCourses.map((c) => (
-                    <button
-                      key={c.semester_course_id}
-                      type="button"
-                      className="rfid-course-card"
-                      onClick={() => setSelectedAttendanceCourse(c)}
-                    >
-                      <div className="rfid-course-header">
-                        <span className="rfid-course-type">{c.course_type?.toUpperCase()}</span>
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: c.percentage >= 75 ? "var(--green)" : "var(--amber)" }}>
-                          {c.classes_attended}/{c.classes_held} ({c.percentage}%)
-                        </span>
-                      </div>
-                      <strong className="rfid-course-title">{c.course_title}</strong>
-                      <div className="rfid-course-footer">
-                        <span>{c.course_code}</span>
-                        <span className="rfid-view-log">
-                          View Daily Log <ChevronRight size={14} />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+          <div
+            className={`attendance-bottom-drawer ${
+              selectedAttendanceCourse ? "expanded-record-mode" : "course-picker-mode"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="attendance-drawer-handle" />
+
+            {!selectedAttendanceCourse ? (
+              <div className="attendance-drawer-courses-view">
+                <div className="attendance-drawer-header">
+                  <div className="attendance-drawer-title-group">
+                    <div className="attendance-drawer-icon-box">
+                      <Radio size={20} />
+                    </div>
+                    <div>
+                      <h3>My Attendance</h3>
+                      <p>Select a course to view previous records</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="attendance-drawer-close-btn"
+                    onClick={() => {
+                      setAttendanceModalOpen(false);
+                      setSelectedAttendanceCourse(null);
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="attendance-table-container">
-              <div className="attendance-table-nav">
-                <button
-                  type="button"
-                  className="inline"
-                  onClick={() => setSelectedAttendanceCourse(null)}
-                >
-                  <ArrowLeft size={16} /> Courses
-                </button>
+
+                <div className="attendance-drawer-course-list">
+                  {activeRfidCourses.length === 0 ? (
+                    <Empty
+                      title="No Attendance Sessions Yet"
+                      body="Attendance logs will appear here once an attendance session has been conducted."
+                    />
+                  ) : (
+                    activeRfidCourses.map((c) => (
+                      <button
+                        key={c.semester_course_id}
+                        type="button"
+                        className="rfid-course-card"
+                        onClick={() => setSelectedAttendanceCourse(c)}
+                      >
+                        <div className="rfid-course-header">
+                          <span className="rfid-course-type">{c.course_type?.toUpperCase()}</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: c.percentage >= 75 ? "var(--green)" : "var(--amber)" }}>
+                            {c.classes_attended}/{c.classes_held} ({c.percentage}%)
+                          </span>
+                        </div>
+                        <strong className="rfid-course-title">{c.course_title}</strong>
+                        <div className="rfid-course-footer">
+                          <span>{c.course_code}</span>
+                          <span className="rfid-view-log">
+                            View Daily Log <ChevronRight size={14} />
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
+            ) : (
+              <div className="attendance-drawer-table-view">
+                <div className="attendance-drawer-table-header">
+                  <button
+                    type="button"
+                    className="attendance-drawer-back-btn"
+                    onClick={() => setSelectedAttendanceCourse(null)}
+                  >
+                    <ArrowLeft size={16} /> Courses
+                  </button>
+                  <div className="attendance-drawer-course-heading">
+                    <h4>{selectedAttendanceCourse.course_title}</h4>
+                    <p>{selectedAttendanceCourse.course_code} · Daily Attendance Log</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="attendance-drawer-close-btn"
+                    onClick={() => {
+                      setAttendanceModalOpen(false);
+                      setSelectedAttendanceCourse(null);
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
-              <div className="attendance-course-summary-card">
-                <h4>{selectedAttendanceCourse.course_title}</h4>
-                <p>
-                  {selectedAttendanceCourse.course_code} · {selectedAttendanceCourse.classes_attended}/{selectedAttendanceCourse.classes_held} classes ({selectedAttendanceCourse.percentage}%)
-                </p>
-              </div>
+                {selectedAttendanceCourse.history.length === 0 ? (
+                  <Empty
+                    title="No History Records"
+                    body="No individual class session logs found for this course."
+                  />
+                ) : (
+                  <div className="attendance-table-wrap">
+                    <table className="attendance-daily-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Class</th>
+                          <th>Status</th>
+                          <th>Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedAttendanceCourse.history.map((row, idx) => {
+                          const isPresent = row.status === "present";
+                          const dateObj = new Date(row.date);
+                          const isValidDate = !isNaN(dateObj.getTime());
+                          const formattedDate = isValidDate
+                            ? new Intl.DateTimeFormat("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              }).format(dateObj)
+                            : row.date;
+                          const formattedDay = isValidDate
+                            ? new Intl.DateTimeFormat("en-US", {
+                                weekday: "short",
+                              }).format(dateObj)
+                            : "";
 
-              {selectedAttendanceCourse.history.length === 0 ? (
-                <Empty
-                  title="No History Records"
-                  body="No individual class session logs found for this course."
-                />
-              ) : (
-                <div className="attendance-table-wrap">
-                  <table className="attendance-daily-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Class</th>
-                        <th>Status</th>
-                        <th>Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedAttendanceCourse.history.map((row, idx) => {
-                        const isPresent = row.status === "present";
-                        const dateObj = new Date(row.date);
-                        const isValidDate = !isNaN(dateObj.getTime());
-                        const formattedDate = isValidDate
-                          ? new Intl.DateTimeFormat("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }).format(dateObj)
-                          : row.date;
-                        const formattedDay = isValidDate
-                          ? new Intl.DateTimeFormat("en-US", {
-                              weekday: "short",
-                            }).format(dateObj)
-                          : "";
-
-                        return (
-                          <tr key={row.session_id || idx}>
-                            <td className="attendance-col-date">
-                              <strong>{formattedDate}</strong>
-                              {formattedDay && <small>{formattedDay}</small>}
-                            </td>
-                            <td>Class #{selectedAttendanceCourse.history.length - idx}</td>
-                            <td>
-                              <span
-                                className={`attendance-status-pill ${
-                                  isPresent ? "present" : "absent"
-                                }`}
-                              >
+                          return (
+                            <tr key={row.session_id || idx}>
+                              <td className="attendance-col-date">
+                                <strong>{formattedDate}</strong>
+                                {formattedDay && <small>{formattedDay}</small>}
+                              </td>
+                              <td>Class #{selectedAttendanceCourse.history.length - idx}</td>
+                              <td>
+                                <span
+                                  className={`attendance-status-pill ${
+                                    isPresent ? "present" : "absent"
+                                  }`}
+                                >
+                                  {isPresent ? (
+                                    <CheckCircle2 size={13} />
+                                  ) : (
+                                    <XCircle size={13} />
+                                  )}
+                                  {isPresent ? "Present" : "Absent"}
+                                </span>
+                              </td>
+                              <td className="attendance-col-time">
                                 {isPresent ? (
-                                  <CheckCircle2 size={13} />
+                                  <span>{row.time || "Logged"}</span>
                                 ) : (
-                                  <XCircle size={13} />
+                                  <span className="text-muted">—</span>
                                 )}
-                                {isPresent ? "Present" : "Absent"}
-                              </span>
-                            </td>
-                            <td className="attendance-col-time">
-                              {isPresent ? (
-                                <span>{row.time || "Logged"}</span>
-                              ) : (
-                                <span className="text-muted">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

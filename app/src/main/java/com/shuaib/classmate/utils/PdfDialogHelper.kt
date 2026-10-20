@@ -62,9 +62,7 @@ object PdfDialogHelper {
         }
 
         val visuals = FileVisuals.getVisuals(pdf)
-        sheet.iconContainer.background = ContextCompat.getDrawable(context, visuals.backgroundRes)
-        sheet.ivFileIcon.setImageResource(visuals.iconRes)
-        sheet.ivFileIcon.setColorFilter(visuals.tint)
+        FileVisuals.applyVisuals(sheet.ivFileIcon, sheet.iconContainer, visuals)
 
         sheet.btnOpenOnline.setOnClickListener {
             dialog.dismiss()
