@@ -682,6 +682,16 @@ class ClassMateAuthActivity : AppCompatActivity() {
         unreadActivity?.refresh()
         friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) },{profile?.optString("role")=="teacher"})
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
+        val baseBottomMargin = resources.getDimensionPixelSize(R.dimen.bottom_nav_bottom_margin)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(nav) { view, insets ->
+            val bottomInset = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars()).bottom
+            val lp = view.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+            if (lp != null) {
+                lp.bottomMargin = baseBottomMargin + bottomInset
+                view.layoutParams = lp
+            }
+            insets
+        }
         nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
         nav.menu.findItem(R.id.nav_friends).title=if(profile?.optString("role")=="teacher") "Students" else "Batch"
         nav.menu.findItem(R.id.nav_manage).isVisible = false

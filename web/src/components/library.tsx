@@ -294,8 +294,8 @@ export function Library({ ctx }: { ctx: Context }) {
             </div>
             <p className="attendance-hero-sub">
               {activeRfidCourses.length > 0
-                ? `${activeRfidCourses.length} ${activeRfidCourses.length === 1 ? "Course" : "Courses"} Active for RFID Tracking · Tap to view`
-                : "RFID Attendance Station · Tap to view logs"}
+                ? `${activeRfidCourses.length} ${activeRfidCourses.length === 1 ? "Course" : "Courses"}`
+                : "No courses"}
             </p>
           </div>
           <div className="attendance-hero-action">
@@ -543,7 +543,7 @@ export function Library({ ctx }: { ctx: Context }) {
           title={
             selectedAttendanceCourse
               ? `${selectedAttendanceCourse.course_code} Attendance`
-              : "My Attendance (RFID)"
+              : "My Attendance"
           }
           close={() => {
             setAttendanceModalOpen(false);
@@ -552,13 +552,10 @@ export function Library({ ctx }: { ctx: Context }) {
         >
           {!selectedAttendanceCourse ? (
             <div className="rfid-modal-body">
-              <p className="rfid-modal-intro">
-                Select an active RFID-monitored course to inspect your daily attendance log.
-              </p>
               {activeRfidCourses.length === 0 ? (
                 <Empty
                   title="No Attendance Sessions Yet"
-                  body="Attendance logs will appear here once an attendance session has been conducted with the RFID reader."
+                  body="Attendance logs will appear here once an attendance session has been conducted."
                 />
               ) : (
                 <div className="rfid-course-list">
@@ -570,14 +567,14 @@ export function Library({ ctx }: { ctx: Context }) {
                       onClick={() => setSelectedAttendanceCourse(c)}
                     >
                       <div className="rfid-course-header">
-                        <span className="rfid-badge">RFID ACTIVE</span>
                         <span className="rfid-course-type">{c.course_type?.toUpperCase()}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: c.percentage >= 75 ? "var(--green)" : "var(--amber)" }}>
+                          {c.classes_attended}/{c.classes_held} ({c.percentage}%)
+                        </span>
                       </div>
                       <strong className="rfid-course-title">{c.course_title}</strong>
                       <div className="rfid-course-footer">
-                        <span>
-                          {c.course_code} · {c.classes_attended}/{c.classes_held} ({c.percentage}%)
-                        </span>
+                        <span>{c.course_code}</span>
                         <span className="rfid-view-log">
                           View Daily Log <ChevronRight size={14} />
                         </span>
@@ -595,15 +592,14 @@ export function Library({ ctx }: { ctx: Context }) {
                   className="inline"
                   onClick={() => setSelectedAttendanceCourse(null)}
                 >
-                  <ArrowLeft size={16} /> All Active RFID Courses
+                  <ArrowLeft size={16} /> Courses
                 </button>
-                <span className="attendance-device-pill">📡 ESP32 Hardware Reader</span>
               </div>
 
               <div className="attendance-course-summary-card">
                 <h4>{selectedAttendanceCourse.course_title}</h4>
                 <p>
-                  {selectedAttendanceCourse.course_code} · Attended {selectedAttendanceCourse.classes_attended} of {selectedAttendanceCourse.classes_held} classes ({selectedAttendanceCourse.percentage}%) · {selectedAttendanceCourse.teacher_name || "Instructor"}
+                  {selectedAttendanceCourse.course_code} · {selectedAttendanceCourse.classes_attended}/{selectedAttendanceCourse.classes_held} classes ({selectedAttendanceCourse.percentage}%)
                 </p>
               </div>
 
@@ -620,7 +616,7 @@ export function Library({ ctx }: { ctx: Context }) {
                         <th>Date</th>
                         <th>Class</th>
                         <th>Status</th>
-                        <th>Time / Reader</th>
+                        <th>Time</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -664,10 +660,7 @@ export function Library({ ctx }: { ctx: Context }) {
                             </td>
                             <td className="attendance-col-time">
                               {isPresent ? (
-                                <>
-                                  <span>{row.time || "Logged"}</span>
-                                  <small>{row.room || "Station Reader"}</small>
-                                </>
+                                <span>{row.time || "Logged"}</span>
                               ) : (
                                 <span className="text-muted">—</span>
                               )}

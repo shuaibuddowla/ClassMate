@@ -240,7 +240,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="2 Courses Active for RFID Tracking · Tap to view"
+                                android:text="2 Courses"
                                 android:textColor="@color/cm_text_secondary"
                                 android:textSize="11.5sp" />
                         </LinearLayout>

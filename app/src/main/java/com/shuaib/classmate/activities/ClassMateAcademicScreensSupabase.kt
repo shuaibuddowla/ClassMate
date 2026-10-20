@@ -1606,15 +1606,6 @@ internal class ClassMateAcademicScreensSupabase(
         val tvTableCode = dialogView.findViewById<TextView>(R.id.tvTableCourseCode)
         val tableContainer = dialogView.findViewById<LinearLayout>(R.id.tableRowsContainer)
 
-        val tvCardStatus = dialogView.findViewById<TextView>(R.id.tvRfidCardStatus)
-        val cardUid = profile().optString("rfid_card_uid").trim()
-        if (cardUid.isNotEmpty()) {
-            tvCardStatus?.text = "Card Enrolled: ••••${cardUid.takeLast(4).uppercase()} · Station Mode Active"
-            tvCardStatus?.setTextColor(activity.getColor(R.color.cm_success))
-        } else {
-            tvCardStatus?.text = "No card registered · Tap on classroom reader to pair"
-        }
-
         val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
             .setView(dialogView)
             .create()
@@ -1633,7 +1624,7 @@ internal class ClassMateAcademicScreensSupabase(
             val percentage = course.optDouble("percentage")
 
             tvTableTitle.text = courseTitle
-            tvTableCode.text = "$courseCode · Daily Attendance Log ($attended/$held classes · $percentage%)"
+            tvTableCode.text = "$courseCode · $attended/$held classes ($percentage%)"
             tableContainer.removeAllViews()
 
             val headerRow = LinearLayout(activity).apply {
@@ -1641,7 +1632,7 @@ internal class ClassMateAcademicScreensSupabase(
                 setPadding(padH, padV, padH, padV)
                 setBackgroundColor(activity.getColor(R.color.cm_surface_glass))
             }
-            val headers = listOf("Date" to 2.2f, "Class" to 1.5f, "Status" to 1.8f, "Time & Reader" to 2.3f)
+            val headers = listOf("Date" to 2.2f, "Class" to 1.5f, "Status" to 1.8f, "Time" to 2.3f)
             headers.forEach { (text, weight) ->
                 val tv = TextView(activity).apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight)
@@ -1779,20 +1770,11 @@ internal class ClassMateAcademicScreensSupabase(
                     orientation = LinearLayout.HORIZONTAL
                     gravity = android.view.Gravity.CENTER_VERTICAL
                 }
-                val badge = TextView(activity).apply {
-                    text = "RFID ACTIVE"
-                    textSize = 9.5f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    setTextColor(activity.getColor(R.color.cm_success))
-                    setBackgroundResource(R.drawable.bg_badge_green)
-                    setPadding((6 * density).toInt(), (2 * density).toInt(), (6 * density).toInt(), (2 * density).toInt())
-                }
                 val tvType = TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                        marginStart = (8 * density).toInt()
-                    }
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     text = type
                     textSize = 10.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
                     setTextColor(activity.getColor(R.color.cm_text_secondary))
                 }
                 val tvStats = TextView(activity).apply {
@@ -1801,7 +1783,6 @@ internal class ClassMateAcademicScreensSupabase(
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                     setTextColor(activity.getColor(if (percentage >= 75.0) R.color.cm_success else R.color.cm_warning))
                 }
-                topRow.addView(badge)
                 topRow.addView(tvType)
                 topRow.addView(tvStats)
                 card.addView(topRow)
@@ -1858,6 +1839,8 @@ internal class ClassMateAcademicScreensSupabase(
                 }
                 if (active(dialogView)) {
                     populateCourseCards(activeList)
+                    root.findViewById<TextView>(R.id.tvAttendanceHeroSub)?.text =
+                        "${activeList.size} ${if (activeList.size == 1) "Course" else "Courses"}"
                 }
             } catch (_: Exception) {
                 if (active(dialogView)) {

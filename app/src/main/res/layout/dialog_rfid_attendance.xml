@@ -49,15 +49,6 @@
                     android:textColor="@color/cm_text_primary"
                     android:textSize="17sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvRfidCardStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Select an active RFID course to view daily punch log"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -92,26 +83,9 @@
                 android:focusable="true"
                 android:paddingVertical="4dp"
                 android:paddingEnd="8dp"
-                android:text="‹ Active Courses"
+                android:text="‹ Courses"
                 android:textColor="#10B981"
                 android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_green"
-                android:backgroundTint="#1F10B981"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="3dp"
-                android:text="📡 Hardware Reader"
-                android:textColor="#10B981"
-                android:textSize="10.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -152,16 +126,6 @@
             android:background="@drawable/bg_library_card"
             android:orientation="vertical"
             android:padding="8dp" />
-
-        <TextView
-            android:id="@+id/tvRfidStationFooter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:text="Real-time attendance recorded via classroom RFID station"
-            android:textColor="@color/cm_text_disabled"
-            android:textSize="11sp" />
     </LinearLayout>
 
 </LinearLayout>
