@@ -40,13 +40,37 @@ function GoogleDriveIcon({ size = 18 }: { size?: number }) {
 }
 
 const categories = ["notes", "slides", "questions", "syllabus", "other"];
-const SKELETON_ATTENDANCE_ROWS = [
-  { date: "Oct 19, 2026", day: "Monday", classNo: "14", status: "Present", punchTime: "10:04 AM", room: "Room 304 (AB-2)" },
-  { date: "Oct 14, 2026", day: "Wednesday", classNo: "13", status: "Present", punchTime: "10:01 AM", room: "Room 304 (AB-2)" },
-  { date: "Oct 12, 2026", day: "Monday", classNo: "12", status: "Absent", punchTime: "", room: "" },
-  { date: "Oct 07, 2026", day: "Wednesday", classNo: "11", status: "Present", punchTime: "09:58 AM", room: "Room 304 (AB-2)" },
-  { date: "Oct 05, 2026", day: "Monday", classNo: "10", status: "Present", punchTime: "10:05 AM", room: "Room 304 (AB-2)" },
-];
+
+interface AttendanceHistoryItem {
+  session_id: string;
+  date: string;
+  time?: string;
+  room?: string;
+  status: "present" | "absent";
+  method?: "rfid" | "manual";
+  marked_at?: string;
+}
+
+interface StudentAttendanceCourse {
+  semester_course_id: string;
+  course_code: string;
+  course_title: string;
+  course_type: string;
+  credit?: number;
+  teacher_name?: string;
+  attendance_enabled?: boolean;
+  classes_held: number;
+  classes_attended: number;
+  percentage: number;
+  history: AttendanceHistoryItem[];
+}
+
+interface StudentAttendanceSummary {
+  courses: StudentAttendanceCourse[];
+  total_classes_held: number;
+  total_classes_attended: number;
+  overall_percentage: number;
+}
 
 export function Library({ ctx }: { ctx: Context }) {
   const [type, setType] = useState("theory"),
@@ -59,15 +83,24 @@ export function Library({ ctx }: { ctx: Context }) {
     [deleting, setDeleting] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null),
     [attendanceModalOpen, setAttendanceModalOpen] = useState(false),
-    [selectedAttendanceCourse, setSelectedAttendanceCourse] = useState<Row | null>(null);
+    [selectedAttendanceCourse, setSelectedAttendanceCourse] = useState<StudentAttendanceCourse | null>(null);
   const qc = useQueryClient();
 
-  const activeRfidCourses = ctx.courses.length > 0 
-    ? ctx.courses.slice(0, Math.min(ctx.courses.length, 2))
-    : [
-        { offering_id: "demo-1", course_title: "Computer Organization & Architecture", course_code: "CSE 2105", course_type: "theory" },
-        { offering_id: "demo-2", course_title: "Data Structures & Algorithms Lab", course_code: "CSE 2102", course_type: "lab" },
-      ];
+  const myAttendance = useQuery({
+    queryKey: [ctx.user, ctx.batch, "student_my_attendance"],
+    queryFn: async () => {
+      try {
+        const data = await rpc<StudentAttendanceSummary>("student_my_attendance", {
+          target_batch: ctx.batch,
+        });
+        return data || { courses: [], total_classes_held: 0, total_classes_attended: 0, overall_percentage: 0 };
+      } catch {
+        return { courses: [], total_classes_held: 0, total_classes_attended: 0, overall_percentage: 0 };
+      }
+    },
+  });
+
+  const activeRfidCourses = myAttendance.data?.courses || [];
 
   useEffect(() => {
     const restore = () => {
@@ -260,7 +293,9 @@ export function Library({ ctx }: { ctx: Context }) {
               <span className="attendance-hero-live-dot" />
             </div>
             <p className="attendance-hero-sub">
-              {activeRfidCourses.length} {activeRfidCourses.length === 1 ? "Course" : "Courses"} Active for RFID Tracking · Tap to view
+              {activeRfidCourses.length > 0
+                ? `${activeRfidCourses.length} ${activeRfidCourses.length === 1 ? "Course" : "Courses"} Active for RFID Tracking · Tap to view`
+                : "RFID Attendance Station · Tap to view logs"}
             </p>
           </div>
           <div className="attendance-hero-action">
@@ -520,28 +555,37 @@ export function Library({ ctx }: { ctx: Context }) {
               <p className="rfid-modal-intro">
                 Select an active RFID-monitored course to inspect your daily attendance log.
               </p>
-              <div className="rfid-course-list">
-                {activeRfidCourses.map((c) => (
-                  <button
-                    key={c.offering_id}
-                    type="button"
-                    className="rfid-course-card"
-                    onClick={() => setSelectedAttendanceCourse(c)}
-                  >
-                    <div className="rfid-course-header">
-                      <span className="rfid-badge">RFID ACTIVE</span>
-                      <span className="rfid-course-type">{c.course_type?.toUpperCase()}</span>
-                    </div>
-                    <strong className="rfid-course-title">{c.course_title}</strong>
-                    <div className="rfid-course-footer">
-                      <span>{c.course_code}</span>
-                      <span className="rfid-view-log">
-                        View Daily Log <ChevronRight size={14} />
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {activeRfidCourses.length === 0 ? (
+                <Empty
+                  title="No Attendance Sessions Yet"
+                  body="Attendance logs will appear here once an attendance session has been conducted with the RFID reader."
+                />
+              ) : (
+                <div className="rfid-course-list">
+                  {activeRfidCourses.map((c) => (
+                    <button
+                      key={c.semester_course_id}
+                      type="button"
+                      className="rfid-course-card"
+                      onClick={() => setSelectedAttendanceCourse(c)}
+                    >
+                      <div className="rfid-course-header">
+                        <span className="rfid-badge">RFID ACTIVE</span>
+                        <span className="rfid-course-type">{c.course_type?.toUpperCase()}</span>
+                      </div>
+                      <strong className="rfid-course-title">{c.course_title}</strong>
+                      <div className="rfid-course-footer">
+                        <span>
+                          {c.course_code} · {c.classes_attended}/{c.classes_held} ({c.percentage}%)
+                        </span>
+                        <span className="rfid-view-log">
+                          View Daily Log <ChevronRight size={14} />
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="attendance-table-container">
@@ -558,55 +602,83 @@ export function Library({ ctx }: { ctx: Context }) {
 
               <div className="attendance-course-summary-card">
                 <h4>{selectedAttendanceCourse.course_title}</h4>
-                <p>{selectedAttendanceCourse.course_code} · Daily Attendance Log</p>
+                <p>
+                  {selectedAttendanceCourse.course_code} · Attended {selectedAttendanceCourse.classes_attended} of {selectedAttendanceCourse.classes_held} classes ({selectedAttendanceCourse.percentage}%) · {selectedAttendanceCourse.teacher_name || "Instructor"}
+                </p>
               </div>
 
-              <div className="attendance-table-wrap">
-                <table className="attendance-daily-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Class</th>
-                      <th>Status</th>
-                      <th>Time / Reader</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {SKELETON_ATTENDANCE_ROWS.map((row, idx) => (
-                      <tr key={idx}>
-                        <td className="attendance-col-date">
-                          <strong>{row.date}</strong>
-                          <small>{row.day}</small>
-                        </td>
-                        <td>Class #{row.classNo}</td>
-                        <td>
-                          <span className={`attendance-status-pill ${row.status.toLowerCase()}`}>
-                            {row.status === "Present" ? (
-                              <CheckCircle2 size={13} />
-                            ) : (
-                              <XCircle size={13} />
-                            )}
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="attendance-col-time">
-                          {row.punchTime ? (
-                            <>
-                              <span>{row.punchTime}</span>
-                              <small>{row.room}</small>
-                            </>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
+              {selectedAttendanceCourse.history.length === 0 ? (
+                <Empty
+                  title="No History Records"
+                  body="No individual class session logs found for this course."
+                />
+              ) : (
+                <div className="attendance-table-wrap">
+                  <table className="attendance-daily-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Class</th>
+                        <th>Status</th>
+                        <th>Time / Reader</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="attendance-skeleton-notice">
-                ℹ️ UI Preview · Live records will sync automatically once the RFID attendance hardware API is connected.
-              </p>
+                    </thead>
+                    <tbody>
+                      {selectedAttendanceCourse.history.map((row, idx) => {
+                        const isPresent = row.status === "present";
+                        const dateObj = new Date(row.date);
+                        const isValidDate = !isNaN(dateObj.getTime());
+                        const formattedDate = isValidDate
+                          ? new Intl.DateTimeFormat("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }).format(dateObj)
+                          : row.date;
+                        const formattedDay = isValidDate
+                          ? new Intl.DateTimeFormat("en-US", {
+                              weekday: "short",
+                            }).format(dateObj)
+                          : "";
+
+                        return (
+                          <tr key={row.session_id || idx}>
+                            <td className="attendance-col-date">
+                              <strong>{formattedDate}</strong>
+                              {formattedDay && <small>{formattedDay}</small>}
+                            </td>
+                            <td>Class #{selectedAttendanceCourse.history.length - idx}</td>
+                            <td>
+                              <span
+                                className={`attendance-status-pill ${
+                                  isPresent ? "present" : "absent"
+                                }`}
+                              >
+                                {isPresent ? (
+                                  <CheckCircle2 size={13} />
+                                ) : (
+                                  <XCircle size={13} />
+                                )}
+                                {isPresent ? "Present" : "Absent"}
+                              </span>
+                            </td>
+                            <td className="attendance-col-time">
+                              {isPresent ? (
+                                <>
+                                  <span>{row.time || "Logged"}</span>
+                                  <small>{row.room || "Station Reader"}</small>
+                                </>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </Modal>

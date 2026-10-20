@@ -157,7 +157,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             do {
                 val page = ClassMateAuthApi.rows(
                     "file_metadata",
-                    "select=id,title,category,size_bytes,created_at,semester_course_id,batch_id,file_type&" +
+                    "select=id,title,category,size_bytes,created_at,semester_course_id,batch_id,file_type,link_url&" +
                         (if (courseId.isBlank()) "batch_id=eq.$batchId" else "semester_course_id=eq.$courseId") +
                         "&status=eq.active&order=created_at.desc&limit=500&offset=$offset"
                 )
@@ -223,6 +223,13 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
     }
 
     private fun openFile(file: JSONObject) = lifecycleScope.launch {
+        val linkUrl = file.optString("link_url").trim()
+        if (linkUrl.isNotBlank()) {
+            val validUrl = if (linkUrl.startsWith("http://", true) || linkUrl.startsWith("https://", true)) linkUrl else "https://$linkUrl"
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(validUrl))) }
+                .onFailure { Toast.makeText(this@ClassMateCourseFilesActivity, it.message, Toast.LENGTH_LONG).show() }
+            return@launch
+        }
         runCatching { ClassMateAuthApi.signedResource(file.getString("id")) }
             .onSuccess { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
             .onFailure {
@@ -285,13 +292,16 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 b.tvMaterialTag.isVisible = false
             }
 
+            val isLink = file.optString("file_type") == "link" || file.optString("link_url").isNotBlank()
+
             // Visuals using FileVisuals
             val tempPdf = PdfFile(
                 id = file.optString("id"),
                 title = title,
-                fileType = file.optString("file_type").ifBlank { "pdf" },
+                fileType = file.optString("file_type").ifBlank { if (isLink) "link" else "pdf" },
                 materialType = category,
-                sizeBytes = file.optLong("size_bytes")
+                sizeBytes = file.optLong("size_bytes"),
+                driveUrl = file.optString("link_url")
             )
             val visuals = FileVisuals.getVisuals(tempPdf)
             b.iconContainer.background = ContextCompat.getDrawable(this@ClassMateCourseFilesActivity, visuals.backgroundRes)
@@ -302,8 +312,12 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
 
             // Metadata: Size & Relative Date
             val metaParts = mutableListOf<String>()
-            val formattedBytes = formatBytes(file.optLong("size_bytes"))
-            if (formattedBytes.isNotBlank()) metaParts.add(formattedBytes)
+            if (isLink) {
+                metaParts.add("Google Drive")
+            } else {
+                val formattedBytes = formatBytes(file.optLong("size_bytes"))
+                if (formattedBytes.isNotBlank()) metaParts.add(formattedBytes)
+            }
             val formattedTime = formatTime(file.optString("created_at"))
             if (formattedTime.isNotBlank()) metaParts.add(formattedTime)
             b.tvFileMeta.text = metaParts.joinToString(" • ")

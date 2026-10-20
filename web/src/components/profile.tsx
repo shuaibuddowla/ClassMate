@@ -31,6 +31,7 @@ import {
   ChevronDown,
   CalendarDays,
   QrCode,
+  Radio,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -121,69 +122,7 @@ export function Profile({
     [clearingStorage, setClearingStorage] = useState(false),
     [subView, setSubView] = useState<"settings" | "profile">("settings"),
     [globalAttendance, setGlobalAttendance] = useState<boolean>(false),
-    [savingGlobalAttendanceToggle, setSavingGlobalAttendanceToggle] = useState(false),
-    [managingAttendanceCourses, setManagingAttendanceCourses] = useState(false),
-    [attendanceCourses, setAttendanceCourses] = useState<Array<{
-      offering_id: string;
-      course_code: string;
-      course_title: string;
-      course_type: string;
-      teacher_name: string;
-      attendance_enabled: boolean;
-    }>>([]),
-    [loadingAttendanceCourses, setLoadingAttendanceCourses] = useState(false),
-    [togglingCourseId, setTogglingCourseId] = useState<string | null>(null);
-
-
-  useEffect(() => {
-    if (!ctx.owner) return;
-    rpc<{ global_enabled: boolean }>("get_attendance_feature_status", { target_batch: ctx.batch })
-      .then((res) => {
-        if (typeof res?.global_enabled === "boolean") {
-          setGlobalAttendance(res.global_enabled);
-        }
-      })
-      .catch(() => {});
-  }, [ctx.owner, ctx.batch]);
-
-  useEffect(() => {
-    if (!managingAttendanceCourses || !ctx.batch) return;
-    setLoadingAttendanceCourses(true);
-    rpc<any[]>("batch_attendance_courses", { target_batch: ctx.batch })
-      .then((data) => setAttendanceCourses(data || []))
-      .catch((e) => setError(e))
-      .finally(() => setLoadingAttendanceCourses(false));
-  }, [managingAttendanceCourses, ctx.batch]);
-
-  const handleToggleCourseAttendance = async (offeringId: string, current: boolean) => {
-    setTogglingCourseId(offeringId);
-    try {
-      await rpc("toggle_course_attendance", {
-        target_course: offeringId,
-        enabled: !current,
-      });
-      setAttendanceCourses((prev) =>
-        prev.map((c) =>
-          c.offering_id === offeringId ? { ...c, attendance_enabled: !current } : c
-        )
-      );
-      try {
-        localStorage.removeItem(`academic:${ctx.user}:${ctx.batch}:routine`);
-        localStorage.removeItem(`academic:${ctx.user}:${ctx.batch}:timetable-details`);
-      } catch {}
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "routine"] });
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "timetable-details"] });
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "attendance-sessions"] });
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "student-my-attendance"] });
-      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "teacher-attendance-overview"] });
-      ctx.refreshProfile(ctx.profile);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to toggle course attendance");
-    } finally {
-      setTogglingCourseId(null);
-    }
-  };
+    [savingGlobalAttendanceToggle, setSavingGlobalAttendanceToggle] = useState(false);
 
   useEffect(() => {
     const checkHash = () => {
@@ -659,19 +598,25 @@ export function Profile({
           </div>
         )}
 
-        {/* Attendance Course Settings (Admin/Owner only) */}
+        {/* Manage Attendance (Admin/Owner only) */}
         {(ctx.owner || ctx.profile.role === "admin") && (
           <button
             type="button"
             className="settings-row"
-            onClick={() => setManagingAttendanceCourses(true)}
+            onClick={() => {
+              if (ctx.manageAttendance) {
+                ctx.manageAttendance();
+              } else {
+                location.hash = "attendance";
+              }
+            }}
           >
             <div className="setting-icon-box emerald">
-              <QrCode size={18} />
+              <Radio size={18} />
             </div>
             <div className="settings-row-text">
-              <span>Attendance Course Settings</span>
-              <small>Select courses that use app-based QR attendance</small>
+              <span>Manage Attendance</span>
+              <small>Live RFID station, ad-hoc sessions, cards &amp; Excel</small>
             </div>
             <ChevronRight size={18} className="chevron" />
           </button>
@@ -932,48 +877,6 @@ export function Profile({
         <AboutDeveloper user={ctx.user} close={() => setDeveloperOpen(false)} />
       )}
 
-      {managingAttendanceCourses && (
-        <Modal title="Attendance Course Settings" close={() => setManagingAttendanceCourses(false)}>
-          <div className="attendance-courses-modal-content">
-            <p style={{ fontSize: "13px", color: "var(--muted)", margin: "0 0 14px", lineHeight: "1.45" }}>
-              Select which courses use app-based QR attendance. Only enabled courses will display &quot;Take Attendance&quot; to teachers and &quot;Scan Attendance&quot; to students on the timetable.
-            </p>
-            {loadingAttendanceCourses ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "20px 0", color: "var(--muted)", justifyContent: "center" }}>
-                <RefreshCw size={20} className="spin" />
-                <span>Loading active semester courses…</span>
-              </div>
-            ) : attendanceCourses.length === 0 ? (
-              <p style={{ fontSize: "13px", color: "var(--muted)", padding: "12px 0" }}>
-                No active courses found for this batch.
-              </p>
-            ) : (
-              <div className="attendance-courses-list">
-                {attendanceCourses.map((c) => (
-                  <div key={c.offering_id} className="attendance-course-item">
-                    <div className="course-item-info">
-                      <span className="course-item-code">{c.course_code}</span>
-                      <strong>{c.course_title}</strong>
-                      <small>{c.teacher_name} · {c.course_type.toUpperCase()}</small>
-                    </div>
-                    <Switch
-                      label={`Enable attendance for ${c.course_code}`}
-                      checked={c.attendance_enabled}
-                      disabled={togglingCourseId === c.offering_id}
-                      onChange={() => handleToggleCourseAttendance(c.offering_id, c.attendance_enabled)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end" }}>
-              <button className="primary" onClick={() => setManagingAttendanceCourses(false)}>
-                Done
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

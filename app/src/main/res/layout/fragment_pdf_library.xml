@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/btnUploadPdf"
+            app:layout_constraintEnd_toStartOf="@+id/btnLibrarySearch"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -46,6 +46,27 @@
                 android:textSize="12.5sp" />
         </LinearLayout>
 
+        <FrameLayout
+            android:id="@+id/btnLibrarySearch"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_notice_search_icon_button"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/btnUploadPdf"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:contentDescription="Search"
+                android:src="@drawable/ic_search_modern"
+                app:tint="@color/cm_text_primary" />
+        </FrameLayout>
+
         <TextView
             android:id="@+id/btnUploadPdf"
             android:layout_width="wrap_content"
@@ -67,6 +88,52 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/librarySearchContainer"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_notice_search"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_search_modern"
+                app:tint="@color/cm_text_secondary" />
+
+            <EditText
+                android:id="@+id/etLibrarySearch"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Search files and courses"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:singleLine="true"
+                android:textColor="@color/cm_text_primary"
+                android:textColorHint="@color/cm_text_secondary"
+                android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/btnCloseLibrarySearch"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Close"
+                android:src="@drawable/ic_close"
+                app:tint="@color/cm_text_secondary" />
+        </LinearLayout>
 
         <FrameLayout android:id="@+id/btnLibraryNotifications" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent">
             <View android:id="@+id/libraryNotificationDot" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
@@ -110,33 +177,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:paddingHorizontal="12dp">
-
-                    <LinearLayout
-                        android:id="@+id/btnLibrarySearch"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="4dp"
-                        android:background="@drawable/bg_library_search_html"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription="Search"
-                            android:src="@drawable/ic_search_modern"
-                            app:tint="@color/cm_text_secondary" />
-
-                        <EditText android:id="@+id/etLibrarySearch"
-                            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-                            android:layout_marginStart="10dp" android:background="@android:color/transparent"
-                            android:hint="Search files and courses" android:singleLine="true" android:inputType="text"
-                            android:imeOptions="actionSearch" android:textColor="@color/cm_text_primary"
-                            android:textColorHint="@color/cm_text_secondary" android:textSize="14sp" />
-                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/cardAttendanceHero"

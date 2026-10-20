@@ -1,0 +1,497 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&display=swap');
+
+:root {
+  color-scheme: light;
+  --bg: #efeae2;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --soft: #f4f6f8;
+  --text: #111b21;
+  --muted: #667781;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --blue-soft: #eaf2ff;
+  --shadow: 0 1px 3px rgba(11, 20, 26, 0.08);
+  --red: #ea3943;
+  --green: #25d366;
+  --chat-tile-bg: #ffffff;
+  --chat-tile-border: rgba(226, 232, 240, 0.85);
+  --chat-tile-shadow: 0 1px 3px rgba(11, 20, 26, 0.08), 0 2px 6px rgba(11, 20, 26, 0.03);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b141a;
+  --surface: #111b21;
+  --card: #111b21;
+  --soft: #202c33;
+  --text: #e9edef;
+  --muted: #8696a0;
+  --border: #222e35;
+  --primary: #53bdeb;
+  --blue-soft: rgba(83, 189, 235, 0.15);
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --red: #f87171;
+  --green: #00a884;
+  --chat-tile-bg: #111b21;
+  --chat-tile-border: #222e35;
+  --chat-tile-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* Theme 1: WhatsApp Classic Chat */
+.theme-whatsapp {
+  --bg: #efeae2;
+  --chat-tile-bg: #ffffff;
+  --chat-tile-border: rgba(0, 0, 0, 0.05);
+  --chat-tile-shadow: 0 1px 2px rgba(11, 20, 26, 0.07), 0 2px 5px rgba(11, 20, 26, 0.03);
+}
+.theme-whatsapp.chat-wallpaper {
+  background-color: #efeae2;
+  background-image: url('/chat-doodle-light.svg');
+  background-repeat: repeat;
+  background-size: 360px 360px;
+  background-attachment: fixed;
+}
+:root[data-theme="dark"] .theme-whatsapp {
+  --bg: #0b141a;
+  --chat-tile-bg: #111b21;
+  --chat-tile-border: #202c33;
+  --chat-tile-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .theme-whatsapp.chat-wallpaper {
+  background-color: #0b141a;
+  background-image: url('/chat-doodle-dark.svg');
+  background-repeat: repeat;
+  background-size: 360px 360px;
+  background-attachment: fixed;
+}
+
+/* Theme 2: Telegram Modern Gradient + Doodle */
+.theme-telegram {
+  --bg: #dce7ee;
+  --chat-tile-bg: #ffffff;
+  --chat-tile-border: rgba(226, 232, 240, 0.9);
+  --chat-tile-shadow: 0 2px 8px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+.theme-telegram.chat-wallpaper {
+  background-color: #dce7ee;
+  background-image: url('/chat-doodle-light.svg'), linear-gradient(155deg, #d8e5ee 0%, #e3ebf3 45%, #ede9f5 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 360px 360px, cover;
+  background-attachment: fixed, fixed;
+}
+:root[data-theme="dark"] .theme-telegram {
+  --bg: #0e1621;
+  --chat-tile-bg: #17212b;
+  --chat-tile-border: #242f3d;
+  --chat-tile-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .theme-telegram.chat-wallpaper {
+  background-color: #0e1621;
+  background-image: url('/chat-doodle-dark.svg'), linear-gradient(155deg, #0e1621 0%, #151e27 50%, #1b2631 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 360px 360px, cover;
+  background-attachment: fixed, fixed;
+}
+
+/* Theme 3: Academic Subtle Notebook Doodle */
+.theme-academic {
+  --bg: #f5f6f9;
+  --chat-tile-bg: #ffffff;
+  --chat-tile-border: #e2e8f0;
+  --chat-tile-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+.theme-academic.chat-wallpaper {
+  background-color: #f5f6f9;
+  background-image: url('/chat-doodle-light.svg'), 
+    linear-gradient(to right, rgba(203, 213, 225, 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(203, 213, 225, 0.25) 1px, transparent 1px);
+  background-repeat: repeat, repeat, repeat;
+  background-size: 360px 360px, 24px 24px, 24px 24px;
+  background-attachment: fixed, fixed, fixed;
+}
+:root[data-theme="dark"] .theme-academic {
+  --bg: #0e1015;
+  --chat-tile-bg: #141720;
+  --chat-tile-border: #222634;
+  --chat-tile-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .theme-academic.chat-wallpaper {
+  background-color: #0e1015;
+  background-image: url('/chat-doodle-dark.svg'),
+    linear-gradient(to right, rgba(38, 42, 53, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(38, 42, 53, 0.35) 1px, transparent 1px);
+  background-repeat: repeat, repeat, repeat;
+  background-size: 360px 360px, 24px 24px, 24px 24px;
+  background-attachment: fixed, fixed, fixed;
+}
+
+/* Theme 4: Original ClassMate Flat */
+.theme-original {
+  --bg: #f4f7fc;
+  --chat-tile-bg: #ffffff;
+  --chat-tile-border: #dfe7f2;
+  --chat-tile-shadow: none;
+}
+.theme-original.chat-wallpaper {
+  background-color: #f4f7fc;
+  background-image: none;
+}
+:root[data-theme="dark"] .theme-original {
+  --bg: #0a0a0c;
+  --chat-tile-bg: #131316;
+  --chat-tile-border: #26262c;
+  --chat-tile-shadow: none;
+}
+:root[data-theme="dark"] .theme-original.chat-wallpaper {
+  background-color: #0a0a0c;
+  background-image: none;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Notice Screen Container */
+.notices-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: 90px;
+  transition: background 0.25s ease;
+}
+
+.notice-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 12px 14px 24px;
+}
+
+/* Header */
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 4px 4px 0;
+}
+.page-heading h1 {
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text);
+}
+.page-heading p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.primary-btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+
+/* Notice Cards List */
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Notice Card (Message Tile) */
+.notice-card {
+  position: relative;
+  background: var(--chat-tile-bg);
+  border: 1px solid var(--chat-tile-border);
+  border-radius: 20px;
+  padding: 18px 16px 6px;
+  box-shadow: var(--chat-tile-shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.25s ease;
+}
+
+.notice-accent {
+  position: absolute;
+  left: 14px;
+  top: 22px;
+  width: 4px;
+  height: 22px;
+  border-radius: 4px;
+  background: #7c3aed;
+}
+.notice-card.cancelled .notice-accent {
+  background: #ea3943;
+}
+.notice-card.resource .notice-accent {
+  background: #059669;
+}
+
+.notice-content {
+  position: relative;
+  min-height: 0;
+}
+.notice-content h2 {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 12px;
+  padding: 0 65px 0 12px;
+  color: var(--text);
+}
+.notice-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 14px;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.timestamp {
+  font-size: 11px;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.notice-translate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #2563eb;
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.notice-illustration {
+  position: absolute;
+  top: -2px;
+  right: 36px;
+  width: 36px;
+  height: 36px;
+  opacity: 0.95;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+.notice-menu {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+}
+.notice-menu-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+
+/* Card Footer */
+.notice-card footer {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 4px 0 0;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.seen-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.avatars {
+  display: flex;
+  padding-left: 4px;
+}
+.avatar-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 9.5px;
+  font-weight: 700;
+  margin-left: -6px;
+  border: 1.5px solid var(--chat-tile-bg);
+}
+
+.reactions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: transform 0.1s ease;
+}
+.reaction-btn.liked {
+  color: #ea3943;
+}
+.reaction-btn:active {
+  transform: scale(1.15);
+}
+
+/* Floating Bottom Navigation (Exact ClassMate Mobile) */
+.bottom-nav {
+  position: fixed;
+  bottom: 12px;
+  left: 14px;
+  right: 14px;
+  max-width: 580px;
+  margin: 0 auto;
+  height: 62px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 35px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 6px;
+  z-index: 100;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  flex: 1;
+  padding: 6px 0;
+}
+.nav-item.active {
+  color: #2563eb;
+}
+:root[data-theme="dark"] .nav-item.active {
+  color: #60a5fa;
+}
+
+/* Theme Control Panel on Top of Screen */
+.theme-test-bar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.theme-pills {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.theme-pill-btn {
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--soft);
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.theme-pill-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+.mode-toggle-btn {
+  padding: 4px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--soft);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}

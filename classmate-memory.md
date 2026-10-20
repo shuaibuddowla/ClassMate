@@ -1,4 +1,4 @@
-﻿# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
+# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
 
 This memory file serves as the definitive engineering knowledge base and memory reference for the ClassMate Android APK project, Web companion client, and Supabase backend. It documents architecture, design tokens, data models, recent features, debugging resolutions, and implementation guidelines across all modules.
 
@@ -2004,3 +2004,277 @@ flowchart TD
    - Pushes real-time presence update via Supabase Realtime WebSocket to the teacher's smartphone (`ClassMateTeacherLiveAttendanceActivity`) and Web dashboard (`attendance-teacher-modal.tsx`), highlighting the student's roll number in emerald green.
 
 
+
+
+---
+
+## 49. Permanent Academic Calendar in Timetable & Courses Screen Redesign
+
+### A. Architectural Motivation & User Feedback
+- **Permanent Academic Calendar**:
+  - The previous batch-wide admin configuration toggle `"Calendar in Timetable"` (`classmate.batches.calendar_in_timetable`) was removed.
+  - The Timetable screen now permanently features a dedicated, unified 3-mode segmented control:
+    - **`[ Class Routine | Bus Schedule | Academic Calendar ]`**
+  - Eliminates administrative toggling overhead and provides students with permanent, one-tap access to university holidays, exam schedules, and semester milestones directly inside their daily routine view.
+- **Renaming Materials / Library to "Courses" (`R.id.nav_library` / `Courses`)**:
+  - Renamed the bottom navigation tab from "Library" / "Materials" to **"Courses"** across both Android APK and Web companion client.
+  - Aligns terminology with academic expectations: the screen serves as an academic course catalog rather than a generic file library.
+
+### B. Courses Screen Information Architecture & UI Layout
+1. **Top Hero Attendance Banner (`Attendance Tracking` / `My Attendance`)**:
+   - Prominently anchored at the top of the Courses feed.
+   - For students: Displays cumulative attendance standing, attended/held ratios, and percentage pill (`%`).
+   - Tapping the hero banner opens the **RFID Attendance Status Sheet / Modal** showing card registration status, active session logs, and course-by-course metrics.
+2. **Filter Chips**:
+   - Filter pills: `[ All | Theory | Lab ]` allow rapid category switching without full reload.
+3. **Streamlined Course Cards**:
+   - Course code pill badge with category accent (e.g., `CSE 2101`, `CSE 2102`).
+   - Bold course title, credit weighting (e.g., `3.00 Credits` / `1.50 Credits`), assigned course teacher with faculty icon, and attached syllabus/materials counter.
+   - One-tap navigation into course materials, drive links, and lecture slide repositories.
+
+### C. Android Native Google Drive Link Pasting (`ClassMatePublishActivity.kt`)
+- **Android APK Feature Parity with Web**:
+  - In `ClassMatePublishActivity`, when an authorized Class Representative (CR) or Admin uploads course material, a top segmented mode switcher is provided:
+    - **`[ Upload File | Drive Link ]`**
+  - **Drive Link Mode**:
+    - Replaces native file picker with a streamlined URL input form: Resource Title, External URL (with hint `https://drive.google.com/...`), Category selector (`notes`, `book`, `question_bank`, `slide`, `syllabus`), and Semester Course dropdown.
+    - Interacts directly with Supabase RPC `create_library_link(target_batch, target_course, target_title, target_category, target_url)` (`202610140001_library_drive_links.sql`).
+    - Creates record in `classmate.file_metadata` with `file_type = 'link'`, `mime_type = 'text/uri-list'`, `size_bytes = 0`, and `link_url = v_url`.
+- **Card Presentation & Redirection**:
+  - In the Android Courses file list, Google Drive resources display an authentic **Google Drive icon** (`ic_drive`) with an emerald green **`DRIVE`** badge pill. Other external links display `ic_external_link` with a blue **`LINK`** badge.
+  - Tapping a Drive link immediately launches the default Android browser or Google Drive app via `Intent(Intent.ACTION_VIEW, Uri.parse(linkUrl))`.
+
+---
+
+## 50. Complete ESP32 RFID Attendance Station Hardware, Display & Audio Overhaul
+
+### A. Context & Physical Hardware Components
+To deploy an institutional-grade, zero-latency physical attendance terminal for classroom doorways (e.g., Room 338/339/Lab-02 for CSE 22nd Batch), the hardware stack was upgraded with visual status displays and acoustic feedback:
+1. **Microcontroller**: ESP32 38-Pin Development Module (Dual-core Xtensa LX6, 240 MHz).
+2. **RFID Reader**: NXP MFRC522 (13.56 MHz HF RFID reader via SPI).
+3. **Display**: 0.96-inch monochrome I2C SSD1306 OLED (128x64 resolution).
+4. **Acoustic Indicator**: 3-terminal active buzzer module (`VCC`, `IO`, `GND`) with onboard NPN transistor driver.
+5. **Visual Indicators**: 5mm High-brightness Green LED (Success) & Red LED (Error/Unregistered) with 220Ω–330Ω current-limiting resistors.
+6. **Power Decoupling**: 100μF 16V electrolytic capacitor across 3.3V/GND power rail near MFRC522 to eliminate radio transmission voltage dips.
+
+### B. Critical Hardware Pinout Conflict Resolution (GPIO 22 SCL Collision)
+- **The Defect**:
+  - In early prototypes, the RC522 `RST` pin was connected to **`GPIO 22`**.
+  - However, on the ESP32 architecture, **`GPIO 22` is the hardwired default I2C SCL (Clock)** pin used by the wire library for OLED displays.
+  - Having RC522 reset on GPIO 22 caused simultaneous SPI bus lockups and blank OLED displays.
+- **The Resolution**:
+  - Moved RC522 `RST` to **`GPIO 4`** (or `GPIO 21`), freeing `GPIO 22` exclusively for OLED `SCL` and `GPIO 21` for OLED `SDA`.
+  - Both buses now operate concurrently without interference: VSPI runs at 1 MHz – 4 MHz, and I2C runs at 400 kHz fast mode.
+
+### C. Master 38-Pin ESP32 Hardware Wiring Map
+| Component | Component Pin | ESP32 Pin | Logic / Bus | Description & Engineering Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **RC522 RFID** | `3.3V (VCC)` | **`3V3`** | Power Rail | **Never connect to 5V (damages IC)** |
+| | `RST` | **`GPIO 4`** | Hardware Reset | Moved from GPIO 22 to avoid I2C SCL conflict |
+| | `GND` | **`GND`** | Common Ground | Common ground reference |
+| | `MISO` | **`GPIO 19`** | VSPI MISO | Master-In-Slave-Out |
+| | `MOSI` | **`GPIO 23`** | VSPI MOSI | Master-Out-Slave-In |
+| | `SCK` | **`GPIO 18`** | VSPI SCK | Hardware serial clock |
+| | `SDA / SS` | **`GPIO 5`** | VSPI SS | Hardware chip select (active low) |
+| **SSD1306 OLED** | `VCC / VDD` | **`3V3`** | 3.3V Power | Display power rail |
+| | `GND` | **`GND`** | Common Ground | Common ground reference |
+| | `SCL / SCK` | **`GPIO 22`** | I2C SCL | I2C clock (400 kHz Fast Mode) |
+| | `SDA` | **`GPIO 21`** | I2C SDA | I2C data line |
+| **3-Pin Buzzer** | `VCC` | **`5V / VIN`** | 5V Power Rail | **Connect to 5V for high volume (3.3V is too quiet)** |
+| | `GND` | **`GND`** | Common Ground | Common ground reference |
+| | `IO / DAT` | **`GPIO 25`** | Digital Output | Active-high driver trigger |
+| **Green LED** | Anode (+) | **`GPIO 32`** | Digital Output | Via 220Ω resistor (Check-in success) |
+| | Cathode (-) | **`GND`** | Common Ground | Common ground reference |
+| **Red LED** | Anode (+) | **`GPIO 33`** | Digital Output | Via 220Ω resistor (Unregistered/Error) |
+| | Cathode (-) | **`GND`** | Common Ground | Common ground reference |
+
+### D. Audio & Video Performance Optimizations
+1. **Buzzer Volume Amplification (Hardware Fix)**:
+   - Connecting the 3-pin buzzer module's `VCC` to `3V3` delivered insufficient current through the on-board surface-mount transistor, making the beep barely audible in noisy lecture halls.
+   - Moving `VCC` to **`5V / VIN`** (USB rail) drove the piezoelectric diaphragm at full resonance, increasing sound pressure level by over **15 dB**.
+2. **Zero-Latency Buzzer Delay Resolution (Software Fix)**:
+   - *Problem*: Users experienced a 2 to 3-second delay between tapping their card and hearing the confirmation tone.
+   - *Root Cause*: The firmware code was executing a blocking, synchronous HTTP POST (`WiFiClientSecure`) *before* activating the buzzer pin. Any Wi-Fi jitter or TLS handshake latency directly delayed the audio cue.
+   - *Fix*: The firmware was refactored to emit an immediate **60ms click/chirp tone** the instant a card UID is captured by the RC522. The HTTP POST is dispatched asynchronously, and on receipt of the JSON response, the system triggers the 2-tone melodic confirmation chime (`2.7 kHz -> 3.5 kHz`) or error burst.
+3. **Elimination of OLED Lag & I2C Bus Flooding**:
+   - Continually redrawing the full 1024-byte display buffer on every `void loop()` iteration flooded the I2C bus and starved network routines.
+   - Implemented an internal state machine with a throttled 25ms timer for marquee text animations and event-driven screen redraws.
+
+### E. 3D Printable Mechanical Enclosure (`esp32_rfid_flat_snapfit_enclosure.stl`)
+- **Review & Engineering Polish**:
+  - Removed internal floor cutouts/slots in favor of a 100% solid, rigid bottom plate to eliminate structural flex.
+  - Added dual rear wall-mounting keyhole slots for easy mounting outside lecture room doors.
+  - Molded internal standoff cradles for the 38-pin ESP32 dev board, RC522 reader, and OLED display bezel.
+  - Precision cutouts for USB-C/Micro-USB power cable and external LED status light pipes.
+
+---
+
+## 51. Admin Attendance Management & Smart Device Controls (Migration `202610200003`)
+
+### A. High-Level Architecture & Paradigm Shift
+Prior to migration `202610200003`, attendance sessions were strictly bound to scheduled `routine_slots` and required manual per-course administrative toggle checkboxes ("Attendance Course Settings").
+In university operations, classes are frequently rescheduled, extra review sessions are called, or faculty take attendance ad-hoc.
+The new architecture unifies attendance into an **Ad-Hoc, Schedule-Independent, Hardware-Linked Platform**:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Admin / Teacher (Web/Android)
+    participant Cloud as Web API (/api/scan)
+    participant DB as Supabase DB
+    participant ESP as ESP32 Terminal (OLED)
+    actor Student as Student (Batch 22)
+
+    Admin->>Cloud: Launch Ad-Hoc Session for Course (e.g. CSE 2101)
+    Cloud->>DB: start_adhoc_attendance_session(target_course, 'ESP32-READER-01')
+    DB-->>Cloud: session_id created, device linked, outbox 'attendance_open' enqueued
+    
+    loop Every 2 Seconds Heartbeat
+        ESP->>Cloud: GET /api/scan?device_id=ESP32-READER-01
+        Cloud->>DB: get_device_active_session('ESP32-READER-01')
+        DB-->>Cloud: { status: "ACTIVE", course_code: "CSE 2101", course_title: "OOP" }
+        Cloud-->>ESP: JSON active session data
+    end
+    ESP->>ESP: Wakes OLED! Displays "CSE 2101" + Marquee Title Animation
+
+    Student->>ESP: Taps RFID Card
+    ESP->>ESP: Instant 60ms Chirp + Flash Student ID (350ms)
+    ESP->>Cloud: POST /api/scan { card_uid, device_id }
+    Cloud->>DB: process_rfid_scan(card_uid, device_id)
+    DB->>DB: Verify student belongs to session batch (Strict Batch Isolation)
+    DB->>DB: Insert attendance_records (idempotent)
+    DB->>DB: Enqueue notification_outbox ('attendance_marked')
+    DB-->>Cloud: { status: "CHECK_IN", identifier: "2101001", user_name: "..." }
+    Cloud-->>ESP: HTTP 200 { status: "CHECK_IN", ... }
+    ESP->>ESP: Display [ ✔ OK! PRESENT ] + Green LED + Rising Chime (800ms)
+    ESP->>ESP: Reverts to Course Marquee
+    DB-->>Student: FCM Push: "Your attendance for OOP was marked present in the app."
+
+    Admin->>Cloud: Click "Close Attendance"
+    Cloud->>DB: close_adhoc_attendance_session(session_id)
+    DB->>DB: Status = 'closed', unlinks device
+    ESP->>Cloud: GET /api/scan (Next Heartbeat)
+    Cloud-->>ESP: { status: "SLEEP" }
+    ESP->>ESP: OLED Display OFF (Sleep Mode, LEDs Off)
+```
+
+### B. Database Schema & RPC Enhancements (`202610200003_admin_manage_attendance_and_scan_notifs.sql`)
+1. **Schema Decoupling (`classmate.attendance_sessions`)**:
+   - `alter table classmate.attendance_sessions alter column routine_slot_id drop not null;`
+   - `alter table classmate.attendance_sessions add column if not exists semester_course_id uuid references classmate.semester_courses(id) on delete cascade;`
+   - `alter table classmate.attendance_sessions add column if not exists batch_id uuid references classmate.batches(id) on delete cascade;`
+   - Backfilled historical session records from `routine_slots` to preserve data continuity.
+2. **RPC: `start_adhoc_attendance_session(target_semester_course uuid, target_device text default 'ESP32-READER-01')`**:
+   - Authorizes Admin, Owner, or assigned faculty.
+   - Automatically closes any previous open session for this course to prevent stale state.
+   - Inserts session with `semester_course_id = target_semester_course` and `status = 'open'`.
+   - Binds `target_device` immediately in `classmate.attendance_devices(active_session_id = sess_id)`.
+   - Enqueues batch-wide notification event `attendance_open`.
+3. **RPC: `close_adhoc_attendance_session(target_session uuid)`**:
+   - Closes the session (`status = 'closed', closed_at = now()`) and immediately unlinks the hardware device (`active_session_id = null`).
+4. **RPC: `get_device_active_session(target_device text)`**:
+   - Executed by the ESP32 every 2 seconds via `GET /api/scan?device_id=...`.
+   - Records `last_heartbeat = now()`.
+   - If device has an open active session: returns `{ status: "ACTIVE", session_id, course_code, course_title, started_at }`.
+   - If session is closed or unlinked: unlinks device and returns `{ status: "SLEEP" }`.
+5. **RPC: `process_rfid_scan(p_card_uid text, p_device_id text)`**:
+   - Normalizes Card UID (case-insensitive hex).
+   - Verifies active session on `p_device_id`.
+   - Looks up student in `classmate.profiles`. If missing, logs into `unregistered_rfid_scans` and returns `UNREGISTERED`.
+   - **Strict Batch Isolation**: Enforces `stu.batch_id == sess.batch_id`. If a student from another batch taps their card, rejects with `WRONG_BATCH`.
+   - Idempotent upsert into `classmate.attendance_records`.
+   - **Single-Recipient Scan Push Notification**: If fresh tap (`is_new_mark = true`), inserts outbox event `attendance_marked` strictly for that student profile:
+     - Title: `"Attendance Recorded"`
+     - Body: `"Your attendance for " || course_title || " was marked present in the app."`
+6. **Student Scoped Attendance RPC (`student_my_attendance`)**:
+   - Filtered to **only display courses where attendance has actually been taken (`classes_held > 0`)**.
+   - Removes empty 0/0 course clutter from students' timetable views.
+
+---
+
+## 52. Manage Attendance UI/UX Refinement & Layout Overhaul
+
+### A. Root Cause Resolution & Layout Architecture
+- **Eliminated `.tab-layout` Class Collision**:
+  - The root container previously inherited the global `.tab-layout` class from `globals.css` (`grid-template-columns: minmax(0, 1fr) minmax(310px, 350px);`).
+  - Because `AdminAttendance` was already mounted inside `.primary-pane` (column 1 of the 3-pane desktop layout), this forced an unintended nested 2-column layout, crushing course cards into a cramped 300px column.
+  - Replaced with `.admin-attendance-root` (`display: flex; flex-direction: column; width: 100%; max-width: 1040px;`).
+- **3-Pane Desktop Alignment**:
+  - Preserved the full 3-pane PC desktop layout: Left Sidebar Navigation, Center Primary Workspace, and Right Persistent Notices Feed. All Manage Attendance controls fit seamlessly with zero horizontal clipping.
+
+### B. Segmented Sub-View Navigation
+The header provides a clean segmented pill toggle between two dedicated operational modes:
+1. **`[ 📊 Course Records & Export ]` (Default)**:
+   - **Hardware Terminal Card**:
+     - Live station status for `ESP32-READER-01`: Displays glowing green indicator with active course and tap count, or calm gray `SLEEP` state.
+     - "Take Attendance" action button opens a modal to launch an ad-hoc session for any semester course.
+     - "Close Attendance" button safely terminates the session.
+   - **Modern Course Cards**:
+     - Flexible auto-padded Course Code pill (e.g. `CSE 2101`, `#3B82F6`) that never overlaps the faculty name.
+     - Course title, enrolled student count, classes taken count, batch average percentage chip.
+     - Pinned action buttons: `[ 📥 Export Excel ]` and `[ View Day Roster ▼ ]` accordion toggle.
+   - **Expanded Day-Wise Matrix**:
+     - Sticky student `#`, `Roll`, and `Name` columns that remain locked on the left while horizontally scrolling across session dates.
+     - Header displays session dates and formatted times (e.g., `20 Oct, 10:30 AM`).
+     - Binary visual badges: Emerald pill `1 · Present` vs Soft Coral pill `0 · Absent`.
+     - Rightmost totals column: Attended / Held count and percentage.
+2. **`[ 💳 Register RFID Cards (N/Total) ]`**:
+   - **Live Detected Card Chip**:
+     - Shows the most recently tapped unknown card UID on the ESP32 reader with a 1-tap `[ Use Detected UID ]` button.
+   - **2-Column Pairing Form**:
+     - Autocomplete Student Search with elevated dropdown (`z-index: 50; box-shadow`) showing Roll and Name.
+     - Monospace Card UID input with validation.
+     - "Register Card" action button calling RPC `enroll_student_rfid`.
+   - **Batch Enrollment Directory Table**:
+     - Filter tabs: `All (N)`, `Registered (N)`, `Unregistered (N)`.
+     - Direct 1-tap `[ Pair Card ]` or `[ Edit Card ]` actions.
+
+### C. Styled Binary ($1$/$0$) Excel Matrix Export (`attendance-excel.ts`)
+- Client-side SheetJS (`xlsx`) spreadsheet generation:
+  - **Metadata Headers**: Course Code, Course Title, Export Timestamp, Total Classes Conducted.
+  - **Frozen Headers**: Columns A (`Roll No`) and B (`Student Name`) are frozen for smooth horizontal scrolling.
+  - **Date Columns**: Every session date and time (`YYYY-MM-DD HH:MM`).
+  - **Binary Values**: Strictly outputs `1` for Present and `0` for Absent.
+  - **Summary Columns**: `Total Present`, `Total Classes`, and Excel calculation percentage (`=SUM(...) / COUNT(...) * 100`).
+
+---
+
+## 53. Friends Tab UI Polish, User Sorting & Profile Privacy Scoping
+
+### A. Wider, Compact Friends Profile Popup
+- **Layout Expansion**:
+  - Increased modal width on both Web and Android to accommodate full student credentials without text wrapping or truncated details.
+  - Reduced excessive padding and tightened typography for a compact, aesthetic profile card.
+
+### B. Live Active Status & Priority Ordering
+- **Real-Time Presence Indicator**:
+  - Integrated green pulsing dot indicator reflecting user activity within the last 5 minutes (`touch_presence`).
+- **Batch 22 Priority Sorting Algorithm**:
+  - Enforced hierarchical sort order across student directories:
+    1. **System Administrator / App Developer** (CSE 22nd Batch exception, pinned to position 0).
+    2. **Class Representatives (CR)** (pinned above regular students).
+    3. **Enrolled Batch Students** (alphabetically/numerically ordered by academic roll number `CE25001...`).
+
+### C. Profile Field Cleanup & Teacher Privacy Enforcement
+1. **Removed Mess/Flat Requirement**:
+   - Removed `"Current mess / flat"` input from profile completion and editing across all onboarding screens and settings.
+2. **Teacher Profile Privacy Protection**:
+   - Faculty member profiles are stripped of sensitive personal attributes across Android and Web:
+     - Phone numbers, personal blood group, undergraduate department, and batch tags are strictly omitted from public teacher views.
+     - Displays only: Full Name, Designation, Official Email, and Assigned Department.
+
+---
+
+## 54. Local Network APK Distribution Server & Production Verification Summary
+
+### A. Local HTTP Distribution Endpoint
+- Built and packaged the latest Android debug APK (`release/ClassMate.apk`) incorporating all recent timetable, courses, and attendance updates.
+- Hosted on the local network HTTP distribution server for instant direct device testing:
+  - **Download Endpoint**: `http://10.233.34.48:8080/download`
+
+### B. Production Deployment Verification
+- **Web Production**: Built and deployed to Vercel Production at **`https://classmatebd.vercel.app`** with zero TypeScript or CSS errors.
+- **Supabase Backend**: Migrations `202610200001`, `202610200002`, and `202610200003` fully verified and applied across Staging and Production.
+- **ESP32 Firmware**: Configured in `D:\Code & Scripts\attendence tracker\firmware\esp32_rfid_attendance\esp32_rfid_attendance.ino` with sub-second OLED animations, fast I2C, 5V buzzer drive, and automated cloud sync.
+
+---

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
+  <!-- Soft drop shadow / ambient glow under the calendar -->
+  <rect x="14" y="22" width="52" height="48" rx="14" fill="#ef4444" fill-opacity="0.12" />
+
+  <!-- Calendar Page Base (clean rounded container) -->
+  <rect x="14" y="16" width="52" height="52" rx="12" fill="#ffffff" stroke="#fecaca" stroke-width="2" />
+
+  <!-- Calendar Header Bar with gradient red -->
+  <defs>
+    <linearGradient id="calCancelHeader" x1="14" y1="16" x2="66" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="42" y1="42" x2="68" y2="68" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#b91c1c" />
+    </linearGradient>
+    <filter id="badgeShadow" x="38" y="38" width="34" height="34" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#7f1d1d" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Top Header Ribbon -->
+  <path d="M14 26 C14 20.477 18.477 16 24 16 L56 16 C61.523 16 66 20.477 66 26 L66 29 L14 29 Z" fill="url(#calCancelHeader)" />
+
+  <!-- Calendar Binder Rings (Metallic Spiral Pins) -->
+  <rect x="23" y="10" width="5" height="12" rx="2.5" fill="#fca5a5" stroke="#ffffff" stroke-width="1.5" />
+  <rect x="52" y="10" width="5" height="12" rx="2.5" fill="#fca5a5" stroke="#ffffff" stroke-width="1.5" />
+
+  <!-- Calendar Date Rows / Schedule Lines -->
+  <!-- Header dots -->
+  <circle cx="24" cy="36" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="36" r="2" fill="#cbd5e1" />
+  <circle cx="44" cy="36" r="2" fill="#cbd5e1" />
+  <circle cx="54" cy="36" r="2" fill="#cbd5e1" />
+
+  <!-- Second row (regular day dots) -->
+  <circle cx="24" cy="46" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="46" r="2" fill="#cbd5e1" />
+  <circle cx="24" cy="56" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="56" r="2" fill="#cbd5e1" />
+
+  <!-- Floating Cancellation / Off-Duty Badge on bottom-right corner -->
+  <g filter="url(#badgeShadow)">
+    <circle cx="55" cy="55" r="14" fill="url(#badgeGrad)" stroke="#ffffff" stroke-width="2.5" />
+    <!-- Crisp diagonal slash / cross (X) inside badge -->
+    <path d="M49 49 L61 61 M61 49 L49 61" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+  </g>
+</svg>

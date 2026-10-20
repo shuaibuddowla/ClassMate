@@ -21,13 +21,15 @@ Deno.serve(request => withWebCors(request, async (request) => {
     return new Response("Server configuration incomplete", { status: 503 });
   }
   // Query as the caller. RLS filters pending users and cross-batch resources.
-  const db = createClient(url, anonKey, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false },
-  }).schema("classmate");
   const { data, error } = await db.from("file_metadata")
-    .select("r2_object_key,mime_type,status").eq("id", resource_id).single();
+    .select("r2_object_key,mime_type,status,link_url").eq("id", resource_id).single();
   if (error || !data || data.status !== "active") return new Response("Not found", { status: 404 });
+
+  if (data.link_url) {
+    return Response.json({ url: data.link_url, expires_in: 3600, mime_type: data.mime_type || "text/uri-list" }, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 
   const s3 = new S3Client({
     region: "auto",

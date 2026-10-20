@@ -101,7 +101,7 @@ export async function downloadCourseMatrixExcel(semesterCourseId: string) {
     compareStudentRolls(a.roll, b.roll) || a.full_name.localeCompare(b.full_name)
   );
 
-  // Build matrix rows sorted cleanly CE25001 -> CE25060
+  // Build matrix rows sorted cleanly by roll
   const rows = students.map((s, idx) => {
     const row: Record<string, any> = {
       "SL": idx + 1,
@@ -109,25 +109,41 @@ export async function downloadCourseMatrixExcel(semesterCourseId: string) {
       "Student Name": s.full_name || "—",
     };
 
-    // Columns for each session date
-    sessions.forEach((sess) => {
-      const colHeader = sess.date || sess.session_id.slice(0, 8);
+    // Columns for each session with day index, date, and timestamp
+    sessions.forEach((sess, sIdx) => {
+      let timeStr = "";
+      if (sess.started_at) {
+        try {
+          const d = new Date(sess.started_at);
+          timeStr = ` (${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })})`;
+        } catch {}
+      }
+      const colHeader = `Day ${sIdx + 1}${timeStr}`;
       const status = s.records?.[sess.session_id];
-      row[colHeader] = status === "present" ? "P" : "A";
+      // Mark 1 if present, 0 if absent as requested
+      row[colHeader] = status === "present" ? 1 : 0;
     });
 
     row["Total Present"] = s.present_count ?? 0;
     row["Total Classes"] = s.total_sessions ?? sessions.length;
-    row["Percentage %"] = `${s.percentage ?? 0}%`;
+    row["Percentage (%)"] = `${s.percentage ?? 0}%`;
 
     return row;
   });
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, `${courseCode} Attendance`);
 
-  const filename = `Attendance_Matrix_${courseCode}_${new Date().toISOString().split("T")[0]}.xlsx`;
+  // Column width calculations for clean auto-fit
+  const colKeys = rows.length > 0 ? Object.keys(rows[0]) : [];
+  worksheet["!cols"] = colKeys.map((k) => ({
+    wch: Math.max(k.length + 3, 12),
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  const safeSheetName = `${courseCode.replace(/[/\\?*[\]]/g, "_").slice(0, 20)} Attendance`;
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+
+  const filename = `Attendance_${courseCode}_${new Date().toISOString().split("T")[0]}.xlsx`;
   XLSX.writeFile(workbook, filename);
 }
 

@@ -80,9 +80,13 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             } else {
                 val key = inputData.getString("record_id") ?: id.toString()
                 val intent = when {
-                    attendance -> Intent(context, com.shuaib.classmate.activities.ClassMateStudentAttendanceScannerActivity::class.java).apply {
+                    attendance -> Intent(context, ClassMateAuthActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        putExtra("OPEN_TAB", "library")
+                        putExtra("OPEN_RFID_ATTENDANCE", true)
                         putExtra("EXTRA_SESSION_ID", inputData.getString("session_id"))
-                        putExtra("EXTRA_COURSE_TITLE", inputData.getString("title"))
+                        putExtra("EXTRA_COURSE_CODE", inputData.getString("course_code"))
+                        putExtra("EXTRA_COURSE_TITLE", inputData.getString("course_title"))
                     }
                     blood -> Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)
                     fund -> Intent(context,com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java).apply {

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.view.View
 import android.widget.*
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
@@ -43,6 +44,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var aiHistory=org.json.JSONArray()
     private var restoredAiDraft=""
     private var aiDraft:com.google.android.material.textfield.TextInputEditText?=null
+    private var uploadMode = "file"
+    private var restoredLinkUrl = ""
+    private var urlInput: com.google.android.material.textfield.TextInputEditText? = null
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected == null) return@registerForActivityResult
         uri = selected
@@ -59,6 +63,8 @@ class ClassMatePublishActivity : AppCompatActivity() {
         aiRequest=state?.getString("ai_request"); aiText=state?.getString("ai_request_text").orEmpty()
         restoredAiDraft=state?.getString("ai_draft").orEmpty()
         aiHistory=org.json.JSONArray(state?.getString("ai_history") ?: "[]")
+        uploadMode = state?.getString("upload_mode") ?: "file"
+        restoredLinkUrl = state?.getString("link_url").orEmpty()
         ClassMateAuthApi.attach(applicationContext)
         uri = state?.getString("file_uri")?.let(Uri::parse)
         selectedFileLabel = state?.getString("file_label").orEmpty()
@@ -74,8 +80,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
         }
+        val isEditingLink = editingFile?.optString("file_type") == "link" || !editingFile?.optString("link_url").isNullOrBlank()
         val toolbar = MaterialToolbar(this).apply {
-            title = if (editingFile != null) "Edit library file" else if (upload) "Add library file" else "Post notice"
+            title = if (editingFile != null) (if (isEditingLink) "Edit drive link" else "Edit library file") else if (upload) "Add library file" else "Post notice"
             setTitleTextColor(getColor(R.color.cm_text_primary)); setNavigationIcon(R.drawable.ic_chevron_left)
             navigationIcon?.setTint(getColor(R.color.cm_text_primary))
             setNavigationOnClickListener { if (!busy) finish() }
@@ -84,7 +91,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
         form = ClassMateFormUi(this)
         form.label(intent.getStringExtra("batch_label").orEmpty()).apply { textSize = 14f }
         root.addView(form.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        submit = MaterialButton(this).apply { text = if (editingFile != null) "Save changes" else if (upload) "Upload file" else "Post notice"; isAllCaps = false; isEnabled = false; cornerRadius = dp(16) }
+        submit = MaterialButton(this).apply {
+            val isLink = isEditingLink || uploadMode == "link"
+            text = if (editingFile != null) "Save changes" else if (upload) (if (isLink) "Share Drive Link" else "Upload file") else "Post notice"
+            isAllCaps = false; isEnabled = false; cornerRadius = dp(16)
+        }
         root.addView(submit, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(dp(24), dp(12), dp(24), dp(16)) })
         setContentView(root)
         val loading = form.label("Loading editor…")
@@ -120,11 +131,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
     }
-    override fun onSaveInstanceState(out: Bundle) {
-        super.onSaveInstanceState(out)
-        out.putString("file_uri", uri?.toString()); out.putString("file_label", selectedFileLabel)
-        if (::name.isInitialized) out.putString("file_name", name.text.toString())
-        out.putString("ai_request",aiRequest); out.putString("ai_request_text",aiText); out.putString("ai_draft",aiDraft?.text?.toString() ?: restoredAiDraft); out.putString("ai_history",aiHistory.toString())
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("upload_mode", uploadMode)
+        outState.putString("link_url", urlInput?.text?.toString() ?: restoredLinkUrl)
+        outState.putString("file_uri", uri?.toString()); outState.putString("file_label", selectedFileLabel)
+        if (::name.isInitialized) outState.putString("file_name", name.text.toString())
+        outState.putString("ai_request",aiRequest); outState.putString("ai_request_text",aiText); outState.putString("ai_draft",aiDraft?.text?.toString() ?: restoredAiDraft); outState.putString("ai_history",aiHistory.toString())
     }
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     private fun dropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
@@ -217,41 +230,263 @@ class ClassMatePublishActivity : AppCompatActivity() {
     }
     private fun buildUpload() {
         if (courses.isEmpty()) { form.label("No active subject is available for uploading."); return }
+
+        val isEditing = editingFile != null
+        val isEditingLink = isEditing && (editingFile!!.optString("file_type") == "link" || !editingFile!!.optString("link_url").isNullOrBlank())
+        if (isEditing) {
+            uploadMode = if (isEditingLink) "link" else "file"
+        }
+
+        var btnUploadFile: TextView? = null
+        var btnDriveLink: TextView? = null
+        fun updateToggleUi() {
+            val isLink = uploadMode == "link"
+            btnUploadFile?.apply {
+                if (!isLink) {
+                    setBackgroundResource(R.drawable.bg_toggle_item_selected)
+                    setTextColor(Color.WHITE)
+                } else {
+                    background = null
+                    setTextColor(getColor(R.color.cm_text_secondary))
+                }
+            }
+            btnDriveLink?.apply {
+                if (isLink) {
+                    setBackgroundResource(R.drawable.bg_toggle_item_selected)
+                    setTextColor(Color.WHITE)
+                } else {
+                    background = null
+                    setTextColor(getColor(R.color.cm_text_secondary))
+                }
+            }
+            if (!isEditing) {
+                submit.text = if (isLink) "Share Drive Link" else "Upload file"
+            }
+        }
+
+        if (!isEditing) {
+            val toggle = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setBackgroundResource(R.drawable.bg_toggle_container)
+                setPadding(dp(3), dp(3), dp(3), dp(3))
+                layoutParams = LinearLayout.LayoutParams(-1, dp(42)).apply {
+                    topMargin = dp(6)
+                    bottomMargin = dp(8)
+                }
+            }
+            btnUploadFile = TextView(this).apply {
+                text = "Upload File"
+                textSize = 12.5f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                gravity = android.view.Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+            }
+            btnDriveLink = TextView(this).apply {
+                text = "Drive Link"
+                textSize = 12.5f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                gravity = android.view.Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+            }
+            toggle.addView(btnUploadFile)
+            toggle.addView(btnDriveLink)
+            form.panel.addView(toggle)
+        }
+
+        name = form.field(if (uploadMode == "link") "Resource title" else "File name").apply {
+            setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') })
+        }
+        val nameBox = name.parent.parent as? TextInputLayout
+
+        val urlBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedStyle).apply {
+            hint = "Google Drive or Resource Link"
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+            endIconMode = TextInputLayout.END_ICON_CUSTOM
+            setEndIconDrawable(R.drawable.ic_copy)
+            setEndIconContentDescription("Paste from clipboard")
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) }
+        }
+        val urlField = com.google.android.material.textfield.TextInputEditText(urlBox.context).apply {
+            setTextColor(getColor(R.color.cm_text_primary))
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setText(editingFile?.optString("link_url") ?: restoredLinkUrl)
+        }
+        urlInput = urlField
+        urlBox.addView(urlField)
+
+        fun pasteFromClipboard() {
+            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            val clip = clipboard?.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).coerceToText(this@ClassMatePublishActivity).toString().trim()
+                if (text.isNotBlank()) {
+                    urlField.setText(text)
+                    urlBox.error = null
+                    Toast.makeText(this@ClassMatePublishActivity, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@ClassMatePublishActivity, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this@ClassMatePublishActivity, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            }
+        }
+        urlBox.setEndIconOnClickListener { pasteFromClipboard() }
+
+        val pasteHelper = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(4))
+            val pasteIcon = ImageView(context).apply {
+                setImageResource(R.drawable.ic_copy)
+                setColorFilter(getColor(R.color.cm_primary))
+                layoutParams = LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginEnd = dp(6) }
+            }
+            val pasteText = TextView(context).apply {
+                text = "Paste from clipboard"
+                textSize = 12f
+                setTextColor(getColor(R.color.cm_primary))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            addView(pasteIcon)
+            addView(pasteText)
+            setOnClickListener { pasteFromClipboard() }
+        }
+
+        form.panel.addView(urlBox)
+        form.panel.addView(pasteHelper)
+
         val (_, category) = dropdown("Category", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
         val (_, subject) = dropdown("Subject", courses.map { it.second })
         val defaultCourseId = intent.getStringExtra("course_id")
         if (editingFile == null && !defaultCourseId.isNullOrBlank()) {
             courses.firstOrNull { it.first == defaultCourseId }?.let { subject.setText(it.second, false) }
         }
-        name = form.field("File name").apply { setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') }) }
+
         picker = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-            text = if (uri == null) "Choose file" else "Change file · $selectedFileLabel"; isAllCaps = false; cornerRadius = dp(14)
+            text = if (uri == null) "Choose file" else "Change file · $selectedFileLabel"
+            isAllCaps = false
+            cornerRadius = dp(14)
             setOnClickListener { if (!busy) pickFile.launch(arrayOf("*/*")) }
         }
+        form.panel.addView(picker, LinearLayout.LayoutParams(-1, dp(64)).apply { topMargin = dp(16) })
+
+        fun updateModeVisibility() {
+            val isLink = uploadMode == "link"
+            updateToggleUi()
+            urlBox.visibility = if (isLink) View.VISIBLE else View.GONE
+            pasteHelper.visibility = if (isLink) View.VISIBLE else View.GONE
+            picker.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
+            nameBox?.hint = if (isLink) "Resource title" else "File name"
+        }
+
+        btnUploadFile?.setOnClickListener {
+            if (uploadMode != "file") {
+                uploadMode = "file"
+                updateModeVisibility()
+            }
+        }
+        btnDriveLink?.setOnClickListener {
+            if (uploadMode != "link") {
+                uploadMode = "link"
+                updateModeVisibility()
+            }
+        }
+
         editingFile?.let { file ->
             category.setText(file.optString("category").replaceFirstChar { it.uppercase() }, false)
             courses.firstOrNull { it.first == file.optString("semester_course_id") }?.let { subject.setText(it.second, false) }
             picker.visibility = View.GONE
-            form.label("Update the name, category or subject. The uploaded file stays unchanged.")
+            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the name, category or subject. The uploaded file stays unchanged."
+            form.label(note)
         }
-        form.panel.addView(picker, LinearLayout.LayoutParams(-1, dp(64)).apply { topMargin = dp(16) })
-        status = form.status(); submit.isEnabled = true
+
+        updateModeVisibility()
+
+        status = form.status()
+        submit.isEnabled = true
         submit.setOnClickListener {
-            val selected = uri
-            if (name.text.isNullOrBlank()) { name.error = "Enter a file name"; return@setOnClickListener }
-            if (selected == null && editingFile == null) { status.visibility = View.VISIBLE; status.text = "Choose a file to upload"; return@setOnClickListener }
-            val course = courses.firstOrNull { it.second == subject.text.toString() } ?: return@setOnClickListener
-            val title = name.text.toString().trim(); val kind = category.text.toString().lowercase()
-            perform {
-                if (editingFile != null) {
-                    ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject().put("target_resource", editingFile!!.getString("id"))
-                        .put("target_title", title).put("target_category", kind).put("target_course", course.first))
-                    null
-                } else {
-                    val size = contentResolver.query(selected!!, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null } ?: error("Could not read file size")
-                    ClassMateAuthApi.uploadResource(contentResolver, selected, batch, course.first, title,
-                        contentResolver.getType(selected) ?: "application/octet-stream", size, kind)
-                    null
+            val isLink = uploadMode == "link"
+            val title = name.text.toString().trim()
+            if (title.isBlank()) {
+                name.error = if (isLink) "Enter a resource title" else "Enter a file name"
+                return@setOnClickListener
+            }
+            name.error = null
+
+            val course = courses.firstOrNull { it.second == subject.text.toString() }
+            if (course == null) {
+                status.visibility = View.VISIBLE
+                status.text = "Select a subject"
+                return@setOnClickListener
+            }
+            val kind = category.text.toString().lowercase()
+
+            if (isLink) {
+                val rawUrl = urlField.text.toString().trim()
+                if (rawUrl.isBlank()) {
+                    urlBox.error = "Enter a Google Drive or resource link"
+                    return@setOnClickListener
+                }
+                val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
+                try {
+                    val uri = java.net.URI(urlWithScheme)
+                    if (uri.host.isNullOrBlank() || !uri.host.contains('.')) {
+                        urlBox.error = "Please enter a valid link URL (e.g. https://drive.google.com/...)"
+                        return@setOnClickListener
+                    }
+                } catch (e: Exception) {
+                    urlBox.error = "Please enter a valid link URL"
+                    return@setOnClickListener
+                }
+                urlBox.error = null
+
+                perform {
+                    if (editingFile != null) {
+                        ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
+                            .put("target_resource", editingFile!!.getString("id"))
+                            .put("target_title", title)
+                            .put("target_category", kind)
+                            .put("target_course", course.first)
+                            .put("target_link_url", urlWithScheme)
+                        )
+                        null
+                    } else {
+                        ClassMateAuthApi.rpc("create_library_link", JSONObject()
+                            .put("target_batch", batch)
+                            .put("target_course", course.first)
+                            .put("target_title", title)
+                            .put("target_category", kind)
+                            .put("target_url", urlWithScheme)
+                        )
+                        null
+                    }
+                }
+            } else {
+                val selected = uri
+                if (selected == null && editingFile == null) {
+                    status.visibility = View.VISIBLE
+                    status.text = "Choose a file to upload"
+                    return@setOnClickListener
+                }
+                perform {
+                    if (editingFile != null) {
+                        ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
+                            .put("target_resource", editingFile!!.getString("id"))
+                            .put("target_title", title)
+                            .put("target_category", kind)
+                            .put("target_course", course.first)
+                        )
+                        null
+                    } else {
+                        val size = contentResolver.query(selected!!, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+                            if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null
+                        } ?: error("Could not read file size")
+                        ClassMateAuthApi.uploadResource(contentResolver, selected, batch, course.first, title,
+                            contentResolver.getType(selected) ?: "application/octet-stream", size, kind)
+                        null
+                    }
                 }
             }
         }
@@ -259,7 +494,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private fun perform(action: suspend () -> JSONObject?) {
         if (busy) return
         busy = true; submit.isEnabled = false; status.visibility = View.VISIBLE
-        status.text = if (editingFile != null) "Saving changes…" else if (upload) "Uploading file…" else "Posting notice…"
+        status.text = if (editingFile != null) "Saving changes…" else if (upload) (if (uploadMode == "link") "Sharing link…" else "Uploading file…") else "Posting notice…"
         lifecycleScope.launch {
             try {
                 val outcome = action()

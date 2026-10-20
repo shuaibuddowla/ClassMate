@@ -1,1 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><path fill="#A991F1" d="M47,16l20,-8v52l-20,-8z" /><path fill="#8D72DE" d="M18,25h29v29H18a9,9 0,0 1,-9 -9V34a9,9 0,0 1,9 -9z" /><path fill="#6F56C0" d="M23,54h15l6,19H29z" /><path fill="none" stroke="#B9A7F5" stroke-width="3" stroke-linecap="round" d="M70,25l6,-4M70,39h8M70,53l6,4" /></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
+  <defs>
+    <!-- Megaphone Cone Linear Gradient -->
+    <linearGradient id="megaConeGrad" x1="22" y1="20" x2="56" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+
+    <!-- Megaphone Body / Back Gradient -->
+    <linearGradient id="megaBackGrad" x1="12" y1="30" x2="26" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a5b4fc" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+
+    <!-- Handle Gradient -->
+    <linearGradient id="megaHandleGrad" x1="22" y1="46" x2="34" y2="68" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#3730a3" />
+    </linearGradient>
+
+    <!-- Megaphone Rim Flare Gradient -->
+    <linearGradient id="megaRimGrad" x1="50" y1="12" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c7d2fe" />
+      <stop offset="50%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+
+    <!-- Soft Ambient Glow -->
+    <filter id="megaGlow" x="6" y="8" width="68" height="66" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#4338ca" flood-opacity="0.22" />
+    </filter>
+  </defs>
+
+  <g filter="url(#megaGlow)">
+    <!-- 1. Ergonomic Megaphone Handle (Angle down-left) -->
+    <path d="M25 45 L33 63 C33.8 64.8 32.5 67 30.5 67 L26 67 C24.5 67 23.2 65.8 22.8 64.4 L18.5 48 Z" fill="url(#megaHandleGrad)" />
+
+    <!-- 2. Megaphone Main Horn / Cone (Flaring out to the right) -->
+    <path d="M24 28 L51 16 C53 15 55 16.5 55 18.8 L55 53.2 C55 55.5 53 57 51 56 L24 44 Z" fill="url(#megaConeGrad)" />
+
+    <!-- 3. Rear Housing / Sound Chamber (Rounded capsule) -->
+    <rect x="13" y="27.5" width="12" height="17" rx="6" fill="url(#megaBackGrad)" stroke="#ffffff" stroke-width="1.5" />
+
+    <!-- 4. Front Horn Opening / Acoustic Rim (Vertical Ellipse) -->
+    <ellipse cx="53" cy="36" rx="3.5" ry="19.5" fill="url(#megaRimGrad)" stroke="#ffffff" stroke-width="1.5" />
+
+    <!-- 5. Sound Waves / Broadcast Broadcast Waves (Dynamic modern ripples) -->
+    <!-- Wave 1 (Inner) -->
+    <path d="M60 26 C64.5 30 64.5 42 60 46" stroke="#818cf8" stroke-width="3" stroke-linecap="round" />
+    <!-- Wave 2 (Outer) -->
+    <path d="M67 20 C74 27 74 45 67 52" stroke="#6366f1" stroke-width="3" stroke-linecap="round" />
+
+    <!-- 6. Playful Announcement Sparkle / Energy accent at the top -->
+    <circle cx="68" cy="14" r="2" fill="#fbbf24" />
+  </g>
+</svg>

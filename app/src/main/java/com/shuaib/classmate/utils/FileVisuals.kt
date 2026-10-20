@@ -19,6 +19,10 @@ object FileVisuals {
         val mime = file.mimeType.lowercase()
 
         return when {
+            // External Drive Link
+            extension == "link" || type == "link" || file.driveUrl.isNotBlank() || mime.contains("uri-list") || mime.contains("link") ->
+                VisualType("DRIVE", R.drawable.ic_attach, R.drawable.bg_library_file_icon_green, Color.parseColor("#10B981"))
+
             // PDF
             extension == "pdf" || type == "pdf" || mime.contains("pdf") ->
                 VisualType("PDF", R.drawable.ic_file_pdf, R.drawable.bg_library_file_icon_red, Color.parseColor("#FF6B7A"))

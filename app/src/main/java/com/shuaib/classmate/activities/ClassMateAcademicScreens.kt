@@ -223,6 +223,7 @@ internal class ClassMateAcademicScreens(
         }
         root.v<View>(R.id.btnSearch).setOnClickListener {
             root.v<View>(R.id.headerTitleBlock).visibility = View.GONE
+            root.v<View>(R.id.btnSearch).visibility = View.GONE
             root.v<View>(R.id.searchContainer).visibility = View.VISIBLE
             root.v<EditText>(R.id.etNoticeSearch).requestFocus()
         }
@@ -230,6 +231,7 @@ internal class ClassMateAcademicScreens(
             root.v<EditText>(R.id.etNoticeSearch).text.clear()
             root.v<View>(R.id.searchContainer).visibility = View.GONE
             root.v<View>(R.id.headerTitleBlock).visibility = View.VISIBLE
+            root.v<View>(R.id.btnSearch).visibility = View.VISIBLE
             loadNotices(root)
         }
         root.v<EditText>(R.id.etNoticeSearch).addTextChangedListener(object : android.text.TextWatcher {
@@ -343,12 +345,26 @@ internal class ClassMateAcademicScreens(
     }
 
     private fun setupLibrary(root: View) {
+        val canUpload = profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
         root.v<View>(R.id.btnUploadPdf).apply {
-            visibility = if (profile().optString("role") in setOf("admin", "teacher") ||
-                profile().optBoolean("is_cr")) View.VISIBLE else View.GONE
+            visibility = if (canUpload) View.VISIBLE else View.GONE
             setOnClickListener { onUpload() }
         }
-        root.v<View>(R.id.btnLibrarySearch).setOnClickListener { searchLibrary(root) }
+        root.v<View>(R.id.btnLibrarySearch).setOnClickListener {
+            root.v<View>(R.id.titleColumn).visibility = View.GONE
+            root.v<View>(R.id.btnLibrarySearch).visibility = View.GONE
+            root.v<View>(R.id.btnUploadPdf).visibility = View.GONE
+            root.v<View>(R.id.librarySearchContainer).visibility = View.VISIBLE
+            root.v<EditText>(R.id.etLibrarySearch).requestFocus()
+        }
+        root.v<View>(R.id.btnCloseLibrarySearch).setOnClickListener {
+            root.v<EditText>(R.id.etLibrarySearch).text.clear()
+            root.v<View>(R.id.librarySearchContainer).visibility = View.GONE
+            root.v<View>(R.id.titleColumn).visibility = View.VISIBLE
+            root.v<View>(R.id.btnLibrarySearch).visibility = View.VISIBLE
+            root.v<View>(R.id.btnUploadPdf).visibility = if (canUpload) View.VISIBLE else View.GONE
+            loadLibrary(root)
+        }
         root.v<View>(R.id.tvViewAll).setOnClickListener { showAllFiles() }
         listOf("All" to R.id.chipAll, "Notes" to R.id.chipNotes,
             "Slides" to R.id.chipSlides, "Questions" to R.id.chipQuestions,

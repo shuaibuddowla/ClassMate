@@ -1,0 +1,304 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360" fill="none">
+  <!-- Seamless 360x360 ClassMate Academic Wallpaper (Light Mode) -->
+  <g stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.22">
+    <defs>
+      <g id="ico-book">
+
+    <path d="M 6 12 C 14 8, 20 8, 24 12 C 28 8, 34 8, 42 12 L 42 34 C 34 30, 28 30, 24 34 C 20 30, 14 30, 6 34 Z" />
+    <path d="M 24 12 L 24 34" />
+    <path d="M 11 18 C 15 16, 19 16, 21 17" />
+    <path d="M 27 17 C 29 16, 33 16, 37 18" />
+    <path d="M 11 24 C 15 22, 19 22, 21 23" />
+    <path d="M 27 23 C 29 22, 33 22, 37 24" />
+
+      </g>
+      <g id="ico-grad_cap">
+
+    <path d="M 5 20 L 24 12 L 43 20 L 24 28 Z" />
+    <path d="M 12 24 L 12 34 C 12 39, 36 39, 36 34 L 36 24" />
+    <path d="M 38 22 L 42 27 L 42 35" />
+    <circle cx="42" cy="36" r="1.5" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-microscope">
+
+    <path d="M 16 14 L 26 8 L 29 13 L 19 19 Z" />
+    <path d="M 18 18 L 14 24" />
+    <path d="M 25 22 C 32 22, 34 26, 34 32 L 34 38 L 26 38" />
+    <path d="M 18 30 L 28 30" stroke-width="2.5" />
+    <path d="M 10 40 L 38 40" stroke-width="2.5" />
+    <circle cx="20" cy="35" r="2" />
+
+      </g>
+      <g id="ico-atom">
+
+    <ellipse cx="24" cy="24" rx="18" ry="6.5" />
+    <ellipse cx="24" cy="24" rx="18" ry="6.5" transform="rotate(60 24 24)" />
+    <ellipse cx="24" cy="24" rx="18" ry="6.5" transform="rotate(120 24 24)" />
+    <circle cx="24" cy="24" r="2.5" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-flask">
+
+    <path d="M 19 8 L 29 8 M 21 8 L 21 16 L 10 36 C 8.5 39, 11 41, 14 41 L 34 41 C 37 41, 39.5 39, 38 36 L 27 16 L 27 8" />
+    <path d="M 14 33 C 18 31, 30 35, 34 33" />
+    <circle cx="21" cy="27" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="27" cy="23" r="1.2" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-pencil">
+
+    <path d="M 12 36 L 9 40 L 13 37 Z" fill="currentColor" />
+    <path d="M 12 36 L 31 17 C 32.5 15.5, 35 15.5, 36.5 17 L 37.5 18 C 39 19.5, 39 22, 37.5 23.5 L 18 43 L 9 40 Z" />
+    <path d="M 28 20 L 34 26" />
+    <path d="M 15 33 L 21 39" />
+
+      </g>
+      <g id="ico-books_stack">
+
+    <rect x="8" y="29" width="32" height="9" rx="2" />
+    <path d="M 14 29 L 14 38" />
+    <rect x="10" y="19" width="30" height="9" rx="2" />
+    <path d="M 16 19 L 16 28" />
+    <rect x="7" y="9" width="33" height="9" rx="2" />
+    <path d="M 13 9 L 13 18" />
+    <path d="M 28 18 L 28 25 L 31 23 L 34 25 L 34 18" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-alarm_clock">
+
+    <circle cx="24" cy="26" r="14" />
+    <path d="M 24 17 L 24 26 L 31 26" />
+    <path d="M 13 12 L 9 8 M 35 12 L 39 8" />
+    <path d="M 14 38 L 10 42 M 34 38 L 38 42" />
+
+      </g>
+      <g id="ico-lightbulb">
+
+    <path d="M 15 20 C 15 14, 19 10, 24 10 C 29 10, 33 14, 33 20 C 33 24, 30 27, 28 30 L 28 34 L 20 34 L 20 30 C 18 27, 15 24, 15 20 Z" />
+    <path d="M 20 37 L 28 37" />
+    <path d="M 22 40 L 26 40" />
+    <path d="M 24 5 L 24 7" />
+    <path d="M 12 11 L 14 13" />
+    <path d="M 36 11 L 34 13" />
+
+      </g>
+      <g id="ico-globe">
+
+    <circle cx="23" cy="20" r="12" />
+    <ellipse cx="23" cy="20" rx="6" ry="12" />
+    <path d="M 11 20 L 35 20" />
+    <path d="M 23 6 C 33 6, 36 16, 36 24 C 36 31, 30 36, 21 36" />
+    <path d="M 21 36 L 21 42 M 14 42 L 28 42" />
+
+      </g>
+      <g id="ico-laptop">
+
+    <rect x="9" y="12" width="30" height="20" rx="2.5" />
+    <path d="M 5 36 L 43 36 C 44 36, 44 34, 43 33 L 39 32 L 9 32 L 5 33 C 4 34, 4 36, 5 36 Z" />
+    <path d="M 17 19 L 14 22 L 17 25" />
+    <path d="M 21 25 L 24 18" />
+    <path d="M 28 19 L 31 22 L 28 25" />
+
+      </g>
+      <g id="ico-coffee_mug">
+
+    <path d="M 11 17 L 13 35 C 13.5 39, 17 41, 23 41 C 29 41, 32.5 39, 33 35 L 35 17 Z" />
+    <path d="M 34 21 C 39 21, 41 24, 41 28 C 41 32, 38 34, 33 34" />
+    <path d="M 18 13 C 18 11, 20 10, 20 8" />
+    <path d="M 24 14 C 24 11, 26 10, 26 7" />
+    <path d="M 30 13 C 30 11, 32 10, 32 8" />
+
+      </g>
+      <g id="ico-compass">
+
+    <circle cx="24" cy="11" r="3" />
+    <path d="M 24 7 L 24 5" />
+    <path d="M 22 14 L 11 41" />
+    <path d="M 26 14 L 37 41" />
+    <path d="M 16 30 C 20 28, 28 28, 32 30" />
+    <circle cx="24" cy="29" r="1.2" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-bell">
+
+    <path d="M 24 8 C 17 8, 14 14, 14 23 L 11 34 L 37 34 L 34 23 C 34 14, 31 8, 24 8 Z" />
+    <path d="M 20 37 C 20 39, 22 41, 24 41 C 26 41, 28 39, 28 37" />
+    <path d="M 24 5 L 24 8" />
+
+      </g>
+      <g id="ico-paper_plane">
+
+    <path d="M 7 24 L 41 9 L 26 41 L 22 28 Z" />
+    <path d="M 22 28 L 41 9" />
+
+      </g>
+      <g id="ico-backpack">
+
+    <path d="M 16 14 C 16 10, 20 8, 24 8 C 28 8, 32 10, 32 14" />
+    <path d="M 12 18 C 12 15, 15 13, 19 13 L 29 13 C 33 13, 36 15, 36 18 L 37 36 C 37 40, 34 42, 30 42 L 18 42 C 14 42, 11 40, 11 36 Z" />
+    <rect x="16" y="26" width="16" height="11" rx="2" />
+    <path d="M 16 20 L 32 20" />
+
+      </g>
+      <g id="ico-clipboard">
+
+    <rect x="11" y="11" width="26" height="32" rx="3" />
+    <path d="M 19 11 L 19 8 C 19 7, 20 6, 21 6 L 27 6 C 28 6, 29 7, 29 8 L 29 11 Z" />
+    <path d="M 16 19 L 19 22 L 25 16" />
+    <path d="M 16 28 L 19 31 L 25 25" />
+    <path d="M 28 20 L 32 20 M 28 29 L 32 29" />
+
+      </g>
+      <g id="ico-calculator">
+
+    <rect x="11" y="7" width="26" height="35" rx="3" />
+    <rect x="15" y="11" width="18" height="8" rx="1.5" />
+    <circle cx="17" cy="25" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="24" cy="25" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="31" cy="25" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="31" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="24" cy="31" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="31" cy="31" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="37" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="24" cy="37" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="31" cy="37" r="1.5" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-grade_a_plus">
+
+    <circle cx="24" cy="24" r="16" />
+    <path d="M 16 31 L 21 16 L 26 31" />
+    <path d="M 18 26 L 24 26" />
+    <path d="M 29 22 L 35 22 M 32 19 L 32 25" stroke-width="2.5" />
+
+      </g>
+      <g id="ico-ruler_set">
+
+    <path d="M 8 10 L 38 40" stroke-width="3" stroke-linecap="square" />
+    <path d="M 13 13 L 16 10 M 18 18 L 21 15 M 23 23 L 26 20 M 28 28 L 31 25 M 33 33 L 36 30" stroke-width="1.5" />
+    <path d="M 12 38 L 34 38 L 12 16 Z" />
+    <path d="M 16 34 L 27 34 L 16 23 Z" stroke-width="1.4" />
+
+      </g>
+      <g id="ico-speech_bubble">
+
+    <path d="M 9 22 C 9 14, 15 9, 24 9 C 33 9, 39 14, 39 22 C 39 30, 33 35, 24 35 L 16 35 L 10 40 L 12 33 C 10 30, 9 26, 9 22 Z" />
+    <circle cx="18" cy="22" r="1.8" fill="currentColor" stroke="none" />
+    <circle cx="24" cy="22" r="1.8" fill="currentColor" stroke="none" />
+    <circle cx="30" cy="22" r="1.8" fill="currentColor" stroke="none" />
+
+      </g>
+      <g id="ico-dna">
+
+    <path d="M 16 9 C 22 15, 22 21, 16 27 C 10 33, 10 39, 16 45" />
+    <path d="M 32 9 C 26 15, 26 21, 32 27 C 38 33, 38 39, 32 45" />
+    <path d="M 18 12 L 30 12" />
+    <path d="M 19 24 L 29 24" />
+    <path d="M 18 36 L 30 36" />
+    <path d="M 17 43 L 31 43" />
+
+      </g>
+      <g id="ico-math_pi">
+
+    <path d="M 7 26 L 11 31 L 16 16 L 30 16" stroke-width="2.2" />
+    <path d="M 33 21 C 36 19, 41 19, 43 21" stroke-width="2" />
+    <path d="M 36 21 L 36 33 M 41 21 L 41 33" stroke-width="2" />
+
+      </g>
+      <g id="ico-magnifier">
+
+    <circle cx="21" cy="20" r="11" />
+    <path d="M 29 28 L 40 39" stroke-width="3" />
+    <path d="M 17 15 C 19 13, 23 13, 25 15" stroke-width="1.5" />
+
+      </g>
+      <g id="ico-notebook">
+
+    <rect x="14" y="9" width="25" height="32" rx="2.5" />
+    <path d="M 20 17 L 33 17 M 20 23 L 33 23 M 20 29 L 30 29" stroke-width="1.5" />
+    <circle cx="14" cy="13" r="2" />
+    <circle cx="14" cy="19" r="2" />
+    <circle cx="14" cy="25" r="2" />
+    <circle cx="14" cy="31" r="2" />
+    <circle cx="14" cy="37" r="2" />
+
+      </g>
+    </defs>
+    <use href="#ico-book" transform="translate(9.600000000000001, 9.600000000000001) scale(0.85) rotate(-12 24 24)" />
+    <use href="#ico-grad_cap" transform="translate(69.6, 9.600000000000001) scale(0.85) rotate(15 24 24)" />
+    <use href="#ico-microscope" transform="translate(129.6, 9.600000000000001) scale(0.85) rotate(-8 24 24)" />
+    <use href="#ico-atom" transform="translate(189.6, 9.600000000000001) scale(0.85) rotate(18 24 24)" />
+    <use href="#ico-flask" transform="translate(249.6, 9.600000000000001) scale(0.85) rotate(-14 24 24)" />
+    <use href="#ico-coffee_mug" transform="translate(309.6, 9.600000000000001) scale(0.85) rotate(12 24 24)" />
+    <use href="#ico-pencil" transform="translate(-20.4, 69.6) scale(0.85) rotate(22 24 24)" />
+    <use href="#ico-pencil" transform="translate(339.6, 69.6) scale(0.85) rotate(22 24 24)" />
+    <use href="#ico-books_stack" transform="translate(39.6, 69.6) scale(0.85) rotate(-10 24 24)" />
+    <use href="#ico-alarm_clock" transform="translate(99.6, 69.6) scale(0.85) rotate(12 24 24)" />
+    <use href="#ico-lightbulb" transform="translate(159.6, 69.6) scale(0.85) rotate(-18 24 24)" />
+    <use href="#ico-globe" transform="translate(219.6, 69.6) scale(0.85) rotate(14 24 24)" />
+    <use href="#ico-compass" transform="translate(279.6, 69.6) scale(0.85) rotate(-12 24 24)" />
+    <use href="#ico-laptop" transform="translate(9.600000000000001, 129.6) scale(0.85) rotate(10 24 24)" />
+    <use href="#ico-bell" transform="translate(69.6, 129.6) scale(0.85) rotate(-15 24 24)" />
+    <use href="#ico-paper_plane" transform="translate(129.6, 129.6) scale(0.85) rotate(18 24 24)" />
+    <use href="#ico-backpack" transform="translate(189.6, 129.6) scale(0.85) rotate(-12 24 24)" />
+    <use href="#ico-clipboard" transform="translate(249.6, 129.6) scale(0.85) rotate(14 24 24)" />
+    <use href="#ico-calculator" transform="translate(309.6, 129.6) scale(0.85) rotate(-10 24 24)" />
+    <use href="#ico-grade_a_plus" transform="translate(-20.4, 189.6) scale(0.85) rotate(-16 24 24)" />
+    <use href="#ico-grade_a_plus" transform="translate(339.6, 189.6) scale(0.85) rotate(-16 24 24)" />
+    <use href="#ico-ruler_set" transform="translate(39.6, 189.6) scale(0.85) rotate(14 24 24)" />
+    <use href="#ico-speech_bubble" transform="translate(99.6, 189.6) scale(0.85) rotate(-8 24 24)" />
+    <use href="#ico-dna" transform="translate(159.6, 189.6) scale(0.85) rotate(16 24 24)" />
+    <use href="#ico-math_pi" transform="translate(219.6, 189.6) scale(0.85) rotate(-14 24 24)" />
+    <use href="#ico-magnifier" transform="translate(279.6, 189.6) scale(0.85) rotate(15 24 24)" />
+    <use href="#ico-notebook" transform="translate(9.600000000000001, 249.6) scale(0.85) rotate(12 24 24)" />
+    <use href="#ico-flask" transform="translate(69.6, 249.6) scale(0.85) rotate(-16 24 24)" />
+    <use href="#ico-book" transform="translate(129.6, 249.6) scale(0.85) rotate(14 24 24)" />
+    <use href="#ico-atom" transform="translate(189.6, 249.6) scale(0.85) rotate(-10 24 24)" />
+    <use href="#ico-alarm_clock" transform="translate(249.6, 249.6) scale(0.85) rotate(15 24 24)" />
+    <use href="#ico-pencil" transform="translate(309.6, 249.6) scale(0.85) rotate(-18 24 24)" />
+    <use href="#ico-coffee_mug" transform="translate(-20.4, 309.6) scale(0.85) rotate(16 24 24)" />
+    <use href="#ico-coffee_mug" transform="translate(339.6, 309.6) scale(0.85) rotate(16 24 24)" />
+    <use href="#ico-microscope" transform="translate(39.6, 309.6) scale(0.85) rotate(-12 24 24)" />
+    <use href="#ico-grad_cap" transform="translate(99.6, 309.6) scale(0.85) rotate(14 24 24)" />
+    <use href="#ico-laptop" transform="translate(159.6, 309.6) scale(0.85) rotate(-15 24 24)" />
+    <use href="#ico-globe" transform="translate(219.6, 309.6) scale(0.85) rotate(12 24 24)" />
+    <use href="#ico-backpack" transform="translate(279.6, 309.6) scale(0.85) rotate(-14 24 24)" />
+    <path d="M 30 27 Q 30 30 33 30 Q 30 30 30 33 Q 30 30 27 30 Q 30 30 30 27 Z" stroke-width="1.2" />
+    <circle cx="90" cy="30" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 150 27 Q 150 30 153 30 Q 150 30 150 33 Q 150 30 147 30 Q 150 30 150 27 Z" stroke-width="1.2" />
+    <circle cx="210" cy="30" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 270 27 Q 270 30 273 30 Q 270 30 270 33 Q 270 30 267 30 Q 270 30 270 27 Z" stroke-width="1.2" />
+    <circle cx="330" cy="30" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="0" cy="90" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 60 87 Q 60 90 63 90 Q 60 90 60 93 Q 60 90 57 90 Q 60 90 60 87 Z" stroke-width="1.2" />
+    <circle cx="120" cy="90" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 180 87 Q 180 90 183 90 Q 180 90 180 93 Q 180 90 177 90 Q 180 90 180 87 Z" stroke-width="1.2" />
+    <circle cx="240" cy="90" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 300 87 Q 300 90 303 90 Q 300 90 300 93 Q 300 90 297 90 Q 300 90 300 87 Z" stroke-width="1.2" />
+    <path d="M 30 147 Q 30 150 33 150 Q 30 150 30 153 Q 30 150 27 150 Q 30 150 30 147 Z" stroke-width="1.2" />
+    <circle cx="90" cy="150" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 150 147 Q 150 150 153 150 Q 150 150 150 153 Q 150 150 147 150 Q 150 150 150 147 Z" stroke-width="1.2" />
+    <circle cx="210" cy="150" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 270 147 Q 270 150 273 150 Q 270 150 270 153 Q 270 150 267 150 Q 270 150 270 147 Z" stroke-width="1.2" />
+    <circle cx="330" cy="150" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="0" cy="210" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 60 207 Q 60 210 63 210 Q 60 210 60 213 Q 60 210 57 210 Q 60 210 60 207 Z" stroke-width="1.2" />
+    <circle cx="120" cy="210" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 180 207 Q 180 210 183 210 Q 180 210 180 213 Q 180 210 177 210 Q 180 210 180 207 Z" stroke-width="1.2" />
+    <circle cx="240" cy="210" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 300 207 Q 300 210 303 210 Q 300 210 300 213 Q 300 210 297 210 Q 300 210 300 207 Z" stroke-width="1.2" />
+    <path d="M 30 267 Q 30 270 33 270 Q 30 270 30 273 Q 30 270 27 270 Q 30 270 30 267 Z" stroke-width="1.2" />
+    <circle cx="90" cy="270" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 150 267 Q 150 270 153 270 Q 150 270 150 273 Q 150 270 147 270 Q 150 270 150 267 Z" stroke-width="1.2" />
+    <circle cx="210" cy="270" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 270 267 Q 270 270 273 270 Q 270 270 270 273 Q 270 270 267 270 Q 270 270 270 267 Z" stroke-width="1.2" />
+    <circle cx="330" cy="270" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="0" cy="330" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 60 327 Q 60 330 63 330 Q 60 330 60 333 Q 60 330 57 330 Q 60 330 60 327 Z" stroke-width="1.2" />
+    <circle cx="120" cy="330" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 180 327 Q 180 330 183 330 Q 180 330 180 333 Q 180 330 177 330 Q 180 330 180 327 Z" stroke-width="1.2" />
+    <circle cx="240" cy="330" r="1.5" fill="currentColor" stroke="none" />
+    <path d="M 300 327 Q 300 330 303 330 Q 300 330 300 333 Q 300 330 297 330 Q 300 330 300 327 Z" stroke-width="1.2" />
+  </g>
+</svg>

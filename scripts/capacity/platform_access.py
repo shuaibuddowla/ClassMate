@@ -16,7 +16,16 @@ def access_token():
  finally:ctypes.windll.advapi32.CredFree(ptr)
 def management(path,method='GET',body=None):
  req=urllib.request.Request('https://api.supabase.com/v1/'+path,data=json.dumps(body).encode() if body is not None else None,method=method,headers={'Authorization':'Bearer '+access_token(),'Content-Type':'application/json'})
- with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
+ for attempt in range(3):
+  try:
+   with urllib.request.urlopen(req,timeout=45) as r:return json.load(r)
+  except urllib.error.HTTPError as e:
+   err_body = e.read().decode('utf-8', errors='ignore')
+   print(f"Supabase Management API Error ({e.code}): {err_body}")
+   raise
+  except Exception as e:
+   if attempt == 2: raise
+   import time; time.sleep(1)
 
 STAGING="qpryxvunhebwljlwmggk"
 PRODUCTION="cbskpifgbdbgdmnnxfrh"

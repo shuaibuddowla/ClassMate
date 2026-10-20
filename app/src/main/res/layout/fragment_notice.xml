@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/cm_background">
+    android:background="@drawable/bg_notice_chat_wallpaper">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -319,32 +319,30 @@
 
                     <FrameLayout
                         android:id="@+id/btnSearch"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_library_icon_button"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_notice_search_icon_button"
                         android:clickable="true"
                         android:focusable="true">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/hint_notice_search"
                             android:src="@drawable/ic_search_modern"
-                            app:tint="@color/cm_text_secondary" />
+                            app:tint="@color/cm_text_primary" />
                     </FrameLayout>
 
                     <TextView
                         android:id="@+id/btnPostNotice"
                         android:layout_width="wrap_content"
-                        android:layout_height="44dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="8dp"
-                        android:background="@drawable/bg_notice_action_pill"
-                        android:backgroundTint="@color/cm_primary"
+                        android:background="@drawable/bg_notice_post_pill"
                         android:gravity="center"
-                        android:minWidth="76dp"
-                        android:paddingHorizontal="15dp"
+                        android:paddingHorizontal="16dp"
                         android:text="+ Post"
                         android:textColor="@color/cm_on_primary"
                         android:textSize="13sp"

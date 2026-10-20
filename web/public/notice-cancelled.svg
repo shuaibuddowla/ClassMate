@@ -1,1 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><path fill="#8DB9F4" d="M14,15h52a5,5 0,0 1,5 5v46a5,5 0,0 1,-5 5H14a5,5 0,0 1,-5 -5V20a5,5 0,0 1,5 -5z" /><path fill="#76A9ED" d="M14,15h52a5,5 0,0 1,5 5v12H9V20a5,5 0,0 1,5 -5z" /><path fill="#5D8DD6" d="M22,7h6v18h-6zM52,7h6v18h-6z" /><path fill="none" stroke="#4C7FD1" stroke-width="6" stroke-linecap="round" d="M30,43l20,20M50,43L30,63" /></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
+  <!-- Soft drop shadow / ambient glow under the calendar -->
+  <rect x="17" y="21" width="46" height="48" rx="12" fill="#ef4444" fill-opacity="0.12" />
+
+  <!-- Calendar Page Base (clean portrait container: 46w x 50h) -->
+  <rect x="17" y="16" width="46" height="50" rx="10" fill="#ffffff" stroke="#fecaca" stroke-width="1.8" />
+
+  <!-- Calendar Header Bar with gradient red -->
+  <defs>
+    <linearGradient id="calCancelHeader" x1="17" y1="16" x2="63" y2="29" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="41" y1="41" x2="67" y2="67" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#b91c1c" />
+    </linearGradient>
+    <filter id="badgeShadow" x="37" y="37" width="34" height="34" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#7f1d1d" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Top Header Ribbon -->
+  <path d="M17 26 C17 20.477 21.477 16 27 16 L53 16 C58.523 16 63 20.477 63 26 L63 29 L17 29 Z" fill="url(#calCancelHeader)" />
+
+  <!-- Calendar Binder Rings (Metallic Spiral Pins) -->
+  <rect x="25" y="11" width="4.5" height="11" rx="2.25" fill="#fca5a5" stroke="#ffffff" stroke-width="1.2" />
+  <rect x="50.5" y="11" width="4.5" height="11" rx="2.25" fill="#fca5a5" stroke="#ffffff" stroke-width="1.2" />
+
+  <!-- Calendar Date Rows / Schedule Lines -->
+  <circle cx="25" cy="37" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="37" r="2" fill="#cbd5e1" />
+  <circle cx="43" cy="37" r="2" fill="#cbd5e1" />
+  <circle cx="52" cy="37" r="2" fill="#cbd5e1" />
+
+  <circle cx="25" cy="46" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="46" r="2" fill="#cbd5e1" />
+  <circle cx="43" cy="46" r="2" fill="#cbd5e1" />
+
+  <circle cx="25" cy="55" r="2" fill="#cbd5e1" />
+  <circle cx="34" cy="55" r="2" fill="#cbd5e1" />
+
+  <!-- Floating Cancellation / Off-Duty Badge on bottom-right corner -->
+  <g filter="url(#badgeShadow)">
+    <circle cx="54" cy="54" r="13" fill="url(#badgeGrad)" stroke="#ffffff" stroke-width="2.2" />
+    <path d="M48.5 48.5 L59.5 59.5 M59.5 48.5 L48.5 59.5" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" />
+  </g>
+</svg>

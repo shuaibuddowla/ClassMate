@@ -11,12 +11,9 @@ import {
   Trash2,
   Clock3,
   Building2,
-  QrCode,
-  ScanLine,
 } from "lucide-react";
 import { supabase, rpc, rows, type Row } from "@/lib/api";
 import { AttendanceTeacherModal } from "./attendance-teacher-modal";
-import { AttendanceScannerModal } from "./attendance-scanner-modal";
 import StudentAttendanceDashboard from "./student-attendance";
 import { useAcademic } from "@/lib/queries";
 import {
@@ -76,10 +73,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
       sessionId?: string;
       courseTitle: string;
       courseCode?: string;
-    } | null>(null),
-    [studentScanner, setStudentScanner] = useState<{
-      sessionId?: string;
-      courseTitle: string;
     } | null>(null);
   const qc = useQueryClient();
 
@@ -613,39 +606,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             : sessionCounts.data?.[slotSession.id] || 0)
                         : 0;
 
-                      const isAttendanceEnabled = Boolean(
-                        detail?.attendance_enabled ?? s.course?.attendance_enabled
-                      );
-
-                      let showAttendanceStrip = false;
-                      let stripType: "teacher_start" | "teacher_live" | "student_scan" =
-                        "teacher_start";
-                      let stripText = "";
-
-                      if (isAttendanceEnabled && showAttendance) {
-                        if (isTeacherViewer) {
-                          if (hasOpenSession) {
-                            showAttendanceStrip = true;
-                            stripType = "teacher_live";
-                            stripText = `Attendance Live · ${presentCount} present`;
-                          } else if (isLive || (isToday && !detail?.cancelled && !closed)) {
-                            showAttendanceStrip = true;
-                            stripType = "teacher_start";
-                            stripText = "Take Attendance";
-                          }
-                        } else {
-                          if (hasOpenSession) {
-                            showAttendanceStrip = true;
-                            stripType = "student_scan";
-                            stripText = "Scan Attendance";
-                          } else if (isAdmin && (isLive || (isToday && !detail?.cancelled && !closed))) {
-                            showAttendanceStrip = true;
-                            stripType = "teacher_start";
-                            stripText = "Take Attendance";
-                          }
-                        }
-                      }
-
                       if (mode === "bus") {
                         return (
                           <button
@@ -754,63 +714,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                               </small>
                             </div>
                           </div>
-
-                          {showAttendanceStrip && (
-                            <button
-                              type="button"
-                              className={`attendance-bottom-strip strip-${stripType}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (stripType === "student_scan") {
-                                  setStudentScanner({
-                                    sessionId: slotSession?.id,
-                                    courseTitle: s.course?.course_title || "Class",
-                                  });
-                                } else {
-                                  setTeacherAttendance({
-                                    slotId: s.id,
-                                    sessionId: slotSession?.id,
-                                    courseTitle: s.course?.course_title || "Class",
-                                    courseCode: s.course?.course_code,
-                                  });
-                                }
-                              }}
-                            >
-                              <span className="strip-content">
-                                {stripType === "teacher_start" && (
-                                  <QrCode size={15} className="strip-icon" />
-                                )}
-                                {stripType === "teacher_live" && (
-                                  <span className="strip-live-dot" />
-                                )}
-                                {stripType === "student_scan" && (
-                                  <ScanLine size={15} className="strip-icon" />
-                                )}
-                                <strong className="strip-title">{stripText}</strong>
-                              </span>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                {hasOpenSession && isAdmin && !isTeacherViewer && (
-                                  <span
-                                    role="button"
-                                    className="strip-manage-chip"
-                                    title="View / Manage Attendance Session"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setTeacherAttendance({
-                                        slotId: s.id,
-                                        sessionId: slotSession?.id,
-                                        courseTitle: s.course?.course_title || "Class",
-                                        courseCode: s.course?.course_code,
-                                      });
-                                    }}
-                                  >
-                                    Live QR ({presentCount})
-                                  </span>
-                                )}
-                                <span className="strip-hint">Tap to open →</span>
-                              </div>
-                            </button>
-                          )}
                         </div>
                       );
                     })}
@@ -1025,13 +928,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
             setTeacherAttendance(null);
             attendanceSessions.refetch();
           }}
-        />
-      )}
-      {studentScanner && (
-        <AttendanceScannerModal
-          initialSessionId={studentScanner.sessionId}
-          courseTitle={studentScanner.courseTitle}
-          onClose={() => setStudentScanner(null)}
         />
       )}
     </div>

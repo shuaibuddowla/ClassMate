@@ -51,6 +51,7 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvRfidCardStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
@@ -153,11 +154,12 @@
             android:padding="8dp" />
 
         <TextView
+            android:id="@+id/tvRfidStationFooter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:gravity="center"
-            android:text="ℹ️ UI Preview · Live records will sync automatically once the RFID hardware API is connected."
+            android:text="Real-time attendance recorded via classroom RFID station"
             android:textColor="@color/cm_text_disabled"
             android:textSize="11sp" />
     </LinearLayout>

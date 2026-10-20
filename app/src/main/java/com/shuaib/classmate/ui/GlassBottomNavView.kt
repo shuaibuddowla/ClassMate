@@ -11,8 +11,8 @@ class GlassBottomNavView @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : BottomNavigationView(context, attrs, defStyleAttr) {
     init {
-        // Selection is communicated by icon/text color, without an animated fill.
-        isItemActiveIndicatorEnabled = false
+        // Selection is communicated by a soft translucent pill indicator and icon color.
+        isItemActiveIndicatorEnabled = true
         itemRippleColor = null
     }
     override fun getMaxItemCount(): Int = 6

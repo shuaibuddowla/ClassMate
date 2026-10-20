@@ -811,68 +811,8 @@ internal class ClassMateAcademicScreensSupabase(
                 val isAttendanceEnabled = (detail?.optBoolean("attendance_enabled") == true || isTeacherViewer || isAdminViewer) && batchAttendanceAllowed
 
                 val strip = card.findViewById<View>(R.id.layoutAttendanceStrip)
-                val stripText = card.findViewById<TextView>(R.id.tvAttendanceStripText)
-                val stripIcon = card.findViewById<ImageView>(R.id.ivAttendanceStripIcon)
-                val stripAction = card.findViewById<TextView>(R.id.tvAttendanceStripAction)
-
-                if (strip != null && stripText != null && stripIcon != null) {
-                    if (isAdminViewer || isTeacherViewer) {
-                        if (hasOpenSession) {
-                            strip.visibility = View.VISIBLE
-                            strip.setBackgroundColor(android.graphics.Color.parseColor("#1410B981"))
-                            stripText.setTextColor(android.graphics.Color.parseColor("#10B981"))
-                            stripText.text = "Attendance Live · Tap to manage"
-                            stripAction?.setTextColor(android.graphics.Color.parseColor("#10B981"))
-                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#10B981"))
-                            strip.setOnClickListener {
-                                val intent = Intent(activity, ClassMateTeacherLiveAttendanceActivity::class.java).apply {
-                                    putExtra("EXTRA_SLOT_ID", slotId)
-                                    putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
-                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
-                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
-                                }
-                                activity.startActivity(intent)
-                            }
-                        } else if (isAttendanceEnabled && (isLive || (isToday && !cancelled))) {
-                            strip.visibility = View.VISIBLE
-                            strip.setBackgroundColor(android.graphics.Color.parseColor("#147C3AED"))
-                            stripText.setTextColor(android.graphics.Color.parseColor("#7C3AED"))
-                            stripText.text = "Take Attendance"
-                            stripAction?.setTextColor(android.graphics.Color.parseColor("#7C3AED"))
-                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#7C3AED"))
-                            strip.setOnClickListener {
-                                val intent = Intent(activity, ClassMateTeacherLiveAttendanceActivity::class.java).apply {
-                                    putExtra("EXTRA_SLOT_ID", slotId)
-                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
-                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
-                                }
-                                activity.startActivity(intent)
-                            }
-                        } else {
-                            strip.visibility = View.GONE
-                        }
-                    } else if (isStudentViewer) {
-                        if (hasOpenSession) {
-                            strip.visibility = View.VISIBLE
-                            strip.setBackgroundColor(android.graphics.Color.parseColor("#142563EB"))
-                            stripText.setTextColor(android.graphics.Color.parseColor("#2563EB"))
-                            stripText.text = "Scan Attendance"
-                            stripAction?.setTextColor(android.graphics.Color.parseColor("#2563EB"))
-                            stripIcon.setColorFilter(android.graphics.Color.parseColor("#2563EB"))
-                            strip.setOnClickListener {
-                                val intent = Intent(activity, ClassMateStudentAttendanceScannerActivity::class.java).apply {
-                                    putExtra("EXTRA_SESSION_ID", slotSession?.optString("id"))
-                                    putExtra("EXTRA_COURSE_TITLE", names[courseId] ?: "Class")
-                                    putExtra("EXTRA_COURSE_CODE", codes[courseId] ?: "")
-                                }
-                                activity.startActivity(intent)
-                            }
-                        } else {
-                            strip.visibility = View.GONE
-                        }
-                    } else {
-                        strip.visibility = View.GONE
-                    }
+                if (strip != null) {
+                    strip.visibility = View.GONE
                 }
             }
             if (!requestedBusMode && !calendarMode && !attendanceMode && isAttendanceBatchAllowed()) {
@@ -1133,8 +1073,7 @@ internal class ClassMateAcademicScreensSupabase(
                 }
                 card.v<View>(R.id.noticeCardSurface).setBackgroundResource(background)
                 card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).setImageResource(icon)
-                card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).imageTintList =
-                    if (resourceNotice) null else android.content.res.ColorStateList.valueOf(activity.getColor(accent))
+                card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).imageTintList = null
                 card.v<View>(R.id.noticeAccent).backgroundTintList =
                     android.content.res.ColorStateList.valueOf(activity.getColor(accent))
                 val source = title + "\n" + item.optString("body")
@@ -1491,11 +1430,47 @@ internal class ClassMateAcademicScreensSupabase(
         state.put(ownKey, enabled)
         state.put("like_count", (oldCount + if (enabled) 1 else -1).coerceAtLeast(0))
         text(card, R.id.tvLikeCount, compactCount(state.optLong("like_count")))
-        card.v<android.widget.ImageView>(R.id.ivLikeIcon).setImageResource(
+        val heart = card.v<android.widget.ImageView>(R.id.ivLikeIcon)
+        heart.setImageResource(
             if (enabled) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline)
-        card.v<android.widget.ImageView>(R.id.ivLikeIcon).imageTintList =
+        heart.imageTintList =
             android.content.res.ColorStateList.valueOf(activity.getColor(
                 if (enabled) R.color.cm_notice_like else R.color.cm_text_muted))
+        (heart.parent as? ViewGroup)?.clipChildren = false
+        (heart.parent as? ViewGroup)?.clipToPadding = false
+        val cx = if (heart.width > 0) heart.width / 2f else 10f * activity.resources.displayMetrics.density
+        val cy = if (heart.height > 0) heart.height / 2f else 10f * activity.resources.displayMetrics.density
+        heart.pivotX = cx
+        heart.pivotY = cy
+        if (enabled) {
+            heart.animate().cancel()
+            heart.scaleX = 0.2f
+            heart.scaleY = 0.2f
+            heart.alpha = 0.8f
+            heart.animate()
+                .scaleX(1.35f)
+                .scaleY(1.35f)
+                .alpha(1f)
+                .setDuration(160)
+                .setInterpolator(android.view.animation.OvershootInterpolator(3.5f))
+                .withEndAction {
+                    heart.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(120)
+                        .setInterpolator(android.view.animation.DecelerateInterpolator())
+                        .start()
+                }.start()
+        } else {
+            heart.animate().cancel()
+            heart.scaleX = 0.8f
+            heart.scaleY = 0.8f
+            heart.animate()
+                .scaleX(1.0f)
+                .scaleY(1.0f)
+                .setDuration(150)
+                .start()
+        }
         launch(root) {
             runCatching {
                 val row = JSONObject().put("profile_id", profile().getString("id"))
@@ -1616,6 +1591,11 @@ internal class ClassMateAcademicScreensSupabase(
             }.show()
     }
 
+    private var currentLibraryRoot: View? = null
+    fun triggerRfidAttendanceDialog() {
+        currentLibraryRoot?.let { showRfidAttendanceDialog(it) }
+    }
+
     private fun showRfidAttendanceDialog(root: View) {
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_rfid_attendance, null, false)
         val coursesView = dialogView.findViewById<LinearLayout>(R.id.layoutCoursesView)
@@ -1626,10 +1606,14 @@ internal class ClassMateAcademicScreensSupabase(
         val tvTableCode = dialogView.findViewById<TextView>(R.id.tvTableCourseCode)
         val tableContainer = dialogView.findViewById<LinearLayout>(R.id.tableRowsContainer)
 
-        val activeCourses = listOf(
-            Triple("CSE 2105", "Computer Organization & Architecture", "Theory"),
-            Triple("CSE 2102", "Data Structures & Algorithms Lab", "Lab")
-        )
+        val tvCardStatus = dialogView.findViewById<TextView>(R.id.tvRfidCardStatus)
+        val cardUid = profile().optString("rfid_card_uid").trim()
+        if (cardUid.isNotEmpty()) {
+            tvCardStatus?.text = "Card Enrolled: ••••${cardUid.takeLast(4).uppercase()} · Station Mode Active"
+            tvCardStatus?.setTextColor(activity.getColor(R.color.cm_success))
+        } else {
+            tvCardStatus?.text = "No card registered · Tap on classroom reader to pair"
+        }
 
         val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
             .setView(dialogView)
@@ -1637,21 +1621,27 @@ internal class ClassMateAcademicScreensSupabase(
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        fun renderTable(courseCode: String, courseTitle: String) {
-            tvTableTitle.text = courseTitle
-            tvTableCode.text = "$courseCode · Daily Attendance Log"
-            tableContainer.removeAllViews()
+        val density = activity.resources.displayMetrics.density
+        val padH = (12 * density).toInt()
+        val padV = (10 * density).toInt()
 
-            val density = activity.resources.displayMetrics.density
-            val padH = (12 * density).toInt()
-            val padV = (10 * density).toInt()
+        fun renderTable(course: JSONObject) {
+            val courseTitle = course.optString("course_title")
+            val courseCode = course.optString("course_code")
+            val attended = course.optInt("classes_attended")
+            val held = course.optInt("classes_held")
+            val percentage = course.optDouble("percentage")
+
+            tvTableTitle.text = courseTitle
+            tvTableCode.text = "$courseCode · Daily Attendance Log ($attended/$held classes · $percentage%)"
+            tableContainer.removeAllViews()
 
             val headerRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(padH, padV, padH, padV)
                 setBackgroundColor(activity.getColor(R.color.cm_surface_glass))
             }
-            val headers = listOf("Date" to 2.2f, "Class" to 1.5f, "Status" to 1.8f, "Time & Room" to 2.3f)
+            val headers = listOf("Date" to 2.2f, "Class" to 1.5f, "Status" to 1.8f, "Time & Reader" to 2.3f)
             headers.forEach { (text, weight) ->
                 val tv = TextView(activity).apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight)
@@ -1664,51 +1654,64 @@ internal class ClassMateAcademicScreensSupabase(
             }
             tableContainer.addView(headerRow)
 
-            val rows = listOf(
-                listOf("Oct 19, 2026\nMon", "Class #14", "Present", "10:04 AM\nRoom 304"),
-                listOf("Oct 14, 2026\nWed", "Class #13", "Present", "10:01 AM\nRoom 304"),
-                listOf("Oct 12, 2026\nMon", "Class #12", "Absent", "—"),
-                listOf("Oct 07, 2026\nWed", "Class #11", "Present", "09:58 AM\nRoom 304"),
-                listOf("Oct 05, 2026\nMon", "Class #10", "Present", "10:05 AM\nRoom 304")
-            )
+            val history = course.optJSONArray("history") ?: JSONArray()
+            if (history.length() == 0) {
+                val tvEmpty = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = (20 * density).toInt()
+                        bottomMargin = (20 * density).toInt()
+                    }
+                    text = "No individual records found for this course yet."
+                    gravity = android.view.Gravity.CENTER
+                    textSize = 12.5f
+                    setTextColor(activity.getColor(R.color.cm_text_muted))
+                }
+                tableContainer.addView(tvEmpty)
+            } else {
+                for (i in 0 until history.length()) {
+                    val record = history.getJSONObject(i)
+                    val dateStr = record.optString("date")
+                    val timeStr = record.optString("time")
+                    val roomStr = record.optString("room").ifBlank { "Station Reader" }
+                    val isPresent = record.optString("status").equals("present", ignoreCase = true)
+                    val classNum = "Class #${history.length() - i}"
 
-            rows.forEach { rowData ->
-                val row = LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    setPadding(padH, (8 * density).toInt(), padH, (8 * density).toInt())
-                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    val row = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(padH, (8 * density).toInt(), padH, (8 * density).toInt())
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                    }
+                    val tvDate = TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.2f)
+                        text = dateStr
+                        textSize = 11.5f
+                        setTextColor(activity.getColor(R.color.cm_text_primary))
+                    }
+                    val tvClass = TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.5f)
+                        text = classNum
+                        textSize = 11.5f
+                        setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    }
+                    val tvStatus = TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
+                        text = if (isPresent) "Present" else "Absent"
+                        textSize = 11f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        setTextColor(if (isPresent) activity.getColor(R.color.cm_success) else activity.getColor(R.color.cm_error))
+                    }
+                    val tvTime = TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.3f)
+                        text = if (timeStr.isNotBlank()) "$timeStr\n$roomStr" else "—"
+                        textSize = 10.5f
+                        setTextColor(activity.getColor(R.color.cm_text_muted))
+                    }
+                    row.addView(tvDate)
+                    row.addView(tvClass)
+                    row.addView(tvStatus)
+                    row.addView(tvTime)
+                    tableContainer.addView(row)
                 }
-                val tvDate = TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.2f)
-                    text = rowData[0]
-                    textSize = 11.5f
-                    setTextColor(activity.getColor(R.color.cm_text_primary))
-                }
-                val tvClass = TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.5f)
-                    text = rowData[1]
-                    textSize = 11.5f
-                    setTextColor(activity.getColor(R.color.cm_text_secondary))
-                }
-                val tvStatus = TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
-                    text = rowData[2]
-                    textSize = 11f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    val isPresent = rowData[2] == "Present"
-                    setTextColor(if (isPresent) activity.getColor(R.color.cm_success) else activity.getColor(R.color.cm_error))
-                }
-                val tvTime = TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.3f)
-                    text = rowData[3]
-                    textSize = 11f
-                    setTextColor(activity.getColor(R.color.cm_text_secondary))
-                }
-                row.addView(tvDate)
-                row.addView(tvClass)
-                row.addView(tvStatus)
-                row.addView(tvTime)
-                tableContainer.addView(row)
             }
 
             coursesView.visibility = View.GONE
@@ -1720,101 +1723,184 @@ internal class ClassMateAcademicScreensSupabase(
             coursesView.visibility = View.VISIBLE
         }
 
-        val density = activity.resources.displayMetrics.density
         coursesContainer.removeAllViews()
-        activeCourses.forEach { (code, title, type) ->
-            val card = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = (10 * density).toInt()
+        val progress = android.widget.ProgressBar(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                topMargin = (20 * density).toInt()
+            }
+        }
+        coursesContainer.addView(progress)
+
+        fun populateCourseCards(coursesList: List<JSONObject>) {
+            coursesContainer.removeAllViews()
+            if (coursesList.isEmpty()) {
+                val tvEmpty = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = (24 * density).toInt()
+                        bottomMargin = (24 * density).toInt()
+                    }
+                    text = "No attendance sessions recorded yet for your courses."
+                    gravity = android.view.Gravity.CENTER
+                    textSize = 13f
+                    setTextColor(activity.getColor(R.color.cm_text_muted))
                 }
-                setBackgroundResource(R.drawable.bg_library_card)
-                setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
-                isClickable = true
-                isFocusable = true
-                foreground = android.util.TypedValue().let { tv ->
-                    activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
-                    activity.getDrawable(tv.resourceId)
-                }
-                setOnClickListener {
-                    renderTable(code, title)
-                }
+                coursesContainer.addView(tvEmpty)
+                return
             }
 
-            val topRow = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
-            val badge = TextView(activity).apply {
-                text = "RFID ACTIVE"
-                textSize = 9.5f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setTextColor(activity.getColor(R.color.cm_success))
-                setBackgroundResource(R.drawable.bg_badge_green)
-                setPadding((6 * density).toInt(), (2 * density).toInt(), (6 * density).toInt(), (2 * density).toInt())
-            }
-            val tvType = TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    marginStart = (8 * density).toInt()
-                }
-                text = type
-                textSize = 10.5f
-                setTextColor(activity.getColor(R.color.cm_text_secondary))
-            }
-            topRow.addView(badge)
-            topRow.addView(tvType)
-            card.addView(topRow)
+            coursesList.forEach { course ->
+                val code = course.optString("course_code")
+                val title = course.optString("course_title")
+                val type = course.optString("course_type").uppercase()
+                val attended = course.optInt("classes_attended")
+                val held = course.optInt("classes_held")
+                val percentage = course.optDouble("percentage")
 
-            val tvTitle = TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = (6 * density).toInt()
+                val card = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = (10 * density).toInt()
+                    }
+                    setBackgroundResource(R.drawable.bg_library_card)
+                    setPadding((14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt(), (14 * density).toInt())
+                    isClickable = true
+                    isFocusable = true
+                    foreground = android.util.TypedValue().let { tv ->
+                        activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                        activity.getDrawable(tv.resourceId)
+                    }
+                    setOnClickListener {
+                        renderTable(course)
+                    }
                 }
-                text = title
-                textSize = 13.5f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setTextColor(activity.getColor(R.color.cm_text_primary))
-            }
-            card.addView(tvTitle)
 
-            val bottomRow = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = (6 * density).toInt()
+                val topRow = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                val badge = TextView(activity).apply {
+                    text = "RFID ACTIVE"
+                    textSize = 9.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(activity.getColor(R.color.cm_success))
+                    setBackgroundResource(R.drawable.bg_badge_green)
+                    setPadding((6 * density).toInt(), (2 * density).toInt(), (6 * density).toInt(), (2 * density).toInt())
+                }
+                val tvType = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        marginStart = (8 * density).toInt()
+                    }
+                    text = type
+                    textSize = 10.5f
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                }
+                val tvStats = TextView(activity).apply {
+                    text = "$attended/$held ($percentage%)"
+                    textSize = 11f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(activity.getColor(if (percentage >= 75.0) R.color.cm_success else R.color.cm_warning))
+                }
+                topRow.addView(badge)
+                topRow.addView(tvType)
+                topRow.addView(tvStats)
+                card.addView(topRow)
+
+                val tvTitle = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = (6 * density).toInt()
+                    }
+                    text = title
+                    textSize = 13.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(activity.getColor(R.color.cm_text_primary))
+                }
+                card.addView(tvTitle)
+
+                val bottomRow = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = (6 * density).toInt()
+                    }
+                }
+                val tvCode = TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    text = code
+                    textSize = 11.5f
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                }
+                val tvLog = TextView(activity).apply {
+                    text = "View Daily Log ›"
+                    textSize = 11.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(activity.getColor(R.color.cm_success))
+                }
+                bottomRow.addView(tvCode)
+                bottomRow.addView(tvLog)
+                card.addView(bottomRow)
+
+                coursesContainer.addView(card)
+            }
+        }
+
+        launch(dialogView) {
+            try {
+                val params = JSONObject().put("target_batch", batchId())
+                val res = ClassMateAuthApi.rpc("student_my_attendance", params)
+                val arr = res?.optJSONArray("courses") ?: JSONArray()
+                val activeList = mutableListOf<JSONObject>()
+                for (i in 0 until arr.length()) {
+                    val c = arr.getJSONObject(i)
+                    if (c.optInt("classes_held", 0) > 0) {
+                        activeList.add(c)
+                    }
+                }
+                if (active(dialogView)) {
+                    populateCourseCards(activeList)
+                }
+            } catch (_: Exception) {
+                if (active(dialogView)) {
+                    populateCourseCards(emptyList())
                 }
             }
-            val tvCode = TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                text = code
-                textSize = 11.5f
-                setTextColor(activity.getColor(R.color.cm_text_secondary))
-            }
-            val tvLog = TextView(activity).apply {
-                text = "View Daily Log ›"
-                textSize = 11.5f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setTextColor(activity.getColor(R.color.cm_success))
-            }
-            bottomRow.addView(tvCode)
-            bottomRow.addView(tvLog)
-            card.addView(bottomRow)
-
-            coursesContainer.addView(card)
         }
 
         dialog.show()
     }
 
     private fun setupLibrary(root: View) {
+        currentLibraryRoot = root
+        val canUpload = profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
         root.v<View>(R.id.btnUploadPdf).apply {
-            visibility = if (profile().optString("role") in setOf("admin", "teacher") ||
-                profile().optBoolean("is_cr")) View.VISIBLE else View.GONE
+            visibility = if (canUpload) View.VISIBLE else View.GONE
             setOnClickListener { onUpload() }
         }
         root.v<View>(R.id.cardAttendanceHero).setOnClickListener {
             showRfidAttendanceDialog(root)
         }
-        root.v<View>(R.id.btnLibrarySearch).setOnClickListener { searchLibrary(root) }
+        root.v<View>(R.id.btnLibrarySearch).setOnClickListener {
+            root.v<View>(R.id.titleColumn).visibility = View.GONE
+            root.v<View>(R.id.btnLibrarySearch).visibility = View.GONE
+            root.v<View>(R.id.btnUploadPdf).visibility = View.GONE
+            root.v<View>(R.id.librarySearchContainer).visibility = View.VISIBLE
+            val input = root.v<EditText>(R.id.etLibrarySearch)
+            input.requestFocus()
+            input.post {
+                (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as
+                    android.view.inputmethod.InputMethodManager).showSoftInput(input, 0)
+            }
+        }
+        root.v<View>(R.id.btnCloseLibrarySearch).setOnClickListener {
+            root.v<EditText>(R.id.etLibrarySearch).text.clear()
+            root.v<View>(R.id.librarySearchContainer).visibility = View.GONE
+            root.v<View>(R.id.titleColumn).visibility = View.VISIBLE
+            root.v<View>(R.id.btnLibrarySearch).visibility = View.VISIBLE
+            root.v<View>(R.id.btnUploadPdf).visibility = if (canUpload) View.VISIBLE else View.GONE
+            (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as
+                android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(root.windowToken, 0)
+            loadLibrary(root)
+        }
         root.v<View>(R.id.tvViewAll).setOnClickListener { showAllFiles() }
         root.v<EditText>(R.id.etLibrarySearch).addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -1904,7 +1990,7 @@ internal class ClassMateAcademicScreensSupabase(
                     val coursesJob = async { rows(ClassMateCourses.catalog(selectedBatch))
                         .associateBy { it.getString("id") } }
                     val filesJob = async { rows(ClassMateAuthApi.rows("file_metadata",
-                        "select=id,title,file_type,category,size_bytes,created_at,semester_course_id" +
+                        "select=id,title,file_type,category,size_bytes,created_at,semester_course_id,link_url" +
                             "&batch_id=eq.$selectedBatch&status=eq.active&order=created_at.desc&limit=100")) }
                     val favoritesJob = async { rows(ClassMateAuthApi.rows("file_favorites",
                         "select=file_id&profile_id=eq.${profile().getString("id")}"))
@@ -1994,7 +2080,22 @@ internal class ClassMateAcademicScreensSupabase(
         val fileId = file.getString("id")
         card.v<TextView>(R.id.tvTitle).text = ClassMateNoticeText.styled(card.v(R.id.tvTitle), file.optString("title"), root.v<EditText>(R.id.etLibrarySearch).text.toString().trim())
         text(card, R.id.tvSubject, file.optString("category").replaceFirstChar { it.uppercase() })
-        text(card, R.id.tvFileMeta, "${file.optLong("size_bytes") / 1024} KB")
+        val isLink = file.optString("file_type") == "link" || file.optString("link_url").isNotBlank()
+        text(card, R.id.tvFileMeta, if (isLink) "Google Drive" else "${file.optLong("size_bytes") / 1024} KB")
+        val tempPdf = com.shuaib.classmate.models.PdfFile(
+            id = fileId,
+            title = file.optString("title"),
+            fileType = file.optString("file_type").ifBlank { if (isLink) "link" else "pdf" },
+            materialType = file.optString("category"),
+            sizeBytes = file.optLong("size_bytes"),
+            driveUrl = file.optString("link_url")
+        )
+        val visuals = com.shuaib.classmate.utils.FileVisuals.getVisuals(tempPdf)
+        card.findViewById<View>(R.id.iconContainer)?.background = androidx.core.content.ContextCompat.getDrawable(card.context, visuals.backgroundRes)
+        card.findViewById<android.widget.ImageView>(R.id.ivFileIcon)?.apply {
+            setImageResource(visuals.iconRes)
+            setColorFilter(visuals.tint)
+        }
         card.v<android.widget.ImageView>(R.id.btnFavorite).apply {
             setImageResource(if (fileId in favorites) R.drawable.ic_star_filled else R.drawable.ic_star_outline)
             setOnClickListener {
@@ -2057,6 +2158,13 @@ internal class ClassMateAcademicScreensSupabase(
             .show()
     }
     private fun openFile(file: JSONObject) = launch(activity.window.decorView) {
+        val linkUrl = file.optString("link_url").trim()
+        if (linkUrl.isNotBlank()) {
+            val validUrl = if (linkUrl.startsWith("http://", true) || linkUrl.startsWith("https://", true)) linkUrl else "https://$linkUrl"
+            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(validUrl))) }
+                .onFailure { Toast.makeText(activity, it.message, Toast.LENGTH_SHORT).show() }
+            return@launch
+        }
         val url = ClassMateAuthApi.signedResource(file.getString("id"))
         activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
@@ -2138,6 +2246,24 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
+        val initialCanManageAttendance = isAdmin || cachedServerOwner
+        root.v<View>(R.id.cardProfileAttendance).apply {
+            visibility = if (initialCanManageAttendance) View.VISIBLE else View.GONE
+            root.v<View>(R.id.dividerProfileAttendance).visibility = visibility
+            if (initialCanManageAttendance) {
+                setOnClickListener {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    val intent = Intent(activity, ClassMateAdminAttendanceActivity::class.java).apply {
+                        putExtra("EXTRA_BATCH_ID", batchId())
+                        putExtra("EXTRA_BATCH_LABEL", effectiveBatch)
+                    }
+                    activity.startActivity(intent)
+                }
+            } else {
+                setOnClickListener(null)
+            }
+        }
+
         root.v<View>(R.id.cardProfileAi).apply {
             visibility = View.GONE
             root.v<View>(R.id.dividerProfileAi).visibility = View.GONE
@@ -2179,6 +2305,24 @@ internal class ClassMateAcademicScreensSupabase(
                         text(root, R.id.tvBatchAdminSub, if (isTeacher) "Assigned courses and teaching resources" else "Manage timetable, members and batch settings")
                         if (canManage) {
                             setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onManage() }
+                        } else {
+                            setOnClickListener(null)
+                        }
+                    }
+
+                    val canManageAttendance = isAdmin || isServerOwner
+                    root.v<View>(R.id.cardProfileAttendance).apply {
+                        visibility = if (canManageAttendance) View.VISIBLE else View.GONE
+                        root.v<View>(R.id.dividerProfileAttendance).visibility = visibility
+                        if (canManageAttendance) {
+                            setOnClickListener {
+                                com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                                val intent = Intent(activity, ClassMateAdminAttendanceActivity::class.java).apply {
+                                    putExtra("EXTRA_BATCH_ID", batchId())
+                                    putExtra("EXTRA_BATCH_LABEL", effectiveBatch)
+                                }
+                                activity.startActivity(intent)
+                            }
                         } else {
                             setOnClickListener(null)
                         }

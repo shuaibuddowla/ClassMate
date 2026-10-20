@@ -31,6 +31,7 @@ import {
   Info,
   Lock,
   QrCode,
+  Radio,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -51,6 +52,7 @@ import { enablePush, removePush, restorePush, syncPushIdentity } from "@/lib/pus
 const ClassMateAI = lazy(() => import("./classmate-ai"));
 const Manage = lazy(() => import("./manage"));
 const TeacherAttendance = lazy(() => import("./teacher-attendance"));
+const AdminAttendance = lazy(() => import("./admin-attendance"));
 export type Context = {
   user: string;
   profile: Row;
@@ -65,6 +67,7 @@ export type Context = {
   ai?: () => void;
   batches?: Row[];
   changeBatch?: (batch: string) => void;
+  manageAttendance?: () => void;
 };
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -862,6 +865,13 @@ function TabDeck({
           <ClassMateAI ctx={active} />
         </Suspense>
       );
+    if (value === "admin-attendance") {
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <AdminAttendance ctx={active} />
+        </Suspense>
+      );
+    }
     if (value === "attendance") {
       if (ctx.profile.role !== "teacher" || active.batchInfo?.attendance_enabled !== true) {
         return <Schedule ctx={active} />;
@@ -1025,6 +1035,7 @@ function Home({
         [
           "timetable",
           "attendance",
+          "admin-attendance",
           "notices",
           "library",
           "friends",
@@ -1033,8 +1044,14 @@ function Home({
           "ai",
         ].includes(targetTab)
       ) {
-        if (targetTab === "attendance" && (profile.role !== "teacher" || info.attendance_enabled !== true)) {
-          setTab("timetable");
+        if (targetTab === "attendance" || targetTab === "admin-attendance") {
+          if (profile.role === "admin" || owner.data === true) {
+            setTab("admin-attendance");
+          } else if (profile.role === "teacher" && info.attendance_enabled === true) {
+            setTab("attendance");
+          } else {
+            setTab("timetable");
+          }
         } else {
           setTab(targetTab);
         }
@@ -1067,7 +1084,7 @@ function Home({
       window.removeEventListener("hashchange", navigate);
       window.removeEventListener("popstate", navigate);
     };
-  }, [user, info.attendance_enabled]);
+  }, [user, info.attendance_enabled, profile.role, owner.data]);
   const ctx: Context = {
     user,
     profile,
@@ -1093,9 +1110,23 @@ function Home({
         setTab("profile");
       }
     },
+    manageAttendance: () => {
+      history.pushState({ classmateAttendance: true }, "", "/#attendance");
+      setTab("admin-attendance");
+    },
   };
   const isTeacher = profile.role === "teacher";
-  const destinations = [
+  const isAdmin = profile.role === "admin" || owner.data === true;
+  const desktopDestinations = [
+    ["timetable", "Timetable", CalendarDays],
+    ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
+    ...(isAdmin ? [["admin-attendance", "Manage Attendance", Radio] as const] : []),
+    ["notices", "Notices", Bell],
+    ["library", "Courses", BookOpen],
+    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
+    ["profile", "Settings", Settings],
+  ] as const;
+  const mobileDestinations = [
     ["timetable", "Timetable", CalendarDays],
     ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
@@ -1106,9 +1137,28 @@ function Home({
   const select = (value: string) => {
     if (value === tab) return;
     setTab(value);
-    history.replaceState({}, "", `/#${value === "friends" ? "batch" : value === "profile" ? "settings" : value === "library" ? "courses" : value}`);
+    history.replaceState(
+      {},
+      "",
+      `/#${
+        value === "friends"
+          ? "batch"
+          : value === "profile"
+          ? "settings"
+          : value === "library"
+          ? "courses"
+          : value === "admin-attendance"
+          ? "attendance"
+          : value
+      }`
+    );
   };
-  const navigationTab = tab === "ai" ? "profile" : desktop && tab === "notices" ? "timetable" : tab;
+  const navigationTab =
+    tab === "ai" || (!desktop && tab === "admin-attendance")
+      ? "profile"
+      : desktop && tab === "notices"
+      ? "timetable"
+      : tab;
   if(profile.role==="teacher" && !teacherEntered) return <main className="teacher-batch-picker"><section className="card">
     <OrbitLogo/><span className="eyebrow">TEACHER WORKSPACE</span><h1>Choose your classroom.</h1><p>Select an assigned batch to open your teaching workspace.</p>
     <ErrorBox error={batches.error} retry={()=>batches.refetch()}/>
@@ -1133,7 +1183,7 @@ function Home({
         </a>
         <span className="sidebar-label">Workspace</span>
         <nav aria-label="Desktop navigation">
-          {destinations.map(([value, label, Icon]) => (
+          {desktopDestinations.map(([value, label, Icon]) => (
             <button
               key={value}
               data-destination={value}
@@ -1242,7 +1292,7 @@ function Home({
         <AboutDeveloper user={user} close={() => setAboutDeveloper(false)} />
       )}
       <nav className="bottom-nav" aria-label="Main navigation">
-        {destinations.map(([value, label, Icon]) => (
+        {mobileDestinations.map(([value, label, Icon]) => (
           <button
             key={value}
             aria-current={navigationTab === value ? "page" : undefined}

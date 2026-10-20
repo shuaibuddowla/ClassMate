@@ -248,6 +248,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         revealAfterAuth = savedInstanceState?.getBoolean("identity_reveal") ?: false
         ClassMateAuthApi.attach(applicationContext)
         if (intent.getStringExtra("OPEN_TAB") == "notices") selectedTab = R.id.nav_notices
+        else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
         val cachedHome = if (ClassMateAuthApi.hasSavedSession()) ClassMateAcademicCache.home(this) else null
         if (cachedHome != null) {
             profile = cachedHome.optJSONObject("profile")
@@ -258,6 +259,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 // Render the last synced home first; revalidate the session in the background.
                 status = TextView(this); profileView = TextView(this); resultView = TextView(this); actions = LinearLayout(this)
                 showHome(); renderHomeTab(selectedTab)
+                if (intent.getBooleanExtra("OPEN_RFID_ATTENDANCE", false)) {
+                    window.decorView.post { academicScreens.triggerRfidAttendanceDialog() }
+                }
                 if (ClassMateAcademicCache.online(this)) {
                     reconnecting = true
                     lifecycleScope.launch {
@@ -1370,6 +1374,22 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private var unreadActivity: ClassMateUnreadActivity? = null
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val openTab = intent.getStringExtra("OPEN_TAB")
+        if (openTab == "notices") {
+            selectedTab = R.id.nav_notices
+            renderHomeTab(selectedTab)
+        } else if (openTab in setOf("library", "courses")) {
+            selectedTab = R.id.nav_pdf
+            renderHomeTab(selectedTab)
+            if (intent.getBooleanExtra("OPEN_RFID_ATTENDANCE", false)) {
+                window.decorView.post { academicScreens.triggerRfidAttendanceDialog() }
+            }
+        }
+    }
 
     override fun onResume() {
         super.onResume()

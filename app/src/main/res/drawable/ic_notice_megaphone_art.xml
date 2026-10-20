@@ -1,11 +1,46 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="80dp" android:height="80dp"
-    android:viewportWidth="80" android:viewportHeight="80">
-    <path android:fillColor="#FFA991F1" android:pathData="M47,16l20,-8v52l-20,-8z" />
-    <path android:fillColor="#FF8D72DE" android:pathData="M18,25h29v29H18a9,9 0,0 1,-9 -9V34a9,9 0,0 1,9 -9z" />
-    <path android:fillColor="#FF6F56C0" android:pathData="M23,54h15l6,19H29z" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFB9A7F5"
-        android:strokeWidth="3" android:strokeLineCap="round"
-        android:pathData="M70,25l6,-4M70,39h8M70,53l6,4" />
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <!-- Megaphone Handle -->
+    <path
+        android:fillColor="#FF4338CA"
+        android:pathData="M25,45 L33,63 C33.8,64.8 32.5,67 30.5,67 L26,67 C24.5,67 23.2,65.8 22.8,64.4 L18.5,48 Z" />
+
+    <!-- Megaphone Horn / Cone -->
+    <path
+        android:fillColor="#FF6366F1"
+        android:pathData="M24,28 L51,16 C53,15 55,16.5 55,18.8 L55,53.2 C55,55.5 53,57 51,56 L24,44 Z" />
+
+    <!-- Rear Housing / Chamber -->
+    <path
+        android:fillColor="#FFA5B4FC"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M13,33.5a6,6 0,0 1,6 -6h0a6,6 0,0 1,6 6v5a6,6 0,0 1,-6 6h0a6,6 0,0 1,-6 -6z" />
+
+    <!-- Front Acoustic Rim Flare -->
+    <path
+        android:fillColor="#FF818CF8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M53,36m-3.5,0a3.5,19.5 0,1 1,7 0a3.5,19.5 0,1 1,-7 0" />
+
+    <!-- Broadcast Sound Waves -->
+    <path
+        android:strokeColor="#FF818CF8"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M60,26 C64.5,30 64.5,42 60,46" />
+    <path
+        android:strokeColor="#FF6366F1"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M67,20 C74,27 74,45 67,52" />
+
+    <!-- Golden announcement sparkle -->
+    <path
+        android:fillColor="#FFFBBF24"
+        android:pathData="M68,14m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
 </vector>
