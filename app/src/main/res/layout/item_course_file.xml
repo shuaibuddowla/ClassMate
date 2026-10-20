@@ -28,7 +28,7 @@
             android:layout_gravity="center"
             android:contentDescription="File Type"
             android:src="@drawable/ic_file_pdf"
-            app:tint="#FF6B7A" />
+             />
 
         <TextView
             android:id="@+id/tvFileBadge"

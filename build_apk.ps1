@@ -1,3 +1,3 @@
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio2\jbr"
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 & ".\gradlew.bat" assembleDebug

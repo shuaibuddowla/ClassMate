@@ -1,9 +1,11 @@
 package com.shuaib.classmate.utils
 
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.view.View
 import android.widget.ImageView
 import androidx.core.content.ContextCompat
+import androidx.core.widget.ImageViewCompat
 import com.shuaib.classmate.R
 import com.shuaib.classmate.models.PdfFile
 
@@ -16,7 +18,8 @@ object FileVisuals {
     )
 
     fun isGoogleDrive(url: String?, provider: String? = null): Boolean {
-        val u = (url ?: "").lowercase()
+        val u = (url ?: "").trim().lowercase()
+        if (u.isBlank() || u == "null") return false
         return u.contains("drive.google.com") ||
                u.contains("docs.google.com") ||
                u.contains("google.com/drive") ||
@@ -29,7 +32,8 @@ object FileVisuals {
         val extension = fileName.substringAfterLast('.', "")
         val type = file.fileType.lowercase()
         val mime = file.mimeType.lowercase()
-        val url = (file.driveUrl.ifBlank { file.downloadUrl }).lowercase()
+        val rawUrl = file.driveUrl.ifBlank { file.downloadUrl }.trim()
+        val url = if (rawUrl.equals("null", ignoreCase = true)) "" else rawUrl.lowercase()
         val material = file.materialType.lowercase()
 
         // 1. Google Drive Links (pasted Google Drive URL)
@@ -91,8 +95,12 @@ object FileVisuals {
         imageView?.apply {
             setImageResource(visuals.iconRes)
             if (visuals.tint != 0) {
+                ImageViewCompat.setImageTintList(this, ColorStateList.valueOf(visuals.tint))
                 setColorFilter(visuals.tint)
             } else {
+                ImageViewCompat.setImageTintList(this, null)
+                imageTintList = null
+                colorFilter = null
                 clearColorFilter()
             }
         }

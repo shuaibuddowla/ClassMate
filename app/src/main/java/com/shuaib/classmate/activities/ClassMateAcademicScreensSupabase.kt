@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.doOnAttach
 import com.shuaib.classmate.services.ClassMateNoticeReminderScheduler
 import java.time.Instant
@@ -2189,7 +2190,8 @@ internal class ClassMateAcademicScreensSupabase(
         val fileId = file.getString("id")
         card.v<TextView>(R.id.tvTitle).text = ClassMateNoticeText.styled(card.v(R.id.tvTitle), file.optString("title"), root.v<EditText>(R.id.etLibrarySearch).text.toString().trim())
         text(card, R.id.tvSubject, file.optString("category").replaceFirstChar { it.uppercase() })
-        val linkUrl = file.optString("link_url")
+        val rawLink = file.optString("link_url").trim()
+        val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
         val isDrive = com.shuaib.classmate.utils.FileVisuals.isGoogleDrive(linkUrl)
         val isLink = file.optString("file_type") == "link" || linkUrl.isNotBlank()
         val metaText = when {
@@ -2275,15 +2277,55 @@ internal class ClassMateAcademicScreensSupabase(
             .show()
     }
     private fun openFile(file: JSONObject) = launch(activity.window.decorView) {
-        val linkUrl = file.optString("link_url").trim()
+        val rawLink = file.optString("link_url").trim()
+        val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
         if (linkUrl.isNotBlank()) {
             val validUrl = if (linkUrl.startsWith("http://", true) || linkUrl.startsWith("https://", true)) linkUrl else "https://$linkUrl"
-            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(validUrl))) }
-                .onFailure { Toast.makeText(activity, it.message, Toast.LENGTH_SHORT).show() }
+            val uri = Uri.parse(validUrl)
+            val opened = runCatching {
+                CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                    .apply {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    .launchUrl(activity, uri)
+                true
+            }.getOrElse { false }
+            if (!opened) {
+                runCatching {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }.onFailure {
+                    Toast.makeText(activity, "Unable to open link: ${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
             return@launch
         }
         val url = ClassMateAuthApi.signedResource(file.getString("id"))
-        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        if (url.isNotBlank()) {
+            val uri = Uri.parse(url)
+            val opened = runCatching {
+                CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                    .apply {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    .launchUrl(activity, uri)
+                true
+            }.getOrElse { false }
+            if (!opened) {
+                runCatching {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }.onFailure {
+                    Toast.makeText(activity, "Unable to open file: ${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun setupProfile(root: View) {

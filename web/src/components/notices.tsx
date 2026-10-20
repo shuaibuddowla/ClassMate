@@ -66,12 +66,17 @@ export function Notices({
       scrolled.current = true;
     };
     const root = scrollContainer?.current;
-    window.addEventListener("scroll", update, { passive: true });
-    root?.addEventListener("scroll", update, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", update);
-      root?.removeEventListener("scroll", update);
-    };
+    if (root) {
+      root.addEventListener("scroll", update, { passive: true });
+      return () => {
+        root.removeEventListener("scroll", update);
+      };
+    } else {
+      window.addEventListener("scroll", update, { passive: true });
+      return () => {
+        window.removeEventListener("scroll", update);
+      };
+    }
   }, [scrollContainer]);
   const permissions = useQuery({
     queryKey: [

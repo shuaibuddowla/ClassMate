@@ -15,7 +15,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="@drawable/bg_library_file_icon_red">
-        <ImageView android:id="@+id/ivFileIcon" android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_file_pdf" app:tint="#FF6B7A" />
+        <ImageView android:id="@+id/ivFileIcon" android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/ic_file_pdf"  />
         <TextView android:id="@+id/tvFileBadge" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="PDF" android:textColor="#DC2626" android:textSize="9sp" android:textStyle="bold" android:visibility="gone" />
     </FrameLayout>
 

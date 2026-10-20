@@ -63,8 +63,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
         aiRequest=state?.getString("ai_request"); aiText=state?.getString("ai_request_text").orEmpty()
         restoredAiDraft=state?.getString("ai_draft").orEmpty()
         aiHistory=org.json.JSONArray(state?.getString("ai_history") ?: "[]")
-        uploadMode = state?.getString("upload_mode") ?: "file"
-        restoredLinkUrl = state?.getString("link_url").orEmpty()
+        val editRawLink = editingFile?.optString("link_url")?.trim().orEmpty()
+        val sanitizedEditLink = if (editRawLink.isBlank() || editRawLink.equals("null", ignoreCase = true)) "" else editRawLink
+        val isEditingLink = editingFile?.optString("file_type") == "link" || sanitizedEditLink.isNotBlank()
+        uploadMode = state?.getString("upload_mode") ?: (if (isEditingLink) "link" else "file")
+        restoredLinkUrl = (state?.getString("link_url") ?: sanitizedEditLink).let {
+            if (it.isBlank() || it.equals("null", ignoreCase = true)) "" else it
+        }
         ClassMateAuthApi.attach(applicationContext)
         uri = state?.getString("file_uri")?.let(Uri::parse)
         selectedFileLabel = state?.getString("file_label").orEmpty()
@@ -80,7 +85,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
         }
-        val isEditingLink = editingFile?.optString("file_type") == "link" || !editingFile?.optString("link_url").isNullOrBlank()
         val toolbar = MaterialToolbar(this).apply {
             title = if (editingFile != null) (if (isEditingLink) "Edit drive link" else "Edit library file") else if (upload) "Add library file" else "Post notice"
             setTitleTextColor(getColor(R.color.cm_text_primary)); setNavigationIcon(R.drawable.ic_chevron_left)
@@ -232,7 +236,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
         if (courses.isEmpty()) { form.label("No active subject is available for uploading."); return }
 
         val isEditing = editingFile != null
-        val isEditingLink = isEditing && (editingFile!!.optString("file_type") == "link" || !editingFile!!.optString("link_url").isNullOrBlank())
+        val editRawLink = editingFile?.optString("link_url")?.trim().orEmpty()
+        val sanitizedEditLink = if (editRawLink.isBlank() || editRawLink.equals("null", ignoreCase = true)) "" else editRawLink
+        val isEditingLink = isEditing && (editingFile!!.optString("file_type") == "link" || sanitizedEditLink.isNotBlank())
         if (isEditing) {
             uploadMode = if (isEditingLink) "link" else "file"
         }
@@ -245,9 +251,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 if (!isLink) {
                     setBackgroundResource(R.drawable.bg_toggle_item_selected)
                     setTextColor(Color.WHITE)
+                    compoundDrawablesRelative[0]?.setTint(Color.WHITE)
                 } else {
                     background = null
-                    setTextColor(getColor(R.color.cm_text_secondary))
+                    val sec = getColor(R.color.cm_text_secondary)
+                    setTextColor(sec)
+                    compoundDrawablesRelative[0]?.setTint(sec)
                 }
             }
             btnDriveLink?.apply {
@@ -258,6 +267,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     background = null
                     setTextColor(getColor(R.color.cm_text_secondary))
                 }
+                compoundDrawablesRelative[0]?.setTintList(null)
             }
             if (!isEditing) {
                 submit.text = if (isLink) "Share Drive Link" else "Upload file"
@@ -275,17 +285,27 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 }
             }
             btnUploadFile = TextView(this).apply {
-                text = "Upload File"
+                text = " Upload File"
                 textSize = 12.5f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 gravity = android.view.Gravity.CENTER
+                val uploadIcon = androidx.core.content.ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)?.mutate()?.apply {
+                    setBounds(0, 0, dp(16), dp(16))
+                }
+                setCompoundDrawablesRelative(uploadIcon, null, null, null)
+                compoundDrawablePadding = dp(6)
                 layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
             }
             btnDriveLink = TextView(this).apply {
-                text = "Drive Link"
+                text = " Drive Link"
                 textSize = 12.5f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 gravity = android.view.Gravity.CENTER
+                val driveIcon = androidx.core.content.ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_google_drive)?.mutate()?.apply {
+                    setBounds(0, 0, dp(16), dp(16))
+                }
+                setCompoundDrawablesRelative(driveIcon, null, null, null)
+                compoundDrawablePadding = dp(6)
                 layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
             }
             toggle.addView(btnUploadFile)
@@ -311,7 +331,8 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setTextColor(getColor(R.color.cm_text_primary))
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            setText(editingFile?.optString("link_url") ?: restoredLinkUrl)
+            val initialUrl = restoredLinkUrl.ifBlank { sanitizedEditLink }
+            setText(if (initialUrl.equals("null", ignoreCase = true)) "" else initialUrl)
         }
         urlInput = urlField
         urlBox.addView(urlField)

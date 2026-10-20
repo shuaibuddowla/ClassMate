@@ -19,6 +19,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.browser.customtabs.CustomTabsIntent
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.databinding.ActivityClassmateCourseFilesBinding
@@ -223,15 +224,57 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
     }
 
     private fun openFile(file: JSONObject) = lifecycleScope.launch {
-        val linkUrl = file.optString("link_url").trim()
+        val rawLink = file.optString("link_url").trim()
+        val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
         if (linkUrl.isNotBlank()) {
             val validUrl = if (linkUrl.startsWith("http://", true) || linkUrl.startsWith("https://", true)) linkUrl else "https://$linkUrl"
-            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(validUrl))) }
-                .onFailure { Toast.makeText(this@ClassMateCourseFilesActivity, it.message, Toast.LENGTH_LONG).show() }
+            val uri = Uri.parse(validUrl)
+            val opened = runCatching {
+                CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                    .apply {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    .launchUrl(this@ClassMateCourseFilesActivity, uri)
+                true
+            }.getOrElse { false }
+            if (!opened) {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }.onFailure {
+                    Toast.makeText(this@ClassMateCourseFilesActivity, "Unable to open link: ${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
             return@launch
         }
         runCatching { ClassMateAuthApi.signedResource(file.getString("id")) }
-            .onSuccess { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+            .onSuccess { signedUrl ->
+                if (signedUrl.isNotBlank()) {
+                    val uri = Uri.parse(signedUrl)
+                    val opened = runCatching {
+                        CustomTabsIntent.Builder()
+                            .setShowTitle(true)
+                            .build()
+                            .apply {
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            .launchUrl(this@ClassMateCourseFilesActivity, uri)
+                        true
+                    }.getOrElse { false }
+                    if (!opened) {
+                        runCatching {
+                            startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        }.onFailure {
+                            Toast.makeText(this@ClassMateCourseFilesActivity, "Unable to open file: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
             .onFailure {
                 Toast.makeText(this@ClassMateCourseFilesActivity, it.message, Toast.LENGTH_LONG).show()
             }
@@ -292,7 +335,9 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 b.tvMaterialTag.isVisible = false
             }
 
-            val isLink = file.optString("file_type") == "link" || file.optString("link_url").isNotBlank()
+            val rawLink = file.optString("link_url").trim()
+            val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
+            val isLink = file.optString("file_type") == "link" || linkUrl.isNotBlank()
 
             // Visuals using FileVisuals
             val tempPdf = PdfFile(
@@ -301,7 +346,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 fileType = file.optString("file_type").ifBlank { if (isLink) "link" else "pdf" },
                 materialType = category,
                 sizeBytes = file.optLong("size_bytes"),
-                driveUrl = file.optString("link_url")
+                driveUrl = linkUrl
             )
             val visuals = FileVisuals.getVisuals(tempPdf)
             FileVisuals.applyVisuals(b.ivFileIcon, b.iconContainer, visuals)
@@ -311,7 +356,6 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             // Metadata: Size & Relative Date
             val metaParts = mutableListOf<String>()
             if (isLink) {
-                val linkUrl = file.optString("link_url")
                 metaParts.add(if (FileVisuals.isGoogleDrive(linkUrl)) "Google Drive" else "External Link")
             } else {
                 val formattedBytes = formatBytes(file.optLong("size_bytes"))
