@@ -316,6 +316,7 @@ internal class ClassMateAcademicScreensSupabase(
     private fun setNavigationShown(show: Boolean) {
         if (navShown == show) return
         navShown = show
+        (activity as? ClassMateAuthActivity)?.composeNavVisible = show
         val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
         nav.animate().cancel()
         nav.animate().translationY(if (show) 0f else

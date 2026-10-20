@@ -33,6 +33,7 @@ class ClassMateUnreadActivity(private val activity: AppCompatActivity,
     }
     fun clearNoticeBadge() {
         activity.findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.removeBadge(R.id.nav_notices)
+        (activity as? ClassMateAuthActivity)?.setComposeBadge(com.shuaib.classmate.ui.ClassMateTab.NOTICES, null)
     }
     fun refresh() {
         if (!enabled()) {
@@ -51,6 +52,13 @@ class ClassMateUnreadActivity(private val activity: AppCompatActivity,
                     if(count==0) nav.removeBadge(tab) else nav.getOrCreateBadge(tab).apply {
                         number=count; maxCharacterCount=3; isVisible=true
                         backgroundColor=0xFFD94B55.toInt(); badgeTextColor=android.graphics.Color.WHITE
+                    }
+                    val cmTab = com.shuaib.classmate.ui.ClassMateTab.fromId(tab)
+                    if (cmTab != null) {
+                        (activity as? ClassMateAuthActivity)?.setComposeBadge(
+                            cmTab,
+                            if (count > 0) com.shuaib.classmate.ui.NavBadge.Count(count) else null
+                        )
                     }
                 }
             } catch(e:kotlinx.coroutines.CancellationException) { throw e }
