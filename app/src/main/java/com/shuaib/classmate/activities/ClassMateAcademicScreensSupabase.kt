@@ -316,7 +316,6 @@ internal class ClassMateAcademicScreensSupabase(
     private fun setNavigationShown(show: Boolean) {
         if (navShown == show) return
         navShown = show
-        (activity as? ClassMateAuthActivity)?.composeNavVisible = show
         val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
         nav.animate().cancel()
         nav.animate().translationY(if (show) 0f else
@@ -883,15 +882,15 @@ internal class ClassMateAcademicScreensSupabase(
         val isWeekend = dayOfWeek == java.time.DayOfWeek.FRIDAY || dayOfWeek == java.time.DayOfWeek.SATURDAY
 
         val (animName, fallbackEmoji) = when {
-            listOf("eid", "ramadan", "romjan", "fitr", "azha", "adho", "barat", "meraj", "qadr", "ashura", "hijri", "muharram", "fateha").any { textToMatch.contains(it) } ->
+            listOf("eid", "ramadan", "romjan", "fitr", "azha", "adho", "barat", "meraj", "qadr", "ashura", "hijri", "muharram", "fateha", "milad", "ঈদ", "রমজান", "মিরাজ", "বরাত", "কদর", "আশুরা", "ফাতেহা", "মিলাদুন্নবী", "সোম্বা").any { textToMatch.contains(it) } ->
                 "eid" to "🌙"
-            listOf("puja", "pooja", "durga", "saraswati", "kali", "diwali", "deepavali", "janmashtami", "dashami", "navami", "bijoya", "shivratri", "holi", "purnima", "buddha").any { textToMatch.contains(it) } ->
+            listOf("puja", "pooja", "durga", "saraswati", "kali", "diwali", "deepavali", "janmashtami", "dashami", "navami", "bijoya", "shivratri", "holi", "purnima", "buddha", "পূজা", "দুর্গা", "সরস্বতী", "জন্মাষ্টমী", "লক্ষ্মী", "বুদ্ধপূর্ণিমা").any { textToMatch.contains(it) } ->
                 "puja" to "🪔"
-            listOf("vacation", "break", "recess", "summer", "winter", "autumn", "spring").any { textToMatch.contains(it) } ->
+            listOf("vacation", "break", "recess", "summer", "winter", "autumn", "spring", "অবকাশ", "ছুটি").any { textToMatch.contains(it) } ->
                 "vacation" to "🏖️"
-            listOf("independence", "victory", "language", "ekushey", "21st february", "21 february", "mourning", "revolution", "bangabandhu", "shaheed", "national", "may day", "labor").any { textToMatch.contains(it) } ->
+            listOf("independence", "victory", "language", "ekushey", "21st february", "21 february", "mourning", "revolution", "bangabandhu", "shaheed", "national", "may day", "labor", "martyrs", "uprising", "স্বাধীনতা", "বিজয়", "মাতৃভাষা", "শহিদ", "গণঅভ্যুত্থান", "ভাসানী", "বুদ্ধিজীবী").any { textToMatch.contains(it) } ->
                 "national" to "🌺"
-            listOf("weekend", "weekly").any { textToMatch.contains(it) } || isWeekend ->
+            listOf("weekend", "weekly", "শুক্রবার", "শনিবার").any { textToMatch.contains(it) } || isWeekend ->
                 "weekend" to "☕"
             else ->
                 "celebration" to "🎉"

@@ -42,12 +42,28 @@ function HolidayLottie({
   name: string;
   fallbackEmoji: string;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [data, setData] = useState<object | null>(null);
 
-  if (!mounted) {
+  useEffect(() => {
+    let active = true;
+    fetch(`/animations/${name}.json`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load animation");
+        return res.json();
+      })
+      .then((json) => {
+        if (active) setData(json);
+      })
+      .catch((err) => {
+        console.error("Failed to load Lottie animation", err);
+        if (active) setData(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [name]);
+
+  if (!data) {
     return (
       <span style={{ fontSize: "3rem", display: "inline-block", lineHeight: 1 }}>
         {fallbackEmoji}
@@ -67,7 +83,7 @@ function HolidayLottie({
       }}
     >
       <Lottie
-        src={`/animations/${name}.json`}
+        src={data}
         autoplay={true}
         loop={true}
         style={{ width: "100%", height: "100%" }}
@@ -94,6 +110,16 @@ function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean
       "hijri",
       "muharram",
       "fateha",
+      "milad",
+      "ঈদ",
+      "রমজান",
+      "মিরাজ",
+      "বরাত",
+      "কদর",
+      "আশুরা",
+      "ফাতেহা",
+      "মিলাদুন্নবী",
+      "সোম্বা",
     ].some((k) => text.includes(k))
   ) {
     return { name: "eid", emoji: "🌙" };
@@ -115,14 +141,28 @@ function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean
       "holi",
       "purnima",
       "buddha",
+      "পূজা",
+      "দুর্গা",
+      "সরস্বতী",
+      "জন্মাষ্টমী",
+      "লক্ষ্মী",
+      "বুদ্ধপূর্ণিমা",
     ].some((k) => text.includes(k))
   ) {
     return { name: "puja", emoji: "🪔" };
   }
   if (
-    ["vacation", "break", "recess", "summer", "winter", "autumn", "spring"].some(
-      (k) => text.includes(k),
-    )
+    [
+      "vacation",
+      "break",
+      "recess",
+      "summer",
+      "winter",
+      "autumn",
+      "spring",
+      "অবকাশ",
+      "ছুটি",
+    ].some((k) => text.includes(k))
   ) {
     return { name: "vacation", emoji: "🏖️" };
   }
@@ -141,11 +181,23 @@ function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean
       "national",
       "may day",
       "labor",
+      "martyrs",
+      "uprising",
+      "স্বাধীনতা",
+      "বিজয়",
+      "মাতৃভাষা",
+      "শহিদ",
+      "গণঅভ্যুত্থান",
+      "ভাসানী",
+      "বুদ্ধিজীবী",
     ].some((k) => text.includes(k))
   ) {
     return { name: "national", emoji: "🌺" };
   }
-  if (["weekend", "weekly"].some((k) => text.includes(k)) || isWeekend) {
+  if (
+    ["weekend", "weekly", "শুক্রবার", "শনিবার"].some((k) => text.includes(k)) ||
+    isWeekend
+  ) {
     return { name: "weekend", emoji: "☕" };
   }
   return { name: "celebration", emoji: "🎉" };
