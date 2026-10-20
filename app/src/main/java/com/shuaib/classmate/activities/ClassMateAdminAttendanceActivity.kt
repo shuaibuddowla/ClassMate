@@ -659,9 +659,12 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Generating Excel sheet...", Toast.LENGTH_SHORT).show()
-                val client = OkHttpClient()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
                 val token = ClassMateAuthApi.accessToken
-                val url = "${BuildConfig.CLASSMATE_URL.trimEnd('/')}/functions/v1/export-attendance"
+                val apiUrl = "https://classmatebd.vercel.app/api/export-attendance"
 
                 val body = JSONObject()
                     .put("semester_course_id", courseOfferingId)
@@ -669,39 +672,100 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     .toRequestBody("application/json".toMediaType())
 
                 val request = Request.Builder()
-                    .url(url)
+                    .url(apiUrl)
                     .addHeader("Authorization", "Bearer $token")
                     .post(body)
                     .build()
 
-                val bytes = withContext(Dispatchers.IO) {
-                    client.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) throw Exception("Server returned ${response.code}")
-                        response.body?.bytes() ?: throw Exception("Empty response")
+                var bytes: ByteArray? = null
+                try {
+                    bytes = withContext(Dispatchers.IO) {
+                        client.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) response.body?.bytes() else null
+                        }
                     }
+                } catch (_: Exception) {
+                    bytes = null
                 }
 
                 val dateStr = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
-                val fileName = "Attendance_${courseCode.ifBlank { "Class" }}_$dateStr.xlsx"
+                val cleanCode = courseCode.ifBlank { "Class" }.replace(Regex("[^a-zA-Z0-9_-]"), "_")
                 val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
-                val file = File(dir, fileName)
-                withContext(Dispatchers.IO) {
-                    FileOutputStream(file).use { it.write(bytes) }
-                }
 
-                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Downloaded: ${file.name}", Toast.LENGTH_LONG).show()
+                if (bytes != null && bytes.isNotEmpty()) {
+                    val fileName = "Attendance_${cleanCode}_$dateStr.xlsx"
+                    val file = File(dir, fileName)
+                    withContext(Dispatchers.IO) {
+                        FileOutputStream(file).use { it.write(bytes) }
+                    }
 
-                // Share / View Intent
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    putExtra(Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(
-                        this@ClassMateAdminAttendanceActivity,
-                        "${packageName}.fileprovider",
-                        file
-                    ))
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    Toast.makeText(this@ClassMateAdminAttendanceActivity, "Downloaded: ${file.name}", Toast.LENGTH_LONG).show()
+
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        putExtra(Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(
+                            this@ClassMateAdminAttendanceActivity,
+                            "${packageName}.fileprovider",
+                            file
+                        ))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(intent, "Share Attendance Excel"))
+                } else {
+                    // Reliable local CSV fallback
+                    val matrix = withContext(Dispatchers.IO) {
+                        ClassMateAuthApi.rpc("course_attendance_matrix", JSONObject().put("target_semester_course", courseOfferingId))
+                    }
+                    val sessions = matrix.optJSONArray("sessions") ?: JSONArray()
+                    val students = matrix.optJSONArray("students") ?: JSONArray()
+                    val studentList = mutableListOf<JSONObject>()
+                    for (i in 0 until students.length()) studentList.add(students.getJSONObject(i))
+                    studentList.sortBy { it.optString("roll") }
+
+                    val csv = StringBuilder()
+                    csv.append("SL,Student ID / Roll,Student Name")
+                    for (i in 0 until sessions.length()) {
+                        val sess = sessions.getJSONObject(i)
+                        val d = sess.optString("date")
+                        csv.append(",Day ${i + 1} ($d)")
+                    }
+                    csv.append(",Total Present,Total Classes,Percentage (%)\n")
+
+                    studentList.forEachIndexed { idx, s ->
+                        val roll = s.optString("roll").replace(",", " ")
+                        val name = s.optString("full_name").replace(",", " ")
+                        csv.append("${idx + 1},\"$roll\",\"$name\"")
+                        val records = s.optJSONObject("records") ?: JSONObject()
+                        for (i in 0 until sessions.length()) {
+                            val sid = sessions.getJSONObject(i).optString("session_id")
+                            val isP = records.optString(sid) == "present"
+                            csv.append(if (isP) ",1" else ",0")
+                        }
+                        val p = s.optInt("present_count", 0)
+                        val tot = s.optInt("total_sessions", sessions.length())
+                        val pct = s.optInt("percentage", 0)
+                        csv.append(",$p,$tot,$pct%\n")
+                    }
+
+                    val fileName = "Attendance_${cleanCode}_$dateStr.csv"
+                    val file = File(dir, fileName)
+                    withContext(Dispatchers.IO) {
+                        file.writeText(csv.toString(), Charsets.UTF_8)
+                    }
+
+                    Toast.makeText(this@ClassMateAdminAttendanceActivity, "Downloaded: ${file.name}", Toast.LENGTH_LONG).show()
+
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(
+                            this@ClassMateAdminAttendanceActivity,
+                            "${packageName}.fileprovider",
+                            file
+                        ))
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(intent, "Share Attendance Sheet"))
                 }
-                startActivity(Intent.createChooser(intent, "Share Attendance Excel"))
             } catch (e: Exception) {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
             }
