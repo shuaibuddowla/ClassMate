@@ -1661,41 +1661,39 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_classmate_home)
 
-        window.statusBarColor = getColor(R.color.cm_bg)
-
-        window.navigationBarColor = getColor(R.color.cm_bg)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
 
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
-
             val lightTheme = resources.configuration.uiMode and
-
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
-
             isAppearanceLightStatusBars = lightTheme
-
             isAppearanceLightNavigationBars = lightTheme
-
         }
 
         homeShown = true
 
         window.decorView.postDelayed({
-
             if(homeShown && welcomeStep==0 && !isFinishing) {
-
                 offerNotificationPermission(); registerFcmToken()
-
                 if(notificationsEnabled()) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
-
             }
-
         },1200)
 
         ClassMateAcademicCache.saveHome(this, profile ?: JSONObject(), selectedBatchId, selectedBatchLabel)
 
         homeHost = findViewById(R.id.classmate_home_content)
-
         content = homeHost
+
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(homeHost) { view, insets ->
+            val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            view.setPadding(0, statusBars.top, 0, 0)
+            insets
+        }
 
         academicScreens = ClassMateAcademicScreensSupabase(
 

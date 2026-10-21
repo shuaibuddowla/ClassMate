@@ -178,7 +178,7 @@ fun ClassMateFloatingNavigationBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .navigationBarsPadding()
             ) {
                 // Top border separator line for crisp edge-to-edge finish
                 Box(
