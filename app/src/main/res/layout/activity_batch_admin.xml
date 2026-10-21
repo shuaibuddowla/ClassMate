@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/cm_background"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/cm_background"
+        app:navigationIcon="@drawable/ic_chevron_left"
+        app:navigationIconTint="@color/cm_text_primary"
+        app:title="Batch Administration"
+        app:titleTextColor="@color/cm_text_primary" />
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="18dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="40dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Hero Batch Overview Summary Card -->
+                <LinearLayout
+                    android:id="@+id/heroCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="22dp"
+                    android:background="@drawable/bg_settings_card"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:layout_width="46dp"
+                            android:layout_height="46dp"
+                            android:background="@drawable/bg_badge_green"
+                            android:backgroundTint="#1F3B82F6">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_academic_cap"
+                                app:tint="@color/cm_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvHeroBatchTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Active Batch"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="17sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvHeroBatchSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Department • Academic Workspace"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="12.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="14dp"
+                        android:background="@color/cm_divider" />
+
+                    <!-- 3 Stats Columns -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <!-- Stat 1: Semester -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvStatSemester"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="—"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Semester"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@color/cm_divider" />
+
+                        <!-- Stat 2: Students -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvStatStudents"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="—"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Students"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@color/cm_divider" />
+
+                        <!-- Stat 3: Courses -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvStatCourses"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="—"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Courses"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- SECTION 1: COURSES & ROUTINE -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:letterSpacing="0.05"
+                    android:text="COURSES &amp; ROUTINE"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <include
+                    android:id="@+id/tileManageCourses"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileTimetable"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileTeacherAssignments"
+                    layout="@layout/item_admin_action_card" />
+
+                <!-- SECTION 2: MEMBERS & PERMISSIONS -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:letterSpacing="0.05"
+                    android:text="MEMBERS &amp; PERMISSIONS"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <include
+                    android:id="@+id/tileStudentRoster"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileManageCr"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileBatchOverrides"
+                    layout="@layout/item_admin_action_card" />
+
+                <!-- SECTION 3: SEMESTER & PROGRESSION -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:letterSpacing="0.05"
+                    android:text="SEMESTER &amp; PROGRESSION"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <include
+                    android:id="@+id/tileActiveSemester"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileCloneSemester"
+                    layout="@layout/item_admin_action_card" />
+
+                <!-- SECTION 4: SYSTEM & BATCH SETTINGS -->
+                <TextView
+                    android:id="@+id/headerSystemSection"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:letterSpacing="0.05"
+                    android:text="SYSTEM &amp; GLOBAL TOOLS"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <include
+                    android:id="@+id/tileCourseCatalog"
+                    layout="@layout/item_admin_action_card" />
+
+                <include
+                    android:id="@+id/tileSystemHealth"
+                    layout="@layout/item_admin_action_card" />
+
+            </LinearLayout>
+        </ScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</LinearLayout>

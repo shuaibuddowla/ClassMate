@@ -359,6 +359,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 if (isAdmin) {
                     listOfNotNull(
                         com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Batch Administration",
+                            subtitle = "Courses, routine, teachers & roster",
+                            iconRes = R.drawable.ic_academic_cap,
+                            onClick = { openManage() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
                             title = "Admin Panel",
                             subtitle = "System configurations & batch controls",
                             iconRes = R.drawable.ic_nav_settings,
@@ -394,6 +400,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
                         com.shuaib.classmate.ui.TabQuickAction(
                             title = "Edit Profile",
                             subtitle = "Update name, teacher ID or phone",
+                            iconRes = R.drawable.ic_profile_outline,
+                            onClick = { editPersonalProfile() }
+                        )
+                    )
+                } else if (isCr) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Batch Administration",
+                            subtitle = "Courses, routine, teachers & roster",
+                            iconRes = R.drawable.ic_academic_cap,
+                            onClick = { openManage() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Edit Profile",
+                            subtitle = "Update name, student ID or phone",
                             iconRes = R.drawable.ic_profile_outline,
                             onClick = { editPersonalProfile() }
                         )
@@ -705,37 +726,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
     private fun openManage() {
-
-        val p=profile ?: return
-
+        val p = profile ?: return
         val isServerOwner = p.optBoolean("is_server_owner")
-
         val isTeacher = p.optString("role") == "teacher"
-
         val isCr = p.optBoolean("is_cr")
-
-        if (!isServerOwner && !isTeacher && !isCr) return
-
-        manageOpen=true
-
-        findViewById<GlassBottomNavView>(R.id.classmate_home_nav).visibility=View.GONE
-
-        renderHomeTab(R.id.nav_manage)
-
-        onBackPressedDispatcher.addCallback(this,object: androidx.activity.OnBackPressedCallback(true) {
-
-            override fun handleOnBackPressed() {
-
-                manageOpen=false; remove()
-
-                findViewById<GlassBottomNavView>(R.id.classmate_home_nav).visibility=View.VISIBLE
-
-                renderHomeTab(R.id.nav_profile)
-
-            }
-
-        })
-
+        val isAdmin = p.optString("role") == "admin" || isServerOwner
+        if (!isServerOwner && !isTeacher && !isCr && !isAdmin) return
+        val intent = Intent(this, ClassMateBatchAdminActivity::class.java).apply {
+            putExtra("batch_id", selectedBatchId)
+            putExtra("batch_label", selectedBatchLabel)
+            putExtra("role", p.optString("role"))
+            putExtra("profile_id", userId)
+            putExtra("is_server_owner", isServerOwner)
+            putExtra("is_cr", isCr)
+        }
+        startActivity(intent)
     }
 
 

@@ -2392,7 +2392,7 @@ internal class ClassMateAcademicScreensSupabase(
         root.v<View>(R.id.btnEditPersonal).setOnClickListener { onEditProfile() }
 
         val cachedServerOwner = account.optBoolean("is_server_owner")
-        val initialCanSwitch = cachedServerOwner || isTeacher
+        val initialCanSwitch = cachedServerOwner || isTeacher || isAdmin
         val initialCanManage = initialCanSwitch || isCr
 
         root.v<View>(R.id.btnSwitchBatch).apply {
@@ -2457,8 +2457,8 @@ internal class ClassMateAcademicScreensSupabase(
                 val isServerOwner = ClassMateAuthApi.rpcText("is_owner", JSONObject()).trim() == "true"
                 account.put("is_server_owner", isServerOwner)
                 if (active(root)) {
-                    val canSwitch = isServerOwner || isTeacher
-                    val canManage = isServerOwner || isTeacher || isCr
+                    val canSwitch = isServerOwner || isTeacher || isAdmin
+                    val canManage = isServerOwner || isTeacher || isCr || isAdmin
 
                     text(root, R.id.tvSwitchBatchTitle, if (canSwitch) "Switch Active Batch" else "Your Academic Batch")
                     text(root, R.id.tvSwitchBatchSub, if (canSwitch) "Active workspace and notice scope" else "Your enrolled academic batch")

@@ -2278,3 +2278,235 @@ The header provides a clean segmented pill toggle between two dedicated operatio
 - **ESP32 Firmware**: Configured in `D:\Code & Scripts\attendence tracker\firmware\esp32_rfid_attendance\esp32_rfid_attendance.ino` with sub-second OLED animations, fast I2C, 5V buzzer drive, and automated cloud sync.
 
 ---
+
+
+## 55. Universal Notice Reader Access & Public WhatsApp-Style "Message Info"
+
+### A. Access Rule Overhaul & Public Transparency
+- **Commit Reference**: `0bf6d4e` (`feat(notices): allow all users to see who has seen the notice`)
+- **Universal Visibility**:
+  - Previously, viewing the reader list for a notice was restricted to administrators, class representatives (CR), and the notice author.
+  - Updated `canViewNoticeReaders(_notice?: Row, _ctx?: Context): boolean { return true; }` in [`web/src/components/notices.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/notices.tsx).
+  - Updated Android `btnReadReceipts` in [`item_notice_modern.xml`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/item_notice_modern.xml): enabled `android:clickable="true"` and `background="?attr/selectableItemBackground"`.
+  - **Effect**: Any authenticated batch member (students, CR, teachers, admin) can tap on the reader avatars or seen count on any notice card to open the WhatsApp-style "Message info" view and see who has viewed the announcement.
+
+### B. Admin Privacy Toggle Protection
+- The privacy toggle `owner_preferences.read_receipts_enabled` remains strictly respected by both backend queries and client UI.
+- If an admin has disabled read receipts (`read_receipts_enabled = false`):
+  - Their read receipt is excluded from `notice_reader_previews`, `notice_readers_page`, and the public reader count.
+  - No student or teacher can see when an opted-out admin viewed a notice.
+
+---
+
+## 56. Complete Deprecation of QR Attendance & Transition to Hardware RFID Architecture
+
+### A. Full Dismantling of Legacy Camera QR System
+- **Commit References**: `f5ab444`, `2fcf2be`, `6a2d8aa`
+- **Removed Artifacts**:
+  - Completely deleted legacy Android activities and layouts: `ClassMateStudentAttendanceScannerActivity.kt` and `activity_student_attendance_scanner.xml`.
+  - Deleted Web scanner modal: `web/src/components/attendance-scanner-modal.tsx`.
+  - Stripped obsolete ZXing camera scanning dependencies and barcode parsing routines.
+
+### B. Cloud Notification Pipeline Update (Migration `202610210002_attendance_punch_card_notification.sql`)
+- Updated stored procedure `classmate.academic_notification_job_context`:
+  - **Attendance Open Event (`attendance_open`)**:
+    - **Notification Title**: `"Attendance Live · " || sess.course_code` (or `"Attendance Live"`)
+    - **Notification Body**: `"Punch your cards for " || sess.course_title || " attendance."`
+    - **Routing Target**: `'my_attendance'` (tapping the notification navigates directly to the student's personal attendance bottom drawer rather than opening a camera scanner).
+  - **Attendance Marked Confirmation (`attendance_marked`)**:
+    - **Notification Title**: `"Attendance Recorded"`
+    - **Notification Body**: `"Your attendance for " || mark_info.course_title || " was marked present in the app."`
+    - Scoped strictly to the individual student profile who tapped the physical card.
+
+### C. Excel Export 404 Resolution & Alphanumeric Matrix Export
+1. **Web Server API Route ([`web/src/app/api/export-attendance/route.ts`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/app/api/export-attendance/route.ts))**:
+   - Created dedicated server endpoint generating binary XLSX using SheetJS (`xlsx`).
+   - Natural alphanumeric student roll sorting (`compareStudentRolls`) ensuring accurate ordering (`CE25001` to `CE25060`).
+   - Frozen headers for Roll No and Student Name for smooth horizontal scrolling.
+   - Exact binary 1/0 attendance matrix per session date and time (`YYYY-MM-DD HH:MM`).
+   - Summary formulas: `=SUM(...) / COUNT(...) * 100`.
+2. **Android OkHttp Download Pipeline ([`ClassMateAdminAttendanceActivity.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAdminAttendanceActivity.kt))**:
+   - `exportCourseExcel` queries `https://classmatebd.vercel.app/api/export-attendance` with the user's Supabase auth bearer token.
+   - Streams XLSX bytes directly to device storage / MediaStore and triggers `ACTION_SEND` / `ACTION_VIEW` via Android `FileProvider`.
+
+---
+
+## 57. Dynamic Festive, Holiday, Vacation & Weekend Lottie Animations for No-Class Screens
+
+### A. Dynamic Contextual Empty States
+- **Commit References**: `0cfd498`, `2c07ac7`, `8fa8c3e`
+- Replaced static emojis and empty views on the Timetable routine screen with animated Lottie compositions when there are no scheduled classes.
+
+### B. Contextual Event Matching & Asset Registry
+1. **Weekend Definition**:
+   - Islamic University / campus schedule strictly defines the academic weekend as **Thursday and Friday** (distinct from standard Western Saturday/Sunday).
+2. **Islamic & Religious Events**:
+   - Keywords: `"eid"`, `"ramadan"`, `"romjan"`, `"fitr"`, `"azha"`, `"barat"`, `"meraj"`, `"qadr"`, `"ashura"`, `"ঈদ"`, `"রমজান"`, etc.
+   - Asset: `eid.json` (Moon & crescent mosque animation, CDN `https://lottie.host/50a404fa-bf71-416f-80c3-142686f02bca/yMoSJ3XoYs.json`). Fallback: `🌙`.
+3. **Hindu & Cultural Festivals**:
+   - Keywords: `"puja"`, `"pooja"`, `"durga"`, `"saraswati"`, `"kali"`, `"diwali"`, `"janmashtami"`, `"পূজা"`, `"দুর্গা"`, etc.
+   - Asset: `puja.json` (Puja oil lamp / celebration). Fallback: `🪔`.
+4. **Vacation & Recess**:
+   - Keywords: `"vacation"`, `"break"`, `"recess"`, `"summer"`, `"winter"`, `"autumn"`, `"spring"`, `"অবকাশ"`, `"ছুটি"`.
+   - Asset: `celebration.json` (Kite & festive celebration, CDN `https://lottie.host/3c653806-b702-48a9-8948-ee4ea85a8d54/XsRwdGteT8.json`). Fallback: `🏖️`.
+5. **National & Memorial Days**:
+   - Keywords: `"independence"`, `"victory"`, `"language"`, `"ekushey"`, `"21st february"`, `"mourning"`, `"revolution"`, `"shaheed"`, `"জাতীয়"`, `"বিজয়"`, etc.
+   - Asset: `national.json` (Memorial floral tribute / national flag, CDN `https://lottie.host/5186d508-9fac-4143-ab59-6076191e0c4f/UYcZxjYaA6.json`). Fallback: `🌺`.
+6. **Weekend / Free Day**:
+   - Day of week matches Thursday or Friday.
+   - Asset: `weekend` / `celebration.json` (Kite celebration animation). Fallback: `☕`.
+
+### C. Critical Debugging & Keyword Collision Resolution (`8fa8c3e`)
+- **The Bug**: On normal weekends (Thursday/Friday), the app was incorrectly displaying the Durga Puja animation instead of the weekend kite animation.
+- **Root Cause**: The holiday parser had loose substring matching where the generic word `"holiday"` collided with Hindu holiday prefixes like `"holi"`, which evaluated ahead of the weekend check.
+- **The Fix**: Re-ordered priority to evaluate Thursday/Friday weekend check first, and used strict word-boundary matching `\bholiday\b` so generic "holiday" descriptions never trigger Hindu festival rules.
+- **Client Implementation Details**:
+  - Android: `bindHolidayLottie` in [`ClassMateAcademicScreensSupabase.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt) sets URL on `LottieAnimationView` (`lottieNoClasses`), caches using `tag`, handles failure listeners gracefully, and falls back to `tvEmptyEmoji` without crashing.
+  - Web: `@dotlottie/player-component` / `dotlottie-player` in [`web/src/components/schedule.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/schedule.tsx).
+
+---
+
+## 58. Jetpack Compose Floating Liquid Glass Navigation Bar (v1.1.33+)
+
+### A. Architecture & Modernization
+- **Commit Reference**: `f28e902` (`feat(ui): restore Jetpack Compose floating pill navigation bar with haptics & spring physics`)
+- Replaced legacy View-based bottom navigation with a fully native **Jetpack Compose** component: [`ClassMateBottomBar.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt) (`ClassMateFloatingNavigationBar`).
+- Embedded seamlessly into [`activity_classmate_home.xml`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/activity_classmate_home.xml) via `androidx.compose.ui.platform.ComposeView` (`bottomNavComposeView`).
+
+### B. Core Visual & Interactive Features
+1. **Continuous Animated Sliding Indicator Pill (Spring Physics)**:
+   - Instead of static tab jumps or detached circles, a single continuous pill glides horizontally between tabs using spring physics:
+     `spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)`.
+   - The indicator hugs **both the icon and the text label** as one unified, organic capsule.
+2. **Tabler/Phosphor Outline-to-Filled Icon Morphing**:
+   - Outline vector drawables when inactive (`ic_timetable_outline`, `ic_bell_outline`, `ic_library_outline`, `ic_batch_friends`, `ic_nav_settings_outline`).
+   - Smooth crossfade to filled/duotone drawables when active (`ic_timetable`, `ic_notice`, `ic_library_filled`, `ic_batch_friends_filled`, `ic_nav_settings`).
+3. **Press Micro-Interactions & Tactile Haptics**:
+   - On touch-down, the tab scales down to `0.92f` (`animateFloatAsState`) and springs back on release.
+   - `LocalHapticFeedback.current.performHapticFeedback(HapticFeedbackType.LongPress / Selection)` delivers immediate physical tactile feedback.
+4. **Liquid Glass Depth & Specular Highlights**:
+   - Translucent glass surface (`Color(0xD90A1324)` in dark theme, `Color(0xE6FFFFFF)` in light theme) with a soft 1px blue/translucent stroke (`0x333B82F6` / `0x2B1D4ED8`).
+   - Floating margins (14dp bottom and sides, 28dp capsule radius) with soft elevation drop shadow.
+5. **Auto-Hide on Scroll**:
+   - Slides down smoothly out of viewport on downward scroll (`slideOutVertically`) and glides back into view on reverse scroll or scroll stop (`slideInVertically`).
+6. **Long-Press Quick Actions**:
+   - Supports `onQuickActionRequest` allowing long-press on tabs (such as Batch or Courses) to bring up quick shortcut bottom sheets.
+
+---
+
+## 59. External Drive Links, Authentic Vector Branding & Layout Tinting Resolution
+
+### A. Authentic Multi-Colored Google Drive Logo & Theme
+- **Commit References**: `af39e29`, `1ae69c7`
+- Implemented multi-color vector drawable [`ic_google_drive.xml`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/drawable/ic_google_drive.xml) with Google Drive brand colors (`#FFBA00` Yellow, `#00AC47` Green, `#2684FC` Blue).
+- Dedicated container background `bg_library_file_icon_drive.xml`.
+- Added dedicated Google Drive pasting tab/toggle in [`ClassMatePublishActivity.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMatePublishActivity.kt) and [`library.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/library.tsx) for 1-tap Drive resource sharing.
+
+### B. Root Cause & Fix for Vector Color Tint Overwriting
+- **Symptom**: In course file cards, the Google Drive logo rendered as a single solid pink triangle instead of its iconic multi-color design.
+- **Root Cause**: XML layout items (`item_course_file.xml`, `item_recent_pdf.xml`, `item_pdf.xml`, `item_library_search_result.xml`) had hardcoded `android:tint="#FF6B7A"` (or `app:tint`). This forcibly tinted all vector path colors into a single flat pink color, destroying the multi-colored Drive logo.
+- **Resolution**: Stripped hardcoded layout tints and updated [`FileVisuals.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/FileVisuals.kt):
+  - `VisualType` defines `tint: Int = 0` (0 indicates multi-colored vector preserving native colors).
+  - In `applyVisuals()`:
+    ```kotlin
+    if (visuals.tint != 0) {
+        ImageViewCompat.setImageTintList(this, ColorStateList.valueOf(visuals.tint))
+        setColorFilter(visuals.tint)
+    } else {
+        ImageViewCompat.setImageTintList(this, null)
+        imageTintList = null
+        colorFilter = null
+        clearColorFilter()
+    }
+    ```
+
+### C. Root Cause & Fix for External Links `"null"` String Trap
+- **Symptom**: Uploaded storage files (such as the OOP Syllabus PDF) displayed `"Google Drive"` and failed to open, crashing with invalid link errors.
+- **Root Cause**: In Android's `JSONObject`, when the database field `link_url` is SQL `NULL`, `file.optString("link_url")` returns the literal four-character string `"null"`. Because `"null".isNotBlank()` is `true`, standard uploaded files were incorrectly classified as external links pointing to `https://null`.
+- **Resolution**: Sanitized `link_url` across [`ClassMateAcademicScreensSupabase.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt), [`ClassMateCourseFilesActivity.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateCourseFilesActivity.kt), and [`ClassMatePublishActivity.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMatePublishActivity.kt):
+  ```kotlin
+  val rawLink = file.optString("link_url").trim()
+  val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
+  ```
+- External link launching upgraded to `CustomTabsIntent` with fallback to `Intent.ACTION_VIEW` (`FLAG_ACTIVITY_NEW_TASK`), and declared Android 11+ `<queries>` in [`AndroidManifest.xml`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/AndroidManifest.xml) for `http`/`https` schemes.
+
+---
+
+## 60. "My Attendance" Auto-Adjusting Bottom Drawer & Course Transition UX
+
+### A. Snug Bottom Sheet & Course Selection
+- **Commit Reference**: `1ae69c7`, `f5ab444` (from Conversation `b447abdd`)
+- Replaced centered dialog with `BottomSheetDialog` on Android and sliding bottom drawer (`.attendance-bottom-drawer`) on Web.
+- Starts in `layoutCoursesView` with `height = WRAP_CONTENT`, snugly fitting the exact vertical height of enrolled courses with zero dead space.
+
+### B. Animated Transition to Day-Wise Daily Records
+- Tapping any course triggers a smooth `AutoTransition` (`duration = 220ms` on Android, `cubic-bezier(0.2, 0.8, 0.2, 1)` on Web):
+  ```kotlin
+  TransitionManager.beginDelayedTransition(dialogView as ViewGroup, AutoTransition().apply { duration = 220 })
+  val expandedHeight = (screenHeight * 0.88f).toInt()
+  dialogView.layoutParams = dialogView.layoutParams?.apply { height = expandedHeight }
+  coursesView.visibility = View.GONE
+  tableView.visibility = View.VISIBLE
+  ```
+- Day-wise records table displays date, class number, binary present/absent status badge (emerald vs coral), and formatted time.
+
+### C. Seamless Back Navigation
+- Tapping "‹ Courses" triggers an inverse `AutoTransition`, restoring `height = WRAP_CONTENT` and sliding smoothly back down to the compact course picker.
+
+---
+
+## 61. Admin-Only "Manage Attendance" Settings Entry & Supabase RPC Mismatch Fix
+
+### A. Role-Gated Settings Option
+- **Commit Reference**: `f5ab444` (from Conversation `b447abdd`)
+- Added `cardProfileAttendance` in [`classmate_profile.xml`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/classmate_profile.xml) under Account & Management.
+- Strictly visible when `isAdmin || cachedServerOwner` (`profile.optString("role") == "admin"`).
+- Tapping opens [`ClassMateAdminAttendanceActivity.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAdminAttendanceActivity.kt) with `EXTRA_BATCH_ID` and `EXTRA_BATCH_LABEL`.
+
+### B. Debugging & Resolution of Ad-Hoc RPC Error
+- **Symptom**: Admin attempting to start an attendance session encountered `"Failed to start: function classmate.start_ad_hoc_attendance_session does not exist"`.
+- **Root Cause**: Client was invoking `classmate.start_ad_hoc_attendance_session` (with underscores in `ad_hoc` and argument `target_course`), whereas the Supabase migration defined:
+  ```sql
+  classmate.start_adhoc_attendance_session(target_semester_course uuid, target_device text)
+  ```
+- **Fix**: Aligned parameter names and function identifier in `ClassMateAdminAttendanceActivity.kt`.
+
+### C. ESP32 Hardware Disconnection & Self-Healing Protocol
+- Sessions are safely created in Supabase cloud asynchronously. Even if the ESP32 reader is powered off or sleeping during session creation, upon powering on and reconnecting to Wi-Fi, the firmware queries `classmate.active_attendance_session`, syncs session state, and begins processing RFID taps with zero state desynchronization.
+
+---
+
+## 62. Desktop Web Persistent Notices Rail Independent Scrolling
+
+### A. Desktop Layout Alignment (`globals.css`)
+- **Commit Reference**: `1ae69c7` (from Conversation `d68b1691`)
+- Updated `@media (min-width: 1001px)` in [`web/src/app/globals.css`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/app/globals.css) so `.notice-pane` has:
+  ```css
+  position: fixed;
+  top: 12px;
+  bottom: 12px;
+  right: 12px;
+  width: var(--notice-width, 380px);
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  ```
+- **Parity with Left Navigation Sidebar**: Academic routine and courses workspace in the center scrolls freely without moving the notices rail; the notices rail only scrolls when the mouse cursor is directly over it.
+
+---
+
+## 63. Verification, Production Deployment & Local Network APK Checklist
+
+### A. Production Deployments
+- **Web Client**: Deployed live to Vercel Production at **`https://classmatebd.vercel.app`** with zero TypeScript or CSS errors.
+- **Supabase Backend**: Applied migration `202610210002_attendance_punch_card_notification.sql` updating live push notification payloads to punch card guidance.
+
+### B. Android Native Builds & Local HTTP Distribution
+- **Jetpack Compose Integration**: Verified clean compilation of `ClassMateBottomBar.kt` with Gradle and Jetpack Compose compiler metrics.
+- **Installed Device**: Installed and verified on physical hardware via ADB.
+- **Local Network HTTP Server**: Hosted for local direct downloading at:
+  - `http://10.233.34.48:8080/download`
+  - `http://192.168.0.101:8080/download`
+
+---
