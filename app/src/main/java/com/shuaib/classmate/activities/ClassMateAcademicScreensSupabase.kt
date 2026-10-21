@@ -2445,11 +2445,7 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        root.v<View>(R.id.cardProfileAi).apply {
-            visibility = View.GONE
-            root.v<View>(R.id.dividerProfileAi).visibility = View.GONE
-            setOnClickListener(null)
-        }
+
 
         // Verify global owner status and batch management permissions with server RPC
         scope.launch {
@@ -2509,18 +2505,7 @@ internal class ClassMateAcademicScreensSupabase(
                         }
                     }
 
-                    root.v<View>(R.id.cardProfileAi).apply {
-                        if (isServerOwner) {
-                            val permitted = ClassMateAuthApi.rpcText("ai_can_write", JSONObject().put("target_batch", batchId())).trim() == "true"
-                            visibility = if (permitted) View.VISIBLE else View.GONE
-                            root.v<View>(R.id.dividerProfileAi).visibility = visibility
-                            setOnClickListener { onOpenAi() }
-                        } else {
-                            visibility = View.GONE
-                            root.v<View>(R.id.dividerProfileAi).visibility = View.GONE
-                            setOnClickListener(null)
-                        }
-                    }
+
                 }
             } catch (_: Exception) {}
         }

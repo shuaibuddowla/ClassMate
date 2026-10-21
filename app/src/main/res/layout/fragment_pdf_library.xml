@@ -273,12 +273,10 @@
                     </LinearLayout>
 
                     <HorizontalScrollView
+                        android:id="@+id/scrollLibraryFilters"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:clipToPadding="false"
-                        android:fillViewport="false"
-                        android:scrollbars="none">
+                        android:visibility="gone">
 
                         <LinearLayout
                             android:layout_width="wrap_content"

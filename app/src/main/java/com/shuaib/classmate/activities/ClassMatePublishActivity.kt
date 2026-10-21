@@ -65,12 +65,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var restoredFileName = ""
     private var busy = false
     private var courses = emptyList<CourseEntry>()
-    private var aiAllowed = false
-    private var aiRequest: String? = null
-    private var aiText = ""
-    private var aiHistory = JSONArray()
-    private var restoredAiDraft = ""
-    private var aiDraft: TextInputEditText? = null
     private var uploadMode = "file"
     private var restoredLinkUrl = ""
     private var urlInput: TextInputEditText? = null
@@ -102,10 +96,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        aiRequest = state?.getString("ai_request")
-        aiText = state?.getString("ai_request_text").orEmpty()
-        restoredAiDraft = state?.getString("ai_draft").orEmpty()
-        aiHistory = JSONArray(state?.getString("ai_history") ?: "[]")
 
         val editRawLink = editingFile?.optString("link_url")?.trim().orEmpty()
         val sanitizedEditLink = if (editRawLink.isBlank() || editRawLink.equals("null", ignoreCase = true)) "" else editRawLink
@@ -223,7 +213,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
                 loading.visibility = View.GONE
                 if (upload) buildUpload() else {
-                    aiAllowed = ClassMateAuthApi.rpcText("ai_can_write", JSONObject().put("target_batch", batch)).trim() == "true"
                     buildNotice()
                 }
             } catch (e: Exception) {
@@ -249,10 +238,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
         outState.putLong("file_size", selectedFileSize)
         if (::name.isInitialized) outState.putString("file_name", name.text.toString())
         outState.putString("upload_task_id", currentUploadTaskId)
-        outState.putString("ai_request", aiRequest)
-        outState.putString("ai_request_text", aiText)
-        outState.putString("ai_draft", aiDraft?.text?.toString() ?: restoredAiDraft)
-        outState.putString("ai_history", aiHistory.toString())
     }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -286,72 +271,146 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val teacher = intent.getStringExtra("role") == "teacher"
         form.label("Notice type")
         val choices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        val ai = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "AI compose"; setTextColor(getColor(R.color.cm_text_primary)) }
-        val general = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "General notice"; setTextColor(getColor(R.color.cm_text_primary)) }
-        val cancellation = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "Class cancellation"; setTextColor(getColor(R.color.cm_text_primary)) }
-        if (aiAllowed) choices.addView(ai)
-        choices.addView(general); choices.addView(cancellation); form.panel.addView(choices)
-        val rough = form.field("Your rough notice · English or Bengali", true).apply { filters = arrayOf(android.text.InputFilter.LengthFilter(8000)); setText(restoredAiDraft) }; aiDraft = rough
-        val aiHint = form.label("AI organizes and posts in English. For cancellations include the course and today/tomorrow. Start with /silent for no phone alerts.")
+        val general = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
+            id = View.generateViewId()
+            text = "General notice"
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        val cancellation = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
+            id = View.generateViewId()
+            text = "Class cancellation"
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        choices.addView(general)
+        choices.addView(cancellation)
+        form.panel.addView(choices)
+
         val title = form.field("Notice title")
-        val message = form.field("Message · links supported", true)
-        val silentHint = form.label("Start with /silent to post without a push notification.")
+        val titleBox = title.parent.parent as View
+        titleBox.visibility = View.GONE
+
+        val message = form.field("Notice message · English, Banglish or Bengali", true).apply {
+            filters = arrayOf(android.text.InputFilter.LengthFilter(8000))
+        }
+        val messageBox = message.parent.parent as View
+
+        val silentHint = form.label("Banglish auto-converts to Bengali. English remains English. Start with /silent to post without push alerts.")
         val (courseBox, course) = dropdown(if (teacher) "Assigned course" else "Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
+
         choices.setOnCheckedChangeListener { _, checked ->
             val cancelled = checked == cancellation.id
-            val composing = checked == ai.id
-            (rough.parent.parent as View).visibility = if (composing) View.VISIBLE else View.GONE
-            aiHint.visibility = if (composing) View.VISIBLE else View.GONE
-            (title.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
-            (message.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
-            silentHint.visibility = if (cancelled || composing) View.GONE else View.VISIBLE
-            courseBox.visibility = if (cancelled || teacher) View.VISIBLE else View.GONE
-            dateBox.visibility = if (cancelled) View.VISIBLE else View.GONE
-            submit.text = if (composing) "Compose & post" else "Post notice"
+            if (cancelled) {
+                titleBox.visibility = View.GONE
+                messageBox.visibility = View.GONE
+                silentHint.visibility = View.GONE
+                courseBox.visibility = View.VISIBLE
+                dateBox.visibility = View.VISIBLE
+            } else {
+                titleBox.visibility = if (title.text.isNullOrBlank()) View.GONE else View.VISIBLE
+                messageBox.visibility = View.VISIBLE
+                silentHint.visibility = View.VISIBLE
+                courseBox.visibility = if (teacher) View.VISIBLE else View.GONE
+                dateBox.visibility = View.GONE
+            }
+            submit.text = "Post notice"
         }
-        choices.check(if (aiAllowed) ai.id else general.id)
+        choices.check(general.id)
+        submit.text = "Post notice"
         submit.isEnabled = true
+
         submit.setOnClickListener {
-            if (choices.checkedRadioButtonId == ai.id) {
-                val value = rough.text.toString().trim()
-                if (value.isBlank()) { rough.error = "Write your notice first"; return@setOnClickListener }
-                if (busy) return@setOnClickListener
-                if (aiText != value) { aiRequest = java.util.UUID.randomUUID().toString(); aiText = value }
-                aiRequest = aiRequest ?: java.util.UUID.randomUUID().toString()
-                busy = true; submit.isEnabled = false; rough.isEnabled = false
-                for (i in 0 until choices.childCount) choices.getChildAt(i).isEnabled = false
-                status.visibility = View.VISIBLE; status.text = "Composing…"
-                lifecycleScope.launch {
-                    try {
-                        val response = ClassMateAuthApi.ai(JSONObject().put("mode", "compose").put("batch_id", batch).put("request_id", aiRequest).put("text", value).put("history", aiHistory))
-                        val actions = response.optJSONObject("result")?.optJSONArray("actions")
-                        if ((actions?.length() ?: 0) > 0) {
-                            val createdNotice = actions?.optJSONObject(0)?.optJSONObject("outcome")
-                            val data = Intent()
-                            if (createdNotice != null) data.putExtra("created_notice", createdNotice.toString())
-                            setResult(RESULT_OK, data)
-                            finish()
-                        } else {
-                            val reply = response.optJSONObject("plan")?.optString("message") ?: response.optJSONObject("result")?.optString("message") ?: "Add the missing course or date."
-                            status.text = reply; aiHistory.put(JSONObject().put("role", "user").put("text", value)); aiHistory.put(JSONObject().put("role", "assistant").put("text", reply)); aiRequest = null
-                            while (aiHistory.length() > 8) aiHistory.remove(0)
-                        }
-                    } catch (e: Exception) { status.text = "${e.message}\nTry again to retry the same request." }
-                    finally { busy = false; submit.isEnabled = true; rough.isEnabled = true; for (i in 0 until choices.childCount) choices.getChildAt(i).isEnabled = true }
+            val cancelled = choices.checkedRadioButtonId == cancellation.id
+            val selected = courses.firstOrNull { it.second == course.text.toString() }
+
+            if ((cancelled || teacher) && selected == null) {
+                courseBox.error = "No assigned course available"
+                return@setOnClickListener
+            }
+
+            if (cancelled) {
+                perform {
+                    ClassMateAuthApi.rpc(
+                        "post_cancellation_notice",
+                        JSONObject().put("target_batch", batch)
+                            .put("target_course", selected!!.first)
+                            .put("change_date", LocalDate.now().plusDays(if (date.text.toString() == "Tomorrow") 1 else 0).toString())
+                    )
                 }
                 return@setOnClickListener
             }
-            val cancelled = choices.checkedRadioButtonId == cancellation.id
-            val selected = courses.firstOrNull { it.second == course.text.toString() }
-            if ((cancelled || teacher) && selected == null) { courseBox.error = "No assigned course available"; return@setOnClickListener }
-            if (!cancelled && title.text.isNullOrBlank()) { title.error = "Enter a title"; return@setOnClickListener }
-            perform {
-                if (cancelled) ClassMateAuthApi.rpc("post_cancellation_notice", JSONObject().put("target_batch", batch)
-                    .put("target_course", selected!!.first).put("change_date", LocalDate.now().plusDays(if (date.text.toString() == "Tomorrow") 1 else 0).toString()))
-                else ClassMateAuthApi.rpc("post_notice", JSONObject().put("target_batch", batch).put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
-                    .put("notice_title", title.text.toString().trim()).put("notice_body", message.text.toString().trim()))
+
+            // General Notice
+            val rawBody = message.text.toString().trim()
+            if (rawBody.isBlank()) {
+                message.error = "Write your notice message first"
+                return@setOnClickListener
+            }
+
+            val manualTitle = title.text?.toString()?.trim().orEmpty()
+            if (titleBox.visibility == View.VISIBLE && manualTitle.isNotBlank()) {
+                perform {
+                    ClassMateAuthApi.rpc(
+                        "post_notice",
+                        JSONObject().put("target_batch", batch)
+                            .put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
+                            .put("notice_title", manualTitle)
+                            .put("notice_body", rawBody)
+                    )
+                }
+                return@setOnClickListener
+            }
+
+            if (busy) return@setOnClickListener
+            busy = true
+            submit.isEnabled = false
+            status.visibility = View.VISIBLE
+            status.text = "Detecting title & formatting notice with ClassMate AI…"
+
+            lifecycleScope.launch {
+                try {
+                    val reqId = java.util.UUID.randomUUID().toString()
+                    val response = ClassMateAuthApi.ai(
+                        JSONObject()
+                            .put("mode", "auto_notice")
+                            .put("batch_id", batch)
+                            .put("request_id", reqId)
+                            .put("text", rawBody)
+                    )
+                    val result = response.optJSONObject("result")
+                    val detectedTitle = result?.optString("title")?.trim().orEmpty()
+                    val formattedBody = result?.optString("body")?.trim().orEmpty()
+
+                    if (detectedTitle.isBlank() || formattedBody.isBlank()) {
+                        throw IllegalStateException("AI returned empty notice details")
+                    }
+
+                    status.text = "Publishing notice to batch…"
+                    val postRes = ClassMateAuthApi.rpc(
+                        "post_notice",
+                        JSONObject().put("target_batch", batch)
+                            .put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
+                            .put("notice_title", detectedTitle)
+                            .put("notice_body", formattedBody)
+                    )
+
+                    Toast.makeText(this@ClassMatePublishActivity, "Notice published successfully!", Toast.LENGTH_SHORT).show()
+                    val data = Intent().putExtra("created_notice", postRes.toString())
+                    setResult(RESULT_OK, data)
+                    finish()
+                } catch (e: Exception) {
+                    busy = false
+                    submit.isEnabled = true
+                    titleBox.visibility = View.VISIBLE
+                    title.requestFocus()
+                    status.text = "ClassMate AI title detection failed. Please enter a title manually and tap Post notice."
+                    Toast.makeText(
+                        this@ClassMatePublishActivity,
+                        "Notice title detection failed. Please enter title manually.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }

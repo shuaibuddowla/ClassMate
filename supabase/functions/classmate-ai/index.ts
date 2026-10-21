@@ -29,7 +29,7 @@ Deno.serve(request=>withWebCors(request,async request=>{
  let lease:string|undefined,id:string|undefined;
  try{
   const body=await request.json();
-  if(!['compose','agent','translate','execute','batch_fund_parse'].includes(body.mode)||!uuid(body.request_id))throw new Error('Invalid AI request.');
+  if(!['compose','agent','translate','execute','batch_fund_parse','auto_notice'].includes(body.mode)||!uuid(body.request_id))throw new Error('Invalid AI request.');
   id=body.request_id;
   if(body.mode==='execute')return Response.json({result:await call(caller,'execute_ai_request',{target_id:id})});
   if(!uuid(body.batch_id))throw new Error('Select an authorized batch first.');
@@ -38,7 +38,7 @@ Deno.serve(request=>withWebCors(request,async request=>{
   let history=Array.isArray(body.history)?body.history.slice(-8).map((m:{role:string;text:string})=>({role:m.role==='assistant'?'assistant':'user',text:String(m.text||'').slice(0,6000)})):[];
   const conversation=body.mode==='agent'?body.conversation_id:undefined;
   if(conversation&&!uuid(conversation))throw new Error('Invalid conversation.');
-  const context=['translate','batch_fund_parse'].includes(body.mode)?null:await call(caller,'ai_context',{target_batch:body.batch_id});
+  const context=['translate','batch_fund_parse','auto_notice'].includes(body.mode)?null:await call(caller,'ai_context',{target_batch:body.batch_id});
   let source:{id:string;title:string;body:string}|undefined;
   if(body.mode==='translate'){
    if(!uuid(body.notice_id))throw new Error('Choose a notice.');
@@ -100,6 +100,32 @@ Deno.serve(request=>withWebCors(request,async request=>{
    const parsed=await generate(prompt,JSON.stringify({text,roster}),batchFundSchema);
    const result={items:Array.isArray(parsed?.items)?parsed.items:[]};
    await call(service,'finish_ai_request',{target_id:id,target_lease:lease,target_plan:{message:'Parsed batch fund entries',actions:[]},target_result:result});
+   return Response.json({result});
+  }
+  if(body.mode==='auto_notice'){
+   const prompt='You are ClassMate AI, an intelligent academic notice processor for a university portal.\n' +
+    'Analyze the user\'s raw notice draft and generate a clean, accurate title and formatted body.\n\n' +
+    'Tasks:\n' +
+    '1. Title Generation:\n' +
+    '   - Generate an informative, concise, and professional title (3 to 8 words) accurately summarizing the notice content.\n' +
+    '   - If the input text starts with /silent, prefix the generated title with "/silent ".\n' +
+    '2. Language and Script Formatting:\n' +
+    '   - Case A: If the input text is written in Banglish (Bengali transliterated in Latin/English alphabets, e.g. "kalke 10 tai class hobe na", "shobai payment kore diyo", "exam postponed hoise") OR if it is in Bengali script (বাংলা):\n' +
+    '     * The "body" MUST be converted to natural, grammatically correct Bengali script (বাংলা লিপি). NEVER output Banglish or Latin letters for Bengali words.\n' +
+    '     * The "title" MUST also be written in Bengali script (বাংলা লিপি).\n' +
+    '   - Case B: If the input text is written in English:\n' +
+    '     * Keep the "body" in English, lightly correcting any typos or awkward grammar while strictly preserving the author\'s original meaning and style.\n' +
+    '     * The "title" MUST be in English.\n' +
+    '3. Strict Fidelity:\n' +
+    '   - Preserve all URLs (http/https links), email addresses, phone numbers, course codes (e.g. CSE 2101), dates, times (e.g. 10:00 AM), room numbers, names, and numbers EXACTLY as written.\n' +
+    '   - Do NOT invent or assume any missing facts.\n' +
+    'Return only JSON conforming to {"title": string, "body": string}.';
+   const parsed=await generate(prompt,text,translationSchema);
+   const result={
+    title:String(parsed?.title||'').trim(),
+    body:String(parsed?.body||'').trim()
+   };
+   await call(service,'finish_ai_request',{target_id:id,target_lease:lease,target_plan:{message:'Auto formatted notice',actions:[]},target_result:result});
    return Response.json({result});
   }
   const available=availableTools(context.owner,context.can_write,body.mode);
