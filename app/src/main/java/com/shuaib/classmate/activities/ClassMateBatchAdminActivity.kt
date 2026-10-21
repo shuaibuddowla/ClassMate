@@ -342,13 +342,12 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                 val items = semesters.map { s ->
                     val num = s.optInt("semester_number")
                     val status = s.optString("status")
-                    val label = when (status) {
-                        "active" -> "Active"
-                        "completed" -> "Completed"
-                        "not_started" -> "Draft"
-                        else -> status
+                    when (status) {
+                        "active" -> "Semester $num  •  Active (Current) ✓"
+                        "completed" -> "Semester $num  •  Completed"
+                        "not_started" -> "Semester $num  •  Draft"
+                        else -> "Semester $num ($status)"
                     }
-                    "Semester $num ($label)"
                 }.toTypedArray()
 
                 MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
@@ -364,10 +363,17 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                             return@setItems
                         }
 
+                        val actionText = if (status == "completed") "Reactivate" else "Publish"
+                        val messageText = if (status == "completed") {
+                            "Reactivating Semester $semNum will set its courses and weekly timetable routine back as active for this batch."
+                        } else {
+                            "Publishing Semester $semNum will make it active for this batch and complete the current semester."
+                        }
+
                         MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                            .setTitle("Publish Semester $semNum?")
-                            .setMessage("Publishing will make Semester $semNum active for this batch and complete the previous active semester.")
-                            .setPositiveButton("Publish") { _, _ ->
+                            .setTitle("$actionText Semester $semNum?")
+                            .setMessage(messageText)
+                            .setPositiveButton(actionText) { _, _ ->
                                 lifecycleScope.launch {
                                     try {
                                         ClassMateAuthApi.rpc("publish_semester", JSONObject().put("target_semester", semId))
