@@ -727,16 +727,16 @@ function NoticeCard({
       : "general";
   const body = String((showTranslation ? translated?.body : n.body) || "");
   const rawLines = body.split("\n");
-  const hasLineOverflow = rawLines.length > 6;
-  const isCharOverflow = body.length > 180;
+  const hasLineOverflow = rawLines.length > 5;
+  const isCharOverflow = body.length > 350;
   const isOverflow = hasLineOverflow || isCharOverflow;
   const text = (() => {
     if (expanded || !isOverflow) return body;
     if (hasLineOverflow) {
-      const preview = rawLines.slice(0, 6).join("\n");
-      return preview.length > 200 ? preview.slice(0, 200) + "…" : preview + "…";
+      const preview = rawLines.slice(0, 5).join("\n");
+      return preview.length > 280 ? preview.slice(0, 280) + "…" : preview + "…";
     }
-    return body.slice(0, 200) + "…";
+    return body.slice(0, 280) + "…";
   })();
 
   const handleLinkClick = (e: React.MouseEvent) => {

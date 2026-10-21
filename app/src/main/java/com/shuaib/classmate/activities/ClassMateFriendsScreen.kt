@@ -275,9 +275,25 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
                     val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
+                    val sorted = merged.sortedWith { a, b ->
+                        val aIsAdmin = a.optString("role") == "admin"
+                        val bIsAdmin = b.optString("role") == "admin"
+                        if (aIsAdmin && !bIsAdmin) -1
+                        else if (!aIsAdmin && bIsAdmin) 1
+                        else {
+                            val aId = a.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+                            val bId = b.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+                            if (aId != null && bId != null) {
+                                val cmp = aId.compareTo(bId, ignoreCase = true)
+                                if (cmp != 0) cmp else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
+                            } else if (aId != null) -1
+                            else if (bId != null) 1
+                            else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
+                        }
+                    }
                     offset=requestedOffset+result.length(); hasMore=result.length()==100
-                    adapter.submitList(merged)
-                    pages[query]=merged
+                    adapter.submitList(sorted)
+                    pages[query]=sorted
                     while(pages.size>8) pages.remove(pages.keys.first())
                     status.text=if(merged.isEmpty()) (if(query.isBlank()) "No members have joined this batch yet." else "No matching people.") else "${merged.size}${if(hasMore) "+" else ""} ${if(merged.size==1) "person" else "people"}"
                 } catch(e: kotlinx.coroutines.CancellationException) { throw e }

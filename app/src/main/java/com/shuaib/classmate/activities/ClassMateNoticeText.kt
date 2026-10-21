@@ -26,7 +26,7 @@ import java.util.regex.Pattern
 import kotlin.math.hypot
 
 internal object ClassMateNoticeText {
-    const val MAX_PREVIEW_LINES = 6
+    const val MAX_PREVIEW_LINES = 5
     const val SUFFIX_MORE = "… see more"
     const val SUFFIX_LESS = "  see less"
 
@@ -39,7 +39,7 @@ internal object ClassMateNoticeText {
     )
 
     fun isExpandable(body: String): Boolean {
-        return body.count { it == '\n' } >= MAX_PREVIEW_LINES || body.length > 350
+        return body.count { it == '\n' } >= MAX_PREVIEW_LINES || body.length > 280
     }
 
     fun normalizeUrl(rawUrl: String): String {

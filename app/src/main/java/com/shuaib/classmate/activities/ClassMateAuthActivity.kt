@@ -1806,6 +1806,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
             com.shuaib.classmate.ui.ClassMateFloatingNavigationBar(
                 selectedTab = composeSelectedTab,
                 onTabSelected = { tab ->
+                    composeNavVisible = true
                     composeSelectedTab = tab
                     selectedTab = tab.id
                     composeBadgeMap.remove(tab)
@@ -2025,6 +2026,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private fun renderHomeTab(tab: Int) {
 
         if (!homeShown) return
+
+        composeNavVisible = true
+        if (::academicScreens.isInitialized) academicScreens.setNavigationShown(true)
 
         composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.fromId(tab) ?: com.shuaib.classmate.ui.ClassMateTab.TIMETABLE
 
@@ -3272,7 +3276,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         super.onResume()
 
-        if (::academicScreens.isInitialized) academicScreens.onResume()
+        composeNavVisible = true
+        if (::academicScreens.isInitialized) {
+            academicScreens.onResume()
+            academicScreens.setNavigationShown(true)
+        }
 
         unreadActivity?.refresh()
 

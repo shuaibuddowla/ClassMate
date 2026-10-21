@@ -21,7 +21,7 @@ class ClassMateNoticeTextTest {
 
     @Test
     fun constantsMatchRequiredBehavior() {
-        assertEquals(6, ClassMateNoticeText.MAX_PREVIEW_LINES)
+        assertEquals(5, ClassMateNoticeText.MAX_PREVIEW_LINES)
         assertEquals("… see more", ClassMateNoticeText.SUFFIX_MORE)
         assertEquals("  see less", ClassMateNoticeText.SUFFIX_LESS)
     }

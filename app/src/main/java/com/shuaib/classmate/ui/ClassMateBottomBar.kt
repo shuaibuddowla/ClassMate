@@ -111,12 +111,12 @@ fun ClassMateFloatingNavigationBar(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    // Accent and surface palette
+    // Accent and surface palette (Edge-to-Edge Frosted Glass)
     val activeColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF1D4ED8)
     val inactiveColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-    val glassBg = if (isDark) Color(0xD90A1324) else Color(0xE6FFFFFF)
-    val glassBorder = if (isDark) Color(0x333B82F6) else Color(0x2B1D4ED8)
-    val indicatorColor = if (isDark) Color(0x2E3B82F6) else Color(0x1F1D4ED8)
+    val glassBg = if (isDark) Color(0xF50B1220) else Color(0xF8FFFFFF)
+    val glassBorder = if (isDark) Color(0x33475569) else Color(0x1F0F172A)
+    val indicatorColor = if (isDark) Color(0x333B82F6) else Color(0x1F1D4ED8)
 
     // Quick actions sheet state
     var quickActionTab by remember { mutableStateOf<ClassMateTab?>(null) }
@@ -170,54 +170,50 @@ fun ClassMateFloatingNavigationBar(
         ),
         modifier = modifier
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .shadow(
-                    elevation = 10.dp,
-                    shape = RoundedCornerShape(28.dp),
-                    spotColor = Color.Black.copy(alpha = if (isDark) 0.6f else 0.16f)
-                )
-                .clip(RoundedCornerShape(28.dp))
-                .background(glassBg)
-                .border(
-                    width = 1.5.dp,
-                    brush = Brush.verticalGradient(
-                        colors = if (isDark) listOf(
-                            Color.White.copy(alpha = 0.22f),
-                            glassBorder
-                        ) else listOf(
-                            Color.White.copy(alpha = 0.85f),
-                            glassBorder
-                        )
-                    ),
-                    shape = RoundedCornerShape(28.dp)
-                )
-                .height(64.dp)
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            contentAlignment = Alignment.CenterStart
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = glassBg,
+            shadowElevation = 8.dp
         ) {
-            // 1. Physical Continuous Sliding Indicator Pill hugging BOTH icon AND label
-            if (animatedIndicatorWidth > 0.dp) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+            ) {
+                // Top border separator line for crisp edge-to-edge finish
                 Box(
                     modifier = Modifier
-                        .offset(x = animatedIndicatorOffset)
-                        .width(animatedIndicatorWidth)
-                        .fillMaxHeight()
-                        .padding(horizontal = 3.dp, vertical = 2.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(indicatorColor)
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(glassBorder)
                 )
-            }
 
-            // 2. Tab Items Row - Equal Horizontal Distribution
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(58.dp)
+                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    // Continuous Sliding Indicator Pill
+                    if (animatedIndicatorWidth > 0.dp) {
+                        Box(
+                            modifier = Modifier
+                                .offset(x = animatedIndicatorOffset)
+                                .width(animatedIndicatorWidth)
+                                .fillMaxHeight()
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(indicatorColor)
+                        )
+                    }
+
+                    // Tab Items Row - Equal Horizontal Distribution
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                 visibleTabs.forEach { tab ->
                     val isSelected = tab == selectedTab
                     val interactionSource = remember { MutableInteractionSource() }
@@ -348,6 +344,8 @@ fun ClassMateFloatingNavigationBar(
             }
         }
     }
+}
+}
 
     // Stretch Addition 2: Long-Press Quick Actions Bottom Sheet
     if (quickActionTab != null && quickActions.isNotEmpty()) {

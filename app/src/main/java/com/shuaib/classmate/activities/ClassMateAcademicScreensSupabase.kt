@@ -242,23 +242,23 @@ internal class ClassMateAcademicScreensSupabase(
         var navigationTravel = 0
         val threshold = (16 * activity.resources.displayMetrics.density).toInt()
         fun react(delta: Int, atTop: Boolean) {
-            if (atTop) {
+            if (atTop || delta < -2) {
                 navigationTravel = 0
                 setNavigationShown(true)
                 return
             }
-            if (delta == 0) return
-            navigationTravel = if ((navigationTravel >= 0 && delta > 0) ||
-                (navigationTravel <= 0 && delta < 0))
-                (navigationTravel + delta).coerceIn(-threshold * 2, threshold * 2) else delta
-            if (navigationTravel >= threshold) setNavigationShown(false)
-            if (navigationTravel <= -threshold) setNavigationShown(true)
+            if (delta <= 0) return
+            navigationTravel = (navigationTravel + delta).coerceIn(0, threshold * 3)
+            if (navigationTravel >= (threshold * 2)) setNavigationShown(false)
         }
         when (tab) {
             R.id.nav_notices -> root.v<RecyclerView>(R.id.rvNotices)
                 .addOnScrollListener(object : RecyclerView.OnScrollListener() {
                     override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                        if(newState==RecyclerView.SCROLL_STATE_IDLE) markVisibleNoticesRead(root,recyclerView)
+                        if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                            markVisibleNoticesRead(root, recyclerView)
+                            setNavigationShown(true)
+                        }
                     }
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                         react(dy, !recyclerView.canScrollVertically(-1))
@@ -279,9 +279,10 @@ internal class ClassMateAcademicScreensSupabase(
             R.id.nav_timetable, R.id.nav_pdf -> root.v<androidx.core.widget.NestedScrollView>(
                 R.id.nestedScrollView).setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
                     _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
-            R.id.nav_profile -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile) ?: root as? androidx.core.widget.NestedScrollView)
-                ?.setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
-                    _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
+            R.id.nav_profile -> {
+                // Settings/Profile always keeps the bottom navigation bar visible
+                setNavigationShown(true)
+            }
         }
         if (tab == R.id.nav_timetable) {
             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
@@ -314,7 +315,15 @@ internal class ClassMateAcademicScreensSupabase(
         }
     }
 
-    private fun setNavigationShown(show: Boolean) {
+    internal fun setNavigationShown(show: Boolean) {
+        if (show) {
+            navShown = true
+            (activity as? ClassMateAuthActivity)?.composeNavVisible = true
+            val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
+            nav.animate().cancel()
+            nav.animate().translationY(0f).alpha(1f).setDuration(180).start()
+            return
+        }
         if (navShown == show) return
         navShown = show
         (activity as? ClassMateAuthActivity)?.composeNavVisible = show
