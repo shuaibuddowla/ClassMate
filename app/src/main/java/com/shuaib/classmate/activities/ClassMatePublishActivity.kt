@@ -58,7 +58,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private lateinit var form: ClassMateFormUi
     private lateinit var submit: MaterialButton
     private lateinit var status: TextView
-    private lateinit var name: TextInputEditText
+    private lateinit var name: EditText
     private var uri: Uri? = null
     private var selectedFileLabel = ""
     private var selectedFileSize = 0L
@@ -67,7 +67,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var courses = emptyList<CourseEntry>()
     private var uploadMode = "file"
     private var restoredLinkUrl = ""
-    private var urlInput: TextInputEditText? = null
+    private var urlInput: EditText? = null
     private var currentUploadTaskId: String? = null
 
     // Callbacks and references for UI updates
@@ -132,31 +132,96 @@ class ClassMatePublishActivity : AppCompatActivity() {
             insets
         }
 
-        val toolbar = MaterialToolbar(this).apply {
-            title = if (editingFile != null) {
-                if (isEditingLink) "Edit Drive link" else "Edit library file"
-            } else if (upload) {
-                "Add library file"
-            } else {
-                "Post notice"
+        var badgeSemester: TextView? = null
+        if (upload) {
+            val header = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(10), dp(16), dp(10))
+                layoutParams = LinearLayout.LayoutParams(-1, -2)
             }
-            setTitleTextColor(getColor(R.color.cm_text_primary))
-            setNavigationIcon(R.drawable.ic_chevron_left)
-            navigationIcon?.setTint(getColor(R.color.cm_text_primary))
-            setNavigationOnClickListener {
-                if (currentUploadTaskId != null) {
-                    Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
-                    finish()
-                } else if (!busy) {
-                    finish()
+            val btnBack = ImageView(this).apply {
+                setImageResource(R.drawable.ic_chevron_left)
+                setColorFilter(getColor(R.color.cm_text_primary))
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                val outVal = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+                setBackgroundResource(outVal.resourceId)
+                layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(4) }
+                setOnClickListener {
+                    if (currentUploadTaskId != null) {
+                        Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else if (!busy) {
+                        finish()
+                    }
                 }
             }
-        }
-        root.addView(toolbar)
+            val headerTitles = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            }
+            val tvHeaderTitle = TextView(this).apply {
+                text = if (editingFile != null) {
+                    if (isEditingLink) "Edit Drive link" else "Edit library file"
+                } else {
+                    "Add Library File"
+                }
+                textSize = 17.5f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(getColor(R.color.cm_text_primary))
+            }
+            val tvHeaderSub = TextView(this).apply {
+                text = intent.getStringExtra("batch_label").orEmpty()
+                textSize = 11.5f
+                setTextColor(getColor(R.color.cm_text_muted))
+                visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+            }
+            headerTitles.addView(tvHeaderTitle)
+            headerTitles.addView(tvHeaderSub)
 
-        form = ClassMateFormUi(this)
-        form.label(intent.getStringExtra("batch_label").orEmpty()).apply { textSize = 14f }
-        root.addView(form.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            badgeSemester = TextView(this).apply {
+                text = "Semester"
+                textSize = 11f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(getColor(R.color.cm_primary))
+                setBackgroundResource(R.drawable.bg_badge_semester)
+                setPadding(dp(10), dp(4), dp(10), dp(4))
+            }
+
+            header.addView(btnBack)
+            header.addView(headerTitles)
+            header.addView(badgeSemester)
+
+            val headerDivider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, dp(1))
+                setBackgroundColor(getColor(R.color.cm_divider))
+            }
+            root.addView(header)
+            root.addView(headerDivider)
+
+            form = ClassMateFormUi(this)
+            root.addView(form.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        } else {
+            val toolbar = MaterialToolbar(this).apply {
+                title = "Post notice"
+                setTitleTextColor(getColor(R.color.cm_text_primary))
+                setNavigationIcon(R.drawable.ic_chevron_left)
+                navigationIcon?.setTint(getColor(R.color.cm_text_primary))
+                setNavigationOnClickListener {
+                    if (currentUploadTaskId != null) {
+                        Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else if (!busy) {
+                        finish()
+                    }
+                }
+            }
+            root.addView(toolbar)
+            form = ClassMateFormUi(this)
+            form.label(intent.getStringExtra("batch_label").orEmpty()).apply { textSize = 14f }
+            root.addView(form.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
 
         submit = MaterialButton(this).apply {
             val isLink = isEditingLink || uploadMode == "link"
@@ -164,8 +229,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
             isAllCaps = false
             isEnabled = false
             cornerRadius = dp(16)
+            setBackgroundColor(getColor(R.color.cm_primary))
         }
-        root.addView(submit, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(dp(24), dp(12), dp(24), dp(16)) })
+        root.addView(submit, LinearLayout.LayoutParams(-1, dp(50)).apply { setMargins(dp(20), dp(10), dp(20), dp(14)) })
         setContentView(root)
 
         val loading = form.label("Loading editor…")
@@ -185,7 +251,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
+                val semesterObj = ClassMateAuthApi.rows("semesters", "select=id,semester_number&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)
+                val semester = semesterObj?.optString("id")
+                val semNum = semesterObj?.optInt("semester_number", 0) ?: 0
+                val semTitle = if (semNum > 0) "Semester $semNum" else "Semester 3"
+                badgeSemester?.text = semTitle
                 val offerings = if (semester == null) JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
                 val catalog = ClassMateCourses.catalog(batch)
                 val catalogMap = (0 until catalog.length()).map { catalog.getJSONObject(it) }.associateBy { it.getString("id") }
@@ -431,102 +501,138 @@ class ClassMatePublishActivity : AppCompatActivity() {
             uploadMode = if (isEditingLink) "link" else "file"
         }
 
-        var btnUploadFile: TextView? = null
-        var btnDriveLink: TextView? = null
+        var updateModeVisibility: (() -> Unit)? = null
 
-        fun updateToggleUi() {
+        // --- 1. Top Underline Tabs [ Upload Document | Google Drive Link ] ---
+        var tvTabUpload: TextView? = null
+        var indTabUpload: View? = null
+        var tvTabLink: TextView? = null
+        var indTabLink: View? = null
+
+        fun updateTabsUi() {
             val isLink = uploadMode == "link"
-            btnUploadFile?.apply {
-                if (!isLink) {
-                    setBackgroundResource(R.drawable.bg_toggle_item_selected)
-                    setTextColor(Color.WHITE)
-                    compoundDrawablesRelative[0]?.setTint(Color.WHITE)
-                } else {
-                    background = null
-                    val sec = getColor(R.color.cm_text_secondary)
-                    setTextColor(sec)
-                    compoundDrawablesRelative[0]?.setTint(sec)
-                }
-            }
-            btnDriveLink?.apply {
-                if (isLink) {
-                    setBackgroundResource(R.drawable.bg_toggle_item_selected)
-                    setTextColor(Color.WHITE)
-                } else {
-                    background = null
-                    setTextColor(getColor(R.color.cm_text_secondary))
-                }
-                compoundDrawablesRelative[0]?.setTintList(null)
+            if (!isLink) {
+                tvTabUpload?.setTypeface(null, Typeface.BOLD)
+                tvTabUpload?.setTextColor(getColor(R.color.cm_primary))
+                indTabUpload?.visibility = View.VISIBLE
+
+                tvTabLink?.setTypeface(null, Typeface.NORMAL)
+                tvTabLink?.setTextColor(getColor(R.color.cm_text_muted))
+                indTabLink?.visibility = View.INVISIBLE
+            } else {
+                tvTabUpload?.setTypeface(null, Typeface.NORMAL)
+                tvTabUpload?.setTextColor(getColor(R.color.cm_text_muted))
+                indTabUpload?.visibility = View.INVISIBLE
+
+                tvTabLink?.setTypeface(null, Typeface.BOLD)
+                tvTabLink?.setTextColor(getColor(R.color.cm_primary))
+                indTabLink?.visibility = View.VISIBLE
             }
             if (!isEditing) {
-                // Primary button casing: sentence case
                 submit.text = if (isLink) "Share Drive link" else "Upload file"
             }
         }
 
-        // Top toggle bar: [ Upload File | Drive Link ]
         if (!isEditing) {
-            val toggle = LinearLayout(this).apply {
+            val tabRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setBackgroundResource(R.drawable.bg_toggle_container)
-                setPadding(dp(3), dp(3), dp(3), dp(3))
-                layoutParams = LinearLayout.LayoutParams(-1, dp(44)).apply {
-                    topMargin = dp(6)
-                    bottomMargin = dp(12)
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(4)
+                    bottomMargin = dp(2)
                 }
             }
-            btnUploadFile = TextView(this).apply {
-                text = " Upload File"
-                textSize = 12.5f
+            val tabUpload = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                isClickable = true
+                isFocusable = true
+                setPadding(0, dp(4), 0, 0)
+            }
+            tvTabUpload = TextView(this).apply {
+                text = "Upload Document"
+                textSize = 13f
                 setTypeface(null, Typeface.BOLD)
+                setTextColor(getColor(R.color.cm_primary))
                 gravity = Gravity.CENTER
-                val uploadIcon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)?.mutate()?.apply {
-                    setBounds(0, 0, dp(16), dp(16))
-                }
-                setCompoundDrawablesRelative(uploadIcon, null, null, null)
-                compoundDrawablePadding = dp(6)
-                layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+                setPadding(0, dp(4), 0, dp(6))
             }
-            btnDriveLink = TextView(this).apply {
-                text = " Drive Link"
-                textSize = 12.5f
-                setTypeface(null, Typeface.BOLD)
+            indTabUpload = View(this).apply {
+                val indH = (2.5f * resources.displayMetrics.density).toInt().coerceAtLeast(dp(2))
+                layoutParams = LinearLayout.LayoutParams(dp(84), indH)
+                setBackgroundColor(getColor(R.color.cm_primary))
+            }
+            tabUpload.addView(tvTabUpload)
+            tabUpload.addView(indTabUpload)
+
+            val tabLink = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                isClickable = true
+                isFocusable = true
+                setPadding(0, dp(4), 0, 0)
+            }
+            tvTabLink = TextView(this).apply {
+                text = "Google Drive Link"
+                textSize = 13f
+                setTypeface(null, Typeface.NORMAL)
+                setTextColor(getColor(R.color.cm_text_muted))
                 gravity = Gravity.CENTER
-                val driveIcon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_google_drive)?.mutate()?.apply {
-                    setBounds(0, 0, dp(16), dp(16))
-                }
-                setCompoundDrawablesRelative(driveIcon, null, null, null)
-                compoundDrawablePadding = dp(6)
-                layoutParams = LinearLayout.LayoutParams(0, -1, 1f)
+                setPadding(0, dp(4), 0, dp(6))
             }
-            toggle.addView(btnUploadFile)
-            toggle.addView(btnDriveLink)
-            form.panel.addView(toggle)
+            indTabLink = View(this).apply {
+                val indH = (2.5f * resources.displayMetrics.density).toInt().coerceAtLeast(dp(2))
+                layoutParams = LinearLayout.LayoutParams(dp(84), indH)
+                setBackgroundColor(getColor(R.color.cm_primary))
+                visibility = View.INVISIBLE
+            }
+            tabLink.addView(tvTabLink)
+            tabLink.addView(indTabLink)
+
+            tabRow.addView(tabUpload)
+            tabRow.addView(tabLink)
+
+            val tabDivider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { bottomMargin = dp(14) }
+                setBackgroundColor(getColor(R.color.cm_divider))
+            }
+
+            form.panel.addView(tabRow)
+            form.panel.addView(tabDivider)
+
+            tabUpload.setOnClickListener {
+                if (uploadMode != "file") {
+                    uploadMode = "file"
+                    updateModeVisibility?.invoke()
+                }
+            }
+            tabLink.setOnClickListener {
+                if (uploadMode != "link") {
+                    uploadMode = "link"
+                    updateModeVisibility?.invoke()
+                }
+            }
         }
 
-        // --- 1. Compact File Picker Card ---
+        // --- 2. Minimalist File Picker Card ---
         val filePickerCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundResource(R.drawable.bg_picker_card_empty)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(4)
-                bottomMargin = dp(8)
+                bottomMargin = dp(12)
             }
             isClickable = true
             isFocusable = true
-            foreground = android.util.TypedValue().let { tv ->
-                theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
-                getDrawable(tv.resourceId)
-            }
         }
         val fileIconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
-            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            setBackgroundResource(R.drawable.bg_picker_pill)
         }
         val fileIconImg = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
             setImageResource(R.drawable.ic_file_generic)
             setColorFilter(getColor(R.color.cm_primary))
         }
@@ -537,7 +643,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
         }
         val tvFileName = TextView(this).apply {
-            text = "Select document"
+            text = "No file selected"
             textSize = 13.5f
             setTypeface(null, Typeface.BOLD)
             setTextColor(getColor(R.color.cm_text_primary))
@@ -545,58 +651,79 @@ class ClassMatePublishActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
         }
         val tvFileMeta = TextView(this).apply {
-            text = "PDF, DOCX, PPTX up to 50MB"
+            text = "PDF, DOCX up to 50MB"
             textSize = 11.5f
-            setTextColor(getColor(R.color.cm_text_secondary))
+            setTextColor(getColor(R.color.cm_text_muted))
         }
         fileDetailsCol.addView(tvFileName)
         fileDetailsCol.addView(tvFileMeta)
 
-        val rightActionContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
         val btnActionChoose = TextView(this).apply {
             text = "Choose"
             textSize = 12f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_primary))
+            setTextColor(getColor(R.color.cm_text_primary))
             setBackgroundResource(R.drawable.bg_picker_pill)
-            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setPadding(dp(14), dp(7), dp(14), dp(7))
         }
         val btnActionChange = TextView(this).apply {
             text = "Change"
             textSize = 12f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_secondary))
+            setTextColor(getColor(R.color.cm_text_primary))
             setBackgroundResource(R.drawable.bg_picker_pill)
-            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setPadding(dp(14), dp(7), dp(14), dp(7))
             visibility = View.GONE
         }
         val btnActionRemove = ImageView(this).apply {
             setImageResource(R.drawable.ic_close)
-            setColorFilter(getColor(R.color.cm_text_secondary))
+            setColorFilter(getColor(R.color.cm_text_muted))
             setBackgroundResource(R.drawable.bg_picker_pill)
             setPadding(dp(6), dp(6), dp(6), dp(6))
             layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(6) }
             visibility = View.GONE
         }
-        rightActionContainer.addView(btnActionChoose)
-        rightActionContainer.addView(btnActionChange)
-        rightActionContainer.addView(btnActionRemove)
-
         filePickerCard.addView(fileIconFrame)
         filePickerCard.addView(fileDetailsCol)
-        filePickerCard.addView(rightActionContainer)
+        filePickerCard.addView(btnActionChoose)
+        filePickerCard.addView(btnActionChange)
+        filePickerCard.addView(btnActionRemove)
         form.panel.addView(filePickerCard)
 
-        // --- 2. Link section containers ---
+        // --- 3. Google Drive Link Section ---
         val linkSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(2)
-                bottomMargin = dp(8)
+                bottomMargin = dp(12)
             }
+        }
+        val tvLinkLabel = TextView(this).apply {
+            text = "Google Drive Link *"
+            textSize = 11.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
+        }
+        val urlField = EditText(this).apply {
+            setBackgroundResource(R.drawable.bg_clean_input)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            textSize = 13.5f
+            setTextColor(getColor(R.color.cm_text_primary))
+            setHintTextColor(getColor(R.color.cm_text_disabled))
+            hint = "Paste Google Drive URL here"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            val initialUrl = restoredLinkUrl.ifBlank { sanitizedEditLink }
+            setText(if (initialUrl.equals("null", ignoreCase = true)) "" else initialUrl)
+        }
+        urlInput = urlField
+
+        val tvUrlError = TextView(this).apply {
+            textSize = 11f
+            setTextColor(getColor(R.color.cm_error))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }
         }
 
         // Inline dismissible clipboard banner: "📋 Link detected — tap to paste"
@@ -608,7 +735,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(4)
+                topMargin = dp(6)
                 bottomMargin = dp(4)
             }
         }
@@ -634,22 +761,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
         clipboardBanner.addView(bannerText)
         clipboardBanner.addView(bannerDismiss)
 
-        val urlBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedStyle).apply {
-            hint = "Google Drive link *"
-            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
-            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }
-        }
-        val urlField = TextInputEditText(urlBox.context).apply {
-            setTextColor(getColor(R.color.cm_text_primary))
-            setSingleLine(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            val initialUrl = restoredLinkUrl.ifBlank { sanitizedEditLink }
-            setText(if (initialUrl.equals("null", ignoreCase = true)) "" else initialUrl)
-        }
-        urlInput = urlField
-        urlBox.addView(urlField)
-
         // Non-Drive link inline warning banner
         val driveWarning = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -673,8 +784,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
         driveWarning.addView(warnIcon)
         driveWarning.addView(warnText)
 
+        linkSection.addView(tvLinkLabel)
+        linkSection.addView(urlField)
+        linkSection.addView(tvUrlError)
         linkSection.addView(clipboardBanner)
-        linkSection.addView(urlBox)
         linkSection.addView(driveWarning)
         form.panel.addView(linkSection)
 
@@ -704,7 +817,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val pasteBannerAction = {
             detectedClipboardUrl?.let { link ->
                 urlField.setText(link)
-                urlBox.error = null
+                tvUrlError.visibility = View.GONE
                 clipboardBanner.visibility = View.GONE
                 Toast.makeText(this, "Link pasted from clipboard", Toast.LENGTH_SHORT).show()
             }
@@ -713,60 +826,168 @@ class ClassMatePublishActivity : AppCompatActivity() {
         bannerText.setOnClickListener { pasteBannerAction() }
         bannerDismiss.setOnClickListener { clipboardBanner.visibility = View.GONE }
 
-        // --- 3. Resource title / File name ---
-        name = form.field(if (uploadMode == "link") "Resource title *" else "File name *").apply {
+        // --- 4. Display Title Section ---
+        val tvNameLabel = TextView(this).apply {
+            text = if (uploadMode == "link") "Resource title *" else "Display Title"
+            textSize = 11.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(2)
+                bottomMargin = dp(6)
+            }
+        }
+        name = EditText(this).apply {
+            setBackgroundResource(R.drawable.bg_clean_input)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            textSize = 13.5f
+            setTextColor(getColor(R.color.cm_text_primary))
+            setHintTextColor(getColor(R.color.cm_text_disabled))
+            hint = "e.g. OOP Syllabus 2026"
+            setSingleLine(true)
             setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') })
         }
-        val nameBox = name.parent.parent as? TextInputLayout
-
-        // --- 4. Side-by-Side Category & Subject row ---
-        val (categoryBox, category) = createDropdown("Category *", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
-
-        val subjectBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
-            hint = "Subject *"
-            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
-            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+        val tvNameError = TextView(this).apply {
+            textSize = 11f
+            setTextColor(getColor(R.color.cm_error))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }
         }
-        val subject = MaterialAutoCompleteTextView(subjectBox.context).apply {
-            inputType = android.text.InputType.TYPE_NULL
-            setSingleLine(true)
-            ellipsize = TextUtils.TruncateAt.END
-            val adapter = object : ArrayAdapter<CourseEntry>(this@ClassMatePublishActivity, R.layout.item_course_two_line_dropdown, courses) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = convertView ?: layoutInflater.inflate(R.layout.item_course_two_line_dropdown, parent, false)
-                    val item = getItem(position)
-                    view.findViewById<TextView>(R.id.tvCourseCode).text = item?.code.orEmpty()
-                    view.findViewById<TextView>(R.id.tvCourseTitle).text = item?.title.orEmpty()
-                    return view
-                }
-            }
-            setAdapter(adapter)
-            if (courses.isNotEmpty()) {
-                val defaultCourseId = intent.getStringExtra("course_id")
-                val matched = if (!defaultCourseId.isNullOrBlank()) courses.firstOrNull { it.offeringId == defaultCourseId } else courses.first()
-                matched?.let { setText(it.displayLabel, false) }
-            }
-            setTextColor(getColor(R.color.cm_text_primary))
-        }
-        subjectBox.addView(subject)
+        form.panel.addView(tvNameLabel)
+        form.panel.addView(name)
+        form.panel.addView(tvNameError)
 
+        // --- 5. Side-by-Side Category & Subject ---
         val metaRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
         }
-        metaRow.addView(categoryBox, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(5) })
-        metaRow.addView(subjectBox, LinearLayout.LayoutParams(0, -2, 1.25f).apply { marginStart = dp(5) })
+
+        // Left Column: Category
+        val colCategory = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) }
+        }
+        val tvCatLabel = TextView(this).apply {
+            text = "Category"
+            textSize = 11.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
+        }
+        val boxCategory = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_clean_select)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            isClickable = true
+            isFocusable = true
+        }
+        val tvCategoryValue = TextView(this).apply {
+            val initialCat = editingFile?.optString("category")?.replaceFirstChar { it.uppercase() } ?: "Notes"
+            text = initialCat
+            textSize = 13f
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        val arrowCategory = TextView(this).apply {
+            text = "▾"
+            textSize = 12f
+            setTextColor(getColor(R.color.cm_text_disabled))
+        }
+        boxCategory.addView(tvCategoryValue)
+        boxCategory.addView(arrowCategory)
+        colCategory.addView(tvCatLabel)
+        colCategory.addView(boxCategory)
+
+        // Right Column: Subject
+        val colSubject = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1.15f).apply { marginStart = dp(6) }
+        }
+        val tvSubLabel = TextView(this).apply {
+            text = "Subject"
+            textSize = 11.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
+        }
+        val boxSubject = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_clean_select)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            isClickable = true
+            isFocusable = true
+        }
+        var selectedCourse: CourseEntry? = editingFile?.optString("semester_course_id")?.let { id ->
+            courses.firstOrNull { it.offeringId == id }
+        } ?: intent.getStringExtra("course_id")?.let { id ->
+            courses.firstOrNull { it.offeringId == id }
+        } ?: courses.firstOrNull()
+
+        val tvSubjectValue = TextView(this).apply {
+            text = selectedCourse?.displayLabel ?: "Select subject"
+            textSize = 13f
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        val arrowSubject = TextView(this).apply {
+            text = "▾"
+            textSize = 12f
+            setTextColor(getColor(R.color.cm_text_disabled))
+        }
+        boxSubject.addView(tvSubjectValue)
+        boxSubject.addView(arrowSubject)
+        colSubject.addView(tvSubLabel)
+        colSubject.addView(boxSubject)
+
+        metaRow.addView(colCategory)
+        metaRow.addView(colSubject)
         form.panel.addView(metaRow)
 
+        val categories = listOf("Notes", "Slides", "Questions", "Syllabus", "Book", "Other")
+        boxCategory.setOnClickListener {
+            val curIndex = categories.indexOf(tvCategoryValue.text.toString()).coerceAtLeast(0)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Select Category")
+                .setSingleChoiceItems(categories.toTypedArray(), curIndex) { dialog, which ->
+                    tvCategoryValue.text = categories[which]
+                    dialog.dismiss()
+                }
+                .show()
+        }
+
+        boxSubject.setOnClickListener {
+            if (courses.isEmpty()) return@setOnClickListener
+            val labels = courses.map { it.displayLabel }.toTypedArray()
+            val curIndex = courses.indexOfFirst { it.offeringId == selectedCourse?.offeringId }.coerceAtLeast(0)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Select Subject")
+                .setSingleChoiceItems(labels, curIndex) { dialog, which ->
+                    selectedCourse = courses[which]
+                    tvSubjectValue.text = selectedCourse?.displayLabel
+                    dialog.dismiss()
+                }
+                .show()
+        }
+
         editingFile?.let { file ->
-            category.setText(file.optString("category").replaceFirstChar { it.uppercase() }, false)
-            courses.firstOrNull { it.offeringId == file.optString("semester_course_id") }?.let { subject.setText(it.displayLabel, false) }
+            tvCategoryValue.text = file.optString("category").replaceFirstChar { it.uppercase() }
+            courses.firstOrNull { it.offeringId == file.optString("semester_course_id") }?.let {
+                selectedCourse = it
+                tvSubjectValue.text = it.displayLabel
+            }
             filePickerCard.visibility = View.GONE
-            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the name, category or subject. The uploaded file stays unchanged."
+            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the title, category or subject. The uploaded file stays unchanged."
             form.label(note)
         }
 
-        // --- 5. Determinate Progress Bar & Status ---
+        // --- 6. Determinate Progress Bar & Status ---
         val progressContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -792,9 +1013,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         fun updatePickedFileUi() {
             if (uri != null && selectedFileLabel.isNotBlank()) {
-                filePickerCard.setBackgroundResource(R.drawable.bg_picked_file_card)
+                filePickerCard.setBackgroundResource(R.drawable.bg_picker_card_empty)
                 tvFileName.text = selectedFileLabel
-                tvFileMeta.text = "${formatFileSize(selectedFileSize)} · Ready to upload"
+                tvFileMeta.text = "${formatFileSize(selectedFileSize)} · Ready"
                 btnActionChoose.visibility = View.GONE
                 btnActionChange.visibility = View.VISIBLE
                 btnActionRemove.visibility = View.VISIBLE
@@ -815,12 +1036,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 }
             } else {
                 filePickerCard.setBackgroundResource(R.drawable.bg_picker_card_empty)
-                tvFileName.text = "Select document"
-                tvFileMeta.text = "PDF, DOCX, PPTX up to 50MB"
+                tvFileName.text = "No file selected"
+                tvFileMeta.text = "PDF, DOCX up to 50MB"
                 btnActionChoose.visibility = View.VISIBLE
                 btnActionChange.visibility = View.GONE
                 btnActionRemove.visibility = View.GONE
-                fileIconFrame.setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+                fileIconFrame.setBackgroundResource(R.drawable.bg_picker_pill)
                 fileIconImg.setImageResource(R.drawable.ic_file_generic)
                 fileIconImg.setColorFilter(getColor(R.color.cm_primary))
             }
@@ -845,31 +1066,18 @@ class ClassMatePublishActivity : AppCompatActivity() {
             updatePickedFileUi()
         }
 
-        fun updateModeVisibility() {
+        updateModeVisibility = {
             val isLink = uploadMode == "link"
-            updateToggleUi()
+            updateTabsUi()
             linkSection.visibility = if (isLink) View.VISIBLE else View.GONE
             filePickerCard.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
-            nameBox?.hint = if (isLink) "Resource title *" else "File name *"
+            tvNameLabel.text = if (isLink) "Resource title *" else "Display Title"
             if (isLink) checkClipboard()
-        }
-
-        btnUploadFile?.setOnClickListener {
-            if (uploadMode != "file") {
-                uploadMode = "file"
-                updateModeVisibility()
-            }
-        }
-        btnDriveLink?.setOnClickListener {
-            if (uploadMode != "link") {
-                uploadMode = "link"
-                updateModeVisibility()
-            }
         }
 
         name.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                nameBox?.error = null
+                tvNameError.visibility = View.GONE
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -877,7 +1085,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         urlField.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                urlBox.error = null
+                tvUrlError.visibility = View.GONE
                 val u = s?.toString()?.trim().orEmpty()
                 val isNonDrive = u.isNotBlank() && !FileVisuals.isGoogleDrive(u)
                 driveWarning.visibility = if (isNonDrive && uploadMode == "link") View.VISIBLE else View.GONE
@@ -886,18 +1094,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
         })
 
-        category.setOnItemClickListener { _, _, _, _ ->
-            categoryBox.error = null
-        }
-
-        subject.setOnItemClickListener { _, _, _, _ ->
-            subjectBox.error = null
-        }
-
         updatePickedFileUi()
-        updateModeVisibility()
+        updateModeVisibility.invoke()
 
-                // Observe background upload progress
+        // Observe background upload progress
         lifecycleScope.launch {
             LibraryUploadManager.uploadState.collect { prog ->
                 if (prog != null && prog.taskId == currentUploadTaskId) {
@@ -943,51 +1143,50 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val isLink = uploadMode == "link"
             val title = name.text.toString().trim()
             if (title.isBlank()) {
-                nameBox?.error = if (isLink) "Resource title is required" else "File name is required"
+                tvNameError.text = if (isLink) "Resource title is required" else "Display title is required"
+                tvNameError.visibility = View.VISIBLE
                 name.requestFocus()
                 return@setOnClickListener
             }
-            nameBox?.error = null
+            tvNameError.visibility = View.GONE
 
-            val selSubjectText = subject.text.toString().trim()
-            val course = courses.firstOrNull { it.displayLabel == selSubjectText || it.second == selSubjectText }
+            val course = selectedCourse
             if (course == null) {
-                subjectBox.error = "Please select a subject"
-                subject.requestFocus()
+                Toast.makeText(this, "Please select a subject", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            subjectBox.error = null
 
-            val kind = category.text.toString().trim().lowercase()
+            val kind = tvCategoryValue.text.toString().trim().lowercase()
             if (kind.isBlank()) {
-                categoryBox.error = "Please select a category"
-                category.requestFocus()
+                Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            categoryBox.error = null
 
             val rawUrl = urlField.text.toString().trim()
             val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
 
             if (isLink) {
                 if (rawUrl.isBlank()) {
-                    urlBox.error = "Google Drive link is required"
+                    tvUrlError.text = "Google Drive link is required"
+                    tvUrlError.visibility = View.VISIBLE
                     urlField.requestFocus()
                     return@setOnClickListener
                 }
                 try {
                     val u = java.net.URI(urlWithScheme)
                     if (u.host.isNullOrBlank() || !u.host.contains('.')) {
-                        urlBox.error = "Please enter a valid link URL (e.g. https://drive.google.com/...)"
+                        tvUrlError.text = "Please enter a valid link URL (e.g. https://drive.google.com/...)"
+                        tvUrlError.visibility = View.VISIBLE
                         urlField.requestFocus()
                         return@setOnClickListener
                     }
                 } catch (e: Exception) {
-                    urlBox.error = "Please enter a valid link URL"
+                    tvUrlError.text = "Please enter a valid link URL"
+                    tvUrlError.visibility = View.VISIBLE
                     urlField.requestFocus()
                     return@setOnClickListener
                 }
-                urlBox.error = null
+                tvUrlError.visibility = View.GONE
             } else {
                 if (uri == null && editingFile == null) {
                     status.visibility = View.VISIBLE
@@ -1035,86 +1234,66 @@ class ClassMatePublishActivity : AppCompatActivity() {
                                 .put("target_title", title)
                                 .put("target_category", kind)
                                 .put("target_course", course.offeringId)
+                                .put("target_link_url", null)
                             )
                             null
                         }
-                    } else {
-                        // Background upload via LibraryUploadManager
-                        val selected = uri ?: return
-                        status.text = "Preparing upload…"
-                        lifecycleScope.launch {
-                            try {
-                                val mime = contentResolver.getType(selected) ?: "application/octet-stream"
-                                val size = selectedFileSize.takeIf { it > 0 } ?: contentResolver.query(selected, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
-                                    if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
-                                } ?: 0L
-
-                                val taskId = LibraryUploadManager.enqueueUpload(
-                                    context = applicationContext,
-                                    uri = selected,
-                                    fileName = selectedFileLabel.ifBlank { title },
-                                    batchId = batch,
-                                    courseId = course.offeringId,
-                                    courseName = course.displayLabel,
-                                    title = title,
-                                    mimeType = mime,
-                                    sizeBytes = size,
-                                    category = kind
-                                )
-                                currentUploadTaskId = taskId
-                                progressContainer.visibility = View.VISIBLE
-                                determinateProgress.isIndeterminate = true
-                                progressText.text = "Upload started in background…"
-                            } catch (e: Exception) {
-                                status.text = e.message ?: "Failed to start upload"
-                                busy = false
-                                submit.isEnabled = true
-                            }
+                    } else if (uri != null) {
+                        try {
+                            val mime = contentResolver.getType(uri!!) ?: "application/pdf"
+                            val taskId = LibraryUploadManager.enqueueUpload(
+                                context = this@ClassMatePublishActivity,
+                                uri = uri!!,
+                                fileName = selectedFileLabel,
+                                batchId = batch,
+                                courseId = course.offeringId,
+                                courseName = course.code,
+                                title = title,
+                                mimeType = mime,
+                                sizeBytes = selectedFileSize,
+                                category = kind
+                            )
+                            currentUploadTaskId = taskId
+                            progressContainer.visibility = View.VISIBLE
+                            progressText.text = "Starting background upload…"
+                            determinateProgress.isIndeterminate = true
+                            determinateProgress.progress = 0
+                            status.text = "Upload running in background. You may leave this screen."
+                            Toast.makeText(this@ClassMatePublishActivity, "Upload started in background", Toast.LENGTH_SHORT).show()
+                            submit.isEnabled = false
+                        } catch (e: Exception) {
+                            busy = false
+                            submit.isEnabled = true
+                            status.text = "Failed to start upload: ${e.message}"
+                            progressContainer.visibility = View.GONE
                         }
                     }
                 }
             }
 
-            // Check for duplicates before submission
+            // Check duplicate
             lifecycleScope.launch {
-                busy = true
-                submit.isEnabled = false
-                status.visibility = View.VISIBLE
-                status.text = "Checking for duplicates…"
-
-                val existingFiles = runCatching {
-                    ClassMateAuthApi.rows(
-                        "file_metadata",
-                        "select=id,title,category,semester_course_id,file_type,link_url&status=eq.active&semester_course_id=eq.${course.offeringId}&category=eq.$kind"
-                    )
-                }.getOrNull() ?: JSONArray()
-
-                val newTitleClean = title.trim().lowercase()
                 var duplicateId: String? = null
                 var duplicateTitle: String? = null
-
-                for (i in 0 until existingFiles.length()) {
-                    val f = existingFiles.getJSONObject(i)
-                    val fId = f.getString("id")
-                    if (editingFile?.optString("id") == fId) continue
-
-                    val fTitle = f.optString("title").trim()
-                    val fTitleClean = fTitle.lowercase()
-
-                    val isExact = fTitleClean == newTitleClean
-                    val isSimilar = fTitleClean.replace(Regex("[^a-z0-9]"), "") == newTitleClean.replace(Regex("[^a-z0-9]"), "") ||
-                            ((fTitleClean.contains(newTitleClean) || newTitleClean.contains(fTitleClean)) && Math.abs(fTitleClean.length - newTitleClean.length) <= 3)
-
-                    if (isExact || isSimilar) {
-                        duplicateId = fId
-                        duplicateTitle = fTitle
-                        break
-                    }
+                if (!isEditing) {
+                    try {
+                        val checkRes = ClassMateAuthApi.rows(
+                            "resources",
+                            "select=id,title&semester_course_id=eq.${course.offeringId}&category=eq.$kind&batch_id=eq.$batch"
+                        )
+                        val normalize = { s: String -> s.lowercase().replace(Regex("[^a-z0-9]"), "") }
+                        val inputNorm = normalize(title)
+                        for (i in 0 until checkRes.length()) {
+                            val r = checkRes.getJSONObject(i)
+                            val rTitle = r.optString("title")
+                            if (normalize(rTitle) == inputNorm) {
+                                duplicateId = r.optString("id")
+                                duplicateTitle = rTitle
+                                break
+                            }
+                        }
+                    } catch (_: Exception) {}
                 }
-
-                busy = false
-                submit.isEnabled = true
-                status.visibility = View.GONE
 
                 if (duplicateId != null && duplicateTitle != null) {
                     MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
