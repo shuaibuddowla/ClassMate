@@ -122,128 +122,294 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     fun getQuickActionsForTab(tab: com.shuaib.classmate.ui.ClassMateTab): List<com.shuaib.classmate.ui.TabQuickAction> {
         val role = profile?.optString("role")
-        val isPrivileged = role in setOf("admin", "teacher") || profile?.optBoolean("is_cr") == true
+        val isTeacher = role == "teacher"
+        val isAdmin = role == "admin" || profile?.optBoolean("is_server_owner") == true
+        val isCr = profile?.optBoolean("is_cr") == true
+
         return when (tab) {
-            com.shuaib.classmate.ui.ClassMateTab.TIMETABLE -> listOfNotNull(
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Academic Calendar",
-                    subtitle = "Holidays, exam schedules & semesters",
-                    iconRes = R.drawable.ic_academic_cap,
-                    onClick = {
-                        startActivity(Intent(this, AcademicCalendarActivity::class.java))
-                    }
-                ),
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Bus Schedule",
-                    subtitle = "Campus transport timing & routes",
-                    iconRes = R.drawable.ic_bus,
-                    onClick = {
-                        startActivity(Intent(this, BusScheduleManagementActivity::class.java))
-                    }
-                ),
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "ClassMate AI",
-                    subtitle = "Ask AI about routine and course updates",
-                    iconRes = R.drawable.ic_timetable,
-                    onClick = {
-                        startActivity(Intent(this, ClassMateAiActivity::class.java))
-                    }
-                ),
-                if (isPrivileged) {
-                    com.shuaib.classmate.ui.TabQuickAction(
-                        title = "Add Routine Period",
-                        subtitle = "Schedule a class slot for your batch",
-                        iconRes = R.drawable.ic_edit,
-                        onClick = {
-                            openPeriodEditor(null, LocalDate.now().dayOfWeek.value % 7 + 1)
-                        }
-                    )
-                } else null
-            )
-            com.shuaib.classmate.ui.ClassMateTab.NOTICES -> listOfNotNull(
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Post a Notice",
-                    subtitle = "Share updates with your batch",
-                    iconRes = R.drawable.ic_notice,
-                    onClick = {
-                        showNoticeForm()
-                    }
-                ),
-                if (isPrivileged) {
-                    com.shuaib.classmate.ui.TabQuickAction(
-                        title = "Post Class Change",
-                        subtitle = "Cancel, reschedule, or change room",
-                        iconRes = R.drawable.ic_edit,
-                        onClick = {
-                            showClassChangeForm()
-                        }
-                    )
-                } else null
-            )
-            com.shuaib.classmate.ui.ClassMateTab.BATCH -> listOf(
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Batch Fund",
-                    subtitle = "Track contributions, balances & ledger",
-                    iconRes = R.drawable.ic_batch_friends,
-                    onClick = {
-                        startActivity(Intent(this, ClassMateBatchFundActivity::class.java))
-                    }
-                ),
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Blood Network",
-                    subtitle = "Emergency donor search & requests",
-                    iconRes = R.drawable.ic_blood_drop,
-                    onClick = {
-                        startActivity(Intent(this, ClassMateBloodActivity::class.java))
-                    }
-                )
-            )
-            com.shuaib.classmate.ui.ClassMateTab.COURSES -> listOfNotNull(
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "All Course Files",
-                    subtitle = "Handouts, notes, slides and lab resources",
-                    iconRes = R.drawable.ic_library_filled,
-                    onClick = {
-                        val canManage = isPrivileged
-                        courseFilesLauncher.launch(
-                            Intent(this, ClassMateCourseFilesActivity::class.java)
-                                .putExtra("course_id", "")
-                                .putExtra("course_name", "All Course Files")
-                                .putExtra("batch_id", selectedBatchId)
-                                .putExtra("profile_id", userId)
-                                .putExtra("can_manage", canManage)
-                                .putExtra("role", profile?.optString("role"))
-                                .putExtra("is_cr", profile?.optBoolean("is_cr") == true)
+            com.shuaib.classmate.ui.ClassMateTab.TIMETABLE -> {
+                if (isTeacher) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Academic Calendar",
+                            subtitle = "Holidays, exam schedules & semesters",
+                            iconRes = R.drawable.ic_academic_cap,
+                            onClick = { startActivity(Intent(this, AcademicCalendarActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Bus Schedule",
+                            subtitle = "Campus transport timing & routes",
+                            iconRes = R.drawable.ic_bus,
+                            onClick = { startActivity(Intent(this, BusScheduleManagementActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Take Attendance",
+                            subtitle = "RFID & roll call session",
+                            iconRes = R.drawable.ic_edit,
+                            onClick = { academicScreens.triggerRfidAttendanceDialog() }
                         )
-                    }
-                ),
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Upload Course File",
-                    subtitle = "Share lecture slides, notes, or drive link",
-                    iconRes = R.drawable.ic_file_generic,
-                    onClick = {
-                        showUploadForm()
-                    }
+                    )
+                } else {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Academic Calendar",
+                            subtitle = "Holidays, exam schedules & semesters",
+                            iconRes = R.drawable.ic_academic_cap,
+                            onClick = { startActivity(Intent(this, AcademicCalendarActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Bus Schedule",
+                            subtitle = "Campus transport timing & routes",
+                            iconRes = R.drawable.ic_bus,
+                            onClick = { startActivity(Intent(this, BusScheduleManagementActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "ClassMate AI",
+                            subtitle = "Ask AI about routine and course updates",
+                            iconRes = R.drawable.ic_timetable,
+                            onClick = { startActivity(Intent(this, ClassMateAiActivity::class.java)) }
+                        ),
+                        if (isAdmin || isCr) {
+                            com.shuaib.classmate.ui.TabQuickAction(
+                                title = "Add Routine Period",
+                                subtitle = "Schedule a class slot for your batch",
+                                iconRes = R.drawable.ic_edit,
+                                onClick = { openPeriodEditor(null, LocalDate.now().dayOfWeek.value % 7 + 1) }
+                            )
+                        } else null
+                    )
+                }
+            }
+
+            com.shuaib.classmate.ui.ClassMateTab.NOTICES -> {
+                if (isTeacher) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Post Class Cancellation",
+                            subtitle = "Cancel or reschedule your class",
+                            iconRes = R.drawable.ic_edit,
+                            onClick = { showClassChangeForm() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Class Cancellations",
+                            subtitle = "View today's cancelled classes",
+                            iconRes = R.drawable.ic_notice,
+                            onClick = {
+                                selectedTab = R.id.nav_notices
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.NOTICES
+                                renderHomeTab(R.id.nav_notices)
+                                window.decorView.postDelayed({ academicScreens.openNoticeSearch("cancelled") }, 200)
+                            }
+                        )
+                    )
+                } else if (isAdmin || isCr) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Post a Notice",
+                            subtitle = "Share updates with your batch",
+                            iconRes = R.drawable.ic_notice,
+                            onClick = { showNoticeForm() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Post Class Change",
+                            subtitle = "Cancel, reschedule, or change room",
+                            iconRes = R.drawable.ic_edit,
+                            onClick = { showClassChangeForm() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Class Cancellations",
+                            subtitle = "View today's cancelled classes",
+                            iconRes = R.drawable.ic_notice,
+                            onClick = {
+                                selectedTab = R.id.nav_notices
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.NOTICES
+                                renderHomeTab(R.id.nav_notices)
+                                window.decorView.postDelayed({ academicScreens.openNoticeSearch("cancelled") }, 200)
+                            }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Search Notices",
+                            subtitle = "Find notices by keyword or teacher",
+                            iconRes = R.drawable.ic_search_modern,
+                            onClick = {
+                                selectedTab = R.id.nav_notices
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.NOTICES
+                                renderHomeTab(R.id.nav_notices)
+                                window.decorView.postDelayed({ academicScreens.openNoticeSearch(null) }, 200)
+                            }
+                        )
+                    )
+                } else {
+                    // Regular Student
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Class Cancellations",
+                            subtitle = "View today's cancelled classes",
+                            iconRes = R.drawable.ic_notice,
+                            onClick = {
+                                selectedTab = R.id.nav_notices
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.NOTICES
+                                renderHomeTab(R.id.nav_notices)
+                                window.decorView.postDelayed({ academicScreens.openNoticeSearch("cancelled") }, 200)
+                            }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Search Notices",
+                            subtitle = "Find notices by keyword or teacher",
+                            iconRes = R.drawable.ic_search_modern,
+                            onClick = {
+                                selectedTab = R.id.nav_notices
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.NOTICES
+                                renderHomeTab(R.id.nav_notices)
+                                window.decorView.postDelayed({ academicScreens.openNoticeSearch(null) }, 200)
+                            }
+                        )
+                    )
+                }
+            }
+
+            com.shuaib.classmate.ui.ClassMateTab.BATCH -> {
+                if (isTeacher) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Attendance Roster",
+                            subtitle = "Enrolled students & course attendance",
+                            iconRes = R.drawable.ic_users,
+                            onClick = {
+                                selectedTab = R.id.nav_friends
+                                composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.BATCH
+                                renderHomeTab(R.id.nav_friends)
+                            }
+                        )
+                    )
+                } else if (isAdmin || isCr) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Batch Fund",
+                            subtitle = "Track contributions, balances & ledger",
+                            iconRes = R.drawable.ic_batch_friends,
+                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Record Fund Entry",
+                            subtitle = "Add student deposit or batch expense",
+                            iconRes = R.drawable.ic_edit,
+                            onClick = {
+                                startActivity(Intent(this, ClassMateBatchFundActivity::class.java).putExtra("open_record_dialog", true))
+                            }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Blood Network",
+                            subtitle = "Emergency donor search & requests",
+                            iconRes = R.drawable.ic_blood_drop,
+                            onClick = { startActivity(Intent(this, ClassMateBloodActivity::class.java)) }
+                        )
+                    )
+                } else {
+                    // Regular Student
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Batch Fund",
+                            subtitle = "View contributions & fund balance",
+                            iconRes = R.drawable.ic_batch_friends,
+                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Blood Network",
+                            subtitle = "Emergency donor search & requests",
+                            iconRes = R.drawable.ic_blood_drop,
+                            onClick = { startActivity(Intent(this, ClassMateBloodActivity::class.java)) }
+                        )
+                    )
+                }
+            }
+
+            com.shuaib.classmate.ui.ClassMateTab.COURSES -> {
+                val canManage = isAdmin || isTeacher || isCr
+                listOfNotNull(
+                    com.shuaib.classmate.ui.TabQuickAction(
+                        title = "All Course Files",
+                        subtitle = "Handouts, notes, slides and lab resources",
+                        iconRes = R.drawable.ic_library_filled,
+                        onClick = {
+                            courseFilesLauncher.launch(
+                                Intent(this, ClassMateCourseFilesActivity::class.java)
+                                    .putExtra("course_id", "")
+                                    .putExtra("course_name", "All Course Files")
+                                    .putExtra("batch_id", selectedBatchId)
+                                    .putExtra("profile_id", userId)
+                                    .putExtra("can_manage", canManage)
+                                    .putExtra("role", profile?.optString("role"))
+                                    .putExtra("is_cr", profile?.optBoolean("is_cr") == true)
+                            )
+                        }
+                    ),
+                    if (canManage) {
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Upload Course File",
+                            subtitle = "Share lecture slides, notes, or drive link",
+                            iconRes = R.drawable.ic_file_generic,
+                            onClick = { showUploadForm() }
+                        )
+                    } else null
                 )
-            )
-            com.shuaib.classmate.ui.ClassMateTab.SETTINGS -> listOf(
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Switch Batch",
-                    subtitle = "Change running academic batch",
-                    iconRes = R.drawable.ic_nav_settings,
-                    onClick = {
-                        showBatchPicker()
-                    }
-                ),
-                com.shuaib.classmate.ui.TabQuickAction(
-                    title = "Edit Profile",
-                    subtitle = "Update name, student ID or phone",
-                    iconRes = R.drawable.ic_profile_outline,
-                    onClick = {
-                        editPersonalProfile()
-                    }
-                )
-            )
+            }
+
+            com.shuaib.classmate.ui.ClassMateTab.SETTINGS -> {
+                if (isAdmin) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Admin Panel",
+                            subtitle = "System configurations & batch controls",
+                            iconRes = R.drawable.ic_nav_settings,
+                            onClick = { startActivity(Intent(this, AdminPanelActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "User Management",
+                            subtitle = "Verify students, teachers & assign CR roles",
+                            iconRes = R.drawable.ic_users,
+                            onClick = { startActivity(Intent(this, UserManagementActivity::class.java)) }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Switch Batch",
+                            subtitle = "Change running academic batch",
+                            iconRes = R.drawable.ic_nav_settings_outline,
+                            onClick = { showBatchPicker() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Edit Profile",
+                            subtitle = "Update name, student ID or phone",
+                            iconRes = R.drawable.ic_profile_outline,
+                            onClick = { editPersonalProfile() }
+                        )
+                    )
+                } else if (isTeacher) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Switch Batch",
+                            subtitle = "Change running academic batch",
+                            iconRes = R.drawable.ic_nav_settings_outline,
+                            onClick = { showBatchPicker() }
+                        ),
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Edit Profile",
+                            subtitle = "Update name, teacher ID or phone",
+                            iconRes = R.drawable.ic_profile_outline,
+                            onClick = { editPersonalProfile() }
+                        )
+                    )
+                } else {
+                    // CR & Regular Student
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Edit Profile",
+                            subtitle = "Update name, student ID or phone",
+                            iconRes = R.drawable.ic_profile_outline,
+                            onClick = { editPersonalProfile() }
+                        )
+                    )
+                }
+            }
         }
     }
     fun showTabQuickActionsDialog(tab: com.shuaib.classmate.ui.ClassMateTab) {

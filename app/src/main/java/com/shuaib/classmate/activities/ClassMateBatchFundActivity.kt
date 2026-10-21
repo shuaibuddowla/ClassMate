@@ -212,6 +212,11 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 tvFundDescription.text = fundDescription
                 ivEditDescHint.visibility = if (isCr) View.VISIBLE else View.GONE
 
+                if (intent.getBooleanExtra("open_record_dialog", false) && isCr) {
+                    intent.removeExtra("open_record_dialog")
+                    showAddFundSheet()
+                }
+
                 // Load recent 5 transactions
                 loadRecentTransactions()
             } catch (e: Exception) {

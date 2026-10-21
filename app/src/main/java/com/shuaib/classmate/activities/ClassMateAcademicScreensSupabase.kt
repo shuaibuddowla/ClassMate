@@ -938,7 +938,29 @@ internal class ClassMateAcademicScreensSupabase(
         text(root, R.id.tvNoClassesSubtitle, "No trips scheduled for this date")
     }
 
+    var currentNoticeRoot: View? = null
+    fun openNoticeSearch(query: String? = null) {
+        currentNoticeRoot?.let { root ->
+            root.findViewById<View>(R.id.headerTitleBlock)?.visibility = View.GONE
+            root.findViewById<View>(R.id.btnSearch)?.visibility = View.GONE
+            root.findViewById<View>(R.id.searchContainer)?.visibility = View.VISIBLE
+            val input = root.findViewById<android.widget.EditText>(R.id.etNoticeSearch)
+            if (!query.isNullOrBlank()) {
+                input?.setText(query)
+                input?.setSelection(query.length)
+            } else {
+                input?.text?.clear()
+            }
+            input?.requestFocus()
+            input?.post {
+                (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+                    ?.showSoftInput(input, 0)
+            }
+        }
+    }
+
     private fun setupNotices(root: View) {
+        currentNoticeRoot = root
         val feed = root.v<RecyclerView>(R.id.rvNotices)
         feed.itemAnimator = null
         val header = root.v<View>(R.id.noticeHeaderPanel)
@@ -1679,7 +1701,7 @@ internal class ClassMateAcademicScreensSupabase(
 
     private var currentLibraryRoot: View? = null
     fun triggerRfidAttendanceDialog() {
-        currentLibraryRoot?.let { showRfidAttendanceDialog(it) }
+        showRfidAttendanceDialog(currentLibraryRoot ?: activity.window.decorView)
     }
 
     private fun showRfidAttendanceDialog(root: View) {
