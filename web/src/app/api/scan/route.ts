@@ -104,56 +104,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify Phone NFC HCE token format: NFC:<studentRoll>:<profileId>:<timestamp>:<hmacHex>
-    let effectiveCardUid = cardUid;
-    if (cardUid.startsWith("NFC:")) {
-      const parts = cardUid.split(":");
-      if (parts.length >= 5) {
-        const studentRoll = parts[1];
-        const profileId = parts[2];
-        const timestamp = parseInt(parts[3], 10);
-        const receivedHmac = parts[4].toLowerCase().trim();
-
-        // 1. Enforce 5-minute expiration window to prevent replay attacks
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (isNaN(timestamp) || Math.abs(nowSec - timestamp) > 300) {
-          return NextResponse.json(
-            {
-              status: "ERROR",
-              user_name: "Token Expired",
-              identifier: studentRoll,
-              message: "NFC tap timestamp expired. Check phone time.",
-            },
-            { status: 400, headers: corsHeaders }
-          );
-        }
-
-        // 2. Validate HMAC-SHA256 signature against profile secret
-        const crypto = await import("crypto");
-        const message = `${studentRoll}:${profileId}:${timestamp}`;
-        const computedHmac = crypto
-          .createHmac("sha256", profileId)
-          .update(message)
-          .digest("hex")
-          .slice(0, 32);
-
-        if (computedHmac !== receivedHmac) {
-          return NextResponse.json(
-            {
-              status: "ERROR",
-              user_name: "Auth Failed",
-              identifier: studentRoll,
-              message: "Invalid phone NFC cryptographic signature.",
-            },
-            { status: 401, headers: corsHeaders }
-          );
-        }
-
-        // Cryptographically verified Phone NFC token -> resolve directly to student profile
-        effectiveCardUid = `nfc-${profileId.replace(/-/g, "").toLowerCase()}`;
-      }
-    }
-
     const supabase = createClient(supabaseUrl, supabaseKey, {
       db: { schema: "classmate" },
       auth: { persistSession: false },
@@ -161,7 +111,7 @@ export async function POST(request: Request) {
 
     // Execute atomic RFID scan processor RPC
     const { data, error } = await supabase.rpc("process_rfid_scan", {
-      p_card_uid: effectiveCardUid,
+      p_card_uid: cardUid,
       p_device_id: deviceId,
     });
 

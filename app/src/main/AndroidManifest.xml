@@ -18,8 +18,6 @@
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.NFC" />
-    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
 
     <queries>
         <package android:name="com.whatsapp" />
@@ -299,17 +297,5 @@
             </intent-filter>
         </receiver>
 
-        <!-- ClassMate NFC HCE Attendance Service -->
-        <service
-            android:name=".nfc.ClassMateHceService"
-            android:exported="true"
-            android:permission="android.permission.BIND_NFC_SERVICE">
-            <intent-filter>
-                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.nfc.cardemulation.host_apdu_service"
-                android:resource="@xml/apduservice" />
-        </service>
     </application>
 </manifest>
