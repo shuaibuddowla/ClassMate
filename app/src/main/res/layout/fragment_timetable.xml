@@ -19,20 +19,42 @@
                 android:paddingTop="12dp"
                 android:paddingBottom="8dp">
 
-                <TextView
-                    android:id="@+id/tvBrandTitle"
+                <LinearLayout
+                    android:id="@+id/layoutBrandContainer"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                    android:includeFontPadding="false"
-                    android:letterSpacing="-0.03"
-                    android:text="ClassMate"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="true"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <TextView
+                        android:id="@+id/tvBrandTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="-0.03"
+                        android:text="classmate"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="25sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvBrandAccentDot"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="-0.03"
+                        android:text="."
+                        android:textColor="@color/cm_primary"
+                        android:textSize="25sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
 
                 <!-- Retained hidden for backward compatibility with binding/controllers -->
                 <LinearLayout
