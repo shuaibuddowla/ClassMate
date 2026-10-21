@@ -290,12 +290,22 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     setError(null);
 
     try {
-      const { error: err } = await client
+      let { error: err } = await client
         .schema("classmate")
         .rpc("enroll_student_rfid", {
-          target_student: selectedStudent.student_id,
-          target_card_uid: cardUidInput.trim().toUpperCase(),
+          p_student_id: selectedStudent.student_id,
+          p_card_uid: cardUidInput.trim().toUpperCase(),
         });
+
+      if (err && err.message?.includes("schema cache")) {
+        const retry = await client
+          .schema("classmate")
+          .rpc("enroll_student_rfid", {
+            target_student: selectedStudent.student_id,
+            target_card_uid: cardUidInput.trim().toUpperCase(),
+          });
+        err = retry.error;
+      }
 
       if (err) throw err;
 

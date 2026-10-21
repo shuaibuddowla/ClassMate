@@ -853,14 +853,24 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
             try {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Assigning card...", Toast.LENGTH_SHORT).show()
                 val cleanUid = cardUid.uppercase().trim()
+                val studentId = student.optString("student_id")
                 val params = JSONObject()
-                    .put("p_student_id", student.optString("student_id"))
+                    .put("p_student_id", studentId)
                     .put("p_card_uid", cleanUid)
-                    .put("target_student", student.optString("student_id"))
-                    .put("target_card_uid", cleanUid)
 
                 withContext(Dispatchers.IO) {
-                    ClassMateAuthApi.rpc("enroll_student_rfid", params)
+                    try {
+                        ClassMateAuthApi.rpc("enroll_student_rfid", params)
+                    } catch (e: Exception) {
+                        if (e.message?.contains("schema cache", ignoreCase = true) == true) {
+                            val altParams = JSONObject()
+                                .put("target_student", studentId)
+                                .put("target_card_uid", cleanUid)
+                            ClassMateAuthApi.rpc("enroll_student_rfid", altParams)
+                        } else {
+                            throw e
+                        }
+                    }
                 }
 
                 Toast.makeText(
