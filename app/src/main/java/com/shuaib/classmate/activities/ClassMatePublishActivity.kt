@@ -250,7 +250,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         else String.format(java.util.Locale.US, "%.0f KB", kb)
     }
 
-    private fun dropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
+    private fun createDropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
         val box = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
             hint = label
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
@@ -263,6 +263,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setTextColor(getColor(R.color.cm_text_primary))
         }
         box.addView(field)
+        return box to field
+    }
+
+    private fun dropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
+        val (box, field) = createDropdown(label, options)
         form.panel.addView(box, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
         return box to field
     }
@@ -499,16 +504,99 @@ class ClassMatePublishActivity : AppCompatActivity() {
             form.panel.addView(toggle)
         }
 
-        // --- Resource title / File name ---
-        name = form.field(if (uploadMode == "link") "Resource title *" else "File name *").apply {
-            setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') })
+        // --- 1. Compact File Picker Card ---
+        val filePickerCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_picker_card_empty)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(8)
+            }
+            isClickable = true
+            isFocusable = true
+            foreground = android.util.TypedValue().let { tv ->
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                getDrawable(tv.resourceId)
+            }
         }
-        val nameBox = name.parent.parent as? TextInputLayout
+        val fileIconFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+        }
+        val fileIconImg = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
+            setImageResource(R.drawable.ic_file_generic)
+            setColorFilter(getColor(R.color.cm_primary))
+        }
+        fileIconFrame.addView(fileIconImg)
 
-        // --- Link section containers ---
+        val fileDetailsCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+        }
+        val tvFileName = TextView(this).apply {
+            text = "Select document"
+            textSize = 13.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val tvFileMeta = TextView(this).apply {
+            text = "PDF, DOCX, PPTX up to 50MB"
+            textSize = 11.5f
+            setTextColor(getColor(R.color.cm_text_secondary))
+        }
+        fileDetailsCol.addView(tvFileName)
+        fileDetailsCol.addView(tvFileMeta)
+
+        val rightActionContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val btnActionChoose = TextView(this).apply {
+            text = "Choose"
+            textSize = 12f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_primary))
+            setBackgroundResource(R.drawable.bg_picker_pill)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+        }
+        val btnActionChange = TextView(this).apply {
+            text = "Change"
+            textSize = 12f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            setBackgroundResource(R.drawable.bg_picker_pill)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            visibility = View.GONE
+        }
+        val btnActionRemove = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            setColorFilter(getColor(R.color.cm_text_secondary))
+            setBackgroundResource(R.drawable.bg_picker_pill)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(6) }
+            visibility = View.GONE
+        }
+        rightActionContainer.addView(btnActionChoose)
+        rightActionContainer.addView(btnActionChange)
+        rightActionContainer.addView(btnActionRemove)
+
+        filePickerCard.addView(fileIconFrame)
+        filePickerCard.addView(fileDetailsCol)
+        filePickerCard.addView(rightActionContainer)
+        form.panel.addView(filePickerCard)
+
+        // --- 2. Link section containers ---
         val linkSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(2)
+                bottomMargin = dp(8)
+            }
         }
 
         // Inline dismissible clipboard banner: "📋 Link detected — tap to paste"
@@ -520,7 +608,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
             visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(8)
+                topMargin = dp(4)
                 bottomMargin = dp(4)
             }
         }
@@ -550,7 +638,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             hint = "Google Drive link *"
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
             setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }
         }
         val urlField = TextInputEditText(urlBox.context).apply {
             setTextColor(getColor(R.color.cm_text_primary))
@@ -569,7 +657,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setBackgroundResource(R.drawable.bg_warning_banner)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) }
         }
         val warnIcon = TextView(this).apply {
             text = "⚠️"
@@ -625,133 +713,15 @@ class ClassMatePublishActivity : AppCompatActivity() {
         bannerText.setOnClickListener { pasteBannerAction() }
         bannerDismiss.setOnClickListener { clipboardBanner.visibility = View.GONE }
 
-        // --- File section (Formats hint, filled button, picked file card) ---
-        val fileSection = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
+        // --- 3. Resource title / File name ---
+        name = form.field(if (uploadMode == "link") "Resource title *" else "File name *").apply {
+            setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') })
         }
+        val nameBox = name.parent.parent as? TextInputLayout
 
-        val formatHint = TextView(this).apply {
-            text = "PDF, DOCX, PPTX, XLSX, Images · up to 50MB"
-            textSize = 12f
-            setTextColor(getColor(R.color.cm_text_secondary))
-            setPadding(0, 0, 0, dp(6))
-        }
+        // --- 4. Side-by-Side Category & Subject row ---
+        val (categoryBox, category) = createDropdown("Category *", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
 
-        val btnChooseFile = MaterialButton(this).apply {
-            text = "Choose file"
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-            isAllCaps = false
-            cornerRadius = dp(14)
-            backgroundTintList = ColorStateList.valueOf(getColor(R.color.cm_primary))
-            setTextColor(Color.WHITE)
-            icon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)
-            iconTint = ColorStateList.valueOf(Color.WHITE)
-            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-            iconPadding = dp(8)
-            elevation = dp(3).toFloat()
-            setOnClickListener { if (!busy) pickFile.launch(arrayOf("*/*")) }
-        }
-
-        // Picked file card with icon, name, size and remove button
-        val pickedFileCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundResource(R.drawable.bg_picked_file_card)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(-1, -2)
-        }
-        val pickedIconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
-            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
-        }
-        val pickedIconImg = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
-            setImageResource(R.drawable.ic_file_generic)
-        }
-        pickedIconFrame.addView(pickedIconImg)
-
-        val pickedDetailsCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
-        }
-        val tvPickedName = TextView(this).apply {
-            text = "Selected file"
-            textSize = 13.5f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_primary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val tvPickedSize = TextView(this).apply {
-            text = "0 MB"
-            textSize = 11.5f
-            setTextColor(getColor(R.color.cm_text_secondary))
-        }
-        pickedDetailsCol.addView(tvPickedName)
-        pickedDetailsCol.addView(tvPickedSize)
-
-        val btnRemovePicked = ImageView(this).apply {
-            setImageResource(R.drawable.ic_close)
-            setColorFilter(getColor(R.color.cm_text_secondary))
-            setBackgroundResource(R.drawable.bg_toggle_container)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(8) }
-        }
-
-        pickedFileCard.addView(pickedIconFrame)
-        pickedFileCard.addView(pickedDetailsCol)
-        pickedFileCard.addView(btnRemovePicked)
-
-        fileSection.addView(formatHint)
-        fileSection.addView(btnChooseFile, LinearLayout.LayoutParams(-1, dp(54)))
-        fileSection.addView(pickedFileCard)
-        form.panel.addView(fileSection)
-
-        fun updatePickedFileUi() {
-            if (uri != null && selectedFileLabel.isNotBlank()) {
-                pickedFileCard.visibility = View.VISIBLE
-                btnChooseFile.visibility = View.GONE
-                formatHint.visibility = View.GONE
-                tvPickedName.text = selectedFileLabel
-                tvPickedSize.text = "${formatFileSize(selectedFileSize)} · Ready to upload"
-
-                val tempPdf = PdfFile(
-                    id = "picked",
-                    title = selectedFileLabel,
-                    fileType = selectedFileLabel.substringAfterLast('.', "pdf"),
-                    materialType = "notes",
-                    sizeBytes = selectedFileSize,
-                    driveUrl = ""
-                )
-                val visuals = FileVisuals.getVisuals(tempPdf)
-                FileVisuals.applyVisuals(pickedIconImg, pickedIconFrame, visuals)
-            } else {
-                pickedFileCard.visibility = View.GONE
-                if (!isEditing) {
-                    btnChooseFile.visibility = View.VISIBLE
-                    formatHint.visibility = View.VISIBLE
-                }
-            }
-        }
-
-        btnRemovePicked.setOnClickListener {
-            uri = null
-            selectedFileLabel = ""
-            selectedFileSize = 0L
-            updatePickedFileUi()
-            onPickedFileChanged?.invoke()
-        }
-        pickedFileCard.setOnClickListener {
-            if (!busy) pickFile.launch(arrayOf("*/*"))
-        }
-
-        // --- Category & Subject Dropdowns ---
-        val (categoryBox, category) = dropdown("Category *", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
-
-        // Subject dropdown with two-line layout: bold course code on top, smaller title below
         val subjectBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
             hint = "Subject *"
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
@@ -779,17 +749,24 @@ class ClassMatePublishActivity : AppCompatActivity() {
             setTextColor(getColor(R.color.cm_text_primary))
         }
         subjectBox.addView(subject)
-        form.panel.addView(subjectBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+
+        val metaRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) }
+        }
+        metaRow.addView(categoryBox, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(5) })
+        metaRow.addView(subjectBox, LinearLayout.LayoutParams(0, -2, 1.25f).apply { marginStart = dp(5) })
+        form.panel.addView(metaRow)
 
         editingFile?.let { file ->
             category.setText(file.optString("category").replaceFirstChar { it.uppercase() }, false)
             courses.firstOrNull { it.offeringId == file.optString("semester_course_id") }?.let { subject.setText(it.displayLabel, false) }
-            fileSection.visibility = View.GONE
+            filePickerCard.visibility = View.GONE
             val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the name, category or subject. The uploaded file stays unchanged."
             form.label(note)
         }
 
-        // --- Determinate Progress Bar & Status ---
+        // --- 5. Determinate Progress Bar & Status ---
         val progressContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -813,123 +790,68 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         status = form.status()
 
-        // --- Live Preview Card ---
-        val previewHeader = TextView(this).apply {
-            text = "PREVIEW IN LIBRARY"
-            textSize = 11f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_secondary))
-            letterSpacing = 0.05f
-            setPadding(0, dp(20), 0, dp(6))
-        }
-        form.panel.addView(previewHeader)
+        fun updatePickedFileUi() {
+            if (uri != null && selectedFileLabel.isNotBlank()) {
+                filePickerCard.setBackgroundResource(R.drawable.bg_picked_file_card)
+                tvFileName.text = selectedFileLabel
+                tvFileMeta.text = "${formatFileSize(selectedFileSize)} · Ready to upload"
+                btnActionChoose.visibility = View.GONE
+                btnActionChange.visibility = View.VISIBLE
+                btnActionRemove.visibility = View.VISIBLE
 
-        val previewCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundResource(R.drawable.bg_preview_card)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
-        }
-        val previewIconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
-        }
-        val previewIconImg = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
-            setImageResource(R.drawable.ic_file_generic)
-        }
-        previewIconFrame.addView(previewIconImg)
+                val tempPdf = PdfFile(
+                    id = "picked",
+                    title = selectedFileLabel,
+                    fileType = selectedFileLabel.substringAfterLast('.', "pdf"),
+                    materialType = "notes",
+                    sizeBytes = selectedFileSize,
+                    driveUrl = ""
+                )
+                val visuals = FileVisuals.getVisuals(tempPdf)
+                FileVisuals.applyVisuals(fileIconImg, fileIconFrame, visuals)
 
-        val previewTextCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
-        }
-        val previewTitle = TextView(this).apply {
-            text = "Resource title"
-            textSize = 14.5f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_primary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val previewSubject = TextView(this).apply {
-            text = "Subject"
-            textSize = 12.5f
-            setTextColor(getColor(R.color.cm_primary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val previewMeta = TextView(this).apply {
-            text = "Notes · File"
-            textSize = 11.5f
-            setTextColor(getColor(R.color.cm_text_secondary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        previewTextCol.addView(previewTitle)
-        previewTextCol.addView(previewSubject)
-        previewTextCol.addView(previewMeta)
-
-        val previewTag = TextView(this).apply {
-            text = "PREVIEW"
-            textSize = 9.5f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_secondary))
-            setBackgroundResource(R.drawable.bg_toggle_container)
-            setPadding(dp(6), dp(3), dp(6), dp(3))
-        }
-
-        previewCard.addView(previewIconFrame)
-        previewCard.addView(previewTextCol)
-        previewCard.addView(previewTag)
-        form.panel.addView(previewCard)
-
-        fun updateLivePreview() {
-            val isLink = uploadMode == "link"
-            val titleText = name.text?.toString()?.trim().orEmpty()
-            previewTitle.text = if (titleText.isNotBlank()) titleText else (if (isLink) "Resource title" else "File name")
-
-            val selSubject = subject.text?.toString()?.trim().orEmpty()
-            previewSubject.text = if (selSubject.isNotBlank()) selSubject else "Subject"
-
-            val selCategory = category.text?.toString()?.trim()?.replaceFirstChar { it.uppercase() } ?: "Notes"
-            val rawUrl = urlField.text?.toString()?.trim().orEmpty()
-            val isDrive = FileVisuals.isGoogleDrive(rawUrl)
-
-            val metaText = when {
-                isLink && isDrive -> "$selCategory · Google Drive"
-                isLink -> "$selCategory · External Link"
-                selectedFileSize > 0 -> "$selCategory · ${formatFileSize(selectedFileSize)}"
-                else -> "$selCategory · File"
+                if (name.text.isNullOrBlank()) {
+                    name.setText(selectedFileLabel.substringBeforeLast('.'))
+                }
+            } else {
+                filePickerCard.setBackgroundResource(R.drawable.bg_picker_card_empty)
+                tvFileName.text = "Select document"
+                tvFileMeta.text = "PDF, DOCX, PPTX up to 50MB"
+                btnActionChoose.visibility = View.VISIBLE
+                btnActionChange.visibility = View.GONE
+                btnActionRemove.visibility = View.GONE
+                fileIconFrame.setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+                fileIconImg.setImageResource(R.drawable.ic_file_generic)
+                fileIconImg.setColorFilter(getColor(R.color.cm_primary))
             }
-            previewMeta.text = metaText
+        }
 
-            val tempPdf = PdfFile(
-                id = "preview",
-                title = if (titleText.isNotBlank()) titleText else (if (isLink) "Link" else selectedFileLabel.ifBlank { "file" }),
-                fileType = if (isLink) "link" else selectedFileLabel.substringAfterLast('.', "pdf"),
-                materialType = selCategory.lowercase(),
-                sizeBytes = selectedFileSize,
-                driveUrl = rawUrl
-            )
-            val visuals = FileVisuals.getVisuals(tempPdf)
-            FileVisuals.applyVisuals(previewIconImg, previewIconFrame, visuals)
+        val triggerPickFile = {
+            if (!busy) pickFile.launch(arrayOf("*/*"))
+        }
+        filePickerCard.setOnClickListener { triggerPickFile() }
+        btnActionChoose.setOnClickListener { triggerPickFile() }
+        btnActionChange.setOnClickListener { triggerPickFile() }
+
+        btnActionRemove.setOnClickListener {
+            uri = null
+            selectedFileLabel = ""
+            selectedFileSize = 0L
+            updatePickedFileUi()
+            onPickedFileChanged?.invoke()
         }
 
         onPickedFileChanged = {
             updatePickedFileUi()
-            updateLivePreview()
         }
 
         fun updateModeVisibility() {
             val isLink = uploadMode == "link"
             updateToggleUi()
             linkSection.visibility = if (isLink) View.VISIBLE else View.GONE
-            fileSection.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
+            filePickerCard.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
             nameBox?.hint = if (isLink) "Resource title *" else "File name *"
             if (isLink) checkClipboard()
-            updateLivePreview()
         }
 
         btnUploadFile?.setOnClickListener {
@@ -948,7 +870,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
         name.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 nameBox?.error = null
-                updateLivePreview()
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -960,7 +881,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 val u = s?.toString()?.trim().orEmpty()
                 val isNonDrive = u.isNotBlank() && !FileVisuals.isGoogleDrive(u)
                 driveWarning.visibility = if (isNonDrive && uploadMode == "link") View.VISIBLE else View.GONE
-                updateLivePreview()
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -968,18 +888,16 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         category.setOnItemClickListener { _, _, _, _ ->
             categoryBox.error = null
-            updateLivePreview()
         }
 
         subject.setOnItemClickListener { _, _, _, _ ->
             subjectBox.error = null
-            updateLivePreview()
         }
 
         updatePickedFileUi()
         updateModeVisibility()
 
-        // Observe background upload progress
+                // Observe background upload progress
         lifecycleScope.launch {
             LibraryUploadManager.uploadState.collect { prog ->
                 if (prog != null && prog.taskId == currentUploadTaskId) {

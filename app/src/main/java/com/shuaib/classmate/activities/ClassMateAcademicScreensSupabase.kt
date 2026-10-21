@@ -1731,9 +1731,26 @@ internal class ClassMateAcademicScreensSupabase(
         val parentView = dialogView.parent as? View
         parentView?.setBackgroundResource(android.R.color.transparent)
 
+        val density = activity.resources.displayMetrics.density
+        val displayMetrics = activity.resources.displayMetrics
+        val screenHeight = displayMetrics.heightPixels
+
         val behavior = bottomSheet.behavior
+        behavior.isFitToContents = true
         behavior.skipCollapsed = true
+        behavior.maxHeight = (screenHeight * 0.88f).toInt()
         behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+
+        val padHorizontal = (20 * density).toInt()
+        val padTop = (12 * density).toInt()
+        val basePadBottom = (24 * density).toInt()
+
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(dialogView) { v, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(padHorizontal, padTop, padHorizontal, basePadBottom + navBars.bottom)
+            insets
+        }
+        androidx.core.view.ViewCompat.requestApplyInsets(dialogView)
 
         btnCloseAttendance?.setOnClickListener {
             com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
@@ -1744,36 +1761,40 @@ internal class ClassMateAcademicScreensSupabase(
             bottomSheet.dismiss()
         }
 
-        val density = activity.resources.displayMetrics.density
-        val displayMetrics = activity.resources.displayMetrics
-        val screenHeight = displayMetrics.heightPixels
         val padH = (12 * density).toInt()
         val padV = (10 * density).toInt()
 
+        fun showCoursesView() {
+            tableView.visibility = View.GONE
+            coursesView.visibility = View.VISIBLE
+            coursesView.alpha = 0f
+            coursesView.animate().alpha(1f).setDuration(150).start()
+            parentView?.post {
+                parentView.requestLayout()
+                behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+
+        fun showTableView() {
+            coursesView.visibility = View.GONE
+            tableView.visibility = View.VISIBLE
+            tableView.alpha = 0f
+            tableView.animate().alpha(1f).setDuration(150).start()
+            parentView?.post {
+                parentView.requestLayout()
+                behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+
         fun renderTable(course: JSONObject) {
-            val courseTitle = course.optString("course_title")
-            val courseCode = course.optString("course_code")
+            val courseTitle = course.optString("course_title").ifBlank { "Course Attendance" }
+            val courseCode = course.optString("course_code").ifBlank { "Daily Log" }
 
             tvTableTitle.text = courseTitle
             tvTableCode.text = "$courseCode · Daily Attendance Log"
             tableContainer.removeAllViews()
 
-            // Smooth expand animation to full screen / expanded height
-            try {
-                android.transition.TransitionManager.beginDelayedTransition(
-                    dialogView as ViewGroup,
-                    android.transition.AutoTransition().apply { duration = 220 }
-                )
-            } catch (_: Exception) {}
-
-            val expandedHeight = (screenHeight * 0.88f).toInt()
-            dialogView.layoutParams = dialogView.layoutParams?.apply {
-                height = expandedHeight
-            } ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, expandedHeight)
-
-            coursesView.visibility = View.GONE
-            tableView.visibility = View.VISIBLE
-            behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            showTableView()
 
             val headerRow = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -1811,7 +1832,12 @@ internal class ClassMateAcademicScreensSupabase(
                     val record = history.getJSONObject(i)
                     val dateStr = record.optString("date")
                     val timeStr = record.optString("time")
-                    val roomStr = record.optString("room").ifBlank { "Station Reader" }
+                    val rawRoom = record.optString("room").trim()
+                    val displayRoom = when {
+                        rawRoom.isEmpty() || rawRoom.equals("null", ignoreCase = true) -> "Station Reader"
+                        rawRoom.contains("room", ignoreCase = true) || rawRoom.contains("station", ignoreCase = true) || rawRoom.contains("lab", ignoreCase = true) -> rawRoom
+                        else -> "Room $rawRoom"
+                    }
                     val isPresent = record.optString("status").equals("present", ignoreCase = true)
                     val classNum = "Class #${history.length() - i}"
 
@@ -1841,7 +1867,7 @@ internal class ClassMateAcademicScreensSupabase(
                     }
                     val tvTime = TextView(activity).apply {
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.3f)
-                        text = if (timeStr.isNotBlank()) "$timeStr\n$roomStr" else "—"
+                        text = if (timeStr.isNotBlank()) "$timeStr\n$displayRoom" else "—"
                         textSize = 10.5f
                         setTextColor(activity.getColor(R.color.cm_text_muted))
                     }
@@ -1856,20 +1882,34 @@ internal class ClassMateAcademicScreensSupabase(
 
         btnBack.setOnClickListener {
             com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-            try {
-                android.transition.TransitionManager.beginDelayedTransition(
-                    dialogView as ViewGroup,
-                    android.transition.AutoTransition().apply { duration = 200 }
-                )
-            } catch (_: Exception) {}
-
-            dialogView.layoutParams = dialogView.layoutParams?.apply {
-                height = ViewGroup.LayoutParams.WRAP_CONTENT
-            } ?: ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-            tableView.visibility = View.GONE
-            coursesView.visibility = View.VISIBLE
+            showCoursesView()
         }
+
+        bottomSheet.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
+                if (tableView.visibility == View.VISIBLE) {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(dialogView)
+                    showCoursesView()
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+
+        bottomSheet.onBackPressedDispatcher.addCallback(bottomSheet, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (tableView.visibility == View.VISIBLE) {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(dialogView)
+                    showCoursesView()
+                } else {
+                    isEnabled = false
+                    bottomSheet.dismiss()
+                }
+            }
+        })
 
         coursesContainer.removeAllViews()
         val progress = android.widget.ProgressBar(activity).apply {
@@ -1894,6 +1934,10 @@ internal class ClassMateAcademicScreensSupabase(
                     setTextColor(activity.getColor(R.color.cm_text_muted))
                 }
                 coursesContainer.addView(tvEmpty)
+                parentView?.post {
+                    parentView.requestLayout()
+                    behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                }
                 return
             }
 
@@ -1980,6 +2024,10 @@ internal class ClassMateAcademicScreensSupabase(
                 card.addView(bottomRow)
 
                 coursesContainer.addView(card)
+            }
+            parentView?.post {
+                parentView.requestLayout()
+                behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
             }
         }
 
