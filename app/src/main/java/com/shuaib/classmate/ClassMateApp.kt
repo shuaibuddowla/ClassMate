@@ -284,8 +284,17 @@ class ClassMateApp : Application() {
                 description = "Notifications for cancelled classes"
             }
 
+            // Library Uploads Channel
+            val libraryUploadsChannel = NotificationChannel(
+                com.shuaib.classmate.workers.LibraryUploadWorker.CHANNEL_ID,
+                "Library Uploads",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Progress notifications for background library file uploads"
+            }
+
             notificationManager.createNotificationChannels(
-                listOf(chatChannel, generalChannel, noticesChannel, cancellationsChannel)
+                listOf(chatChannel, generalChannel, noticesChannel, cancellationsChannel, libraryUploadsChannel)
             )
         }
     }

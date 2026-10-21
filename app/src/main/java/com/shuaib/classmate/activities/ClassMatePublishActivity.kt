@@ -1,29 +1,56 @@
 package com.shuaib.classmate.activities
 
-import android.os.Bundle
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.provider.OpenableColumns
-import android.view.View
-import android.widget.*
+import android.content.res.ColorStateList
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
+import android.graphics.Typeface
+import android.net.Uri
+import android.os.Bundle
+import android.provider.OpenableColumns
+import android.text.Editable
+import android.text.TextUtils
+import android.text.TextWatcher
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import com.shuaib.classmate.models.PdfFile
+import com.shuaib.classmate.utils.FileVisuals
+import com.shuaib.classmate.workers.LibraryUploadManager
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 
-/** Real notice/upload editor using the existing RPC and protected upload pipeline. */
+data class CourseEntry(
+    val offeringId: String,
+    val code: String,
+    val title: String
+) {
+    val displayLabel: String get() = if (title.isNotBlank()) "$code · $title" else code
+    val second: String get() = displayLabel
+    val first: String get() = offeringId
+    override fun toString(): String = displayLabel
+}
+
+/** Redesigned notice & library file publish editor. */
 class ClassMatePublishActivity : AppCompatActivity() {
     private val batch by lazy { intent.getStringExtra("batch_id").orEmpty() }
     private val editingFile by lazy { intent.getStringExtra("resource")?.let { JSONObject(it) } }
@@ -31,38 +58,55 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private lateinit var form: ClassMateFormUi
     private lateinit var submit: MaterialButton
     private lateinit var status: TextView
-    private lateinit var picker: MaterialButton
-    private lateinit var name: com.google.android.material.textfield.TextInputEditText
+    private lateinit var name: TextInputEditText
     private var uri: Uri? = null
     private var selectedFileLabel = ""
+    private var selectedFileSize = 0L
     private var restoredFileName = ""
     private var busy = false
-    private var courses = emptyList<Pair<String, String>>()
-    private var aiAllowed=false
-    private var aiRequest:String?=null
-    private var aiText=""
-    private var aiHistory=org.json.JSONArray()
-    private var restoredAiDraft=""
-    private var aiDraft:com.google.android.material.textfield.TextInputEditText?=null
+    private var courses = emptyList<CourseEntry>()
+    private var aiAllowed = false
+    private var aiRequest: String? = null
+    private var aiText = ""
+    private var aiHistory = JSONArray()
+    private var restoredAiDraft = ""
+    private var aiDraft: TextInputEditText? = null
     private var uploadMode = "file"
     private var restoredLinkUrl = ""
-    private var urlInput: com.google.android.material.textfield.TextInputEditText? = null
+    private var urlInput: TextInputEditText? = null
+    private var currentUploadTaskId: String? = null
+
+    // Callbacks and references for UI updates
+    private var onPickedFileChanged: (() -> Unit)? = null
+    private var onClipboardCheckRequested: (() -> Unit)? = null
+
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected == null) return@registerForActivityResult
         uri = selected
-        runCatching { contentResolver.takePersistableUriPermission(selected, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        runCatching { contentResolver.takePersistableUriPermission(selected, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         val label = contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
         } ?: "Selected file"
         selectedFileLabel = label
-        if (::picker.isInitialized) picker.text = "Change file · $label"
-        if (::name.isInitialized && name.text.isNullOrBlank()) name.setText(label.substringBeforeLast('.'))
+
+        val size = contentResolver.query(selected, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+            if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+        } ?: 0L
+        selectedFileSize = size
+
+        if (::name.isInitialized && name.text.isNullOrBlank()) {
+            name.setText(label.substringBeforeLast('.'))
+        }
+        onPickedFileChanged?.invoke()
     }
+
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        aiRequest=state?.getString("ai_request"); aiText=state?.getString("ai_request_text").orEmpty()
-        restoredAiDraft=state?.getString("ai_draft").orEmpty()
-        aiHistory=org.json.JSONArray(state?.getString("ai_history") ?: "[]")
+        aiRequest = state?.getString("ai_request")
+        aiText = state?.getString("ai_request_text").orEmpty()
+        restoredAiDraft = state?.getString("ai_draft").orEmpty()
+        aiHistory = JSONArray(state?.getString("ai_history") ?: "[]")
+
         val editRawLink = editingFile?.optString("link_url")?.trim().orEmpty()
         val sanitizedEditLink = if (editRawLink.isBlank() || editRawLink.equals("null", ignoreCase = true)) "" else editRawLink
         val isEditingLink = editingFile?.optString("file_type") == "link" || sanitizedEditLink.isNotBlank()
@@ -70,83 +114,161 @@ class ClassMatePublishActivity : AppCompatActivity() {
         restoredLinkUrl = (state?.getString("link_url") ?: sanitizedEditLink).let {
             if (it.isBlank() || it.equals("null", ignoreCase = true)) "" else it
         }
+
         ClassMateAuthApi.attach(applicationContext)
         uri = state?.getString("file_uri")?.let(Uri::parse)
         selectedFileLabel = state?.getString("file_label").orEmpty()
+        selectedFileSize = state?.getLong("file_size", 0L) ?: 0L
         restoredFileName = state?.getString("file_name").orEmpty()
+        currentUploadTaskId = state?.getString("upload_task_id")
+
         if (batch.isBlank()) { finish(); return }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
             val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
-            isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
         }
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(getColor(R.color.cm_background)) }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(getColor(R.color.cm_background))
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
         }
+
         val toolbar = MaterialToolbar(this).apply {
-            title = if (editingFile != null) (if (isEditingLink) "Edit drive link" else "Edit library file") else if (upload) "Add library file" else "Post notice"
-            setTitleTextColor(getColor(R.color.cm_text_primary)); setNavigationIcon(R.drawable.ic_chevron_left)
+            title = if (editingFile != null) {
+                if (isEditingLink) "Edit Drive link" else "Edit library file"
+            } else if (upload) {
+                "Add library file"
+            } else {
+                "Post notice"
+            }
+            setTitleTextColor(getColor(R.color.cm_text_primary))
+            setNavigationIcon(R.drawable.ic_chevron_left)
             navigationIcon?.setTint(getColor(R.color.cm_text_primary))
-            setNavigationOnClickListener { if (!busy) finish() }
+            setNavigationOnClickListener {
+                if (currentUploadTaskId != null) {
+                    Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                    finish()
+                } else if (!busy) {
+                    finish()
+                }
+            }
         }
         root.addView(toolbar)
+
         form = ClassMateFormUi(this)
         form.label(intent.getStringExtra("batch_label").orEmpty()).apply { textSize = 14f }
         root.addView(form.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
         submit = MaterialButton(this).apply {
             val isLink = isEditingLink || uploadMode == "link"
-            text = if (editingFile != null) "Save changes" else if (upload) (if (isLink) "Share Drive Link" else "Upload file") else "Post notice"
-            isAllCaps = false; isEnabled = false; cornerRadius = dp(16)
+            text = if (editingFile != null) "Save changes" else if (upload) (if (isLink) "Share Drive link" else "Upload file") else "Post notice"
+            isAllCaps = false
+            isEnabled = false
+            cornerRadius = dp(16)
         }
         root.addView(submit, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(dp(24), dp(12), dp(24), dp(16)) })
         setContentView(root)
+
         val loading = form.label("Loading editor…")
+
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() { if (!busy) finish() else Toast.makeText(this@ClassMatePublishActivity, "Please wait for completion", Toast.LENGTH_SHORT).show() }
+            override fun handleOnBackPressed() {
+                if (currentUploadTaskId != null) {
+                    Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                    finish()
+                } else if (!busy) {
+                    finish()
+                } else {
+                    Toast.makeText(this@ClassMatePublishActivity, "Please wait for completion", Toast.LENGTH_SHORT).show()
+                }
+            }
         })
+
         lifecycleScope.launch {
             try {
                 val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
-                val offerings = if (semester == null) org.json.JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
+                val offerings = if (semester == null) JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
                 val catalog = ClassMateCourses.catalog(batch)
-                val names = (0 until catalog.length()).associate { i -> catalog.getJSONObject(i).let { it.getString("id") to "${it.getString("course_code")} · ${it.getString("course_title")}" } }
+                val catalogMap = (0 until catalog.length()).map { catalog.getJSONObject(it) }.associateBy { it.getString("id") }
+
                 val teacher = intent.getStringExtra("role") == "teacher"
                 val assigned = if (teacher) ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.${intent.getStringExtra("profile_id")}&active=eq.true").let { rows ->
                     (0 until rows.length()).map { rows.getJSONObject(it).getString("semester_course_id") }.toSet()
                 } else null
+
                 courses = (0 until offerings.length()).map { offerings.getJSONObject(it) }
                     .filter { assigned == null || it.getString("id") in assigned }
-                    .map { it.getString("id") to (names[it.getString("course_id")] ?: "Course") }
-                editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" && courses.none { c -> c.first == it } }?.let { id ->
+                    .map { off ->
+                        val offId = off.getString("id")
+                        val cat = catalogMap[off.getString("course_id")]
+                        val code = cat?.optString("course_code") ?: "Course"
+                        val title = cat?.optString("course_title") ?: ""
+                        CourseEntry(offId, code, title)
+                    }
+
+                editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" && courses.none { c -> c.offeringId == it } }?.let { id ->
                     val offering = ClassMateAuthApi.rows("semester_courses", "select=course_id&id=eq.$id").optJSONObject(0)
-                    offering?.optString("course_id")?.let { courseId -> courses = courses + (id to (names[courseId] ?: "Current subject")) }
+                    val cat = offering?.optString("course_id")?.let { catalogMap[it] }
+                    courses = courses + CourseEntry(id, cat?.optString("course_code") ?: "Course", cat?.optString("course_title") ?: "Current subject")
                 }
+
                 loading.visibility = View.GONE
                 if (upload) buildUpload() else {
-                    aiAllowed=ClassMateAuthApi.rpcText("ai_can_write",JSONObject().put("target_batch",batch)).trim()=="true"
+                    aiAllowed = ClassMateAuthApi.rpcText("ai_can_write", JSONObject().put("target_batch", batch)).trim() == "true"
                     buildNotice()
                 }
             } catch (e: Exception) {
                 loading.text = "Could not load editor. ${e.message}"
-                submit.text = "Retry"; submit.isEnabled = true
+                submit.text = "Retry"
+                submit.isEnabled = true
                 submit.setOnClickListener { recreate() }
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        onClipboardCheckRequested?.invoke()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString("upload_mode", uploadMode)
         outState.putString("link_url", urlInput?.text?.toString() ?: restoredLinkUrl)
-        outState.putString("file_uri", uri?.toString()); outState.putString("file_label", selectedFileLabel)
+        outState.putString("file_uri", uri?.toString())
+        outState.putString("file_label", selectedFileLabel)
+        outState.putLong("file_size", selectedFileSize)
         if (::name.isInitialized) outState.putString("file_name", name.text.toString())
-        outState.putString("ai_request",aiRequest); outState.putString("ai_request_text",aiText); outState.putString("ai_draft",aiDraft?.text?.toString() ?: restoredAiDraft); outState.putString("ai_history",aiHistory.toString())
+        outState.putString("upload_task_id", currentUploadTaskId)
+        outState.putString("ai_request", aiRequest)
+        outState.putString("ai_request_text", aiText)
+        outState.putString("ai_draft", aiDraft?.text?.toString() ?: restoredAiDraft)
+        outState.putString("ai_history", aiHistory.toString())
     }
+
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
+
+    private fun formatFileSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val kb = bytes / 1024.0
+        val mb = kb / 1024.0
+        return if (mb >= 1.0) String.format(java.util.Locale.US, "%.1f MB", mb)
+        else String.format(java.util.Locale.US, "%.0f KB", kb)
+    }
+
     private fun dropdown(label: String, options: List<String>): Pair<TextInputLayout, MaterialAutoCompleteTextView> {
         val box = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
-            hint = label; boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            hint = label
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
             setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
         }
         val field = MaterialAutoCompleteTextView(box.context).apply {
@@ -155,68 +277,69 @@ class ClassMatePublishActivity : AppCompatActivity() {
             if (options.isNotEmpty()) setText(options.first(), false)
             setTextColor(getColor(R.color.cm_text_primary))
         }
-        box.addView(field); form.panel.addView(box, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        box.addView(field)
+        form.panel.addView(box, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
         return box to field
     }
+
     private fun buildNotice() {
         val teacher = intent.getStringExtra("role") == "teacher"
         form.label("Notice type")
         val choices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        val ai = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id=View.generateViewId(); text="AI compose"; setTextColor(getColor(R.color.cm_text_primary)) }
+        val ai = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "AI compose"; setTextColor(getColor(R.color.cm_text_primary)) }
         val general = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "General notice"; setTextColor(getColor(R.color.cm_text_primary)) }
         val cancellation = com.google.android.material.radiobutton.MaterialRadioButton(this).apply { id = View.generateViewId(); text = "Class cancellation"; setTextColor(getColor(R.color.cm_text_primary)) }
-        if(aiAllowed) choices.addView(ai)
+        if (aiAllowed) choices.addView(ai)
         choices.addView(general); choices.addView(cancellation); form.panel.addView(choices)
-        val rough=form.field("Your rough notice · English or Bengali",true).apply { filters=arrayOf(android.text.InputFilter.LengthFilter(8000)); setText(restoredAiDraft) }; aiDraft=rough
-        val aiHint=form.label("AI organizes and posts in English. For cancellations include the course and today/tomorrow. Start with /silent for no phone alerts.")
+        val rough = form.field("Your rough notice · English or Bengali", true).apply { filters = arrayOf(android.text.InputFilter.LengthFilter(8000)); setText(restoredAiDraft) }; aiDraft = rough
+        val aiHint = form.label("AI organizes and posts in English. For cancellations include the course and today/tomorrow. Start with /silent for no phone alerts.")
         val title = form.field("Notice title")
         val message = form.field("Message · links supported", true)
-        val silentHint=form.label("Start with /silent to post without a push notification.")
+        val silentHint = form.label("Start with /silent to post without a push notification.")
         val (courseBox, course) = dropdown(if (teacher) "Assigned course" else "Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
         choices.setOnCheckedChangeListener { _, checked ->
             val cancelled = checked == cancellation.id
-            val composing=checked==ai.id
-            (rough.parent.parent as View).visibility=if(composing) View.VISIBLE else View.GONE
-            aiHint.visibility=if(composing) View.VISIBLE else View.GONE
+            val composing = checked == ai.id
+            (rough.parent.parent as View).visibility = if (composing) View.VISIBLE else View.GONE
+            aiHint.visibility = if (composing) View.VISIBLE else View.GONE
             (title.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
             (message.parent.parent as View).visibility = if (cancelled || composing) View.GONE else View.VISIBLE
-            silentHint.visibility=if(cancelled || composing) View.GONE else View.VISIBLE
+            silentHint.visibility = if (cancelled || composing) View.GONE else View.VISIBLE
             courseBox.visibility = if (cancelled || teacher) View.VISIBLE else View.GONE
             dateBox.visibility = if (cancelled) View.VISIBLE else View.GONE
-            submit.text=if(composing) "Compose & post" else "Post notice"
+            submit.text = if (composing) "Compose & post" else "Post notice"
         }
-        choices.check(if(aiAllowed) ai.id else general.id)
+        choices.check(if (aiAllowed) ai.id else general.id)
         submit.isEnabled = true
         submit.setOnClickListener {
-            if(choices.checkedRadioButtonId==ai.id) {
-                val value=rough.text.toString().trim()
-                if(value.isBlank()) { rough.error="Write your notice first"; return@setOnClickListener }
-                if(busy) return@setOnClickListener
-                if(aiText!=value) { aiRequest=java.util.UUID.randomUUID().toString(); aiText=value }
-                aiRequest=aiRequest ?: java.util.UUID.randomUUID().toString()
-                busy=true; submit.isEnabled=false; rough.isEnabled=false
-                for(i in 0 until choices.childCount) choices.getChildAt(i).isEnabled=false
-                status.visibility=View.VISIBLE; status.text="Composing…"
+            if (choices.checkedRadioButtonId == ai.id) {
+                val value = rough.text.toString().trim()
+                if (value.isBlank()) { rough.error = "Write your notice first"; return@setOnClickListener }
+                if (busy) return@setOnClickListener
+                if (aiText != value) { aiRequest = java.util.UUID.randomUUID().toString(); aiText = value }
+                aiRequest = aiRequest ?: java.util.UUID.randomUUID().toString()
+                busy = true; submit.isEnabled = false; rough.isEnabled = false
+                for (i in 0 until choices.childCount) choices.getChildAt(i).isEnabled = false
+                status.visibility = View.VISIBLE; status.text = "Composing…"
                 lifecycleScope.launch {
                     try {
-                        val response=ClassMateAuthApi.ai(JSONObject().put("mode","compose").put("batch_id",batch).put("request_id",aiRequest).put("text",value).put("history",aiHistory))
-                        val actions=response.optJSONObject("result")?.optJSONArray("actions")
-                        if((actions?.length() ?: 0)>0) {
-                            val createdNotice=actions?.optJSONObject(0)?.optJSONObject("outcome")
-                            val data=Intent()
-                            if(createdNotice!=null) data.putExtra("created_notice",createdNotice.toString())
-                            setResult(RESULT_OK,data)
+                        val response = ClassMateAuthApi.ai(JSONObject().put("mode", "compose").put("batch_id", batch).put("request_id", aiRequest).put("text", value).put("history", aiHistory))
+                        val actions = response.optJSONObject("result")?.optJSONArray("actions")
+                        if ((actions?.length() ?: 0) > 0) {
+                            val createdNotice = actions?.optJSONObject(0)?.optJSONObject("outcome")
+                            val data = Intent()
+                            if (createdNotice != null) data.putExtra("created_notice", createdNotice.toString())
+                            setResult(RESULT_OK, data)
                             finish()
+                        } else {
+                            val reply = response.optJSONObject("plan")?.optString("message") ?: response.optJSONObject("result")?.optString("message") ?: "Add the missing course or date."
+                            status.text = reply; aiHistory.put(JSONObject().put("role", "user").put("text", value)); aiHistory.put(JSONObject().put("role", "assistant").put("text", reply)); aiRequest = null
+                            while (aiHistory.length() > 8) aiHistory.remove(0)
                         }
-                        else {
-                            val reply=response.optJSONObject("plan")?.optString("message") ?: response.optJSONObject("result")?.optString("message") ?: "Add the missing course or date."
-                            status.text=reply; aiHistory.put(JSONObject().put("role","user").put("text",value)); aiHistory.put(JSONObject().put("role","assistant").put("text",reply)); aiRequest=null
-                            while(aiHistory.length()>8) aiHistory.remove(0)
-                        }
-                    } catch(e:Exception) { status.text="${e.message}\nTry again to retry the same request." }
-                    finally { busy=false; submit.isEnabled=true; rough.isEnabled=true; for(i in 0 until choices.childCount) choices.getChildAt(i).isEnabled=true }
+                    } catch (e: Exception) { status.text = "${e.message}\nTry again to retry the same request." }
+                    finally { busy = false; submit.isEnabled = true; rough.isEnabled = true; for (i in 0 until choices.childCount) choices.getChildAt(i).isEnabled = true }
                 }
                 return@setOnClickListener
             }
@@ -232,6 +355,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun buildUpload() {
         if (courses.isEmpty()) { form.label("No active subject is available for uploading."); return }
 
@@ -245,6 +369,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         var btnUploadFile: TextView? = null
         var btnDriveLink: TextView? = null
+
         fun updateToggleUi() {
             val isLink = uploadMode == "link"
             btnUploadFile?.apply {
@@ -270,26 +395,28 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 compoundDrawablesRelative[0]?.setTintList(null)
             }
             if (!isEditing) {
-                submit.text = if (isLink) "Share Drive Link" else "Upload file"
+                // Primary button casing: sentence case
+                submit.text = if (isLink) "Share Drive link" else "Upload file"
             }
         }
 
+        // Top toggle bar: [ Upload File | Drive Link ]
         if (!isEditing) {
             val toggle = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundResource(R.drawable.bg_toggle_container)
                 setPadding(dp(3), dp(3), dp(3), dp(3))
-                layoutParams = LinearLayout.LayoutParams(-1, dp(42)).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, dp(44)).apply {
                     topMargin = dp(6)
-                    bottomMargin = dp(8)
+                    bottomMargin = dp(12)
                 }
             }
             btnUploadFile = TextView(this).apply {
                 text = " Upload File"
                 textSize = 12.5f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER
-                val uploadIcon = androidx.core.content.ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)?.mutate()?.apply {
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                val uploadIcon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)?.mutate()?.apply {
                     setBounds(0, 0, dp(16), dp(16))
                 }
                 setCompoundDrawablesRelative(uploadIcon, null, null, null)
@@ -299,9 +426,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
             btnDriveLink = TextView(this).apply {
                 text = " Drive Link"
                 textSize = 12.5f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER
-                val driveIcon = androidx.core.content.ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_google_drive)?.mutate()?.apply {
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                val driveIcon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_google_drive)?.mutate()?.apply {
                     setBounds(0, 0, dp(16), dp(16))
                 }
                 setCompoundDrawablesRelative(driveIcon, null, null, null)
@@ -313,93 +440,437 @@ class ClassMatePublishActivity : AppCompatActivity() {
             form.panel.addView(toggle)
         }
 
-        name = form.field(if (uploadMode == "link") "Resource title" else "File name").apply {
+        // --- Resource title / File name ---
+        name = form.field(if (uploadMode == "link") "Resource title *" else "File name *").apply {
             setText(editingFile?.optString("title") ?: restoredFileName.ifBlank { selectedFileLabel.substringBeforeLast('.') })
         }
         val nameBox = name.parent.parent as? TextInputLayout
 
+        // --- Link section containers ---
+        val linkSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+
+        // Inline dismissible clipboard banner: "📋 Link detected — tap to paste"
+        var detectedClipboardUrl: String? = null
+        val clipboardBanner = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_toggle_container)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(4)
+            }
+        }
+        val bannerIcon = TextView(this).apply {
+            text = "📋"
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+        }
+        val bannerText = TextView(this).apply {
+            text = "Link detected — tap to paste"
+            textSize = 12.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_primary))
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        val bannerDismiss = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            setColorFilter(getColor(R.color.cm_text_secondary))
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
+        }
+        clipboardBanner.addView(bannerIcon)
+        clipboardBanner.addView(bannerText)
+        clipboardBanner.addView(bannerDismiss)
+
         val urlBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedStyle).apply {
-            hint = "Google Drive or Resource Link"
+            hint = "Google Drive link *"
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
             setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
-            endIconMode = TextInputLayout.END_ICON_CUSTOM
-            setEndIconDrawable(R.drawable.ic_copy)
-            setEndIconContentDescription("Paste from clipboard")
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
         }
-        val urlField = com.google.android.material.textfield.TextInputEditText(urlBox.context).apply {
+        val urlField = TextInputEditText(urlBox.context).apply {
             setTextColor(getColor(R.color.cm_text_primary))
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            val initialUrl = restoredLinkUrl.ifBlank { sanitizedEditLink }
+            val initialUrl = restoredLinkUrl.ifBlank { sanitizedEditLink }
             setText(if (initialUrl.equals("null", ignoreCase = true)) "" else initialUrl)
         }
         urlInput = urlField
         urlBox.addView(urlField)
 
-        fun pasteFromClipboard() {
-            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-            val clip = clipboard?.primaryClip
-            if (clip != null && clip.itemCount > 0) {
-                val text = clip.getItemAt(0).coerceToText(this@ClassMatePublishActivity).toString().trim()
-                if (text.isNotBlank()) {
-                    urlField.setText(text)
-                    urlBox.error = null
-                    Toast.makeText(this@ClassMatePublishActivity, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@ClassMatePublishActivity, "Clipboard is empty", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(this@ClassMatePublishActivity, "Clipboard is empty", Toast.LENGTH_SHORT).show()
-            }
-        }
-        urlBox.setEndIconOnClickListener { pasteFromClipboard() }
-
-        val pasteHelper = LinearLayout(this).apply {
+        // Non-Drive link inline warning banner
+        val driveWarning = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, dp(4))
-            val pasteIcon = ImageView(context).apply {
-                setImageResource(R.drawable.ic_copy)
-                setColorFilter(getColor(R.color.cm_primary))
-                layoutParams = LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginEnd = dp(6) }
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_warning_banner)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+        }
+        val warnIcon = TextView(this).apply {
+            text = "⚠️"
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+        }
+        val warnText = TextView(this).apply {
+            text = "This doesn't look like a Drive link — make sure it's shared as 'Anyone with the link can view' or others won't be able to open it."
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#B45309"))
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        driveWarning.addView(warnIcon)
+        driveWarning.addView(warnText)
+
+        linkSection.addView(clipboardBanner)
+        linkSection.addView(urlBox)
+        linkSection.addView(driveWarning)
+        form.panel.addView(linkSection)
+
+        fun checkClipboard() {
+            if (uploadMode != "link" || isEditing) {
+                clipboardBanner.visibility = View.GONE
+                return
             }
-            val pasteText = TextView(context).apply {
-                text = "Paste from clipboard"
-                textSize = 12f
-                setTextColor(getColor(R.color.cm_primary))
-                setTypeface(null, android.graphics.Typeface.BOLD)
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val raw = clip.getItemAt(0).coerceToText(this@ClassMatePublishActivity).toString().trim()
+                val isUrl = raw.startsWith("http://", ignoreCase = true) ||
+                            raw.startsWith("https://", ignoreCase = true) ||
+                            raw.contains("drive.google.com", ignoreCase = true)
+                val cur = urlField.text?.toString()?.trim().orEmpty()
+                if (isUrl && raw != cur && cur.isBlank()) {
+                    detectedClipboardUrl = raw
+                    clipboardBanner.visibility = View.VISIBLE
+                    return
+                }
             }
-            addView(pasteIcon)
-            addView(pasteText)
-            setOnClickListener { pasteFromClipboard() }
+            clipboardBanner.visibility = View.GONE
+        }
+        onClipboardCheckRequested = { checkClipboard() }
+
+        val pasteBannerAction = {
+            detectedClipboardUrl?.let { link ->
+                urlField.setText(link)
+                urlBox.error = null
+                clipboardBanner.visibility = View.GONE
+                Toast.makeText(this, "Link pasted from clipboard", Toast.LENGTH_SHORT).show()
+            }
+        }
+        clipboardBanner.setOnClickListener { pasteBannerAction() }
+        bannerText.setOnClickListener { pasteBannerAction() }
+        bannerDismiss.setOnClickListener { clipboardBanner.visibility = View.GONE }
+
+        // --- File section (Formats hint, filled button, picked file card) ---
+        val fileSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
         }
 
-        form.panel.addView(urlBox)
-        form.panel.addView(pasteHelper)
-
-        val (_, category) = dropdown("Category", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
-        val (_, subject) = dropdown("Subject", courses.map { it.second })
-        val defaultCourseId = intent.getStringExtra("course_id")
-        if (editingFile == null && !defaultCourseId.isNullOrBlank()) {
-            courses.firstOrNull { it.first == defaultCourseId }?.let { subject.setText(it.second, false) }
+        val formatHint = TextView(this).apply {
+            text = "PDF, DOCX, PPTX, XLSX, Images · up to 50MB"
+            textSize = 12f
+            setTextColor(getColor(R.color.cm_text_secondary))
+            setPadding(0, 0, 0, dp(6))
         }
 
-        picker = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-            text = if (uri == null) "Choose file" else "Change file · $selectedFileLabel"
+        val btnChooseFile = MaterialButton(this).apply {
+            text = "Choose file"
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
             isAllCaps = false
             cornerRadius = dp(14)
+            backgroundTintList = ColorStateList.valueOf(getColor(R.color.cm_primary))
+            setTextColor(Color.WHITE)
+            icon = ContextCompat.getDrawable(this@ClassMatePublishActivity, R.drawable.ic_file_generic)
+            iconTint = ColorStateList.valueOf(Color.WHITE)
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            iconPadding = dp(8)
+            elevation = dp(3).toFloat()
             setOnClickListener { if (!busy) pickFile.launch(arrayOf("*/*")) }
         }
-        form.panel.addView(picker, LinearLayout.LayoutParams(-1, dp(64)).apply { topMargin = dp(16) })
+
+        // Picked file card with icon, name, size and remove button
+        val pickedFileCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_picked_file_card)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+        val pickedIconFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+        }
+        val pickedIconImg = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
+            setImageResource(R.drawable.ic_file_generic)
+        }
+        pickedIconFrame.addView(pickedIconImg)
+
+        val pickedDetailsCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+        }
+        val tvPickedName = TextView(this).apply {
+            text = "Selected file"
+            textSize = 13.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val tvPickedSize = TextView(this).apply {
+            text = "0 MB"
+            textSize = 11.5f
+            setTextColor(getColor(R.color.cm_text_secondary))
+        }
+        pickedDetailsCol.addView(tvPickedName)
+        pickedDetailsCol.addView(tvPickedSize)
+
+        val btnRemovePicked = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            setColorFilter(getColor(R.color.cm_text_secondary))
+            setBackgroundResource(R.drawable.bg_toggle_container)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(8) }
+        }
+
+        pickedFileCard.addView(pickedIconFrame)
+        pickedFileCard.addView(pickedDetailsCol)
+        pickedFileCard.addView(btnRemovePicked)
+
+        fileSection.addView(formatHint)
+        fileSection.addView(btnChooseFile, LinearLayout.LayoutParams(-1, dp(54)))
+        fileSection.addView(pickedFileCard)
+        form.panel.addView(fileSection)
+
+        fun updatePickedFileUi() {
+            if (uri != null && selectedFileLabel.isNotBlank()) {
+                pickedFileCard.visibility = View.VISIBLE
+                btnChooseFile.visibility = View.GONE
+                formatHint.visibility = View.GONE
+                tvPickedName.text = selectedFileLabel
+                tvPickedSize.text = "${formatFileSize(selectedFileSize)} · Ready to upload"
+
+                val tempPdf = PdfFile(
+                    id = "picked",
+                    title = selectedFileLabel,
+                    fileType = selectedFileLabel.substringAfterLast('.', "pdf"),
+                    materialType = "notes",
+                    sizeBytes = selectedFileSize,
+                    driveUrl = ""
+                )
+                val visuals = FileVisuals.getVisuals(tempPdf)
+                FileVisuals.applyVisuals(pickedIconImg, pickedIconFrame, visuals)
+            } else {
+                pickedFileCard.visibility = View.GONE
+                if (!isEditing) {
+                    btnChooseFile.visibility = View.VISIBLE
+                    formatHint.visibility = View.VISIBLE
+                }
+            }
+        }
+
+        btnRemovePicked.setOnClickListener {
+            uri = null
+            selectedFileLabel = ""
+            selectedFileSize = 0L
+            updatePickedFileUi()
+            onPickedFileChanged?.invoke()
+        }
+        pickedFileCard.setOnClickListener {
+            if (!busy) pickFile.launch(arrayOf("*/*"))
+        }
+
+        // --- Category & Subject Dropdowns ---
+        val (categoryBox, category) = dropdown("Category *", listOf("Notes", "Slides", "Questions", "Syllabus", "Other"))
+
+        // Subject dropdown with two-line layout: bold course code on top, smaller title below
+        val subjectBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
+            hint = "Subject *"
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+        }
+        val subject = MaterialAutoCompleteTextView(subjectBox.context).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setSingleLine(true)
+            ellipsize = TextUtils.TruncateAt.END
+            val adapter = object : ArrayAdapter<CourseEntry>(this@ClassMatePublishActivity, R.layout.item_course_two_line_dropdown, courses) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = convertView ?: layoutInflater.inflate(R.layout.item_course_two_line_dropdown, parent, false)
+                    val item = getItem(position)
+                    view.findViewById<TextView>(R.id.tvCourseCode).text = item?.code.orEmpty()
+                    view.findViewById<TextView>(R.id.tvCourseTitle).text = item?.title.orEmpty()
+                    return view
+                }
+            }
+            setAdapter(adapter)
+            if (courses.isNotEmpty()) {
+                val defaultCourseId = intent.getStringExtra("course_id")
+                val matched = if (!defaultCourseId.isNullOrBlank()) courses.firstOrNull { it.offeringId == defaultCourseId } else courses.first()
+                matched?.let { setText(it.displayLabel, false) }
+            }
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        subjectBox.addView(subject)
+        form.panel.addView(subjectBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+
+        editingFile?.let { file ->
+            category.setText(file.optString("category").replaceFirstChar { it.uppercase() }, false)
+            courses.firstOrNull { it.offeringId == file.optString("semester_course_id") }?.let { subject.setText(it.displayLabel, false) }
+            fileSection.visibility = View.GONE
+            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the name, category or subject. The uploaded file stays unchanged."
+            form.label(note)
+        }
+
+        // --- Determinate Progress Bar & Status ---
+        val progressContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding(0, dp(12), 0, dp(8))
+        }
+        val progressText = TextView(this).apply {
+            text = "Uploading… 0%"
+            textSize = 12.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_primary))
+        }
+        val determinateProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+            isIndeterminate = false
+            layoutParams = LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(6) }
+        }
+        progressContainer.addView(progressText)
+        progressContainer.addView(determinateProgress)
+        form.panel.addView(progressContainer)
+
+        status = form.status()
+
+        // --- Live Preview Card ---
+        val previewHeader = TextView(this).apply {
+            text = "PREVIEW IN LIBRARY"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            letterSpacing = 0.05f
+            setPadding(0, dp(20), 0, dp(6))
+        }
+        form.panel.addView(previewHeader)
+
+        val previewCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_preview_card)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
+        }
+        val previewIconFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            setBackgroundResource(R.drawable.bg_library_file_icon_blue)
+        }
+        val previewIconImg = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
+            setImageResource(R.drawable.ic_file_generic)
+        }
+        previewIconFrame.addView(previewIconImg)
+
+        val previewTextCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+        }
+        val previewTitle = TextView(this).apply {
+            text = "Resource title"
+            textSize = 14.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val previewSubject = TextView(this).apply {
+            text = "Subject"
+            textSize = 12.5f
+            setTextColor(getColor(R.color.cm_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val previewMeta = TextView(this).apply {
+            text = "Notes · File"
+            textSize = 11.5f
+            setTextColor(getColor(R.color.cm_text_secondary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        previewTextCol.addView(previewTitle)
+        previewTextCol.addView(previewSubject)
+        previewTextCol.addView(previewMeta)
+
+        val previewTag = TextView(this).apply {
+            text = "PREVIEW"
+            textSize = 9.5f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            setBackgroundResource(R.drawable.bg_toggle_container)
+            setPadding(dp(6), dp(3), dp(6), dp(3))
+        }
+
+        previewCard.addView(previewIconFrame)
+        previewCard.addView(previewTextCol)
+        previewCard.addView(previewTag)
+        form.panel.addView(previewCard)
+
+        fun updateLivePreview() {
+            val isLink = uploadMode == "link"
+            val titleText = name.text?.toString()?.trim().orEmpty()
+            previewTitle.text = if (titleText.isNotBlank()) titleText else (if (isLink) "Resource title" else "File name")
+
+            val selSubject = subject.text?.toString()?.trim().orEmpty()
+            previewSubject.text = if (selSubject.isNotBlank()) selSubject else "Subject"
+
+            val selCategory = category.text?.toString()?.trim()?.replaceFirstChar { it.uppercase() } ?: "Notes"
+            val rawUrl = urlField.text?.toString()?.trim().orEmpty()
+            val isDrive = FileVisuals.isGoogleDrive(rawUrl)
+
+            val metaText = when {
+                isLink && isDrive -> "$selCategory · Google Drive"
+                isLink -> "$selCategory · External Link"
+                selectedFileSize > 0 -> "$selCategory · ${formatFileSize(selectedFileSize)}"
+                else -> "$selCategory · File"
+            }
+            previewMeta.text = metaText
+
+            val tempPdf = PdfFile(
+                id = "preview",
+                title = if (titleText.isNotBlank()) titleText else (if (isLink) "Link" else selectedFileLabel.ifBlank { "file" }),
+                fileType = if (isLink) "link" else selectedFileLabel.substringAfterLast('.', "pdf"),
+                materialType = selCategory.lowercase(),
+                sizeBytes = selectedFileSize,
+                driveUrl = rawUrl
+            )
+            val visuals = FileVisuals.getVisuals(tempPdf)
+            FileVisuals.applyVisuals(previewIconImg, previewIconFrame, visuals)
+        }
+
+        onPickedFileChanged = {
+            updatePickedFileUi()
+            updateLivePreview()
+        }
 
         fun updateModeVisibility() {
             val isLink = uploadMode == "link"
             updateToggleUi()
-            urlBox.visibility = if (isLink) View.VISIBLE else View.GONE
-            pasteHelper.visibility = if (isLink) View.VISIBLE else View.GONE
-            picker.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
-            nameBox?.hint = if (isLink) "Resource title" else "File name"
+            linkSection.visibility = if (isLink) View.VISIBLE else View.GONE
+            fileSection.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
+            nameBox?.hint = if (isLink) "Resource title *" else "File name *"
+            if (isLink) checkClipboard()
+            updateLivePreview()
         }
 
         btnUploadFile?.setOnClickListener {
@@ -415,106 +886,283 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
 
-        editingFile?.let { file ->
-            category.setText(file.optString("category").replaceFirstChar { it.uppercase() }, false)
-            courses.firstOrNull { it.first == file.optString("semester_course_id") }?.let { subject.setText(it.second, false) }
-            picker.visibility = View.GONE
-            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the name, category or subject. The uploaded file stays unchanged."
-            form.label(note)
+        name.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                nameBox?.error = null
+                updateLivePreview()
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        })
+
+        urlField.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                urlBox.error = null
+                val u = s?.toString()?.trim().orEmpty()
+                val isNonDrive = u.isNotBlank() && !FileVisuals.isGoogleDrive(u)
+                driveWarning.visibility = if (isNonDrive && uploadMode == "link") View.VISIBLE else View.GONE
+                updateLivePreview()
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        })
+
+        category.setOnItemClickListener { _, _, _, _ ->
+            categoryBox.error = null
+            updateLivePreview()
         }
 
+        subject.setOnItemClickListener { _, _, _, _ ->
+            subjectBox.error = null
+            updateLivePreview()
+        }
+
+        updatePickedFileUi()
         updateModeVisibility()
 
-        status = form.status()
+        // Observe background upload progress
+        lifecycleScope.launch {
+            LibraryUploadManager.uploadState.collect { prog ->
+                if (prog != null && prog.taskId == currentUploadTaskId) {
+                    when (prog.status) {
+                        LibraryUploadManager.Status.QUEUED -> {
+                            progressContainer.visibility = View.VISIBLE
+                            determinateProgress.isIndeterminate = true
+                            progressText.text = "Queued for upload…"
+                        }
+                        LibraryUploadManager.Status.UPLOADING -> {
+                            progressContainer.visibility = View.VISIBLE
+                            determinateProgress.isIndeterminate = false
+                            determinateProgress.progress = prog.percent
+                            val upStr = formatFileSize(prog.uploadedBytes)
+                            val totStr = formatFileSize(prog.totalBytes)
+                            progressText.text = "Uploading… ${prog.percent}% ($upStr / $totStr)"
+                        }
+                        LibraryUploadManager.Status.COMPLETED -> {
+                            progressContainer.visibility = View.GONE
+                            Toast.makeText(this@ClassMatePublishActivity, "File uploaded successfully", Toast.LENGTH_SHORT).show()
+                            setResult(RESULT_OK)
+                            finish()
+                        }
+                        LibraryUploadManager.Status.WAITING_FOR_NETWORK -> {
+                            progressContainer.visibility = View.VISIBLE
+                            determinateProgress.isIndeterminate = true
+                            progressText.text = "Connection lost. Upload queued — will finish when online."
+                        }
+                        LibraryUploadManager.Status.FAILED -> {
+                            progressContainer.visibility = View.GONE
+                            status.visibility = View.VISIBLE
+                            status.text = "Upload failed: ${prog.error ?: "Unknown error"}"
+                            submit.isEnabled = true
+                            busy = false
+                        }
+                    }
+                }
+            }
+        }
+
         submit.isEnabled = true
         submit.setOnClickListener {
             val isLink = uploadMode == "link"
             val title = name.text.toString().trim()
             if (title.isBlank()) {
-                name.error = if (isLink) "Enter a resource title" else "Enter a file name"
+                nameBox?.error = if (isLink) "Resource title is required" else "File name is required"
+                name.requestFocus()
                 return@setOnClickListener
             }
-            name.error = null
+            nameBox?.error = null
 
-            val course = courses.firstOrNull { it.second == subject.text.toString() }
+            val selSubjectText = subject.text.toString().trim()
+            val course = courses.firstOrNull { it.displayLabel == selSubjectText || it.second == selSubjectText }
             if (course == null) {
-                status.visibility = View.VISIBLE
-                status.text = "Select a subject"
+                subjectBox.error = "Please select a subject"
+                subject.requestFocus()
                 return@setOnClickListener
             }
-            val kind = category.text.toString().lowercase()
+            subjectBox.error = null
+
+            val kind = category.text.toString().trim().lowercase()
+            if (kind.isBlank()) {
+                categoryBox.error = "Please select a category"
+                category.requestFocus()
+                return@setOnClickListener
+            }
+            categoryBox.error = null
+
+            val rawUrl = urlField.text.toString().trim()
+            val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
 
             if (isLink) {
-                val rawUrl = urlField.text.toString().trim()
                 if (rawUrl.isBlank()) {
-                    urlBox.error = "Enter a Google Drive or resource link"
+                    urlBox.error = "Google Drive link is required"
+                    urlField.requestFocus()
                     return@setOnClickListener
                 }
-                val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
                 try {
-                    val uri = java.net.URI(urlWithScheme)
-                    if (uri.host.isNullOrBlank() || !uri.host.contains('.')) {
+                    val u = java.net.URI(urlWithScheme)
+                    if (u.host.isNullOrBlank() || !u.host.contains('.')) {
                         urlBox.error = "Please enter a valid link URL (e.g. https://drive.google.com/...)"
+                        urlField.requestFocus()
                         return@setOnClickListener
                     }
                 } catch (e: Exception) {
                     urlBox.error = "Please enter a valid link URL"
+                    urlField.requestFocus()
                     return@setOnClickListener
                 }
                 urlBox.error = null
-
-                perform {
-                    if (editingFile != null) {
-                        ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
-                            .put("target_resource", editingFile!!.getString("id"))
-                            .put("target_title", title)
-                            .put("target_category", kind)
-                            .put("target_course", course.first)
-                            .put("target_link_url", urlWithScheme)
-                        )
-                        null
-                    } else {
-                        ClassMateAuthApi.rpc("create_library_link", JSONObject()
-                            .put("target_batch", batch)
-                            .put("target_course", course.first)
-                            .put("target_title", title)
-                            .put("target_category", kind)
-                            .put("target_url", urlWithScheme)
-                        )
-                        null
-                    }
-                }
             } else {
-                val selected = uri
-                if (selected == null && editingFile == null) {
+                if (uri == null && editingFile == null) {
                     status.visibility = View.VISIBLE
-                    status.text = "Choose a file to upload"
+                    status.text = "Please choose a file to upload"
                     return@setOnClickListener
                 }
-                perform {
-                    if (editingFile != null) {
-                        ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
-                            .put("target_resource", editingFile!!.getString("id"))
-                            .put("target_title", title)
-                            .put("target_category", kind)
-                            .put("target_course", course.first)
-                        )
-                        null
-                    } else {
-                        val size = contentResolver.query(selected!!, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
-                            if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null
-                        } ?: error("Could not read file size")
-                        ClassMateAuthApi.uploadResource(contentResolver, selected, batch, course.first, title,
-                            contentResolver.getType(selected) ?: "application/octet-stream", size, kind)
-                        null
+            }
+
+            // Perform submission with duplicate detection
+            fun executeSubmission(targetResourceId: String?) {
+                if (busy) return
+                busy = true
+                submit.isEnabled = false
+                status.visibility = View.VISIBLE
+
+                if (isLink) {
+                    perform {
+                        if (targetResourceId != null || editingFile != null) {
+                            val resId = targetResourceId ?: editingFile!!.getString("id")
+                            ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
+                                .put("target_resource", resId)
+                                .put("target_title", title)
+                                .put("target_category", kind)
+                                .put("target_course", course.offeringId)
+                                .put("target_link_url", urlWithScheme)
+                            )
+                            null
+                        } else {
+                            ClassMateAuthApi.rpc("create_library_link", JSONObject()
+                                .put("target_batch", batch)
+                                .put("target_course", course.offeringId)
+                                .put("target_title", title)
+                                .put("target_category", kind)
+                                .put("target_url", urlWithScheme)
+                            )
+                            null
+                        }
                     }
+                } else {
+                    if (editingFile != null || (targetResourceId != null && uri == null)) {
+                        val resId = targetResourceId ?: editingFile!!.getString("id")
+                        perform {
+                            ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
+                                .put("target_resource", resId)
+                                .put("target_title", title)
+                                .put("target_category", kind)
+                                .put("target_course", course.offeringId)
+                            )
+                            null
+                        }
+                    } else {
+                        // Background upload via LibraryUploadManager
+                        val selected = uri ?: return
+                        status.text = "Preparing upload…"
+                        lifecycleScope.launch {
+                            try {
+                                val mime = contentResolver.getType(selected) ?: "application/octet-stream"
+                                val size = selectedFileSize.takeIf { it > 0 } ?: contentResolver.query(selected, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+                                    if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+                                } ?: 0L
+
+                                val taskId = LibraryUploadManager.enqueueUpload(
+                                    context = applicationContext,
+                                    uri = selected,
+                                    fileName = selectedFileLabel.ifBlank { title },
+                                    batchId = batch,
+                                    courseId = course.offeringId,
+                                    courseName = course.displayLabel,
+                                    title = title,
+                                    mimeType = mime,
+                                    sizeBytes = size,
+                                    category = kind
+                                )
+                                currentUploadTaskId = taskId
+                                progressContainer.visibility = View.VISIBLE
+                                determinateProgress.isIndeterminate = true
+                                progressText.text = "Upload started in background…"
+                            } catch (e: Exception) {
+                                status.text = e.message ?: "Failed to start upload"
+                                busy = false
+                                submit.isEnabled = true
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check for duplicates before submission
+            lifecycleScope.launch {
+                busy = true
+                submit.isEnabled = false
+                status.visibility = View.VISIBLE
+                status.text = "Checking for duplicates…"
+
+                val existingFiles = runCatching {
+                    ClassMateAuthApi.rows(
+                        "file_metadata",
+                        "select=id,title,category,semester_course_id,file_type,link_url&status=eq.active&semester_course_id=eq.${course.offeringId}&category=eq.$kind"
+                    )
+                }.getOrNull() ?: JSONArray()
+
+                val newTitleClean = title.trim().lowercase()
+                var duplicateId: String? = null
+                var duplicateTitle: String? = null
+
+                for (i in 0 until existingFiles.length()) {
+                    val f = existingFiles.getJSONObject(i)
+                    val fId = f.getString("id")
+                    if (editingFile?.optString("id") == fId) continue
+
+                    val fTitle = f.optString("title").trim()
+                    val fTitleClean = fTitle.lowercase()
+
+                    val isExact = fTitleClean == newTitleClean
+                    val isSimilar = fTitleClean.replace(Regex("[^a-z0-9]"), "") == newTitleClean.replace(Regex("[^a-z0-9]"), "") ||
+                            ((fTitleClean.contains(newTitleClean) || newTitleClean.contains(fTitleClean)) && Math.abs(fTitleClean.length - newTitleClean.length) <= 3)
+
+                    if (isExact || isSimilar) {
+                        duplicateId = fId
+                        duplicateTitle = fTitle
+                        break
+                    }
+                }
+
+                busy = false
+                submit.isEnabled = true
+                status.visibility = View.GONE
+
+                if (duplicateId != null && duplicateTitle != null) {
+                    MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                        .setTitle("Similar file already exists")
+                        .setMessage("A file titled \"$duplicateTitle\" already exists in ${course.code} under ${kind.replaceFirstChar { it.uppercase() }}.\n\nWould you like to add this as a new file, or update the existing file instead?")
+                        .setPositiveButton("Update existing") { _, _ ->
+                            executeSubmission(targetResourceId = duplicateId)
+                        }
+                        .setNegativeButton("Add as new") { _, _ ->
+                            executeSubmission(targetResourceId = null)
+                        }
+                        .setNeutralButton("Cancel", null)
+                        .show()
+                } else {
+                    executeSubmission(targetResourceId = null)
                 }
             }
         }
     }
+
     private fun perform(action: suspend () -> JSONObject?) {
         if (busy) return
-        busy = true; submit.isEnabled = false; status.visibility = View.VISIBLE
+        busy = true
+        submit.isEnabled = false
+        status.visibility = View.VISIBLE
         status.text = if (editingFile != null) "Saving changes…" else if (upload) (if (uploadMode == "link") "Sharing link…" else "Uploading file…") else "Posting notice…"
         lifecycleScope.launch {
             try {
@@ -523,9 +1171,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 if (outcome != null) data.putExtra("created_notice", outcome.toString())
                 setResult(RESULT_OK, data)
                 finish()
+            } catch (e: Exception) {
+                status.text = e.message ?: "Could not complete. Try again."
+            } finally {
+                busy = false
+                submit.isEnabled = true
             }
-            catch (e: Exception) { status.text = e.message ?: "Could not complete. Try again." }
-            finally { busy = false; submit.isEnabled = true }
         }
     }
 }

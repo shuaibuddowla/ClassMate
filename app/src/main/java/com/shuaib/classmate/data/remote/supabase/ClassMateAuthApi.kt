@@ -178,9 +178,16 @@ object ClassMateAuthApi {
     }
 
     suspend fun uploadResource(
-        resolver: ContentResolver, uri: Uri, batchId: String,
-        semesterCourseId: String?, title: String, mimeType: String, size: Long,
+        resolver: ContentResolver?,
+        uri: Uri?,
+        localFile: java.io.File? = null,
+        batchId: String,
+        semesterCourseId: String?,
+        title: String,
+        mimeType: String,
+        size: Long,
         category: String,
+        onProgress: ((uploadedBytes: Long, totalBytes: Long) -> Unit)? = null
     ): String = withContext(Dispatchers.IO) {
         require(size in 1..500_000_000L) { "File must be between 1 byte and 500 MB" }
         val start = JSONObject(request("POST", "/functions/v1/upload-classmate-resource",
@@ -193,8 +200,22 @@ object ClassMateAuthApi {
             override fun contentType() = mimeType.toMediaType()
             override fun contentLength() = size
             override fun writeTo(sink: BufferedSink) {
-                val input = resolver.openInputStream(uri) ?: throw IOException("Selected file unavailable")
-                input.use { sink.writeAll(it.source()) }
+                val input = when {
+                    localFile != null && localFile.exists() -> java.io.FileInputStream(localFile)
+                    uri != null && resolver != null -> resolver.openInputStream(uri)
+                    else -> null
+                } ?: throw IOException("Selected file unavailable")
+                input.use { inStream ->
+                    val buffer = ByteArray(32 * 1024)
+                    var uploaded = 0L
+                    var read: Int
+                    while (inStream.read(buffer).also { read = it } != -1) {
+                        sink.write(buffer, 0, read)
+                        uploaded += read
+                        onProgress?.invoke(uploaded, size)
+                    }
+                    sink.flush()
+                }
             }
         }
         uploadHttp.newCall(Request.Builder().url(uploadUrl).put(body).build()).execute().use {
@@ -205,6 +226,23 @@ object ClassMateAuthApi {
                 .put("resource_id", start.getString("resource_id"))))
         finish.getString("resource_id")
     }
+
+    suspend fun uploadResource(
+        resolver: ContentResolver, uri: Uri, batchId: String,
+        semesterCourseId: String?, title: String, mimeType: String, size: Long,
+        category: String,
+    ): String = uploadResource(
+        resolver = resolver,
+        uri = uri,
+        localFile = null,
+        batchId = batchId,
+        semesterCourseId = semesterCourseId,
+        title = title,
+        mimeType = mimeType,
+        size = size,
+        category = category,
+        onProgress = null
+    )
 
     private fun notificationPrefs() = appContext?.getSharedPreferences("classmate_notification_identity_${BuildConfig.CLASSMATE_ENV}", Context.MODE_PRIVATE)
     fun saveNotificationIdentity(profile: JSONObject) {

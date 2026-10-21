@@ -38,6 +38,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 import android.widget.Toast
+import android.widget.ProgressBar
 
 import android.widget.Spinner
 
@@ -1713,6 +1714,33 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         }
 
+        val uploadChip = findViewById<View>(R.id.uploadProgressChip)
+        val uploadChipText = findViewById<TextView>(R.id.uploadChipText)
+        val uploadChipProgress = findViewById<ProgressBar>(R.id.uploadChipProgress)
+        lifecycleScope.launch {
+            com.shuaib.classmate.workers.LibraryUploadManager.uploadState.collect { prog ->
+                if (uploadChip == null) return@collect
+                if (prog != null && (prog.status == com.shuaib.classmate.workers.LibraryUploadManager.Status.UPLOADING ||
+                            prog.status == com.shuaib.classmate.workers.LibraryUploadManager.Status.QUEUED ||
+                            prog.status == com.shuaib.classmate.workers.LibraryUploadManager.Status.WAITING_FOR_NETWORK)) {
+                    uploadChip.visibility = View.VISIBLE
+                    uploadChipText?.text = "${prog.title} · ${prog.percent}%"
+                    uploadChipProgress?.progress = prog.percent
+                    uploadChipProgress?.isIndeterminate = (prog.status != com.shuaib.classmate.workers.LibraryUploadManager.Status.UPLOADING)
+                } else if (prog?.status == com.shuaib.classmate.workers.LibraryUploadManager.Status.COMPLETED) {
+                    uploadChip.visibility = View.VISIBLE
+                    uploadChipText?.text = "Upload complete!"
+                    uploadChipProgress?.isIndeterminate = false
+                    uploadChipProgress?.progress = 100
+                    academicScreens.invalidateLibrary()
+                    kotlinx.coroutines.delay(2500)
+                    uploadChip.visibility = View.GONE
+                    com.shuaib.classmate.workers.LibraryUploadManager.clearState()
+                } else {
+                    uploadChip.visibility = View.GONE
+                }
+            }
+        }
     }
 
 
