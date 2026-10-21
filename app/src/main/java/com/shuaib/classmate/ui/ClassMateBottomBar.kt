@@ -1,11 +1,9 @@
 package com.shuaib.classmate.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -125,48 +123,16 @@ fun ClassMateFloatingNavigationBar(
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Coordinates of each tab for continuous pill tracking
-    val tabOffsets = remember { mutableStateMapOf<ClassMateTab, Dp>() }
-    val tabWidths = remember { mutableStateMapOf<ClassMateTab, Dp>() }
-
-    // Animated sliding indicator
-    val targetOffset = tabOffsets[selectedTab] ?: 0.dp
-    val targetWidth = tabWidths[selectedTab] ?: 0.dp
-
-    val animatedIndicatorOffset by animateDpAsState(
-        targetValue = targetOffset,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "continuousIndicatorOffset"
-    )
-
-    val animatedIndicatorWidth by animateDpAsState(
-        targetValue = targetWidth,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "continuousIndicatorWidth"
-    )
-
     // Animated auto-hide on scroll
     AnimatedVisibility(
         visible = isVisible,
         enter = slideInVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMedium
-            ),
-            initialOffsetY = { it * 2 }
+            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            initialOffsetY = { it }
         ),
         exit = slideOutVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMedium
-            ),
-            targetOffsetY = { it * 2 }
+            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            targetOffsetY = { it }
         ),
         modifier = modifier
     ) {
@@ -188,25 +154,35 @@ fun ClassMateFloatingNavigationBar(
                         .background(glassBorder)
                 )
 
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(58.dp)
                         .padding(horizontal = 4.dp, vertical = 3.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
+                    val tabCount = visibleTabs.size.coerceAtLeast(1)
+                    val tabWidth = maxWidth / tabCount
+                    val selectedIndex = visibleTabs.indexOf(selectedTab).coerceAtLeast(0)
+                    val targetOffset = tabWidth * selectedIndex
+
+                    // Snappy, buttery-smooth 200ms indicator slide
+                    val animatedIndicatorOffset by animateDpAsState(
+                        targetValue = targetOffset,
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                        label = "indicatorOffset"
+                    )
+
                     // Continuous Sliding Indicator Pill
-                    if (animatedIndicatorWidth > 0.dp) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = animatedIndicatorOffset)
-                                .width(animatedIndicatorWidth)
-                                .fillMaxHeight()
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(indicatorColor)
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .offset(x = animatedIndicatorOffset)
+                            .width(tabWidth)
+                            .fillMaxHeight()
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(indicatorColor)
+                    )
 
                     // Tab Items Row - Equal Horizontal Distribution
                     Row(
@@ -214,138 +190,110 @@ fun ClassMateFloatingNavigationBar(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                visibleTabs.forEach { tab ->
-                    val isSelected = tab == selectedTab
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isPressed by interactionSource.collectIsPressedAsState()
+                        visibleTabs.forEach { tab ->
+                            val isSelected = tab == selectedTab
+                            val labelText = if (tab == ClassMateTab.BATCH) batchTabTitle else tab.defaultTitle
 
-                    // Press-scale micro-interaction: scales to ~0.92 on press, springs back on release
-                    val scale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.92f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        label = "pressScale_${tab.name}"
-                    )
-
-                    val labelText = if (tab == ClassMateTab.BATCH) batchTabTitle else tab.defaultTitle
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .onGloballyPositioned { coordinates ->
-                                val xInParent = with(density) { coordinates.positionInParent().x.toDp() }
-                                val widthInParent = with(density) { coordinates.size.width.toDp() }
-                                tabOffsets[tab] = xInParent
-                                tabWidths[tab] = widthInParent
-                            }
-                            .clip(RoundedCornerShape(20.dp))
-                            .combinedClickable(
-                                interactionSource = interactionSource,
-                                indication = null, // Custom sliding indicator handles visual feedback
-                                onClick = {
-                                    if (!isSelected) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onTabSelected(tab)
-                                    }
-                                },
-                                onLongClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    if (onTabLongClick != null) {
-                                        onTabLongClick.invoke(tab)
-                                    } else {
-                                        quickActionTab = tab
-                                    }
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier
-                                .scale(scale)
-                                .padding(vertical = 2.dp)
-                        ) {
-                            // Icon container with Badge
-                            Box(contentAlignment = Alignment.TopEnd) {
-                                // Outline to Filled Morph with smooth 180ms ease
-                                Crossfade(
-                                    targetState = isSelected,
-                                    animationSpec = tween(durationMillis = 180),
-                                    label = "iconMorph_${tab.name}"
-                                ) { selected ->
-                                    val iconRes = if (selected) tab.filledIcon else tab.outlineIcon
-                                    Icon(
-                                        painter = painterResource(id = iconRes),
-                                        contentDescription = labelText,
-                                        tint = if (selected) activeColor else inactiveColor,
-                                        modifier = Modifier.size(21.dp)
-                                    )
-                                }
-
-                                // Generic Badges (Dot or Count Bubble)
-                                val badge = badges[tab]
-                                if (badge != null && !isSelected) {
-                                    when (badge) {
-                                        is NavBadge.Dot -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .offset(x = 5.dp, y = (-2).dp)
-                                                    .size(7.dp)
-                                                    .background(Color(0xFFEF4444), CircleShape)
-                                                    .border(1.dp, glassBg, CircleShape)
-                                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .combinedClickable(
+                                        indication = null, // Custom sliding indicator handles visual feedback
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        onClick = {
+                                            if (!isSelected) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onTabSelected(tab)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (onTabLongClick != null) {
+                                                onTabLongClick.invoke(tab)
+                                            } else {
+                                                quickActionTab = tab
+                                            }
                                         }
-                                        is NavBadge.Count -> {
-                                            if (badge.count > 0) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .offset(x = 9.dp, y = (-4).dp)
-                                                        .height(16.dp)
-                                                        .widthIn(min = 16.dp)
-                                                        .background(Color(0xFFEF4444), RoundedCornerShape(8.dp))
-                                                        .border(1.5.dp, glassBg, RoundedCornerShape(8.dp))
-                                                        .padding(horizontal = 4.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = if (badge.count > 99) "99+" else badge.count.toString(),
-                                                        color = Color.White,
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        lineHeight = 9.sp,
-                                                        textAlign = TextAlign.Center
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                ) {
+                                    // Icon container with Badge
+                                    Box(contentAlignment = Alignment.TopEnd) {
+                                        val iconRes = if (isSelected) tab.filledIcon else tab.outlineIcon
+                                        Icon(
+                                            painter = painterResource(id = iconRes),
+                                            contentDescription = labelText,
+                                            tint = if (isSelected) activeColor else inactiveColor,
+                                            modifier = Modifier.size(21.dp)
+                                        )
+
+                                        // Generic Badges (Dot or Count Bubble)
+                                        val badge = badges[tab]
+                                        if (badge != null && !isSelected) {
+                                            when (badge) {
+                                                is NavBadge.Dot -> {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .offset(x = 5.dp, y = (-2).dp)
+                                                            .size(7.dp)
+                                                            .background(Color(0xFFEF4444), CircleShape)
+                                                            .border(1.dp, glassBg, CircleShape)
                                                     )
+                                                }
+                                                is NavBadge.Count -> {
+                                                    if (badge.count > 0) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .offset(x = 9.dp, y = (-4).dp)
+                                                                .height(16.dp)
+                                                                .widthIn(min = 16.dp)
+                                                                .background(Color(0xFFEF4444), RoundedCornerShape(8.dp))
+                                                                .border(1.5.dp, glassBg, RoundedCornerShape(8.dp))
+                                                                .padding(horizontal = 4.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = if (badge.count > 99) "99+" else badge.count.toString(),
+                                                                color = Color.White,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                lineHeight = 9.sp,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                    // Label: bold + accent when active, regular + muted when inactive
+                                    Text(
+                                        text = labelText,
+                                        color = if (isSelected) activeColor else inactiveColor,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        letterSpacing = (-0.1).sp
+                                    )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            // Label: bold + accent when active, regular + muted when inactive
-                            Text(
-                                text = labelText,
-                                color = if (isSelected) activeColor else inactiveColor,
-                                fontSize = 10.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                letterSpacing = (-0.1).sp
-                            )
                         }
                     }
                 }
             }
         }
     }
-}
-}
 
     // Stretch Addition 2: Long-Press Quick Actions Bottom Sheet
     if (quickActionTab != null && quickActions.isNotEmpty()) {

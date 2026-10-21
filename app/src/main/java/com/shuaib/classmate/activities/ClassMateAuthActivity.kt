@@ -1808,7 +1808,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     composeSelectedTab = tab
                     selectedTab = tab.id
                     composeBadgeMap.remove(tab)
-                    renderHomeTab(tab.id)
+                    homeHost.post {
+                        renderHomeTab(tab.id)
+                    }
                 },
                 visibleTabs = visibleTabs,
                 batchTabTitle = if (isTeacher) "Students" else "Batch",
