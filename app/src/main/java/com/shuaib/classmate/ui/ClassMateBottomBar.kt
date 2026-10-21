@@ -104,6 +104,7 @@ fun ClassMateFloatingNavigationBar(
     batchTabTitle: String = "Batch",
     badges: Map<ClassMateTab, NavBadge> = emptyMap(),
     isVisible: Boolean = true,
+    onTabLongClick: ((ClassMateTab) -> Unit)? = null,
     onQuickActionRequest: ((ClassMateTab) -> List<TabQuickAction>)? = null,
     isDark: Boolean = isSystemInDarkTheme()
 ) {
@@ -122,6 +123,7 @@ fun ClassMateFloatingNavigationBar(
     val quickActions = remember(quickActionTab) {
         quickActionTab?.let { onQuickActionRequest?.invoke(it) } ?: emptyList()
     }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Coordinates of each tab for continuous pill tracking
     val tabOffsets = remember { mutableStateMapOf<ClassMateTab, Dp>() }
@@ -237,7 +239,6 @@ fun ClassMateFloatingNavigationBar(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .scale(scale)
                             .onGloballyPositioned { coordinates ->
                                 val xInParent = with(density) { coordinates.positionInParent().x.toDp() }
                                 val widthInParent = with(density) { coordinates.size.width.toDp() }
@@ -256,7 +257,11 @@ fun ClassMateFloatingNavigationBar(
                                 },
                                 onLongClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    quickActionTab = tab
+                                    if (onTabLongClick != null) {
+                                        onTabLongClick.invoke(tab)
+                                    } else {
+                                        quickActionTab = tab
+                                    }
                                 }
                             ),
                         contentAlignment = Alignment.Center
@@ -264,7 +269,9 @@ fun ClassMateFloatingNavigationBar(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            modifier = Modifier
+                                .scale(scale)
+                                .padding(vertical = 2.dp)
                         ) {
                             // Icon container with Badge
                             Box(contentAlignment = Alignment.TopEnd) {
@@ -346,7 +353,7 @@ fun ClassMateFloatingNavigationBar(
     if (quickActionTab != null && quickActions.isNotEmpty()) {
         ModalBottomSheet(
             onDismissRequest = { quickActionTab = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = sheetState,
             containerColor = if (isDark) Color(0xFF0F172A) else Color.White,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
