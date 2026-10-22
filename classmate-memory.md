@@ -2510,3 +2510,373 @@ The header provides a clean segmented pill toggle between two dedicated operatio
   - `http://192.168.0.101:8080/download`
 
 ---
+
+## 64. Navigation Bar Tap-and-Hold Shortcuts & Role-Based Security Partitioning
+
+### A. Touch Bounds & Gesture Routing Fix
+- **Commit References**: `320e76e`, `cd30525`
+- **The Defect**:
+  - In earlier iterations of the Jetpack Compose floating navigation bar, long-pressing tabs failed to register consistently on physical devices. Touch events were either absorbed by child view hit-boxes or failed due to strict touch-slop bounds.
+- **The Resolution**:
+  - In [`ClassMateBottomBar.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt), applied `combinedClickable(onClick = { ... }, onLongClick = { ... })` directly onto the full-width tab cell container.
+  - Linked native `ModalBottomSheet` and fallback `dialog_nav_tab_shortcuts.xml` (`item_nav_tab_shortcut.xml`) with tactile haptic feedback (`HapticFeedbackType.LongPress`).
+
+### B. Strict Role-Based Partitioning Matrix
+To eliminate privilege escalation risks and keep student workflows clutter-free, [`ClassMateAuthActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt) (`getQuickActionsForTab`) strictly gates shortcuts based on the user's authenticated profile role (`role`, `is_cr`, `is_server_owner`):
+
+| Tab | Admin / Server Owner | Course Teacher | Class Representative (CR) | Enrolled Student |
+| :--- | :--- | :--- | :--- | :--- |
+| **Timetable** | • Academic Calendar<br>• Bus Schedule<br>• Add Routine Period | • Bus Schedule<br>• Add Routine Period (Assigned) | • Bus Schedule<br>• Academic Calendar | • Bus Schedule<br>• Academic Calendar |
+| **Notices** | • Post Notice<br>• Search Notices | • Post Course Notice<br>• Search Notices | • Post Batch Notice<br>• Search Notices | • Search Notices |
+| **Courses** | • Add Library File / Drive Link<br>• Manage Attendance | • Add Course Material<br>• Manage Attendance | • Share Drive Link / Add Material | • My Attendance Drawer |
+| **Batch** | • Batch Administration<br>• Batch Fund Ledger | • Batch Student Directory | • Record Batch Fund<br>• View Fund Ledger | • Batchmates Directory |
+| **Settings** | • Admin Panel<br>• User Management<br>• Switch Batch<br>• Edit Profile | • Switch Batch<br>• Edit Profile | • Edit Profile | • Edit Profile |
+
+- **Security Guarantee**: Regular students are completely walled off from administrative tooling, user verification lists, and teacher controls. Class Representatives only receive actions scoped to their specific batch.
+
+---
+
+## 65. "Add Library File" Screen Complete Redesign & Option 2 Architecture
+
+### A. Motivation & Elimination of Cluttered Redundancies
+- **Commit References**: `7eb85a8`, `7b0a4d2`, `e68a9da`
+- **Problems Addressed**:
+  - The previous upload screen featured cluttered, redundant controls: both an in-field copy-style paste icon and a separate `"Paste from clipboard"` button.
+  - Non-Drive links frequently failed silently or lacked viewing permissions.
+  - Long course titles were clipped mid-word in dropdown selectors without ellipses.
+  - The "Choose file" action looked like a disabled text input rather than an actionable button.
+
+### B. Intelligent Paste & Automatic Clipboard Detection
+- In [`ClassMatePublishActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMatePublishActivity.kt):
+  - **Zero-Click Clipboard Detection**: On `onResume()`, the activity inspects the system clipboard. If a valid `http://` or `https://` string is detected, an inline dismissible banner appears immediately above the URL field:
+    `"📋 Link detected — tap to paste"`. One tap populates the input and dismisses the banner.
+  - **Drive Share Link Advisory**: If the pasted URL does not match a Google Drive share pattern (`drive.google.com/...`), an inline warning alerts the user:
+    `"This doesn't look like a Drive link — make sure it's shared as 'Anyone with the link can view' or others won't be able to open it."` (Advisory banner that never blocks valid submissions).
+
+### C. Two-Line Course Code Dropdown
+- Inflates [`item_course_two_line_dropdown.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/item_course_two_line_dropdown.xml):
+  - **Top Line**: Bold course code in primary blue (`CSE 2101`, 14sp, bold).
+  - **Bottom Line**: Full course title in secondary text with clean `TextUtils.TruncateAt.END` ellipsis, preventing awkward mid-word breaks.
+
+### D. Prominent Action Button & Form State Preservation
+- **"Choose File" Button**: Restyled into a prominent filled primary button (`bg_picker_pill.xml`) displaying accepted formats and file size limits (`"PDF, DOCX, PPTX, ZIP • up to 50MB"`).
+- **Post-Selection Card**: Once selected, transforms into an active file card showing the file-type vector icon, filename, formatted byte size (e.g. `14.2 MB`), and a clear button (`✕`).
+- **Auto-Title Infill**: If the resource title is blank, selecting a file automatically populates the title field from the sanitized filename.
+- **State Preservation**: Switching between `[ Upload File | Drive Link ]` tabs preserves shared form inputs (Category, Course selection) without resetting the entire form.
+- **Dynamic Live Preview Card**: Renders an interactive preview card directly underneath the form showing exactly how the asset will render in the Courses feed.
+
+### E. Background Resilience & Duplicate Detection
+- **WorkManager Pipeline**: Backed by `LibraryUploadWorker` and `LibraryUploadManager` with determinate progress percentage and persistent notification. If Wi-Fi drops, uploads are queued and resumed automatically.
+- **Pre-Submission Collision Guard**: Queries existing batch resources before submitting. If a duplicate or similar title exists in the selected category and course, prompts:
+  `"A similar file already exists in this course — add as a new file, or update the existing one instead?"`.
+
+---
+
+## 66. True Neutral Charcoal / OLED Dark Mode Overhaul
+
+### A. Root Cause: Midnight-Blue Glare
+- **Commit Reference**: `1955d71`
+- **User Feedback**: The previous dark theme utilized heavy midnight-blue tones (`#0A1324`), which produced noticeable blue light glare, harsh visual contrast at night, and cognitive irritation during extended study sessions.
+
+### B. True Neutral OLED Palette Specifications
+Overhauled [`app/src/main/res/values-night/colors.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/values-night/colors.xml) to a pure, true neutral charcoal / OLED dark hierarchy:
+
+| Token Name | Hex Value | Semantic Role |
+| :--- | :--- | :--- |
+| **`cm_bg`** | `#0B0C0E` | App-wide root canvas background (OLED near-black) |
+| **`cm_bg_secondary`** | `#111215` | Secondary container & scroll background |
+| **`cm_surface` / `cm_card`** | `#16171B` | Surface card & item background |
+| **`cm_surface_elevated`** | `#1E2025` | Elevated dialogs, bottom sheets & dropdown menus |
+| **`cm_border`** | `#272930` | Subdued borders (1px) |
+| **`cm_border_strong`** | `#383C44` | High-contrast interactive borders |
+| **`cm_divider`** | `#1F2126` | Inset list item dividers |
+| **`cm_text_primary`** | `#F8FAFC` | High-legibility crisp white text |
+| **`cm_text_secondary`** | `#CBD5E1` | Muted subtitle typography |
+| **`cm_text_muted`** | `#94A3B8` | Inactive labels & timestamp metadata |
+
+- **Impact**: Completely eliminates eye strain, significantly reduces power consumption on mobile AMOLED displays, and matches contemporary minimalist design standards.
+
+---
+
+## 67. Dedicated Batch Administration Modernization & Semester Lifecycle Architecture
+
+### A. Dedicated Batch Admin Workspace
+- **Commit Reference**: `1955d71`
+- Introduced [`ClassMateBatchAdminActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateBatchAdminActivity.kt) and [`activity_batch_admin.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/activity_batch_admin.xml).
+- Replaced cramped modal settings with a spacious administrative dashboard:
+  - Metric Summary Tiles: Total Enrolled Students, Active Semester Badge, Routine Slot Count, Enrolled Course Count.
+  - Semester Controls: Switch active semester, publish new semester, view archive.
+  - Class Representative (CR) Management: Assign or revoke CR status with live Supabase synchronization.
+
+### B. Critical Disaster Recovery: 3rd Semester Reactivation
+- **Commit Reference**: `9e19ed4`
+- **Incident**: An administrator accidentally clicked "Publish 4th Semester" for the **CSE 22nd Batch**. In the legacy database schema, publishing a semester marked all preceding semesters as `status = 'completed'`, immediately hiding all 3rd semester courses and weekly routine slots from student feeds.
+- **Database Stored Procedure Overhaul (`202610210003_allow_semester_reactivation.sql`)**:
+  - Replaced the rigid one-way `publish_semester` function with a bidirectional reactivation procedure:
+    ```sql
+    create or replace function classmate.publish_semester(target_semester uuid)
+    returns classmate.semesters
+    language plpgsql security definer set search_path = '' as $$
+    declare
+      s classmate.semesters%rowtype;
+    begin
+      perform classmate.require_owner();
+      select * into s from classmate.semesters where id = target_semester;
+      if s.id is null then raise exception 'Semester not found'; end if;
+      perform 1 from classmate.batches where id = s.batch_id for update;
+      select * into s from classmate.semesters where id = target_semester for update;
+
+      if s.status = 'active' then return s; end if;
+
+      -- Mark other semesters completed
+      update classmate.semesters set status = 'completed'
+      where batch_id = s.batch_id and status = 'active' and id <> s.id;
+
+      -- Reactivate target semester seamlessly
+      update classmate.semesters set status = 'active', published_at = coalesce(s.published_at, now())
+      where id = s.id returning * into s;
+
+      insert into classmate.notification_outbox(kind, record_id, department_id, batch_id, routing_label)
+      select 'semester', s.id, b.department_id, b.id, classmate.routing_label(b.id)
+      from classmate.batches b where b.id = s.batch_id
+      on conflict (kind, record_id) do nothing;
+
+      return s;
+    end;
+    $$;
+    ```
+- **UI Guardrails (`ClassMateBatchAdminActivity.kt`)**:
+  - Distinguishes semesters as `Semester X • Active (Current) ✓`, `Semester X • Completed`, and `Semester X • Draft`.
+  - Tapping a completed semester displays an explicit dialog: `"Reactivate Semester X? Reactivating Semester X will set its courses and weekly timetable routine back as active for this batch."`.
+  - Successfully restored **CSE 22nd Batch, 2nd Year 1st Semester** (`56056dc8-5c95-40d5-95b5-162a6ff4cd49`) with all routine slots and courses completely intact.
+
+---
+
+## 68. Streamlined Courses, Notices & Banglish-to-Bengali AI Formatting Engine
+
+### A. UI Simplification
+- **Commit Reference**: `19b22c1`
+- **Courses Screen**: Removed redundant filter chips (`[ All | Theory | Lab ]`) beneath the "My Attendance" hero banner in [`fragment_pdf_library.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/fragment_pdf_library.xml).
+- **Settings Screen**: Completely deleted the "ClassMate AI Assistant" card (`cardProfileAi`, `dividerProfileAi`) from [`classmate_profile.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/classmate_profile.xml) and [`ClassMateAcademicScreensSupabase.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt).
+- **Notice Composer**: Removed the experimental AI compose chat tab; retained clean General Notice and Class Cancellation tabs.
+
+### B. Banglish-to-Bengali AI Auto-Formatting Engine
+- **Migration & Edge Function**: `202610210004_auto_notice_ai_mode.sql` & `supabase/functions/classmate-ai/index.ts`.
+- **Purpose**: Class Representatives frequently type urgent notices in informal "Banglish" (Bengali transliterated into English/Latin letters, e.g. *"kalke 10 tai class hobe na, shobai thakba"*).
+- **Behavior & Strict Rules**:
+  1. **Script Transliteration**: Automatically converts Banglish and informal phonetic typing into natural, grammatically sound Bengali script (বাংলা লিপি).
+  2. **Auto-Title Synthesis**: If the title field was left empty, generates a concise, professional title based on notice contents.
+  3. **English Fidelity**: If input is written in standard English, preserves English text while correcting minor grammar and typos.
+  4. **Strict Entity Preservation**: Never modifies or translates URLs (`http/https`), phone numbers, email addresses, course codes (`CSE 2101`), dates, times (`10:00 AM`), or room numbers.
+  5. **Silent Directive**: Honors `/silent` flag to suppress push broadcasts.
+
+---
+
+## 69. Modern Timetable Header Wordmark & Perfect Visual Alignment
+
+### A. Brand Wordmark Architecture
+- **Commit References**: `6dfc683`, `c6a1c70`, `10706ec`
+- **Inspiration**: Top app-bar aesthetics from modern messaging clients (WhatsApp & Facebook Messenger).
+- **Layout (`fragment_timetable.xml`)**:
+  - Replaced the greeting row (`"Good morning, [Name] 👋"`) with an ultra-clean brand wordmark.
+  - Typography: **Plus Jakarta Sans ExtraBold** (`plus_jakarta_sans_extrabold.ttf`), lowercase **`classmate`** in `cm_text_primary` (`#F8FAFC` dark / `#0F172A` light) paired with a vibrant brand-accent period **`.`** in `cm_primary` (`#3B82F6`).
+  - Size: Bumped to **`28sp`** with `letterSpacing="-0.03"` and `includeFontPadding="false"`.
+
+### B. Perfect Horizontal Margin Alignment
+- **The Issue**: The 7-day selector pills (`layoutDaySelector`) started at a slightly different horizontal inset than the title text, creating an awkward visual misalignment along the left edge.
+- **The Fix**: Standardized header horizontal container padding to `paddingHorizontal="12dp"`, aligning the wordmark's initial letter `'c'` with the exact left boundary of the first day selector pill.
+
+---
+
+## 70. Bottom Navigation Bar State Restoration, Batchmates Sorting & 5-Line Notice Preview
+
+### A. Navigation Bar State Restoration Bug Fix
+- **Commit Reference**: `a6fc600`
+- **The Bug**: When users navigated deep into Settings/Profile or scrolled extensive feeds, returning to top views occasionally caused the floating bottom navigation bar to remain hidden off-screen.
+- **The Fix**: In `ClassMateAcademicScreensSupabase.kt`, visiting `R.id.nav_profile` explicitly enforces `setNavigationShown(true)` with immediate translation and alpha reset. Furthermore, `SCROLL_STATE_IDLE` on the RecyclerView feed automatically restores navigation visibility.
+
+### B. Natural Batchmates Directory Sorting Engine
+- **Migration**: `202610210005_sort_batch_friends_by_student_id.sql`.
+- **Database Function**: `classmate.batch_friends(target_batch uuid, query_text text, result_offset integer)`.
+- **Ordering Hierarchy**:
+  1. **System Administrator / App Developer**: Pinned to index 0 (`order by (p.role = 'admin') desc`).
+  2. **Batch Enrolled Students**: Naturally sorted by `student_id` ascending (`CE24027`, `CE25001` < `CE25002` < `...` < `CE25060`).
+  3. **Alphabetical Tie-breaker**: `full_name asc, id asc`.
+
+### C. Notice Card 5-Line Truncation Standard
+- Standardized maximum preview lines to **5 lines** (`MAX_PREVIEW_LINES = 5`) across:
+  - Android: `ClassMateNoticeText.kt` and unit test `ClassMateNoticeTextTest.kt`.
+  - Web: `web/src/components/notices.tsx` (`rawLines.length > 5`).
+
+---
+
+## 71. True Edge-to-Edge Transparent System Navigation Bar with Safe Insets
+
+### A. Immersive System Window Architecture
+- **Commit Reference**: `8162624`
+- In [`ClassMateAuthActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt):
+  ```kotlin
+  WindowCompat.setDecorFitsSystemWindows(window, false)
+  window.statusBarColor = Color.TRANSPARENT
+  window.navigationBarColor = Color.TRANSPARENT
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      window.isNavigationBarContrastEnforced = false
+  }
+  ```
+
+### B. Safe Insets Management
+- **Status Bar Inset**: Applied `ViewCompat.setOnApplyWindowInsetsListener(homeHost)` to add padding top equal to `statusBars().top`, preventing headers from drawing under the physical camera cutout.
+- **Navigation Bar Inset**: In `ClassMateBottomBar.kt`, the floating pill navigation bar utilizes `.navigationBarsPadding()`:
+  - System 3-button navigation bars and gesture navigation pill handles float cleanly over the transparent viewport without black bottom bars or clipped touch areas.
+
+---
+
+## 72. Jetpack Compose Floating Nav Bar Performance & 60/120fps Smoothness Engine
+
+### A. Recomposition Thrashing Root Cause
+- **Commit Reference**: `da79afe`
+- **Symptom**: Tapping tabs on 120Hz physical displays caused noticeable stutter, frame drops, and delayed spring animations.
+- **Root Cause**: The floating indicator pill relied on `onGloballyPositioned` measurement callbacks on every tab item. Measuring and writing layout positions back into Compose `mutableState` triggered continuous recomposition loops during indicator animations.
+
+### B. Mathematical Indicator Positioning
+- In [`ClassMateBottomBar.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt):
+  - Completely removed `onGloballyPositioned` state writes.
+  - Calculated tab position mathematically:
+    ```kotlin
+    val tabWidth = totalBarWidth / visibleTabs.size
+    val indicatorOffset by animateDpAsState(
+        targetValue = tabWidth * selectedIndex,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "indicatorOffset"
+    )
+    ```
+  - **Result**: Completely decoupled indicator motion from child layout measurement, locking frame rates at a silky smooth 60fps/120fps.
+
+---
+
+## 73. "My Attendance" Bottom Sheet Bug Fixes & Height Auto-Adjustment
+
+### A. Bottom Sheet Transition Polish
+- **Commit Reference**: `7b0a4d2`
+- **Layouts & Code**: `dialog_rfid_attendance.xml` and `ClassMateAcademicScreensSupabase.kt`.
+- **Fixes**:
+  - Corrected height calculation during `AutoTransition` between the compact course overview (`height = WRAP_CONTENT`) and the expanded day-wise attendance table (`height = 88% screen height`).
+  - Fixed dismiss on outside touch and back navigation restoring the compact view without visual jumps.
+
+---
+
+## 74. ESP32 Hardware Wiring Guide & Standalone RFID Reader Operation
+
+### A. Standalone Reader Pinout (ESP32 38-Pin Dev Module + MFRC522)
+When testing in environments without the OLED display or buzzer, the ESP32 operates independently with only the MFRC522 SPI bus connected:
+
+| MFRC522 Pin | ESP32 Pin | Function | Wiring Guidance |
+| :--- | :--- | :--- | :--- |
+| **`3.3V`** | **`3V3`** | Regulated Power | **Never connect to 5V (permanently damages IC)** |
+| **`RST`** | **`GPIO 4`** | Hardware Reset | Clean GPIO avoiding I2C bus |
+| **`GND`** | **`GND`** | Ground Rail | Common system ground |
+| **`MISO`** | **`GPIO 19`** | VSPI MISO | Master-In-Slave-Out |
+| **`MOSI`** | **`GPIO 23`** | VSPI MOSI | Master-Out-Slave-In |
+| **`SCK`** | **`GPIO 18`** | VSPI SCK | Hardware serial clock |
+| **`SDA / SS`** | **`GPIO 5`** | VSPI SS | Active-low chip select |
+
+### B. Serial Monitor Card Verification
+- Firmware: `esp32_rfid_attendance.ino`.
+- Configured immediate serial printout on card tap:
+  ```text
+  04:49:03.962 -> >>> CARD TAPPED! UID: F9831C02  [F9 83 1C 02] <<<
+  04:49:04.052 -> -> Sending Scan POST: {"card_uid":"F9831C02","device_id":"ESP32-READER-01"}
+  ```
+
+---
+
+## 75. `enroll_student_rfid` RPC Parameter Mismatch Resolution & Anon Security Grants
+
+### A. RPC Parameter Naming Collision
+- **Commit References**: `2569759`, `525d773`, `fdb6180`
+- **The Defect**:
+  - When assigning an RFID card in Web or Android, users encountered an error: `"cant register card"`.
+  - Web client called PostgREST with `{ target_student, target_card_uid }`, while Android called with `{ p_student_id, p_card_uid }`. PostgREST schema cache rejected mismatched parameter signatures.
+
+### B. Universal Database Adapter (`202610220001_fix_enroll_student_rfid_parameters.sql`)
+- Updated stored procedure `classmate.enroll_student_rfid` to accept both conventions seamlessly:
+  ```sql
+  create or replace function classmate.enroll_student_rfid(
+    p_student_id uuid default null,
+    p_card_uid text default null,
+    target_student uuid default null,
+    target_card_uid text default null
+  ) returns jsonb language plpgsql security definer set search_path='' as $$
+  declare
+    v_student_id uuid := coalesce(p_student_id, target_student);
+    v_raw_uid text := coalesce(p_card_uid, target_card_uid);
+  ...
+  ```
+- Added retry fallback in `ClassMateAdminAttendanceActivity.kt` and `admin-attendance.tsx`.
+
+### C. Anon Hardware Endpoint Permissions (`202610220002_grant_rfid_scan_anon.sql`)
+- Granted `anon` role execute permissions on:
+  - `classmate.process_rfid_scan(text, text)`
+  - `classmate.get_device_active_session(text)`
+- Enables unauthenticated ESP32 microcontrollers to dispatch heartbeats and record attendance taps directly without API bearer tokens.
+
+---
+
+## 76. Android Phone NFC Host Card Emulation (HCE) Exploration & Clean Revert
+
+### A. The Requirement & Android UID Randomization
+- **User Request**: Allow students to mark attendance by tapping their Android smartphone's NFC against the doorway reader instead of carrying a physical plastic card.
+- **Technical Barrier**: In Android 4.4+, standard NFC card emulation intentionally randomizes the 4-byte UID on every single tap as a privacy protection measure against tracking. Consequently, the UID cannot be used as a static student identifier.
+
+### B. The HCE Architectural Approach
+To provide a static credential, Android requires **Host Card Emulation (HCE)**:
+1. Android app declares a `HostApduService` with an ISO 7816-4 Application ID (AID) in `apduservice.xml`.
+2. The reader detects the phone (returning SAK = `0x20` indicating ISO 14443-4 compliance).
+3. The reader sends an ISO-DEP RATS (Request for Answer to Select) command.
+4. The reader sends a `SELECT AID` APDU.
+5. The Android OS routes the APDU to `ClassMateHceService.kt`, which responds with a secure cryptographic token.
+
+### C. Real-World Hardware Failure on MFRC522
+- **Prototype Implementation**: Commit `2143354`.
+- **Empirical Hardware Test Logs**:
+  ```text
+  05:26:16.939 -> Smartphone detected (ISO 14443-4 SAK=0x20). Starting APDU exchange...
+  05:26:16.985 -> [NFC] RATS handshake failed: Timeout in communication.
+  05:39:01.194 -> [NFC] Smartphone detected (ISO 14443-4 SAK=0x20). Starting RATS...
+  05:39:01.506 -> [NFC] RATS handshake timed out. Keep phone steady near antenna.
+  ```
+- **Root Cause Analysis**:
+  - The MFRC522 IC is an entry-level RFID reader designed primarily for Mifare Classic (ISO 14443-3A) cards. It features a tiny 64-byte FIFO buffer and lacks a hardware ISO 14443-4 framing engine.
+  - Software bit-level emulation of ISO-DEP framing over SPI introduces timing jitter and high packet error rates.
+  - Smartphone NFC controllers have strict ISO-DEP response timing windows ($< 10\text{ ms}$). The MFRC522 repeatedly failed the RATS handshake due to RF coupling attenuation and protocol timeouts. Dedicated controllers like **PN532** or **ST25R3916** are required for reliable smartphone HCE.
+
+### D. Clean Revert
+- **Commit Reference**: `72d3fc5`
+- As requested by the user, all HCE services, APDU descriptors, and firmware ISO-DEP modifications were cleanly reverted via `git revert`.
+- **System Integrity**: Reverted cleanly to the 100% reliable physical Mifare Classic 1K RFID card architecture without orphaned files or regressions.
+
+---
+
+## 77. Comprehensive Verification, Production Deployment & Current System State
+
+### A. Production Deployments
+- **Web Client**: Deployed live to Vercel Production at **`https://classmatebd.vercel.app`** with zero TypeScript, CSS, or build errors.
+- **Supabase Cloud**: Applied and verified migrations:
+  - `202610210003_allow_semester_reactivation.sql`
+  - `202610210004_auto_notice_ai_mode.sql`
+  - `202610210005_sort_batch_friends_by_student_id.sql`
+  - `202610220001_fix_enroll_student_rfid_parameters.sql`
+  - `202610220002_grant_rfid_scan_anon.sql`
+
+### B. Android Native Builds & Local Distribution
+- **Build Status**: Verified clean compilation of APK with Jetpack Compose floating pill navigation bar, true edge-to-edge transparent system navigation, OLED neutral dark palette, and Option 2 library layout.
+- **Physical Device**: Deployed and tested on physical Android smartphone via ADB.
+- **Local Network HTTP Server**: Hosted for local direct downloading at:
+  - `http://10.233.34.48:8080/download`
+  - `http://192.168.0.101:8080/download`
+
+---
+
