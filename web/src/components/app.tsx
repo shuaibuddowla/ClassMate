@@ -11,6 +11,7 @@ import { AboutDeveloper } from "./about-developer";
 import { OrbitLogo } from "./orbit-logo";
 import { InstallProvider, InstallWebApp } from "./install-web-app";
 import { AppUpdate } from "./app-update";
+import { AndroidInstallPopup } from "./android-install-popup";
 import {
   QueryClient,
   QueryClientProvider,
@@ -350,6 +351,7 @@ function SessionApp() {
   if (!user || !profile)
     return (
       <>
+        <AndroidInstallPopup />
         {/* Desktop / Large Tablet Presentation (Visual Source of Truth) */}
         <div className="desktop-landing-root">
           <div className="desktop-bg-atmosphere" aria-hidden="true">
@@ -597,7 +599,9 @@ function SessionApp() {
     );
   if (profile.verification_status !== "active")
     return (
-      <main className="boot">
+      <>
+        <AndroidInstallPopup />
+        <main className="boot">
         <h1>
           {!profile.department_id
             ? "Find your department"
@@ -625,9 +629,11 @@ function SessionApp() {
         </button>
         <button onClick={signOut}>Sign out</button>
       </main>
+      </>
     );
   return (
     <>
+      <AndroidInstallPopup />
       <Home
         user={user}
         profile={profile}

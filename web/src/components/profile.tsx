@@ -35,6 +35,7 @@ import {
   Cloud,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
+import { openAndroidInstallPrompt, isAndroidMobileDevice } from "./android-install-popup";
 import type { Context } from "./app";
 import { Avatar, Form, Modal, ErrorBox, Switch } from "./ui";
 import { enablePush, removePush, restorePush } from "@/lib/push";
@@ -843,16 +844,21 @@ export function Profile({
 
         <a
           className="settings-row external-promo"
-          href="https://github.com/shuaibuddowla/ClassMate/releases/latest"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/download/android"
+          onClick={(e) => {
+            if (isAndroidMobileDevice()) {
+              e.preventDefault();
+              openAndroidInstallPrompt();
+            }
+          }}
+          title="Download ClassMate for Android"
         >
           <div className="setting-icon-box green">
             <Smartphone size={18} />
           </div>
           <div className="settings-row-text">
             <strong>ClassMate for Android</strong>
-            <small>Download latest native APK from GitHub Releases</small>
+            <small>Download latest native APK or install guide</small>
           </div>
           <ChevronRight size={18} className="chevron" />
         </a>
