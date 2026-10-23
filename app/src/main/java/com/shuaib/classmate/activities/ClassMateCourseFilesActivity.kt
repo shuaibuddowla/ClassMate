@@ -326,14 +326,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             val title = file.optString("title")
             b.tvTitle.text = ClassMateNoticeText.styled(b.tvTitle, title, search)
 
-            // Category tag
-            val category = file.optString("category").trim()
-            if (category.isNotBlank()) {
-                b.tvMaterialTag.isVisible = true
-                b.tvMaterialTag.text = category.uppercase()
-            } else {
-                b.tvMaterialTag.isVisible = false
-            }
+            b.tvMaterialTag.isVisible = false
 
             val rawLink = file.optString("link_url").trim()
             val linkUrl = if (rawLink.isBlank() || rawLink.equals("null", ignoreCase = true)) "" else rawLink
@@ -344,7 +337,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 id = file.optString("id"),
                 title = title,
                 fileType = file.optString("file_type").ifBlank { if (isLink) "link" else "pdf" },
-                materialType = category,
+                materialType = file.optString("category", "notes"),
                 sizeBytes = file.optLong("size_bytes"),
                 driveUrl = linkUrl
             )

@@ -24,6 +24,9 @@ import {
   LoaderCircle,
   ArrowLeft,
   X,
+  Image as ImageIcon,
+  Palmtree,
+  CalendarDays,
 } from "lucide-react";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
@@ -32,7 +35,12 @@ import type { Context } from "./app";
 import { Avatar, Confirm, Empty, ErrorBox, Form, Modal, Skeleton } from "./ui";
 import { Comments } from "./notice-comments";
 import { AICompose } from "./classmate-ai";
-type Page = { entries: Row[]; details: Row; hasMore: boolean };
+type Page = {
+  entries: Row[];
+  details: Row;
+  attachments?: Record<string, { id: string; url: string; fileName: string; sizeBytes: number }>;
+  hasMore: boolean;
+};
 export function Notices({
   ctx,
   scrollContainer,
@@ -143,12 +151,62 @@ export function Notices({
       const { data, error } = await query;
       if (error) throw error;
       const entries = data || [],
-        details = entries.length
-          ? await rpc("notice_feed_details", {
-              target_ids: entries.map((n) => n.id),
+        noticeIds = entries.map((n) => n.id);
+
+      const [details, attachmentsData] = await Promise.all([
+        noticeIds.length
+          ? rpc("notice_feed_details", {
+              target_ids: noticeIds,
             })
-          : {};
-      return { entries, details, hasMore: entries.length === 10 };
+          : {},
+        noticeIds.length
+          ? (async () => {
+              try {
+                const res = await supabase()
+                  .from("notice_attachments")
+                  .select("id,notice_id,storage_key,file_name,mime_type,size_bytes")
+                  .in("notice_id", noticeIds);
+                return (res.data || []) as any[];
+              } catch {
+                return [] as any[];
+              }
+            })()
+          : Promise.resolve([]),
+      ]);
+
+      const attachmentMap: Record<
+        string,
+        { id: string; url: string; fileName: string; sizeBytes: number }
+      > = {};
+      if (attachmentsData && attachmentsData.length > 0) {
+        const keys = attachmentsData.map((a: Row) => a.storage_key);
+        try {
+          const signed = await supabase()
+            .storage.from("notice-images")
+            .createSignedUrls(keys, 3600);
+          const urlByPath: Record<string, string> = {};
+          if (signed?.data) {
+            for (const item of signed.data) {
+              if (item?.path && item?.signedUrl) {
+                urlByPath[item.path] = item.signedUrl;
+              }
+            }
+          }
+          for (const a of attachmentsData) {
+            const url = urlByPath[a.storage_key];
+            if (url) {
+              attachmentMap[a.notice_id] = {
+                id: a.id,
+                url,
+                fileName: a.file_name,
+                sizeBytes: a.size_bytes,
+              };
+            }
+          }
+        } catch (_) {}
+      }
+
+      return { entries, details, attachments: attachmentMap, hasMore: entries.length === 10 };
     },
     getNextPageParam: (last) =>
       last.hasMore ? last.entries.at(-1) : undefined,
@@ -209,6 +267,10 @@ export function Notices({
         acc[k] = [...(acc[k] || []), ...(p.details[k] || [])];
       return acc;
     }, {} as Row) || {};
+  const attachments =
+    feed.data?.pages.reduce((acc, p) => {
+      return { ...acc, ...(p.attachments || {}) };
+    }, {} as Record<string, { id: string; url: string; fileName: string; sizeBytes: number }>) || {};
   const refresh = () =>
     qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
   async function reaction(n: Row, change: Row) {
@@ -310,6 +372,7 @@ export function Notices({
                     ? permissions.data?.courses[n.semester_course_id]
                     : permissions.data?.general))
               }
+              attachment={attachments[n.id]}
               onEdit={() => setEditing(n)}
               onDelete={() => setDeleting(n)}
               onOpenDetail={() => setDetailNotice(n)}
@@ -442,6 +505,7 @@ export function Notices({
       {detailNotice && (
         <NoticeDetailModal
           notice={detailNotice}
+          attachment={attachments[detailNotice.id]}
           close={() => setDetailNotice(null)}
         />
       )}{" "}
@@ -498,112 +562,371 @@ function NoticeComposer({
 }) {
   const aiAllowed =
     ctx.owner || (ctx.profile.is_cr && ctx.profile.cr_batch_id === ctx.batch);
-  const [type, setType] = useState(aiAllowed ? "ai" : "general");
+  const [tabMode, setTabMode] = useState<"manual" | "ai">("manual");
+  const [type, setType] = useState<"general" | "cancelled" | "vacation">("general");
+
+  // Image attachment state matching Android PostNoticeActivity
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageError(null);
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      setImageError("Only JPG, PNG, or WebP images are supported.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError("Choose an image smaller than 10 MB.");
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setImageError(null);
+  };
+
   return (
     <>
-      <div className="segment notice-compose-tabs">
+      <div className="segment notice-compose-tabs" style={{ marginBottom: "14px" }}>
+        <button
+          type="button"
+          className={tabMode === "manual" ? "selected" : ""}
+          onClick={() => setTabMode("manual")}
+        >
+          <FileText size={16} /> Manual
+        </button>
         {aiAllowed && (
           <button
-            className={type === "ai" ? "selected" : ""}
-            onClick={() => setType("ai")}
+            type="button"
+            className={tabMode === "ai" ? "selected" : ""}
+            onClick={() => setTabMode("ai")}
           >
-            <Sparkles size={16} /> AI compose
+            <Sparkles size={16} /> ✨ AI compose
           </button>
         )}
-        <button
-          className={type === "general" ? "selected" : ""}
-          onClick={() => setType("general")}
-        >
-          General notice
-        </button>
-        <button
-          className={type === "cancelled" ? "selected" : ""}
-          onClick={() => setType("cancelled")}
-        >
-          Class cancellation
-        </button>
       </div>
-      {type === "ai" ? (
+
+      {tabMode === "ai" ? (
         <AICompose ctx={ctx} done={done} />
       ) : (
-        <Form
-          key={type}
-          label="Post notice"
-          fields={
-            type === "general"
-              ? [
-                  ...(!allowed?.general
-                    ? [
+        <>
+          <div className="segment notice-compose-subtypes" style={{ display: "flex", gap: "6px", marginBottom: "16px" }}>
+            <button
+              type="button"
+              className={type === "general" ? "selected" : ""}
+              onClick={() => setType("general")}
+            >
+              Normal notice
+            </button>
+            <button
+              type="button"
+              className={type === "cancelled" ? "selected" : ""}
+              onClick={() => setType("cancelled")}
+            >
+              Class cancellation
+            </button>
+            <button
+              type="button"
+              className={type === "vacation" ? "selected" : ""}
+              onClick={() => setType("vacation")}
+            >
+              <Palmtree size={14} style={{ display: "inline", marginRight: "4px" }} /> Vacation
+            </button>
+          </div>
+
+          <Form
+            key={type}
+            label={type === "vacation" ? "Publish vacation notice" : type === "cancelled" ? "Post cancellation" : "Post notice"}
+            fields={
+              type === "general"
+                ? [
+                    ...(!allowed?.general
+                      ? [
+                          {
+                            name: "course",
+                            label: "Assigned course",
+                            required: true,
+                            options: ctx.courses
+                              .filter((c) => allowed?.courses[c.offering_id])
+                              .map((c) => ({
+                                value: c.offering_id,
+                                label: c.course_title,
+                              })),
+                          },
+                        ]
+                      : []),
+                    { name: "title", label: "Title", required: true },
+                    {
+                      name: "body",
+                      label: "Message",
+                      type: "textarea",
+                      required: true,
+                      placeholder: "Start with /silent for a feed-only notice",
+                    },
+                  ]
+                : type === "cancelled"
+                ? [
+                    {
+                      name: "course",
+                      label: "Course",
+                      required: true,
+                      options: ctx.courses
+                        .filter((c) => allowed?.courses[c.offering_id])
+                        .map((c) => ({
+                          value: c.offering_id,
+                          label: c.course_title,
+                        })),
+                    },
+                    {
+                      name: "date",
+                      label: "Which day?",
+                      required: true,
+                      options: [
+                        { value: dhakaToday(), label: "Today" },
                         {
-                          name: "course",
-                          label: "Assigned course",
-                          required: true,
-                          options: ctx.courses
-                            .filter((c) => allowed?.courses[c.offering_id])
-                            .map((c) => ({
-                              value: c.offering_id,
-                              label: c.course_title,
-                            })),
+                          value: (() => {
+                            const d = parseDate(dhakaToday());
+                            d.setDate(d.getDate() + 1);
+                            return dateKey(d);
+                          })(),
+                          label: "Tomorrow",
                         },
-                      ]
-                    : []),
-                  { name: "title", label: "Title", required: true },
-                  {
-                    name: "body",
-                    label: "Message",
-                    type: "textarea",
-                    required: true,
-                    placeholder: "Start with /silent for a feed-only notice",
-                  },
+                      ],
+                    },
+                  ]
+                : [
+                    {
+                      name: "title",
+                      label: "Vacation / Occasion title",
+                      required: true,
+                      placeholder: "e.g. Eid-ul-Fitr Vacation, Puja Holidays, Summer Break",
+                    },
+                    {
+                      name: "start_date",
+                      label: "Start date",
+                      type: "date",
+                      required: true,
+                      value: dhakaToday(),
+                    },
+                    {
+                      name: "end_date",
+                      label: "End date",
+                      type: "date",
+                      required: true,
+                      value: dhakaToday(),
+                    },
+                    {
+                      name: "body",
+                      label: "Details & Resumption notes (Optional)",
+                      type: "textarea",
+                      required: false,
+                      placeholder: "Additional guidelines or when classes resume...",
+                    },
+                  ]
+            }
+            extra={
+              type === "general" ? (
+                <div style={{ marginTop: "12px", marginBottom: "14px" }}>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageChange}
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: "none" }}
+                  />
+                  {!imageFile ? (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "13px",
+                        padding: "8px 14px",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <ImageIcon size={16} /> Attach Image (JPG, PNG, WebP)
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "10px 14px",
+                        borderRadius: "12px",
+                        border: "1px solid var(--border)",
+                        background: "var(--card)",
+                        maxWidth: "420px",
+                      }}
+                    >
+                      {imagePreview && (
+                        <img
+                          src={imagePreview}
+                          alt="Attachment preview"
+                          style={{
+                            width: "48px",
+                            height: "48px",
+                            objectFit: "cover",
+                            borderRadius: "8px",
+                            border: "1px solid var(--border)",
+                          }}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {imageFile.name}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                          {(imageFile.size / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="icon"
+                        title="Remove image"
+                        style={{ padding: "6px" }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                  {imageError && (
+                    <div style={{ color: "var(--danger, #ef4444)", fontSize: "12px", marginTop: "6px" }}>
+                      {imageError}
+                    </div>
+                  )}
+                  {uploadProgress && (
+                    <div
+                      style={{
+                        color: "var(--primary)",
+                        fontSize: "12px",
+                        marginTop: "6px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <LoaderCircle size={14} className="spin" /> {uploadProgress}
+                    </div>
+                  )}
+                </div>
+              ) : null
+            }
+            submit={async (d) => {
+              let created: Row | null = null;
+              if (type === "general") {
+                created = await rpc<Row>("post_notice", {
+                  target_batch: ctx.batch,
+                  target_course: d.course || null,
+                  notice_title: d.title,
+                  notice_body: d.body,
+                });
+
+                if (created && created.id && imageFile) {
+                  try {
+                    setUploadProgress("Uploading image attachment…");
+                    const { data: prep, error: prepError } = await supabase().rpc("prepare_notice_image", {
+                      target_notice: created.id,
+                      image_file_name: imageFile.name,
+                      image_mime_type: imageFile.type,
+                      image_size_bytes: imageFile.size,
+                    });
+                    if (prepError) throw prepError;
+                    const storageKey = prep?.storage_key;
+                    if (!storageKey) throw new Error("Could not prepare image upload");
+
+                    const { error: upError } = await supabase().storage
+                      .from("notice-images")
+                      .upload(storageKey, imageFile, {
+                        contentType: imageFile.type,
+                        upsert: false,
+                      });
+
+                    if (upError) {
+                      try {
+                        await supabase().rpc("discard_failed_notice_upload", { target_notice: created.id });
+                      } catch {
+                        // ignore discard errors
+                      }
+                      throw upError;
+                    }
+                  } catch (err: any) {
+                    console.error("Notice image attachment upload failed:", err);
+                    throw new Error(`Notice posted, but attachment upload failed: ${err.message || err}`);
+                  } finally {
+                    setUploadProgress(null);
+                  }
+                }
+              } else if (type === "cancelled") {
+                created = await rpc<Row>("post_cancellation_notice", {
+                  target_batch: ctx.batch,
+                  target_course: d.course,
+                  change_date: d.date,
+                });
+              } else {
+                // Vacation Notice
+                const vacTitle = `Vacation: ${d.title}`;
+                const dateDuration =
+                  d.start_date === d.end_date
+                    ? `Date: ${d.start_date}`
+                    : `Duration: ${d.start_date} to ${d.end_date}`;
+                const vacBody = [
+                  `🌴 ${vacTitle}`,
+                  `📅 ${dateDuration}`,
+                  d.body?.trim() ? d.body.trim() : "",
+                  "Classes and academic activities will remain suspended during this vacation period.",
                 ]
-              : [
-                  {
-                    name: "course",
-                    label: "Course",
-                    required: true,
-                    options: ctx.courses
-                      .filter((c) => allowed?.courses[c.offering_id])
-                      .map((c) => ({
-                        value: c.offering_id,
-                        label: c.course_title,
-                      })),
-                  },
-                  {
-                    name: "date",
-                    label: "Which day?",
-                    required: true,
-                    options: [
-                      { value: dhakaToday(), label: "Today" },
-                      {
-                        value: (() => {
-                          const d = parseDate(dhakaToday());
-                          d.setDate(d.getDate() + 1);
-                          return dateKey(d);
-                        })(),
-                        label: "Tomorrow",
-                      },
-                    ],
-                  },
-                ]
-          }
-          submit={async (d) => {
-            let created: Row | null = null;
-            if (type === "general")
-              created = await rpc<Row>("post_notice", {
-                target_batch: ctx.batch,
-                target_course: d.course || null,
-                notice_title: d.title,
-                notice_body: d.body,
-              });
-            else
-              created = await rpc<Row>("post_cancellation_notice", {
-                target_batch: ctx.batch,
-                target_course: d.course,
-                change_date: d.date,
-              });
-            await done(created || undefined);
-          }}
-        />
+                  .filter(Boolean)
+                  .join("\n\n");
+
+                created = await rpc<Row>("post_notice", {
+                  target_batch: ctx.batch,
+                  target_course: null,
+                  notice_title: vacTitle,
+                  notice_body: vacBody,
+                });
+
+                try {
+                  await rpc("save_academic_calendar_event", {
+                    target_title: d.title,
+                    target_start: d.start_date,
+                    target_end: d.end_date,
+                    target_scope: "all",
+                  });
+                } catch (_) {}
+              }
+              await done(created || undefined);
+            }}
+          />
+        </>
       )}
     </>
   );
@@ -638,6 +961,7 @@ function NoticeCard({
   state,
   read,
   previews,
+  attachment,
   editable,
   search,
   onLike,
@@ -655,6 +979,7 @@ function NoticeCard({
   state: Row;
   read: Row;
   previews: Row[];
+  attachment?: { id: string; url: string; fileName: string; sizeBytes: number };
   editable: boolean;
   search: string;
   onLike: (liked: boolean) => Promise<void>;
@@ -666,6 +991,7 @@ function NoticeCard({
   onDelete: () => void;
   markRead: () => void;
 }) {
+  const [zoomAttachment, setZoomAttachment] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false),
     [menu, setMenu] = useState(false),
     [liked, setLiked] = useState(!!state.is_liked),
@@ -841,6 +1167,66 @@ function NoticeCard({
           >
             {expanded ? "see less" : "… see more"}
           </button>
+        )}
+        {attachment?.url && (
+          <div
+            className="notice-attachment-wrapper"
+            style={{
+              marginTop: "12px",
+              marginBottom: "12px",
+              borderRadius: "12px",
+              overflow: "hidden",
+              border: "1px solid var(--border)",
+              background: "rgba(0,0,0,0.06)",
+              maxWidth: "520px",
+            }}
+          >
+            <img
+              src={attachment.url}
+              alt={attachment.fileName || "Notice attachment"}
+              style={{
+                width: "100%",
+                maxHeight: "340px",
+                objectFit: "cover",
+                display: "block",
+                cursor: "pointer",
+              }}
+              onClick={() => setZoomAttachment(attachment.url)}
+              loading="lazy"
+            />
+            <div
+              style={{
+                padding: "8px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                color: "var(--muted)",
+                background: "var(--card)",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
+                {attachment.fileName}
+              </span>
+              <span>
+                {attachment.sizeBytes > 1048576
+                  ? `${(attachment.sizeBytes / 1048576).toFixed(1)} MB`
+                  : `${Math.round(attachment.sizeBytes / 1024)} KB`}
+              </span>
+            </div>
+          </div>
+        )}
+        {zoomAttachment && (
+          <Modal title={attachment?.fileName || "Attachment preview"} close={() => setZoomAttachment(null)}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
+              <img
+                src={zoomAttachment}
+                alt="Enlarged attachment"
+                style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: "10px" }}
+              />
+            </div>
+          </Modal>
         )}
         <div className="timestamp">
           <CalendarClock size={14} />
@@ -1276,9 +1662,11 @@ function ReaderList({
 
 export function NoticeDetailModal({
   notice,
+  attachment,
   close,
 }: {
   notice: Row;
+  attachment?: { id: string; url: string; fileName: string; sizeBytes: number };
   close: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -1318,6 +1706,43 @@ export function NoticeDetailModal({
                   part
                 ),
               )}
+            </div>
+          )}
+
+          {attachment?.url && (
+            <div
+              className="notice-detail-attachment-preview"
+              style={{
+                marginTop: "14px",
+                marginBottom: "14px",
+                borderRadius: "12px",
+                overflow: "hidden",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <img
+                src={attachment.url}
+                alt={attachment.fileName || "Notice attachment"}
+                style={{ width: "100%", maxHeight: "450px", objectFit: "contain", background: "black" }}
+              />
+              <div
+                style={{
+                  padding: "8px 12px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  color: "var(--muted)",
+                  background: "var(--card)",
+                  borderTop: "1px solid var(--border)",
+                }}
+              >
+                <span>{attachment.fileName}</span>
+                <span>
+                  {attachment.sizeBytes > 1048576
+                    ? `${(attachment.sizeBytes / 1048576).toFixed(1)} MB`
+                    : `${Math.round(attachment.sizeBytes / 1024)} KB`}
+                </span>
+              </div>
             </div>
           )}
 

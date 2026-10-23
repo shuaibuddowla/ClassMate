@@ -1,5 +1,8 @@
 package com.shuaib.classmate.activities
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -857,55 +860,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
         form.panel.addView(name)
         form.panel.addView(tvNameError)
 
-        // --- 5. Side-by-Side Category & Subject ---
-        val metaRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
-        }
-
-        // Left Column: Category
-        val colCategory = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) }
-        }
-        val tvCatLabel = TextView(this).apply {
-            text = "Category"
-            textSize = 11.5f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_secondary))
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
-        }
-        val boxCategory = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundResource(R.drawable.bg_clean_select)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            isClickable = true
-            isFocusable = true
-        }
-        val tvCategoryValue = TextView(this).apply {
-            val initialCat = editingFile?.optString("category")?.replaceFirstChar { it.uppercase() } ?: "Notes"
-            text = initialCat
-            textSize = 13f
-            setTextColor(getColor(R.color.cm_text_primary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-        }
-        val arrowCategory = TextView(this).apply {
-            text = "▾"
-            textSize = 12f
-            setTextColor(getColor(R.color.cm_text_disabled))
-        }
-        boxCategory.addView(tvCategoryValue)
-        boxCategory.addView(arrowCategory)
-        colCategory.addView(tvCatLabel)
-        colCategory.addView(boxCategory)
-
-        // Right Column: Subject
+        // --- 5. Subject Picker ---
         val colSubject = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1.15f).apply { marginStart = dp(6) }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
         }
         val tvSubLabel = TextView(this).apply {
             text = "Subject"
@@ -946,21 +904,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         colSubject.addView(tvSubLabel)
         colSubject.addView(boxSubject)
 
-        metaRow.addView(colCategory)
-        metaRow.addView(colSubject)
-        form.panel.addView(metaRow)
-
-        val categories = listOf("Notes", "Slides", "Questions", "Syllabus", "Book", "Other")
-        boxCategory.setOnClickListener {
-            val curIndex = categories.indexOf(tvCategoryValue.text.toString()).coerceAtLeast(0)
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Select Category")
-                .setSingleChoiceItems(categories.toTypedArray(), curIndex) { dialog, which ->
-                    tvCategoryValue.text = categories[which]
-                    dialog.dismiss()
-                }
-                .show()
-        }
+        form.panel.addView(colSubject)
 
         boxSubject.setOnClickListener {
             if (courses.isEmpty()) return@setOnClickListener
@@ -977,13 +921,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
 
         editingFile?.let { file ->
-            tvCategoryValue.text = file.optString("category").replaceFirstChar { it.uppercase() }
             courses.firstOrNull { it.offeringId == file.optString("semester_course_id") }?.let {
                 selectedCourse = it
                 tvSubjectValue.text = it.displayLabel
             }
             filePickerCard.visibility = View.GONE
-            val note = if (isEditingLink) "Update the title, link, category or subject." else "Update the title, category or subject. The uploaded file stays unchanged."
+            val note = if (isEditingLink) "Update the title, link or subject." else "Update the title or subject. The uploaded file stays unchanged."
             form.label(note)
         }
 
@@ -1156,11 +1099,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val kind = tvCategoryValue.text.toString().trim().lowercase()
-            if (kind.isBlank()) {
-                Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            val kind = "notes"
 
             val rawUrl = urlField.text.toString().trim()
             val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
@@ -1239,33 +1178,55 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             null
                         }
                     } else if (uri != null) {
-                        try {
-                            val mime = contentResolver.getType(uri!!) ?: "application/pdf"
-                            val taskId = LibraryUploadManager.enqueueUpload(
-                                context = this@ClassMatePublishActivity,
-                                uri = uri!!,
-                                fileName = selectedFileLabel,
-                                batchId = batch,
-                                courseId = course.offeringId,
-                                courseName = course.code,
-                                title = title,
-                                mimeType = mime,
-                                sizeBytes = selectedFileSize,
-                                category = kind
-                            )
-                            currentUploadTaskId = taskId
-                            progressContainer.visibility = View.VISIBLE
-                            progressText.text = "Starting background upload…"
-                            determinateProgress.isIndeterminate = true
-                            determinateProgress.progress = 0
-                            status.text = "Upload running in background. You may leave this screen."
-                            Toast.makeText(this@ClassMatePublishActivity, "Upload started in background", Toast.LENGTH_SHORT).show()
-                            submit.isEnabled = false
-                        } catch (e: Exception) {
-                            busy = false
-                            submit.isEnabled = true
-                            status.text = "Failed to start upload: ${e.message}"
-                            progressContainer.visibility = View.GONE
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                val stats = runCatching { ClassMateAuthApi.rpc("get_r2_storage_stats", JSONObject()) }.getOrNull()
+                                val totalBytes = stats?.optLong("total_bytes", 0L) ?: 0L
+                                val limitBytes = stats?.optLong("limit_bytes", 10_630_044_057L) ?: 10_630_044_057L
+                                if (totalBytes >= limitBytes || totalBytes + selectedFileSize > limitBytes) {
+                                    withContext(Dispatchers.Main) {
+                                        busy = false
+                                        submit.isEnabled = true
+                                        status.text = "Storage limit reached (9.9 GB). File uploads are paused. Please share via Drive Link."
+                                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                                            .setTitle("Storage Quota Reached")
+                                            .setMessage("Cloudflare R2 free tier storage has reached the 9.9 GB limit. Direct file uploads are paused.\n\nYou can still share this resource using Drive Link!")
+                                            .setPositiveButton("OK", null)
+                                            .show()
+                                    }
+                                    return@launch
+                                }
+                                withContext(Dispatchers.Main) {
+                                    val mime = contentResolver.getType(uri!!) ?: "application/pdf"
+                                    val taskId = LibraryUploadManager.enqueueUpload(
+                                        context = this@ClassMatePublishActivity,
+                                        uri = uri!!,
+                                        fileName = selectedFileLabel,
+                                        batchId = batch,
+                                        courseId = course.offeringId,
+                                        courseName = course.code,
+                                        title = title,
+                                        mimeType = mime,
+                                        sizeBytes = selectedFileSize,
+                                        category = kind
+                                    )
+                                    currentUploadTaskId = taskId
+                                    progressContainer.visibility = View.VISIBLE
+                                    progressText.text = "Starting background upload…"
+                                    determinateProgress.isIndeterminate = true
+                                    determinateProgress.progress = 0
+                                    status.text = "Upload running in background. You may leave this screen."
+                                    Toast.makeText(this@ClassMatePublishActivity, "Upload started in background", Toast.LENGTH_SHORT).show()
+                                    submit.isEnabled = false
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    busy = false
+                                    submit.isEnabled = true
+                                    status.text = "Failed to start upload: ${e.message}"
+                                    progressContainer.visibility = View.GONE
+                                }
+                            }
                         }
                     }
                 }
@@ -1279,7 +1240,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     try {
                         val checkRes = ClassMateAuthApi.rows(
                             "resources",
-                            "select=id,title&semester_course_id=eq.${course.offeringId}&category=eq.$kind&batch_id=eq.$batch"
+                            "select=id,title&semester_course_id=eq.${course.offeringId}&batch_id=eq.$batch"
                         )
                         val normalize = { s: String -> s.lowercase().replace(Regex("[^a-z0-9]"), "") }
                         val inputNorm = normalize(title)

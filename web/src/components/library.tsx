@@ -25,8 +25,11 @@ import {
   XCircle,
   Clock,
   X,
+  AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { rpc, supabase, edge, openFile, uploadFile, type Row } from "@/lib/api";
+import { type R2StorageStats, formatBytes } from "./r2-storage-modal";
 import type { Context } from "./app";
 import { Confirm, Empty, ErrorBox, Form, Modal, Skeleton } from "./ui";
 
@@ -42,8 +45,6 @@ function GoogleDriveIcon({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
-const categories = ["notes", "slides", "questions", "syllabus", "other"];
 
 interface AttendanceHistoryItem {
   session_id: string;
@@ -79,7 +80,6 @@ interface StudentAttendanceSummary {
 export function Library({ ctx }: { ctx: Context }) {
   const [type, setType] = useState("theory"),
     [search, setSearch] = useState(""),
-    [category, setCategory] = useState("all"),
     [course, setCourse] = useState(""),
     [upload, setUpload] = useState(false),
     [allFiles, setAllFiles] = useState(false),
@@ -118,7 +118,7 @@ export function Library({ ctx }: { ctx: Context }) {
   }, [ctx.batch, ctx.courses]);
   const selectedCourse = ctx.courses.find(c => c.offering_id === course);
   function openCourse(id: string) {
-    setCategory("all"); setSearch(""); setCourse(id);
+    setSearch(""); setCourse(id);
     history.pushState({classmateCourse:true}, "", `#courses/course/${id}`);
   }
   function closeCourse() {
@@ -157,7 +157,7 @@ export function Library({ ctx }: { ctx: Context }) {
     },
   });
   const files = useInfiniteQuery({
-    queryKey: [ctx.user, ctx.batch, "files", course, category, search],
+    queryKey: [ctx.user, ctx.batch, "files", course, search],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       let q = supabase()
@@ -172,7 +172,6 @@ export function Library({ ctx }: { ctx: Context }) {
         .order("id")
         .range(pageParam, pageParam + 49);
       if (course) q = q.eq("semester_course_id", course);
-      if (category !== "all") q = q.eq("category", category);
       if (search.trim())
         q = q.ilike("title", `%${search.replace(/[%_]/g, "")}%`);
       const { data, error } = await q;
@@ -199,27 +198,14 @@ export function Library({ ctx }: { ctx: Context }) {
     items.map((f) => {
       const external = isExternal(f);
       const isDrive = isDriveLink(f.link_url, f);
-      const cat = (f.category || "").toLowerCase();
       const fileIconClass = isDrive
         ? "file-icon-drive"
-        : cat === "slides"
-        ? "file-icon-slides"
-        : cat === "questions"
-        ? "file-icon-questions"
-        : cat === "syllabus"
-        ? "file-icon-syllabus"
         : external
         ? "file-icon-link"
         : "";
 
       const fileIconNode = isDrive ? (
         <GoogleDriveIcon size={20} />
-      ) : cat === "slides" ? (
-        <Presentation size={20} />
-      ) : cat === "questions" ? (
-        <HelpCircle size={20} />
-      ) : cat === "syllabus" ? (
-        <GraduationCap size={20} />
       ) : external ? (
         <ExternalLink size={20} />
       ) : (
@@ -242,7 +228,7 @@ export function Library({ ctx }: { ctx: Context }) {
                 {external && !isDrive && <span className="drive-badge external-badge">Link</span>}
               </strong>
               <small>
-                {f.category} · {external ? (isDrive ? "Google Drive" : "External link") : `${Math.ceil(f.size_bytes / 1024)} KB`}
+                {external ? (isDrive ? "Google Drive" : "External link") : `${Math.ceil(f.size_bytes / 1024)} KB`}
               </small>
             </span>
           </button>
@@ -273,7 +259,7 @@ export function Library({ ctx }: { ctx: Context }) {
     });
   return (
     <div
-      className={`library-screen ${selectedCourse ? "course-files-page" : ""} ${type === "syllabus" ? "syllabus-view" : ""}`}
+      className={`library-screen ${selectedCourse ? "course-files-page" : ""}`}
     >
       <div className="page-heading">
         <div>
@@ -338,17 +324,7 @@ export function Library({ ctx }: { ctx: Context }) {
           </div>
         </button>
       )}
-      <div className="category-list">
-        {["all", ...categories].map((c) => (
-          <button
-            className={category === c ? "selected" : ""}
-            key={c}
-            onClick={() => setCategory(c)}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
+
       {!selectedCourse && <section className="library-courses">
         <div className="section-heading">
           <h2>Courses</h2>
@@ -361,7 +337,6 @@ export function Library({ ctx }: { ctx: Context }) {
           <button
             className={type === "theory" ? "selected" : ""}
             onClick={() => {
-              if (type === "syllabus") setCategory("all");
               setType("theory");
               setCourse("");
             }}
@@ -371,27 +346,14 @@ export function Library({ ctx }: { ctx: Context }) {
           <button
             className={type === "lab" ? "selected" : ""}
             onClick={() => {
-              if (type === "syllabus") setCategory("all");
               setType("lab");
               setCourse("");
             }}
           >
             Labs
           </button>
-          <button
-            className={type === "syllabus" ? "selected" : ""}
-            onClick={() => {
-              setType("syllabus");
-              setCategory("syllabus");
-              setCourse("");
-              setSearch("");
-            }}
-          >
-            Syllabus
-          </button>
         </div>
-        {type !== "syllabus" && (
-          <div className="course-grid">
+        <div className="course-grid">
             {ctx.courses
               .filter((c) => {
                 const matchesType = c.course_type === type;
@@ -417,16 +379,11 @@ export function Library({ ctx }: { ctx: Context }) {
                 </button>
               ))}
           </div>
-        )}
       </section>}
       <section className="library-files">
         <div className="section-heading">
           <h2>
-            {course
-              ? "Course files"
-              : type === "syllabus"
-                ? "Syllabus files"
-                : "Recently shared"}
+            {course ? "Course files" : "Recently shared"}
           </h2>
           {!course && (
             <button className="inline" onClick={() => setAllFiles(true)}>
@@ -445,7 +402,7 @@ export function Library({ ctx }: { ctx: Context }) {
         ) : (
           <div className="file-list">
             {renderFiles(
-              course || type === "syllabus" ? entries : entries.slice(0, 3),
+              course ? entries : entries.slice(0, 3),
             )}
           </div>
         )}
@@ -505,13 +462,6 @@ export function Library({ ctx }: { ctx: Context }) {
                   ]
                 : []),
               {
-                name: "target_category",
-                label: "Category",
-                required: true,
-                value: editing.category,
-                options: categories.map((value) => ({ value, label: value })),
-              },
-              {
                 name: "target_course",
                 label: "Subject",
                 value:
@@ -527,7 +477,7 @@ export function Library({ ctx }: { ctx: Context }) {
               await rpc("edit_resource_metadata", {
                 target_resource: editing.id,
                 target_title: d.target_title,
-                target_category: d.target_category,
+                target_category: editing.category || "notes",
                 target_course: d.target_course || null,
                 target_link_url: d.target_link_url || null,
               });
@@ -762,6 +712,14 @@ function UploadForm({
   const [tab, setTab] = useState<"file" | "link">("file");
   const [file, setFile] = useState<File | null>(null);
 
+  const storageQuery = useQuery({
+    queryKey: ["r2-storage-stats"],
+    queryFn: () => rpc<R2StorageStats>("get_r2_storage_stats"),
+    staleTime: 30_000,
+  });
+  const isStorageExceeded = storageQuery.data?.status === "exceeded";
+  const isStorageWarning = storageQuery.data?.status === "warning";
+
   return (
     <div className="upload-form-wrapper">
       <div className="segment upload-mode-toggle" style={{ marginBottom: "1rem" }}>
@@ -783,52 +741,79 @@ function UploadForm({
         </button>
       </div>
 
-      {tab === "file" ? (
-        <Form
-          label="Upload file"
-          fields={[
-            {
-              name: "category",
-              label: "Category",
-              required: true,
-              options: categories.map((value) => ({ value, label: value })),
-            },
-            {
-              name: "course",
-              label: "Subject",
-              value: defaultCourse || undefined,
-              required: !permissions?.general,
-              options: ctx.courses
-                .filter((c) => permissions?.courses[c.offering_id])
-                .map((c) => ({ value: c.offering_id, label: c.course_title })),
-            },
-            { name: "title", label: "File name", required: true },
-          ]}
-          extra={
-            <label className="upload-area">
-              <Upload />
-              <strong>{file?.name || "Choose a file"}</strong>
-              <small>Up to 500 MB · shared with your batch</small>
-              <input
-                type="file"
-                required
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-            </label>
-          }
-          submit={async (d) => {
-            if (!file) throw new Error("Choose a file.");
-            if (file.size < 1 || file.size > 500_000_000)
-              throw new Error("Choose a file smaller than 500 MB.");
-            await uploadFile(file, {
-              batch_id: ctx.batch,
-              semester_course_id: d.course || null,
-              title: d.title,
-              category: d.category,
-            });
-            await done();
-          }}
-        />
+      {tab === "file" && isStorageExceeded ? (
+        <div style={{ padding: "1.25rem", background: "rgba(239, 68, 68, 0.1)", border: "1px solid #ef4444", borderRadius: "12px", textAlign: "center", marginBottom: "1rem" }}>
+          <AlertCircle size={28} style={{ color: "#ef4444", margin: "0 auto 8px" }} />
+          <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: "4px" }}>
+            Storage Quota Exceeded (9.9 GB Limit)
+          </div>
+          <div style={{ fontSize: "12.5px", color: "var(--muted)", lineHeight: 1.5 }}>
+            Cloudflare R2 free tier storage is at capacity. Direct file uploads are paused.
+            You can still share resources without limits using <strong>Drive Link</strong>!
+          </div>
+          <button
+            type="button"
+            className="primary"
+            style={{ marginTop: "12px", width: "100%" }}
+            onClick={() => setTab("link")}
+          >
+            Switch to Drive Link
+          </button>
+        </div>
+      ) : tab === "file" ? (
+        <div>
+          {isStorageWarning && storageQuery.data && (
+            <div style={{ padding: "0.6rem 0.85rem", background: "rgba(245, 158, 11, 0.1)", border: "1px solid #f59e0b", borderRadius: "8px", fontSize: "11.5px", color: "var(--text)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "6px" }}>
+              <AlertTriangle size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
+              <span>Storage notice: Cloudflare R2 is at <strong>{(storageQuery.data.total_bytes / (1024**3)).toFixed(2)} GB</strong> (approaching 9.9 GB limit).</span>
+            </div>
+          )}
+          <Form
+            label="Upload file"
+            fields={[
+              {
+                name: "course",
+                label: "Subject",
+                value: defaultCourse || undefined,
+                required: !permissions?.general,
+                options: ctx.courses
+                  .filter((c) => permissions?.courses[c.offering_id])
+                  .map((c) => ({ value: c.offering_id, label: c.course_title })),
+              },
+              { name: "title", label: "File name", required: true },
+            ]}
+            extra={
+              <label className="upload-area">
+                <Upload />
+                <strong>{file?.name || "Choose a file"}</strong>
+                <small>Up to 500 MB · shared with your batch</small>
+                <input
+                  type="file"
+                  required
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </label>
+            }
+            submit={async (d) => {
+              if (!file) throw new Error("Choose a file.");
+              if (file.size < 1 || file.size > 500_000_000)
+                throw new Error("Choose a file smaller than 500 MB.");
+              if (isStorageExceeded) {
+                throw new Error("Storage quota exceeded (9.9 GB limit). Please share via Drive Link.");
+              }
+              if (storageQuery.data && (storageQuery.data.total_bytes + file.size > 10_630_044_057)) {
+                throw new Error(`This file (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the remaining 9.9 GB storage quota.`);
+              }
+              await uploadFile(file, {
+                batch_id: ctx.batch,
+                semester_course_id: d.course || null,
+                title: d.title,
+                category: "notes",
+              });
+              await done();
+            }}
+          />
+        </div>
       ) : (
         <Form
           label="Share Drive Link"
@@ -844,12 +829,6 @@ function UploadForm({
               label: "Google Drive or Resource Link",
               required: true,
               placeholder: "https://drive.google.com/...",
-            },
-            {
-              name: "category",
-              label: "Category",
-              required: true,
-              options: categories.map((value) => ({ value, label: value })),
             },
             {
               name: "course",
@@ -874,7 +853,7 @@ function UploadForm({
               target_batch: ctx.batch,
               target_course: d.course || null,
               target_title: d.title.trim(),
-              target_category: d.category,
+              target_category: "notes",
               target_url: urlWithScheme,
             });
             await done();

@@ -1771,6 +1771,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         nav.selectedItemId = selectedTab
 
+        handleDeepLinkIntent(intent)
+
 
 
         val composeNav = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.classmate_home_compose_nav)
@@ -3267,6 +3269,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }
 
         }
+
+        handleDeepLinkIntent(intent)
 
     }
 
@@ -4950,5 +4954,34 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     }
 
+
+    private fun handleDeepLinkIntent(targetIntent: Intent?) {
+        val uri = targetIntent?.data ?: return
+        if (uri.scheme == "https" && uri.host == "classmatebd.vercel.app") {
+            val path = uri.path.orEmpty()
+            val fragment = uri.fragment.orEmpty()
+            val queryFile = uri.getQueryParameter("file") ?: uri.getQueryParameter("id")
+
+            val fileId = when {
+                queryFile != null && queryFile.length == 36 -> queryFile
+                path.startsWith("/r/") -> path.removePrefix("/r/").trim()
+                fragment.startsWith("library/") -> fragment.removePrefix("library/").split("?")[0].trim()
+                fragment.startsWith("courses/") -> fragment.removePrefix("courses/").split("?")[0].trim()
+                fragment.contains("file=") -> {
+                    fragment.substringAfter("file=").substringBefore("&").trim()
+                }
+                else -> null
+            }
+
+            if (!fileId.isNullOrBlank()) {
+                targetIntent.data = null
+                window.decorView.postDelayed({
+                    if (::academicScreens.isInitialized) {
+                        academicScreens.openDirectResource(fileId)
+                    }
+                }, 400)
+            }
+        }
+    }
 }
 

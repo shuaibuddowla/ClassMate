@@ -114,7 +114,7 @@ object LibraryUploadManager {
         title: String,
         mimeType: String,
         sizeBytes: Long,
-        category: String
+        category: String = "notes"
     ): String {
         val taskId = UUID.randomUUID().toString()
         val dir = File(context.filesDir, "pending_library_uploads").apply { mkdirs() }

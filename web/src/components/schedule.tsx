@@ -495,52 +495,20 @@ export function Schedule({ ctx }: { ctx: Context }) {
       <div className="schedule-header">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">
-              {mode === "calendar" ? (
-                "YOUR UNIVERSITY, MONTH BY MONTH"
-              ) : mode === "bus" ? (
-                "STUDENT TRANSPORT"
-              ) : isTeacherViewer ? (
-                teacherGreeting.eyebrow
-              ) : (
-                <>
-                  <span className="desktop-greeting">
-                    MAKE ROOM FOR A GOOD DAY
-                  </span>
-                  <span className="mobile-greeting">Welcome back.</span>
-                </>
-              )}
-            </span>
-            <h1>
-              {mode === "calendar" ? (
-                "Academic calendar"
-              ) : mode === "bus" ? (
-                "Campus buses"
-              ) : isTeacherViewer ? (
-                <>
-                  {teacherGreeting.greeting}
-                  <span
-                    className="greeting-wave"
-                    aria-hidden="true"
-                  >
-                    {" "}
-                    👋
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="desktop-greeting">Welcome, </span>
-                  {ctx.profile.full_name?.split(" ")[0] || "there"}
-                  <span
-                    className="mobile-greeting greeting-wave"
-                    aria-hidden="true"
-                  >
-                    {" "}
-                    👋
-                  </span>
-                </>
-              )}
-            </h1>
+            {mode === "calendar" ? (
+              <span className="eyebrow">YOUR UNIVERSITY, MONTH BY MONTH</span>
+            ) : mode === "bus" ? (
+              <span className="eyebrow">STUDENT TRANSPORT</span>
+            ) : null}
+            {mode === "calendar" ? (
+              <h1>Academic calendar</h1>
+            ) : mode === "bus" ? (
+              <h1>Campus buses</h1>
+            ) : (
+              <h1 className="schedule-brand-title">
+                classmate<span className="brand-dot">.</span>
+              </h1>
+            )}
           </div>
           {mode !== "calendar" &&
             (mode === "bus"

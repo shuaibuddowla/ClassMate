@@ -32,6 +32,7 @@ import {
   CalendarDays,
   QrCode,
   Radio,
+  Cloud,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import type { Context } from "./app";
@@ -40,6 +41,7 @@ import { enablePush, removePush, restorePush } from "@/lib/push";
 import { pushEnabled as isPushEnabled, pushRegistrationState } from "@/lib/push-state";
 import { InstallWebApp } from "./install-web-app";
 import { AboutDeveloper } from "./about-developer";
+import { R2StorageModal } from "./r2-storage-modal";
 
 export function ProfileForm({
   profile,
@@ -111,6 +113,7 @@ export function Profile({
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false),
     [developerOpen, setDeveloperOpen] = useState(false),
+    [r2StorageOpen, setR2StorageOpen] = useState(false),
     [receiptsEnabled, setReceiptsEnabled] = useState(true),
     [receiptsBusy, setReceiptsBusy] = useState(false),
     [pushEnabled, setPushEnabled] = useState(false),
@@ -809,6 +812,28 @@ export function Profile({
             </button>
           </div>
         </div>
+
+        {(ctx.owner || ctx.profile.is_cr || ctx.profile.role === "admin" || ctx.profile.role === "superadmin" || ctx.profile.role === "teacher") && (
+          <button
+            type="button"
+            className="settings-row"
+            onClick={() => setR2StorageOpen(true)}
+          >
+            <div className="setting-icon-box cyan">
+              <Cloud size={18} />
+            </div>
+            <div className="settings-row-text">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>Cloudflare R2 Storage</span>
+                <span className="status-pill active" style={{ fontSize: "9.5px", padding: "1px 6px" }}>
+                  10 GB Limit
+                </span>
+              </div>
+              <small>Monitor active storage records, course usage, and 9.9 GB quota</small>
+            </div>
+            <ChevronRight size={18} className="chevron" />
+          </button>
+        )}
       </section>
 
       {/* 7. SYSTEM & UPDATES (MATCHED WITH ANDROID) */}

@@ -48,6 +48,8 @@
     <color name="cm_notice_class_test_text">#60A5FA</color>
     <color name="cm_notice_cancel_bg">#261214</color>
     <color name="cm_notice_cancel_text">#EF4444</color>
+    <color name="cm_period_cancel_bg">#1C1315</color>
+    <color name="cm_period_cancel_border">#3D1E24</color>
 
     <!-- WhatsApp-style Message Info Palette (Dark Mode) -->
     <color name="wa_read_green">#00A884</color>

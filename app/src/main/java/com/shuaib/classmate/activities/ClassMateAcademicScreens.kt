@@ -371,8 +371,7 @@ internal class ClassMateAcademicScreens(
             "Starred" to R.id.chipStarred).forEach { (value, id) ->
             root.v<View>(id).setOnClickListener { libraryFilter = value; loadLibrary(root) }
         }
-        listOf("theory" to R.id.btnCategoryRegular, "lab" to R.id.btnCategoryLab,
-            "other" to R.id.btnCategorySyllabus).forEach { (value, id) ->
+        listOf("theory" to R.id.btnCategoryRegular, "lab" to R.id.btnCategoryLab).forEach { (value, id) ->
             root.v<View>(id).setOnClickListener { libraryCategory = value; loadLibrary(root) }
         }
         root.v<SwipeRefreshLayout>(R.id.swipeRefresh).setOnRefreshListener { loadLibrary(root) }
@@ -409,11 +408,7 @@ internal class ClassMateAcademicScreens(
                 .put("offering_id", pair.first.getString("id")) }
             text(root, R.id.tvLibrarySummary, "${items.size} courses")
             listOf(R.id.rvRegular, R.id.rvLab, R.id.rvOther).forEach { root.v<View>(it).visibility = View.GONE }
-            val listId = when (libraryCategory) {
-                "lab" -> R.id.rvLab
-                "other" -> R.id.rvOther
-                else -> R.id.rvRegular
-            }
+            val listId = if (libraryCategory == "lab") R.id.rvLab else R.id.rvRegular
             root.v<View>(listId).visibility = View.VISIBLE
             recycler(root, listId, R.layout.item_subject_card, items) { card, course ->
                 text(card, R.id.tvSubjectName, course.optString("course_title"))

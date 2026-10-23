@@ -185,40 +185,7 @@ class SubjectPdfListFragment : Fragment() {
     private fun renderFilters() {
         if (_binding == null) return
         binding.resourceChipContainer.removeAllViews()
-        lockParentSwipeWhileTouching(binding.resourceChipContainer.parent as View)
-
-        Filter.values().forEach { filter ->
-            val isSelected = filter == selectedFilter
-            val chip = TextView(requireContext()).apply {
-                text = filter.label
-                textSize = 12.5f
-                setTextColor(
-                    if (isSelected) ThemeColors.get(requireContext(), R.color.cm_text_inverse)
-                    else ThemeColors.get(requireContext(), R.color.cm_text_primary)
-                )
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                background = ContextCompat.getDrawable(
-                    requireContext(),
-                    if (isSelected) R.drawable.bg_library_chip_html_selected
-                    else R.drawable.bg_library_chip_html
-                )
-                setPadding(dp(14), dp(7), dp(14), dp(7))
-                layoutParams = ViewGroup.MarginLayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    marginEnd = dp(8)
-                }
-                applyClickAnimation {
-                    if (selectedFilter != filter) {
-                        selectedFilter = filter
-                        renderFilters()
-                        applyResourceFilter()
-                    }
-                }
-            }
-            binding.resourceChipContainer.addView(chip)
-        }
+        (binding.resourceChipContainer.parent as? View)?.visibility = View.GONE
     }
 
     private fun checkAdminAccess(onComplete: () -> Unit) {
@@ -347,7 +314,7 @@ class SubjectPdfListFragment : Fragment() {
                 binding.tvEmptySubtitle.text = "Be the first to share notes, slides, or questions for this course."
             } else {
                 binding.tvEmptyTitle.text = "No ${selectedFilter.label.lowercase()} found"
-                binding.tvEmptySubtitle.text = "Try selecting another category above to view available materials."
+                binding.tvEmptySubtitle.text = "No materials available for this course yet."
             }
             binding.btnEmptyUpload.isVisible = isAdmin
         }
@@ -385,16 +352,7 @@ class SubjectPdfListFragment : Fragment() {
     }
 
     private fun matchesFilter(pdf: PdfFile): Boolean {
-        val text = "${pdf.fileType} ${pdf.mimeType} ${pdf.title} ${pdf.description} ${pdf.materialType}".lowercase()
-        return when (selectedFilter) {
-            Filter.All -> true
-            Filter.Slides -> text.contains("ppt") || text.contains("slide") || text.contains("presentation")
-            Filter.Notes -> text.contains("note") || text.contains("doc") || text.contains("handout")
-            Filter.Assignments -> text.contains("assignment") || text.contains("task") || text.contains("hw")
-            Filter.Questions -> text.contains("question") || text.contains("cq") || text.contains("mid") || text.contains("final") || text.contains("ct ")
-            Filter.Lab -> pdf.courseType.equals("lab", true) || FileVisuals.isLabResource(pdf)
-            Filter.Starred -> favoritePdfIds.contains(pdf.id)
-        }
+        return if (selectedFilter == Filter.Starred) favoritePdfIds.contains(pdf.id) else true
     }
 
     private fun handleResourceAction(pdf: PdfFile) {

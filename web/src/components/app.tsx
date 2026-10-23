@@ -1029,7 +1029,16 @@ function Home({
   useEffect(() => {
     let live = true;
     const navigate = async () => {
-      const [hash, id] = location.hash.slice(1).split("/");
+      const rawHash = location.hash.slice(1);
+      const basePart = rawHash.split("?")[0];
+      const queryPart = rawHash.includes("?") ? rawHash.split("?")[1] : "";
+      const segments = basePart.split("/");
+      const hash = segments[0];
+      let id = segments[1] || null;
+      if (!id && queryPart) {
+        const params = new URLSearchParams(queryPart);
+        id = params.get("file") || params.get("id");
+      }
       const targetTab = hash === "batch" ? "friends" : hash === "settings" ? "profile" : hash === "courses" ? "library" : hash;
       if (
         [

@@ -7,6 +7,13 @@ This memory file serves as the definitive engineering knowledge base and memory 
 ## 1. High-Level Overview & Core Concepts
 
 - **Purpose**: The Notice page/feed is the central academic broadcasting and engagement hub in ClassMate. It delivers announcements, class cancellations, resources/file attachments, exam notices, and deadlines to students and faculty.
+- **Public Resource Sharing (/r/[slug])**:
+  - Direct public access for academic files and Google Drive resources shared in Telegram or copied externally without requiring user authentication, session cookies, or app installation.
+  - Dedicated Next.js web preview page (web/src/app/r/[id]/page.tsx) and download streaming endpoint (web/src/app/api/public-download/[id]/route.ts).
+  - Title slug generation via classmate.slugify(title) and classmate.generate_unique_resource_slug(title) with auto-deduplication (-1, -2) on insert/update in classmate.file_metadata.slug.
+  - Dual side-by-side action buttons: **Open** (inline browser tab view / Drive folder) and **Download** (direct device file save with original clean filename and extension via Content-Disposition: attachment).
+  - Brand footer accurately matches Android Timetable header: lowercase classmate. in heavy bold (Plus Jakarta Sans 800, letter spacing -0.03em) with primary accent dot ..
+  - Backward compatibility: supports both title slugs and legacy UUID paths.
 - **Dual Architecture**:
   1. **Modern Supabase Academic Screens** (`ClassMateAcademicScreensSupabase.kt`): The active, production architecture powering ClassMate 1.1.23+ with smooth ListAdapter paging, real avatars, threaded comments, read receipts, and AI compose.
   2. **Legacy / Complementary Components** (`NoticeFragment.kt`, `NoticeAdapter.kt`, `NoticeRepository.kt`, Room DB `NoticeDao.kt`, Firestore): Kept for offline caching, hybrid fallbacks, and backward compatibility.
@@ -2880,3 +2887,249 @@ To provide a static credential, Android requires **Host Card Emulation (HCE)**:
 
 ---
 
+
+
+## 78. Web Notice Composer Full Parity with Android (Vacation Mode, Image Attachments & AI Polish)
+
+### A. Background & Requirement
+- **Context**: While the native Android client ([`PostNoticeActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/PostNoticeActivity.kt)) had received rich composition features—including image attachments, vacation mode with duration calculation, and AI polishing—the Web companion client ([`web/src/components/notices.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/notices.tsx)) only supported basic text notices and simple class cancellation forms.
+- **Goal**: Bring the Web notice composer to complete 1:1 functional parity with the Android app.
+
+### B. Core Features & Modalities Added to Web Notice Composer
+1. **Three Dedicated Composition Modalities**:
+   - **General Notice**: Subject title, body with multi-line auto-resizing text area, and optional course selector (for teachers assigned to multiple courses).
+   - **Class Cancellation**: Quick day selector (`Today` / `Tomorrow`), active semester course dropdown, and automatic linkage to `classmate.class_changes`.
+   - **Vacation / Academic Recess Announcement**:
+     - Dedicated input fields: Vacation Title (e.g. *Durga Puja Vacation*, *Eid-ul-Fitr Break*), Start Date, and End Date.
+     - **Dynamic Duration Engine**: Automatically computes and formats the vacation span:
+       ```typescript
+       const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+       const dateDuration = `${days} days (${format(start)} – ${format(end)})`;
+       ```
+     - **Standard Academic Advisory Footer**: Automatically appends the institutional notice text:
+       `"Classes and academic activities will remain suspended during this vacation period."`
+2. **Image & Photo Attachments in Web Notices**:
+   - Integrated native image file input with drag-and-drop or file browser trigger.
+   - **Client-Side Validation**: Restricts to `image/jpeg`, `image/png`, and `image/webp`; enforces maximum 10 MB file size limit.
+   - **Interactive Thumbnail Preview**: Renders thumbnail preview with quick remove button (`✕`) and upload progress indicator.
+   - **Storage Pipeline**: Uploads to Supabase Storage bucket `notice-images` with unique UUID storage keys.
+   - **Database Association**: Inserts row into `classmate.notice_attachments` linking `notice_id`, `storage_key`, `file_name`, `mime_type`, and `size_bytes`.
+   - **Signed URL Resolution**: The feed query uses `supabase().storage.from("notice-images").createSignedUrls(keys, 3600)` to render authenticated image previews in notice feed cards.
+   - **Atomic Discard on Failure**: If client-side image upload fails after the notice record is created, triggers database RPC `discard_failed_notice_upload(target_notice)` to prevent orphaned notices.
+3. **AI Compose & Polish Integration**:
+   - Integrated with Supabase Edge Function `classmate-ai` (`mode: "polish"` / `"auto_notice"`).
+   - Allows Class Representatives (CR) to paste informal, messy drafts (including Banglish typing); the AI transliterates into grammatically sound Bengali script (বাংলা লিপি), refines the body, synthesizes a title if omitted, and strictly preserves key entities (dates, course codes, phone numbers, and URLs).
+
+---
+
+## 79. WhatsApp Bot Broadcasting Exploration & Clean Teardown
+
+### A. Context & User Problem
+- Many students in the batch had not yet installed the ClassMate app, forcing Class Representatives (CR) to manually re-post announcements into the batch's WhatsApp notice group.
+- The user requested investigating an automated bridge to forward notices published in ClassMate directly into WhatsApp groups.
+
+### B. Engineering Investigation & Architecture Tested
+- Tested a headless WhatsApp Web gateway using Baileys / Evolution-style microservice deployed on cloud hosting (Render):
+  - Attempted WhatsApp Multi-Device 8-character pairing code linking (`requestPairingCode`) to avoid the physical limitation where a user on a single smartphone cannot scan an on-screen QR code.
+  - Explored filtering WhatsApp chats to only expose group chats and isolate batch groups.
+
+### C. Technical Obstacles & Operational Hazards
+1. **Hosting Cold Starts & Webhook Timeouts**: Free-tier cloud instances (Render) experience 50+ second cold-start spin-ups, causing WhatsApp socket pairing attempts to time out.
+2. **Device Linking Failures**: Users repeatedly encountered WhatsApp protocol errors: `"couldnt link device. check the phone number is correct on your device or get a new code"`.
+3. **Anti-Bot & Ban Risks**: WhatsApp actively flags and bans accounts running unapproved headless automation on personal numbers.
+4. **Data Privacy & Credential Security**: Storing WhatsApp multi-device authentication credentials on external infrastructure introduced data leakage concerns regarding personal chats and contacts.
+
+### D. Clean Teardown & Complete Revert
+- As requested by the user, all experimental WhatsApp bot services, Render project instances, API bridges, and associated UI controls were cleanly destroyed and reverted without leaving orphaned code or impacting other features.
+
+---
+
+## 80. Resurrection of Automated Telegram Channel Broadcasting for Note Sharing (CSE 22)
+
+### A. Motivation & Channel Integration
+- The CSE 22nd Batch maintains an active Telegram channel specifically for sharing lecture notes, slides, and study resources.
+- Rather than maintaining precarious WhatsApp scrapers, the system resurrected and upgraded the official Telegram bot integration (`@ClassMateBot`):
+  - When an Admin or Class Representative (CR) uploads an academic file (PDF, slide, book) or shares a Google Drive link, the system automatically broadcasts an announcement directly into the CSE 22 batch's Telegram channel.
+
+### B. Database Trigger & Vault Secret Architecture (`202610230001_telegram_bot_and_drive_notices.sql`)
+1. **Trigger Function**: `classmate.broadcast_resource_to_telegram()` on `classmate.file_metadata`:
+   - Fires on `INSERT` for active resources (such as Google Drive links) and on `UPDATE` when file upload status transitions from `'pending'` to `'active'`.
+   - **Strict Batch Isolation**: Validates `batch_number = 22`. Never broadcasts resources belonging to other academic batches.
+   - **Vault Security**: Decrypts the integration secret securely from Supabase Vault:
+     ```sql
+     select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'classmate_dispatch_secret' limit 1;
+     ```
+   - **Course & Contributor Resolution**: Resolves course title and course code by joining with `classmate.courses`, and looks up the uploader's display name from `classmate.profiles`.
+   - **Asynchronous HTTP Dispatch**: Dispatches non-blocking HTTP POST via `net.http_post` to the Cloudflare Worker `/internal/telegram-broadcast` endpoint, wrapped in an exception handler so database transactions never fail if Telegram dispatch encounters network issues.
+
+### C. Cloudflare Worker Telegram Dispatcher (`cloudflare-worker/src/index.ts`)
+- **Endpoint**: `/internal/telegram-broadcast` (secured via `X-Dispatch-Secret` matching vault secret).
+- **HTML Sanitization**: Escapes user text using `escapeTelegramHtml(text)` (`&`, `<`, `>`).
+- **Standardized Message Payload**:
+  ```text
+  New Academic Resource
+
+  <code>{title}</code>
+
+  Course: {course_title} ({course_code})
+  Link: https://classmatebd.vercel.app/r/{resource_id}
+  ```
+- **Inline Keyboard**: Includes a single, clean action button:
+  `[ Open in ClassMate ↗ ]` pointing to `https://classmatebd.vercel.app/r/{resource_id}`.
+
+---
+
+## 81. Automatic In-App Notices for Google Drive Links & Dedicated Push Notifications
+
+### A. The In-App Feed Gap Resolution (`202610230001_telegram_bot_and_drive_notices.sql`)
+- **Previous Defect**: When a user uploaded a physical PDF to Cloudflare R2 storage, a corresponding notice was created in `classmate.notices`. However, when a user added a Google Drive resource link via `create_library_link`, it only inserted into `file_metadata`. The Drive resource remained hidden inside the course files directory, and students received no feed announcement.
+- **Resolution**:
+  - Updated `classmate.create_library_link`:
+    ```sql
+    insert into classmate.notices (
+      department_id, batch_id, semester_course_id, author_id, title, body, resource_id
+    ) values (
+      v_dept, target_batch, target_course, caller_id,
+      left('Resource: ' || v_title, 200),
+      'A new learning resource link has been shared. Open the link below.',
+      new_resource.id
+    );
+    ```
+  - Drive links now generate authentic in-app notice cards with green resource art, course association, and 1-tap file access.
+
+### B. Dedicated Push Notification Context (`202610230002_resource_push_notifications.sql`)
+- Updated `classmate.academic_notification_job_context`:
+  - When notification outbox processes an event of kind `'notice'` linked to a `resource_id`:
+    - **Notification Title**: `"New Resources"`
+    - **Notification Body**: `"{file_title} · {course_title} ({course_code})"` (or `"{file_title} is now available"`)
+    - **FCM Dispatch**: Broadcasts directly to all mobile devices in the enrolled batch.
+
+---
+
+## 82. Universal Elimination of Resource Categories Across Android & Web
+
+### A. Motivation & User Feedback
+- **User Mandate**: *"Remove the category system while sharing files entirely on ClassMate web and Android client. Also, remove these options everywhere where they exist. We don't need some filter like the categories as it exists slightly in notes, slides, questions, syllabus, etc. Delete it entirely from the file uploading page as well as from the courses section in the ClassMate web, as well as in the detailed view list of all the files of courses."*
+- **Problem**: Academic categories created friction during upload, resulted in confusing semi-empty filter tabs, and caused arbitrary categorization disputes. Course files are naturally grouped by Subject/Course, making sub-categories redundant.
+
+### B. Database Schema & Stored Procedure Updates (`202610230003_remove_resource_category.sql`)
+1. `alter table classmate.file_metadata alter column category set default 'notes';`
+2. `classmate.create_library_link`: Made `target_category` optional with default `'notes'`.
+3. `classmate.edit_resource_metadata`: Made `target_category` optional with fallback to existing file category or `'notes'`.
+4. Schema reloaded via `notify pgrst, 'reload schema'`.
+
+### C. Android APK UI Overhaul
+1. **[`ClassMatePublishActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMatePublishActivity.kt)**:
+   - Completely deleted the side-by-side `metaRow` containing `colCategory` and the category picker dialog (`Select Category`).
+   - Expanded `colSubject` into a spacious, full-width dropdown container.
+   - Hardcoded default category parameter to `"notes"` for backend API compatibility.
+   - Removed category filter constraints from duplicate resource detection queries.
+   - Updated helper copy: `"Update the title, link or subject."`.
+2. **[`ClassMateAcademicScreensSupabase.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt)**:
+   - Hidden `btnCategorySyllabus` (`View.GONE`), turning the category toggle into a clean 2-segment switcher (`[ Theory | Lab ]`).
+   - Removed category filter chips (`updateLibraryFilterChips`).
+   - In file cards (`bindLibraryFile`), replaced the generic category subtitle (`Notes`, `Slides`) with the actual **Course Name** (`courseNames[file.optString("semester_course_id")]`).
+3. **Course File Lists (`ClassMateCourseFilesActivity.kt`, `SubjectPdfListFragment.kt`, `PdfLibraryFragment.kt`)**:
+   - Stripped category filter chips, search criteria, and category tags.
+
+### D. Web Companion Client UI Overhaul (`web/src/components/library.tsx`)
+1. Removed `categories = ["notes", "slides", "questions", "syllabus", "other"]` array.
+2. Removed category filter pill list (`.category-list`).
+3. Removed "Syllabus" tab from course type filters; simplified to `[ Theory | Labs ]`.
+4. Removed `category` field from `UploadForm` (both file upload and drive link tabs); automatically passes `category: "notes"`.
+5. Removed category select from the Edit Resource modal.
+6. File cards render cleanly: title, course name, Google Drive/External Link/PDF icon badge, and formatted size.
+
+---
+
+## 83. Public Zero-Login Resource Access & Streamlined Web URLs (`/r/[id]`)
+
+### A. The Zero-Login Requirement
+- **User Request**: *"Bro for the file sharing link in telegram we need to work on the link that you post there, currently it takes user and asks for log into classmate, i want to make it a public like system. Anyone with the link can view the shared file without having the classmate app. For it dont use hyperlink anymore write directly our configured url of classmate."*
+- **Problem**: Links previously directed users to `/#library/...`, which immediately threw a login modal if the user was unauthenticated, blocking external classmates or guest users from downloading lecture materials.
+
+### B. Database Public RPC (`202610230004_public_resource_access.sql`)
+- Implemented `classmate.get_public_resource(target_resource uuid)`:
+  - Language: PL/pgSQL, `SECURITY DEFINER`, `set search_path = ''`.
+  - Permissions: `GRANT EXECUTE ON FUNCTION classmate.get_public_resource(uuid) TO anon, authenticated, service_role;`.
+  - Added wrapper in `public` schema for standard PostgREST RPC access.
+  - Returns public-safe metadata: `id`, `title`, `file_type`, `size_bytes`, `mime_type`, `link_url`, `is_link`, `course_title`, `course_code`, `batch_number`, and `created_at`.
+  - Excludes internal storage paths, user IDs, or administrative audit data.
+
+### C. Public Landing Page (`web/src/app/r/[id]/page.tsx`)
+- Server-rendered Next.js page accessible at `https://classmatebd.vercel.app/r/{id}`:
+  - **Dynamic OpenGraph Meta Tags**:
+    - `title: "{title} · ClassMate"`
+    - `description: "Public shared learning resource for {course}. Accessible on web or native app without login."`
+    - Renders rich link preview cards with course details on Telegram, WhatsApp, Messenger, and Discord.
+  - **Visual Design**:
+    - Top header: ClassMate brand mark + green `🛡️ Public Resource` badge.
+    - Course banner: Course title + bold course code pill (e.g. `CSE 2101`).
+    - File icon: Authentic multi-color Google Drive vector icon (for Drive links), link icon (for external links), or red PDF badge (for documents).
+    - Meta tags: Formatted size, Batch number, upload date.
+    - **Action Buttons**:
+      1. **Primary Action**:
+         - For Google Drive links: `"Open on Google Drive ↗"` (opens in new tab).
+         - For uploaded files: `"Download / Open File 📥"` (triggers direct download).
+      2. **Secondary Action**:
+         - `"Open in ClassMate App 📱"` (routes to app deep link).
+    - Public reassurance banner: *"Anyone with this link can view and download this academic material without logging in."*
+
+### D. Serverless Download Pipeline (`web/src/app/api/public-download/[id]/route.ts`)
+- Server route `GET /api/public-download/[id]`:
+  - Validates resource UUID and queries `classmate.get_public_resource`.
+  - **Drive & External Links**: Issues immediate HTTP `302 Found` redirect to destination link.
+  - **Cloudflare R2 Storage Files**: Calls the Supabase Edge Function `signed-classmate-resource` with service role authorization to generate a secure, temporary download URL, then issues HTTP `302 Found` redirect directly to the signed R2 object.
+  - Supports query parameter `?json=true` for client-side API consumers.
+
+---
+
+## 84. Android App Links & Seamless Deep Linking (`https://classmatebd.vercel.app`)
+
+### A. Manifest Registration ([`AndroidManifest.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/AndroidManifest.xml))
+- Declared auto-verifying App Link intent filter on `ClassMateAuthActivity`:
+  ```xml
+  <intent-filter android:autoVerify="true">
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.DEFAULT" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data android:scheme="https" android:host="classmatebd.vercel.app" />
+  </intent-filter>
+  ```
+
+### B. Deep Link Router Implementation ([`ClassMateAuthActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt))
+- Added `handleDeepLinkIntent(targetIntent: Intent?)`:
+  - Parses incoming intents on startup and `onNewIntent`.
+  - Extracts 36-character resource UUID from:
+    - Path prefix `/r/{id}`
+    - Query parameter `?file={id}` or `?id={id}`
+    - URL fragments `/#library/{id}` or `/#courses/{id}`
+  - Dispatches to `academicScreens.openDirectResource(fileId)`:
+    - Opens Google Drive links smoothly in Chrome Custom Tabs.
+    - Opens Cloudflare R2 documents directly in the in-app PDF/resource viewer.
+
+---
+
+## 85. Current System Verification & Production Deployment State (Oct 23, 2026)
+
+### A. Production Cloud Deployments
+- **Supabase Backend**: All four recent migrations successfully applied across Staging and Production:
+  - `202610230001_telegram_bot_and_drive_notices.sql`
+  - `202610230002_resource_push_notifications.sql`
+  - `202610230003_remove_resource_category.sql`
+  - `202610230004_public_resource_access.sql`
+- **Cloudflare Worker**: Production deployment verified on `classmate-secure-api.shuaibuddowla-personal.workers.dev`:
+  - `/internal/telegram-broadcast` handles batch 22 note sharing with zero latency.
+- **Web Client**: Deployed live to Vercel Production at **`https://classmatebd.vercel.app`**:
+  - `/r/[id]` public zero-login resource landing page verified with live OpenGraph cards.
+  - `/api/public-download/[id]` verified with live 302 redirects.
+  - Web notice composer tested with image attachments, vacation mode, and AI polishing.
+
+### B. Android Native Builds & Local Testing
+- **APK Verification**: Built and deployed to physical smartphone via ADB.
+- **Features Tested**:
+  - Streamlined resource publishing with category removal and full-width subject dropdown.
+  - Deep linking from Telegram `/r/{id}` into Android app.
+  - 2-segment routine toggle and course name subtitles in file lists.
+
+---

@@ -224,7 +224,7 @@ class PdfLibraryFragment : Fragment() {
 
         binding.btnCategoryRegular.applyClickAnimation { coursesExpanded = false; selectCourseCategory("regular") }
         binding.btnCategoryLab.applyClickAnimation { coursesExpanded = false; selectCourseCategory("lab") }
-        binding.btnCategorySyllabus.applyClickAnimation { coursesExpanded = false; selectCourseCategory("syllabus") }
+        binding.btnCategorySyllabus.isVisible = false
         binding.tvCollapseAll.applyClickAnimation {
             coursesExpanded = !coursesExpanded
             selectCourseCategory(selectedCourseCategory)
@@ -372,10 +372,9 @@ class PdfLibraryFragment : Fragment() {
         if (selectedSubjects.isEmpty()) {
             binding.tvNoSubjectResults.text = "No courses in this category yet"
         }
-        val selected = listOf(binding.btnCategoryRegular, binding.btnCategoryLab, binding.btnCategorySyllabus)
+        val selected = listOf(binding.btnCategoryRegular, binding.btnCategoryLab)
         val selectedView = when (category) {
             "lab" -> binding.btnCategoryLab
-            "syllabus" -> binding.btnCategorySyllabus
             else -> binding.btnCategoryRegular
         }
         selected.forEach { view ->
@@ -404,15 +403,7 @@ class PdfLibraryFragment : Fragment() {
     }
 
     private fun matchesResourceFilter(pdf: PdfFile): Boolean {
-        val searchable = "${pdf.title} ${pdf.description} ${pdf.fileType} ${pdf.mimeType}".lowercase()
-        return when (selectedResourceFilter) {
-            "slides" -> searchable.contains("slide") || searchable.contains("ppt") || searchable.contains("presentation")
-            "questions" -> listOf("question", "final", "midterm", "class test", "ct ").any { searchable.contains(it) }
-            "starred" -> pdf.id in favoritePdfIds
-            "notes" -> !searchable.contains("ppt") && !searchable.contains("slide") &&
-                !listOf("question", "final", "midterm", "class test").any { searchable.contains(it) }
-            else -> true
-        }
+        return if (selectedResourceFilter == "starred") pdf.id in favoritePdfIds else true
     }
 
     private fun resourceCountFor(subjects: List<Subject>, pdfs: List<PdfFile>): Int {

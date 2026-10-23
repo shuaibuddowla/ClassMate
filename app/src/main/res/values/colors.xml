@@ -48,7 +48,8 @@
     <color name="cm_notice_class_test_bg">#EEF2FF</color>
     <color name="cm_notice_class_test_text">#4338CA</color>
     <color name="cm_notice_cancel_bg">#FEE2E2</color>
-    <color name="cm_period_cancel_bg">#FFF3F3</color>
+    <color name="cm_period_cancel_bg">#FFF5F5</color>
+    <color name="cm_period_cancel_border">#FECDD3</color>
     <color name="cm_notice_cancel_text">#B91C1C</color>
     <color name="cm_notice_general_start">#E6FFFFFF</color>
     <color name="cm_notice_general_end">#D8F5F1EB</color>

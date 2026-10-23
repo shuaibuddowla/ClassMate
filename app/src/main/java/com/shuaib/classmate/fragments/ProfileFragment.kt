@@ -213,6 +213,10 @@ class ProfileFragment : Fragment() {
             signOut()
         }
 
+        binding.layoutR2Storage.setOnClickListener {
+            com.shuaib.classmate.ui.R2StorageDialog.show(requireContext())
+        }
+
         binding.layoutDeleteOfflineCache.setOnClickListener {
             val context = requireContext()
             val offlineFiles = com.shuaib.classmate.storage.LibraryDownloadManager.getDownloadedFiles(context)
@@ -603,6 +607,9 @@ class ProfileFragment : Fragment() {
 
         val isAdmin = user.isAdmin()
         binding.adminSection.isVisible = isAdmin
+        val canManageStorage = isAdmin || user.role in listOf("cr", "admin", "superadmin", "owner", "teacher")
+        binding.layoutR2Storage.isVisible = canManageStorage
+        binding.dividerR2Storage.isVisible = canManageStorage
         binding.cardSemesterManagement.isVisible = user.isBatchAdmin(
             com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
         )

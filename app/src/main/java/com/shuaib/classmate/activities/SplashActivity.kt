@@ -123,7 +123,11 @@ class SplashActivity : AppCompatActivity() {
         if (hasNavigated || isFinishing) return
         hasNavigated = true
         isReady = true // Release system splash screen
-        startActivity(Intent(this, destination))
+        val navIntent = Intent(this, destination).apply {
+            data = intent.data
+            intent.extras?.let { putExtras(it) }
+        }
+        startActivity(navIntent)
         finish()
         overridePendingTransition(0, 0)
     }

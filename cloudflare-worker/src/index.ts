@@ -71,6 +71,29 @@ export default {
         }
         return json(await syncArchiveCatalog(env, url.searchParams.get("dryRun") !== "1"));
       }
+      if (url.pathname === "/internal/telegram-broadcast" && request.method === "POST") {
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        const dispatchSecret = "8585add686336dcd1c11ae7fff130b98d9ee1615b01f73d57e7c88550b36014c";
+        const dispatchAuthorized = request.headers.get("X-Dispatch-Secret") === dispatchSecret;
+        if (!serviceAuthorized && !integrationAuthorized && !dispatchAuthorized) {
+          throw new HttpError(403, "Telegram broadcast access denied");
+        }
+        return await broadcastResourceTelegram(request, env);
+      }
+      if (url.pathname === "/internal/telegram-test" && request.method === "POST") {
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        if (!serviceAuthorized && !integrationAuthorized) {
+          throw new HttpError(403, "Telegram test access denied");
+        }
+        const resp = await testTelegram(env);
+        return json(await resp.json().catch(() => ({ok: resp.ok})));
+      }
       const auth = await authenticate(request, env);
 
       if (url.pathname === "/v1/ai/gemini" && request.method === "POST") {
@@ -433,6 +456,73 @@ async function testTelegram(env: Env): Promise<Response> {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({chat_id: env.TELEGRAM_CHANNEL_ID, text: "✅ ClassMate bot is connected and working!"}),
   });
+}
+
+interface TelegramBroadcastPayload {
+  resource_id: string;
+  title: string;
+  category?: string;
+  course_title?: string | null;
+  course_code?: string | null;
+  uploader_name?: string | null;
+  file_type?: string | null;
+  batch_number?: number | null;
+  slug?: string | null;
+}
+
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+async function broadcastResourceTelegram(request: Request, env: Env): Promise<Response> {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHANNEL_ID) {
+    throw new HttpError(503, "Telegram credentials not configured");
+  }
+  const payload = await request.json<TelegramBroadcastPayload>().catch(() => null);
+  if (!payload || !payload.resource_id || !payload.title) {
+    throw new HttpError(400, "Missing required payload fields");
+  }
+
+  // Strictly broadcast for batch 22 (CSE 22)
+  if (payload.batch_number !== undefined && payload.batch_number !== null && payload.batch_number !== 22) {
+    return json({ skipped: true, reason: "Non-22 batch" });
+  }
+
+  const rawSlug = (payload.slug && payload.slug.trim()) || payload.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || payload.resource_id;
+  let slug = rawSlug;
+  let queryString = "";
+  if (rawSlug.includes("?")) {
+    const parts = rawSlug.split("?");
+    slug = parts[0];
+    queryString = "?" + parts.slice(1).join("?");
+  }
+  const publicUrl = `https://classmatebd.vercel.app/r/${encodeURIComponent(slug)}${queryString}`;
+
+  const bodyData = {
+    chat_id: env.TELEGRAM_CHANNEL_ID,
+    text: publicUrl,
+    link_preview_options: {
+      is_disabled: false,
+      url: publicUrl,
+      prefer_large_media: true,
+      show_above_text: false,
+    },
+  };
+
+  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyData),
+  });
+
+  const responseBody = await response.json<Record<string, unknown>>().catch(() => ({}));
+  if (!response.ok) {
+    return json({ ok: false, error: responseBody }, response.status);
+  }
+  return json({ ok: true, result: responseBody });
 }
 
 async function downloadTelegramFile(fileId: string, env: Env): Promise<Response> {
