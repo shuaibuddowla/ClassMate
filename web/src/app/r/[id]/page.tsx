@@ -43,7 +43,7 @@ export async function generateMetadata({
   }
   const course = res.course_title ? `${res.course_title}${res.course_code ? ` (${res.course_code})` : ""}` : "Academic Resource";
   const slugPath = res.slug || res.id;
-  const ogImageUrl = `https://classmatebd.vercel.app/r/${slugPath}/opengraph-image?v=light3`;
+  const ogImageUrl = `https://classmatebd.vercel.app/r/${slugPath}/opengraph-image?v=satori2`;
   return {
     title: res.title,
     description: `Course: ${course} · Shared with Batch ${res.batch_number || 22}`,

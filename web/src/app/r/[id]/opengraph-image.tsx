@@ -178,25 +178,65 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   <path d="M73.4 26.5 60.7 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.1h27.5c0-1.55-.4-3.1-1.2-4.5z" fill="#FFBA00" />
                 </svg>
               ) : (
-                /* Premium 3D Folded PDF Icon */
-                <svg width="72" height="78" viewBox="0 0 56 60" fill="none">
-                  <defs>
-                    <linearGradient id="pdfGrad" x1="0" y1="0" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#FF4D4D" />
-                      <stop offset="1" stopColor="#DC2626" />
-                    </linearGradient>
-                    <linearGradient id="foldGrad" x1="42" y1="0" x2="56" y2="14" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#B91C1C" />
-                      <stop offset="1" stopColor="#991B1B" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M8 0C3.58 0 0 3.58 0 8v44c0 4.42 3.58 8 8 8h40c4.42 0 8-3.58 8-8V14L42 0H8z" fill="url(#pdfGrad)" />
-                  <path d="M42 0v10c0 2.21 1.79 4 4 4h10L42 0z" fill="url(#foldGrad)" opacity="0.85" />
-                  <rect x="12" y="18" width="22" height="3" rx="1.5" fill="#FFFFFF" fillOpacity="0.45" />
-                  <rect x="12" y="24" width="32" height="3" rx="1.5" fill="#FFFFFF" fillOpacity="0.45" />
-                  <rect x="10" y="34" width="36" height="18" rx="5" fill="#FFFFFF" />
-                  <text x="28" y="47.5" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="900" fill="#DC2626" textAnchor="middle" letterSpacing="0.5">PDF</text>
-                </svg>
+                /* Premium Satori-compatible Folded PDF Icon */
+                <div
+                  style={{
+                    position: "relative",
+                    width: "72px",
+                    height: "78px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg width="72" height="78" viewBox="0 0 56 60" fill="none">
+                    <path
+                      d="M8 0C3.58 0 0 3.58 0 8v44c0 4.42 3.58 8 8 8h40c4.42 0 8-3.58 8-8V14L42 0H8z"
+                      fill="#DC2626"
+                    />
+                    <path
+                      d="M42 0v10c0 2.21 1.79 4 4 4h10L42 0z"
+                      fill="#991B1B"
+                      opacity="0.85"
+                    />
+                    <rect
+                      x="12"
+                      y="18"
+                      width="22"
+                      height="3"
+                      rx="1.5"
+                      fill="#FFFFFF"
+                      fillOpacity="0.45"
+                    />
+                    <rect
+                      x="12"
+                      y="24"
+                      width="32"
+                      height="3"
+                      rx="1.5"
+                      fill="#FFFFFF"
+                      fillOpacity="0.45"
+                    />
+                  </svg>
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "10px",
+                      backgroundColor: "#ffffff",
+                      color: "#dc2626",
+                      fontSize: "13px",
+                      fontWeight: 900,
+                      borderRadius: "5px",
+                      padding: "2px 7px",
+                      letterSpacing: "0.5px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    PDF
+                  </div>
+                </div>
               )}
             </div>
 
