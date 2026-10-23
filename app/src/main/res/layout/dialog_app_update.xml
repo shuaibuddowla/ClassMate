@@ -8,9 +8,9 @@
     android:layout_height="wrap_content"
     android:layout_margin="16dp"
     app:cardBackgroundColor="@color/cm_surface"
-    app:cardCornerRadius="28dp"
-    app:cardElevation="4dp"
-    app:strokeWidth="1dp"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1.5dp"
     app:strokeColor="@color/cm_border">
 
     <LinearLayout
@@ -22,9 +22,9 @@
 
         <!-- Glowing Badge Header -->
         <FrameLayout
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="8dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginTop="4dp"
             android:layout_marginBottom="16dp">
 
             <!-- Outer Glowing Ring -->
@@ -35,15 +35,15 @@
 
             <!-- Inner Gradient Circle -->
             <FrameLayout
-                android:layout_width="60dp"
-                android:layout_height="60dp"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
                 android:layout_gravity="center"
                 android:background="@drawable/bg_update_circle_gradient">
 
                 <ImageView
                     android:id="@+id/ivUpdateIcon"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_classmate_logo"
                     android:importantForAccessibility="no"/>
@@ -68,8 +68,9 @@
             android:textColor="@color/cm_text_secondary"
             android:textSize="13sp"
             android:gravity="center"
+            android:lineSpacingExtra="2dp"
             android:layout_marginTop="6dp"
-            android:layout_marginHorizontal="8dp"/>
+            android:layout_marginHorizontal="6dp"/>
 
         <!-- Version Transition Pills -->
         <LinearLayout
@@ -78,42 +79,42 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginTop="16dp"
-            android:layout_marginBottom="20dp"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:background="@drawable/bg_settings_card">
+            android:layout_marginBottom="18dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/bg_version_container">
 
             <TextView
                 android:id="@+id/tvLocalVersionPill"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_pill"
+                android:background="@drawable/bg_version_pill_installed"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="4dp"
-                android:textColor="@color/cm_text_secondary"
+                android:textColor="@color/cm_version_pill_installed_text"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                tools:text="v1.0.0"/>
+                tools:text="v1.1.31"/>
 
             <ImageView
                 android:layout_width="16dp"
                 android:layout_height="16dp"
-                android:layout_marginHorizontal="12dp"
+                android:layout_marginHorizontal="10dp"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="@color/cm_primary"
+                app:tint="@color/cm_text_muted"
                 android:importantForAccessibility="no"/>
 
             <TextView
                 android:id="@+id/tvUpdateVersion"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_purple"
+                android:background="@drawable/bg_version_pill_target"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="4dp"
                 android:textColor="@android:color/white"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                tools:text="v1.1.0"/>
+                tools:text="v1.1.33"/>
         </LinearLayout>
 
         <!-- Changelog Container (Card-in-card style) -->
@@ -121,8 +122,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/bg_shimmer_rect"
-            android:backgroundTint="@color/cm_background"
+            android:background="@drawable/bg_changelog_card"
             android:padding="16dp"
             android:layout_marginBottom="20dp">
 
@@ -131,17 +131,18 @@
                 android:layout_height="wrap_content"
                 android:text="WHAT'S NEW"
                 android:textColor="@color/cm_primary"
-                android:textSize="10sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.1"
+                android:letterSpacing="0.08"
                 android:layout_marginBottom="8dp"/>
 
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/nsvChangelog"
                 android:layout_width="match_parent"
-                android:layout_height="140dp"
-                android:fadeScrollbars="false"
-                android:scrollbars="vertical">
+                android:layout_height="wrap_content"
+                android:fadeScrollbars="true"
+                android:scrollbars="vertical"
+                android:overScrollMode="never">
 
                 <TextView
                     android:id="@+id/tvUpdateChangelog"
@@ -149,8 +150,8 @@
                     android:layout_height="wrap_content"
                     android:textColor="@color/cm_text_primary"
                     android:textSize="13sp"
-                    android:lineSpacingMultiplier="1.25"
-                    tools:text="• Added interactive bus schedules\n• UI design updates\n• Bug fixes"/>
+                    android:lineSpacingExtra="4dp"
+                    tools:text="• Added interactive bus schedules\n\n• UI design updates\n\n• Bug fixes"/>
             </androidx.core.widget.NestedScrollView>
         </LinearLayout>
 
@@ -184,36 +185,39 @@
                 android:gravity="end"/>
         </LinearLayout>
 
-        <!-- Action Buttons Section (Equal split layout) -->
+        <!-- Action Buttons Section -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center">
 
             <Button
                 android:id="@+id/btnUpdateLater"
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_weight="0.8"
                 android:background="@drawable/bg_update_btn_outline"
                 android:text="Later"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:textAllCaps="false"
-                android:layout_marginEnd="12dp"/>
+                android:layout_marginEnd="10dp"/>
 
             <Button
                 android:id="@+id/btnUpdateNow"
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
                 android:background="@drawable/bg_gradient_button"
                 android:text="Update Now"
                 android:textColor="@color/cm_on_primary"
-                android:textSize="14sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:paddingHorizontal="10dp"
                 android:textAllCaps="false"/>
         </LinearLayout>
 

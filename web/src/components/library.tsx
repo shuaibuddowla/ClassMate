@@ -80,6 +80,7 @@ interface StudentAttendanceSummary {
 export function Library({ ctx }: { ctx: Context }) {
   const [type, setType] = useState("theory"),
     [search, setSearch] = useState(""),
+    [searchOpen, setSearchOpen] = useState(false),
     [course, setCourse] = useState(""),
     [upload, setUpload] = useState(false),
     [allFiles, setAllFiles] = useState(false),
@@ -277,15 +278,26 @@ export function Library({ ctx }: { ctx: Context }) {
             {entries.length === 1 ? "file" : "files"} shown
           </p>
         </div>
-        {(permissions.data?.general ||
-          Object.values(permissions.data?.courses || {}).some(Boolean)) && (
-          <button className="primary" onClick={() => setUpload(true)}>
-            <Plus size={18} />
-            Add file
+        <div className="library-heading-actions">
+          <button
+            type="button"
+            className="icon library-search-toggle"
+            aria-label="Search courses and files"
+            aria-expanded={searchOpen}
+            onClick={() => setSearchOpen(!searchOpen)}
+          >
+            <Search size={20} />
           </button>
-        )}
+          {(permissions.data?.general ||
+            Object.values(permissions.data?.courses || {}).some(Boolean)) && (
+            <button className="primary" onClick={() => setUpload(true)}>
+              <Plus size={18} />
+              <span>Add file</span>
+            </button>
+          )}
+        </div>
       </div>
-      <label className="search">
+      <label className={`search library-search ${searchOpen || search ? "open" : ""}`}>
         <Search size={18} />
         <input
           value={search}

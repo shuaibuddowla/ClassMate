@@ -133,6 +133,16 @@ try {
     $assetName = "classmate-$versionName.apk"
     $versionedApk = Join-Path $tempDir $assetName
     Copy-Item -LiteralPath $apk -Destination $versionedApk
+    $cleanNotes = @()
+    foreach ($note in $ReleaseNotes) {
+        if (-not $note) { continue }
+        $lines = $note -split "[\r\n]+"
+        foreach ($l in $lines) {
+            $trimmed = $l.Trim()
+            if ($trimmed) { $cleanNotes += $trimmed }
+        }
+    }
+    if ($cleanNotes.Count -gt 0) { $ReleaseNotes = $cleanNotes }
     $metadata = [ordered]@{
         versionCode = $versionCode
         versionName = $versionName

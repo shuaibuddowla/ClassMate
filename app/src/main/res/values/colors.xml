@@ -140,4 +140,10 @@
     <color name="colorAccent">#D97706</color>
     <color name="cm_search_highlight">#FFE08A</color>
     <color name="cm_search_highlight_text">#302400</color>
+    <color name="cm_version_pill_installed_bg">#F1F5F9</color>
+    <color name="cm_version_pill_installed_border">#CBD5E1</color>
+    <color name="cm_version_pill_installed_text">#475569</color>
+    <color name="cm_version_card_bg">#F8FAFC</color>
+    <color name="cm_changelog_bg">#F8FAFC</color>
+    <color name="cm_changelog_border">#E2E8F0</color>
 </resources>

@@ -121,12 +121,34 @@ class UpdateActionActivity : AppCompatActivity() {
             }
         }
 
-        val notes = if (metadata.releaseNotes.isNotEmpty()) {
-            metadata.releaseNotes.joinToString("\n• ", prefix = "• ")
+        val cleanNotes = metadata.releaseNotes
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.startsWith("#") || it.contains("what's new", ignoreCase = true) }
+            .map { line ->
+                line.removePrefix("- ")
+                    .removePrefix("* ")
+                    .removePrefix("• ")
+                    .replace(Regex("""^\d+\.\s*"""), "")
+                    .replace(Regex("""\*\*(.*?)\*\*"""), "$1")
+                    .trim()
+            }
+            .filter { it.isNotBlank() }
+
+        val notes = if (cleanNotes.isNotEmpty()) {
+            cleanNotes.joinToString("\n\n") { "•  $it" }
         } else {
-            "• Stability and performance improvements."
+            "•  Stability and performance improvements."
         }
         binding.tvUpdateChangelog.text = notes
+
+        binding.nsvChangelog.post {
+            val maxPx = (150 * resources.displayMetrics.density).toInt()
+            if (binding.nsvChangelog.height > maxPx) {
+                binding.nsvChangelog.layoutParams.height = maxPx
+                binding.nsvChangelog.requestLayout()
+            }
+        }
 
         val repository = UpdateRepository(this)
         val alreadyDownloaded = repository.hasDownloaded(metadata)

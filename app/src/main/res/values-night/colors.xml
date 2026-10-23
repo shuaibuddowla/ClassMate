@@ -124,4 +124,10 @@
     <color name="colorAccent">#FBBF24</color>
     <color name="cm_search_highlight">#FFE08A</color>
     <color name="cm_search_highlight_text">#302400</color>
+    <color name="cm_version_pill_installed_bg">#1E2025</color>
+    <color name="cm_version_pill_installed_border">#2E323B</color>
+    <color name="cm_version_pill_installed_text">#94A3B8</color>
+    <color name="cm_version_card_bg">#16171B</color>
+    <color name="cm_changelog_bg">#1A1B20</color>
+    <color name="cm_changelog_border">#272930</color>
 </resources>
