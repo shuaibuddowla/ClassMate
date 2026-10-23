@@ -19,6 +19,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Check,
   X,
   Sparkles,
@@ -107,7 +108,8 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   // Course Attendance History & Matrix
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
-  const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
+  const [selectedCourseRoster, setSelectedCourseRoster] = useState<CourseItem | null>(null);
+  const [matrixSearch, setMatrixSearch] = useState("");
   const [matrixData, setMatrixData] = useState<MatrixData | null>(null);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [exportingCourseId, setExportingCourseId] = useState<string | null>(null);
@@ -269,8 +271,8 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
       if (err) throw err;
       setActiveSession(null);
       fetchCourses();
-      if (expandedCourseId) {
-        fetchMatrix(expandedCourseId);
+      if (selectedCourseRoster) {
+        fetchMatrix(selectedCourseRoster.semester_course_id);
       }
     } catch (e: any) {
       console.error("Failed to close session:", e);
@@ -326,15 +328,12 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     }
   };
 
-  // Handle Course Tile Click
-  const handleToggleCourse = (courseId: string) => {
-    if (expandedCourseId === courseId) {
-      setExpandedCourseId(null);
-      setMatrixData(null);
-    } else {
-      setExpandedCourseId(courseId);
-      fetchMatrix(courseId);
-    }
+  // Open dedicated Course Attendance Roster View
+  const handleOpenCourseRoster = (course: CourseItem) => {
+    setSelectedCourseRoster(course);
+    setMatrixSearch("");
+    setMatrixData(null);
+    fetchMatrix(course.semester_course_id);
   };
 
   // Handle Excel Export
@@ -372,6 +371,17 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   );
 
   // Filtered Roster for Directory Table
+  const filteredMatrixStudents = useMemo(() => {
+    if (!matrixData?.students) return [];
+    if (!matrixSearch.trim()) return matrixData.students;
+    const q = matrixSearch.toLowerCase().trim();
+    return matrixData.students.filter(
+      (s) =>
+        s.roll.toLowerCase().includes(q) ||
+        s.full_name.toLowerCase().includes(q)
+    );
+  }, [matrixData, matrixSearch]);
+
   const filteredRoster = useMemo(() => {
     return students.filter((s) => {
       if (cardFilter === "registered" && !s.rfid_card_uid) return false;
@@ -703,74 +713,552 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
 
       {/* 4. SUB-VIEW A: COURSE ATTENDANCE RECORDS */}
       {activeView === "courses" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text)" }}>
-                Active Semester Courses
-              </h2>
-              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>
-                Click &quot;View Day Roster&quot; on any course to view day-wise matrix or export full data to Excel.
-              </p>
+        selectedCourseRoster ? (
+          /* DEDICATED COURSE ATTENDANCE ROSTER SUB-VIEW (No endless scrolling) */
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Top Back Navigation Bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCourseRoster(null);
+                  setMatrixData(null);
+                  setMatrixSearch("");
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Back to All Courses</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fetchMatrix(selectedCourseRoster.semester_course_id)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                }}
+              >
+                <RefreshCw size={13} className={matrixLoading ? "spin" : ""} /> Refresh
+              </button>
             </div>
-            <button
-              onClick={fetchCourses}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text)",
-                fontSize: 12.5,
-                cursor: "pointer",
-              }}
-            >
-              <RefreshCw size={13} className={coursesLoading ? "spin" : ""} /> Refresh
-            </button>
-          </div>
 
-          {coursesLoading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-              <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px" }} />
-              <p style={{ fontSize: 13 }}>Loading course records…</p>
-            </div>
-          ) : courses.length === 0 ? (
+            {/* Course Summary Banner */}
             <div
               className="card"
-              style={{ padding: 32, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}
+              style={{
+                borderRadius: 14,
+                padding: "16px 20px",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+              }}
             >
-              <BookOpen size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
-              <p style={{ fontSize: 14, margin: 0 }}>No active courses found for this batch.</p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {courses.map((c) => {
-                const isExpanded = expandedCourseId === c.semester_course_id;
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "0.03em",
+                      padding: "3px 10px",
+                      borderRadius: 6,
+                      background: "rgba(59, 130, 246, 0.12)",
+                      color: "var(--primary)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {selectedCourseRoster.course_code}
+                  </span>
+                  <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                    · {selectedCourseRoster.teacher_name}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>
+                  {selectedCourseRoster.enrolled_students} Enrolled
+                </span>
+              </div>
 
-                return (
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  margin: "0 0 12px",
+                  color: "var(--text)",
+                  lineHeight: 1.3,
+                }}
+              >
+                {selectedCourseRoster.course_title}
+              </h2>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      background: "var(--soft)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                    }}
+                  >
+                    <Calendar size={13} style={{ color: "var(--primary)" }} />
+                    <span>{selectedCourseRoster.total_sessions} Classes Held</span>
+                  </div>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      background: "rgba(16, 185, 129, 0.1)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#10b981",
+                    }}
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>{selectedCourseRoster.average_percentage}% Avg Attendance</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => handleExport(e, selectedCourseRoster.semester_course_id)}
+                  disabled={exportingCourseId === selectedCourseRoster.semester_course_id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#10b981",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                  title="Download full attendance matrix (.xlsx)"
+                >
+                  <FileSpreadsheet
+                    size={14}
+                    className={exportingCourseId === selectedCourseRoster.semester_course_id ? "spin" : ""}
+                  />
+                  <span>
+                    {exportingCourseId === selectedCourseRoster.semester_course_id
+                      ? "Exporting..."
+                      : "Download Excel Matrix (.xlsx)"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Matrix Search & Session Count */}
+            {matrixData && matrixData.sessions.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                <div style={{ position: "relative", minWidth: 220, flex: 1, maxWidth: 360 }}>
+                  <Search
+                    size={14}
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--muted)",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search student roll or name..."
+                    value={matrixSearch}
+                    onChange={(e) => setMatrixSearch(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "7px 10px 7px 32px",
+                      borderRadius: 8,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      fontSize: 12.5,
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  {matrixSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setMatrixSearch("")}
+                      style={{
+                        position: "absolute",
+                        right: 8,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                  Showing <strong>{filteredMatrixStudents.length}</strong> of {matrixData.students.length} students · <strong>{matrixData.sessions.length}</strong> sessions
+                </div>
+              </div>
+            )}
+
+            {/* Matrix Table with Capped Scrollable Height */}
+            {matrixLoading ? (
+              <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}>
+                <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px" }} />
+                <p style={{ fontSize: 13, margin: 0 }}>Loading day-wise matrix…</p>
+              </div>
+            ) : !matrixData || matrixData.sessions.length === 0 ? (
+              <div className="card" style={{ padding: 32, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}>
+                <Calendar size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+                <p style={{ fontSize: 13, margin: 0 }}>No attendance sessions have been recorded for this course yet.</p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  maxHeight: "calc(100vh - 360px)",
+                  minHeight: 280,
+                  overflow: "auto",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  background: "var(--card)",
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12.5,
+                    textAlign: "left",
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        background: "var(--soft)",
+                        borderBottom: "1px solid var(--border)",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 10,
+                      }}
+                    >
+                      <th
+                        style={{
+                          padding: "10px 12px",
+                          width: 44,
+                          position: "sticky",
+                          left: 0,
+                          top: 0,
+                          background: "var(--soft)",
+                          zIndex: 12,
+                        }}
+                      >
+                        #
+                      </th>
+                      <th
+                        style={{
+                          padding: "10px 12px",
+                          minWidth: 90,
+                          position: "sticky",
+                          left: 44,
+                          top: 0,
+                          background: "var(--soft)",
+                          zIndex: 12,
+                        }}
+                      >
+                        Roll
+                      </th>
+                      <th
+                        style={{
+                          padding: "10px 12px",
+                          minWidth: 150,
+                          position: "sticky",
+                          left: 134,
+                          top: 0,
+                          background: "var(--soft)",
+                          zIndex: 12,
+                          borderRight: "1px solid var(--border)",
+                        }}
+                      >
+                        Student Name
+                      </th>
+                      {matrixData.sessions.map((s, idx) => (
+                        <th
+                          key={s.session_id}
+                          style={{
+                            padding: "8px 10px",
+                            textAlign: "center",
+                            minWidth: 84,
+                            borderLeft: "1px solid var(--border)",
+                            background: "var(--soft)",
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: 11.5 }}>
+                            Day {idx + 1}
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--muted)" }}>
+                            {s.date}
+                          </div>
+                        </th>
+                      ))}
+                      <th
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "center",
+                          minWidth: 80,
+                          borderLeft: "1px solid var(--border)",
+                          background: "var(--soft)",
+                        }}
+                      >
+                        Present
+                      </th>
+                      <th
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "center",
+                          minWidth: 70,
+                          borderLeft: "1px solid var(--border)",
+                          background: "var(--soft)",
+                        }}
+                      >
+                        %
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMatrixStudents.map((stu, sIdx) => (
+                      <tr
+                        key={stu.student_id}
+                        style={{
+                          borderBottom: "1px solid var(--border)",
+                          background:
+                            sIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "8px 12px",
+                            color: "var(--muted)",
+                            position: "sticky",
+                            left: 0,
+                            background: "var(--card)",
+                            zIndex: 2,
+                          }}
+                        >
+                          {sIdx + 1}
+                        </td>
+                        <td
+                          style={{
+                            padding: "8px 12px",
+                            fontWeight: 600,
+                            position: "sticky",
+                            left: 44,
+                            background: "var(--card)",
+                            zIndex: 2,
+                          }}
+                        >
+                          {stu.roll}
+                        </td>
+                        <td
+                          style={{
+                            padding: "8px 12px",
+                            position: "sticky",
+                            left: 134,
+                            background: "var(--card)",
+                            zIndex: 2,
+                            borderRight: "1px solid var(--border)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {stu.full_name}
+                        </td>
+                        {matrixData.sessions.map((sess) => {
+                          const isPresent =
+                            stu.records?.[sess.session_id] === "present";
+                          return (
+                            <td
+                              key={sess.session_id}
+                              style={{
+                                padding: "6px 8px",
+                                textAlign: "center",
+                                borderLeft: "1px solid var(--border)",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: 24,
+                                  height: 24,
+                                  lineHeight: "24px",
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  background: isPresent
+                                    ? "rgba(16, 185, 129, 0.15)"
+                                    : "var(--soft)",
+                                  color: isPresent ? "#10b981" : "var(--muted)",
+                                }}
+                              >
+                                {isPresent ? "1" : "0"}
+                              </span>
+                            </td>
+                          );
+                        })}
+                        <td
+                          style={{
+                            padding: "8px 12px",
+                            textAlign: "center",
+                            fontWeight: 700,
+                            borderLeft: "1px solid var(--border)",
+                          }}
+                        >
+                          {stu.present_count}/{matrixData.sessions.length}
+                        </td>
+                        <td
+                          style={{
+                            padding: "8px 12px",
+                            textAlign: "center",
+                            fontWeight: 700,
+                            borderLeft: "1px solid var(--border)",
+                            color: stu.percentage >= 75 ? "#10b981" : "#ef4444",
+                          }}
+                        >
+                          {stu.percentage}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* COURSE LIST VIEW (Clean, compact cards without inline matrix expansion) */
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--text)" }}>
+                  Courses Attendance Directory
+                </h3>
+                <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
+                  Select a course to view detailed session rosters, or export full semester records to Excel.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchCourses}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                }}
+              >
+                <RefreshCw size={13} className={coursesLoading ? "spin" : ""} /> Refresh
+              </button>
+            </div>
+
+            {coursesLoading ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px" }} />
+                <p style={{ fontSize: 13 }}>Loading course records…</p>
+              </div>
+            ) : courses.length === 0 ? (
+              <div
+                className="card"
+                style={{ padding: 32, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}
+              >
+                <BookOpen size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+                <p style={{ fontSize: 14, margin: 0 }}>No active courses found for this batch.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {courses.map((c) => (
                   <div
                     key={c.semester_course_id}
                     className="card"
                     style={{
                       borderRadius: 14,
                       overflow: "hidden",
-                      border: isExpanded ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+                      border: "1px solid var(--border)",
                       background: "var(--card)",
                       transition: "all 0.2s ease",
                     }}
                   >
-                    {/* Modern Course Card Content */}
                     <div style={{ padding: "16px 20px" }}>
                       {/* Row 1: Course Code Pill + Teacher Name */}
                       <div
@@ -904,307 +1392,33 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
 
                           <button
                             type="button"
-                            onClick={() => handleToggleCourse(c.semester_course_id)}
+                            onClick={() => handleOpenCourseRoster(c)}
                             style={{
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 6,
-                              padding: "6px 12px",
+                              padding: "6px 14px",
                               borderRadius: 8,
-                              border: isExpanded
-                                ? "1px solid var(--primary)"
-                                : "1px solid var(--border)",
-                              background: isExpanded ? "var(--primary)" : "var(--soft)",
-                              color: isExpanded ? "#fff" : "var(--text)",
+                              border: "1px solid var(--primary)",
+                              background: "var(--primary)",
+                              color: "#fff",
                               fontSize: 12,
                               fontWeight: 600,
                               cursor: "pointer",
                             }}
                           >
-                            <span>{isExpanded ? "Hide Roster" : "View Day Roster"}</span>
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span>View Roster</span>
+                            <ChevronRight size={14} />
                           </button>
                         </div>
                       </div>
                     </div>
-
-                    {/* Expanded Day-Wise Roster Matrix */}
-                    {isExpanded && (
-                      <div
-                        style={{
-                          borderTop: "1px solid var(--border)",
-                          padding: "16px 20px",
-                          background: "var(--surface)",
-                        }}
-                      >
-                        {matrixLoading ? (
-                          <div style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
-                            <RefreshCw size={20} className="spin" style={{ margin: "0 auto 6px" }} />
-                            <p style={{ fontSize: 12.5, margin: 0 }}>Loading day-wise matrix…</p>
-                          </div>
-                        ) : !matrixData || matrixData.sessions.length === 0 ? (
-                          <div
-                            style={{
-                              padding: 16,
-                              textAlign: "center",
-                              color: "var(--muted)",
-                              fontSize: 13,
-                            }}
-                          >
-                            No attendance sessions have been recorded for this course yet.
-                          </div>
-                        ) : (
-                          <div>
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                flexWrap: "wrap",
-                                gap: 10,
-                                marginBottom: 12,
-                              }}
-                            >
-                              <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                                Showing <strong>{matrixData.students.length}</strong> enrolled students
-                                across <strong>{matrixData.sessions.length}</strong> recorded sessions.
-                              </div>
-                              <button
-                                onClick={(e) => handleExport(e, c.semester_course_id)}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  padding: "6px 12px",
-                                  borderRadius: 6,
-                                  border: "none",
-                                  background: "#10b981",
-                                  color: "#fff",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Download size={13} /> Download Excel Matrix (.xlsx)
-                              </button>
-                            </div>
-
-                            {/* Responsive Matrix Table with Sticky Columns */}
-                            <div
-                              style={{
-                                overflowX: "auto",
-                                border: "1px solid var(--border)",
-                                borderRadius: 10,
-                                background: "var(--card)",
-                              }}
-                            >
-                              <table
-                                style={{
-                                  width: "100%",
-                                  borderCollapse: "collapse",
-                                  fontSize: 12.5,
-                                  textAlign: "left",
-                                }}
-                              >
-                                <thead>
-                                  <tr
-                                    style={{
-                                      background: "var(--soft)",
-                                      borderBottom: "1px solid var(--border)",
-                                    }}
-                                  >
-                                    <th
-                                      style={{
-                                        padding: "10px 12px",
-                                        width: 44,
-                                        position: "sticky",
-                                        left: 0,
-                                        background: "var(--soft)",
-                                        zIndex: 2,
-                                      }}
-                                    >
-                                      #
-                                    </th>
-                                    <th
-                                      style={{
-                                        padding: "10px 12px",
-                                        minWidth: 90,
-                                        position: "sticky",
-                                        left: 44,
-                                        background: "var(--soft)",
-                                        zIndex: 2,
-                                      }}
-                                    >
-                                      Roll
-                                    </th>
-                                    <th
-                                      style={{
-                                        padding: "10px 12px",
-                                        minWidth: 150,
-                                        position: "sticky",
-                                        left: 134,
-                                        background: "var(--soft)",
-                                        zIndex: 2,
-                                        borderRight: "1px solid var(--border)",
-                                      }}
-                                    >
-                                      Student Name
-                                    </th>
-                                    {matrixData.sessions.map((s, idx) => (
-                                      <th
-                                        key={s.session_id}
-                                        style={{
-                                          padding: "8px 10px",
-                                          textAlign: "center",
-                                          minWidth: 84,
-                                          borderLeft: "1px solid var(--border)",
-                                        }}
-                                      >
-                                        <div style={{ fontWeight: 700, fontSize: 11.5 }}>
-                                          Day {idx + 1}
-                                        </div>
-                                        <div style={{ fontSize: 10, color: "var(--muted)" }}>
-                                          {s.date}
-                                        </div>
-                                      </th>
-                                    ))}
-                                    <th
-                                      style={{
-                                        padding: "10px 12px",
-                                        textAlign: "center",
-                                        minWidth: 80,
-                                        borderLeft: "1px solid var(--border)",
-                                      }}
-                                    >
-                                      Present
-                                    </th>
-                                    <th
-                                      style={{
-                                        padding: "10px 12px",
-                                        textAlign: "center",
-                                        minWidth: 70,
-                                        borderLeft: "1px solid var(--border)",
-                                      }}
-                                    >
-                                      %
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {matrixData.students.map((stu, sIdx) => (
-                                    <tr
-                                      key={stu.student_id}
-                                      style={{
-                                        borderBottom: "1px solid var(--border)",
-                                        background:
-                                          sIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
-                                      }}
-                                    >
-                                      <td
-                                        style={{
-                                          padding: "8px 12px",
-                                          color: "var(--muted)",
-                                          position: "sticky",
-                                          left: 0,
-                                          background: "var(--card)",
-                                          zIndex: 1,
-                                        }}
-                                      >
-                                        {sIdx + 1}
-                                      </td>
-                                      <td
-                                        style={{
-                                          padding: "8px 12px",
-                                          fontWeight: 600,
-                                          position: "sticky",
-                                          left: 44,
-                                          background: "var(--card)",
-                                          zIndex: 1,
-                                        }}
-                                      >
-                                        {stu.roll}
-                                      </td>
-                                      <td
-                                        style={{
-                                          padding: "8px 12px",
-                                          position: "sticky",
-                                          left: 134,
-                                          background: "var(--card)",
-                                          zIndex: 1,
-                                          borderRight: "1px solid var(--border)",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {stu.full_name}
-                                      </td>
-                                      {matrixData.sessions.map((sess) => {
-                                        const isPresent =
-                                          stu.records?.[sess.session_id] === "present";
-                                        return (
-                                          <td
-                                            key={sess.session_id}
-                                            style={{
-                                              padding: "6px 8px",
-                                              textAlign: "center",
-                                              borderLeft: "1px solid var(--border)",
-                                            }}
-                                          >
-                                            <span
-                                              style={{
-                                                display: "inline-block",
-                                                width: 24,
-                                                height: 24,
-                                                lineHeight: "24px",
-                                                borderRadius: 6,
-                                                fontSize: 12,
-                                                fontWeight: 700,
-                                                background: isPresent
-                                                  ? "rgba(16, 185, 129, 0.15)"
-                                                  : "var(--soft)",
-                                                color: isPresent ? "#10b981" : "var(--muted)",
-                                              }}
-                                            >
-                                              {isPresent ? "1" : "0"}
-                                            </span>
-                                          </td>
-                                        );
-                                      })}
-                                      <td
-                                        style={{
-                                          padding: "8px 12px",
-                                          textAlign: "center",
-                                          fontWeight: 700,
-                                          borderLeft: "1px solid var(--border)",
-                                        }}
-                                      >
-                                        {stu.present_count}/{matrixData.sessions.length}
-                                      </td>
-                                      <td
-                                        style={{
-                                          padding: "8px 12px",
-                                          textAlign: "center",
-                                          fontWeight: 700,
-                                          borderLeft: "1px solid var(--border)",
-                                          color: stu.percentage >= 75 ? "#10b981" : "#ef4444",
-                                        }}
-                                      >
-                                        {stu.percentage}%
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* 5. SUB-VIEW B: REGISTER STUDENT RFID CARDS */}
@@ -1579,6 +1793,8 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
             {/* Roster Table */}
             <div
               style={{
+                maxHeight: 520,
+                overflowY: "auto",
                 overflowX: "auto",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
