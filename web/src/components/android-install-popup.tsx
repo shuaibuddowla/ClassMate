@@ -24,6 +24,24 @@ export function AndroidInstallPopup() {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState<"prompt" | "guide">("prompt");
   const [downloading, setDownloading] = useState(false);
+  const [versionName, setVersionName] = useState<string | null>(null);
+  const [directApkUrl, setDirectApkUrl] = useState<string | null>(null);
+
+  // Fetch the latest release version metadata dynamically
+  useEffect(() => {
+    let active = true;
+    fetch(`/download/android?format=json&t=${Date.now()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.versionName) setVersionName(data.versionName);
+        if (data.apkUrl) setDirectApkUrl(data.apkUrl);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Listen for manual trigger from Settings / Profile
@@ -71,14 +89,16 @@ export function AndroidInstallPopup() {
 
   const triggerDownload = () => {
     setDownloading(true);
+    // Prefer verified direct APK URL from latest release, fallback to cache-busted endpoint
+    const targetUrl = directApkUrl || `/download/android?t=${Date.now()}`;
     try {
       const iframe = document.createElement("iframe");
       iframe.style.display = "none";
-      iframe.src = "/download/android";
+      iframe.src = targetUrl;
       document.body.appendChild(iframe);
       setTimeout(() => iframe.remove(), 20000);
     } catch {
-      window.location.href = "/download/android";
+      window.location.href = targetUrl;
     }
 
     setTimeout(() => {
@@ -137,12 +157,14 @@ export function AndroidInstallPopup() {
                   className="android-popup-logo-img"
                 />
               </div>
-              <span className="android-popup-pill">OFFICIAL ANDROID APP</span>
+              <span className="android-popup-pill">
+                OFFICIAL ANDROID APP{versionName ? ` · v${versionName}` : ""}
+              </span>
             </div>
 
             <h2 className="android-popup-title">Get ClassMate for Android</h2>
             <p className="android-popup-desc">
-              Experience faster performance, reliable push notifications, and offline timetables with the native app.
+              Experience faster performance, reliable push notifications, and offline timetables with the latest native release.
             </p>
 
             <div className="android-popup-features">
@@ -175,7 +197,9 @@ export function AndroidInstallPopup() {
                 ) : (
                   <>
                     <Download size={18} />
-                    <span>Download &amp; Install Android App</span>
+                    <span>
+                      Download &amp; Install Android App{versionName ? ` (v${versionName})` : ""}
+                    </span>
                   </>
                 )}
               </button>
@@ -206,10 +230,14 @@ export function AndroidInstallPopup() {
               <div className="android-popup-icon-glow success">
                 <Smartphone size={32} style={{ color: "var(--primary)" }} />
               </div>
-              <span className="android-popup-pill success">DOWNLOAD INITIATED</span>
+              <span className="android-popup-pill success">
+                {versionName ? `v${versionName} DOWNLOADED` : "DOWNLOAD INITIATED"}
+              </span>
             </div>
 
-            <h2 className="android-popup-title">Installing ClassMate</h2>
+            <h2 className="android-popup-title">
+              Installing ClassMate{versionName ? ` v${versionName}` : ""}
+            </h2>
             <p className="android-popup-desc">
               Follow these two simple steps to complete your setup:
             </p>
