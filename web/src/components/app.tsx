@@ -522,10 +522,10 @@ function SessionApp() {
           {mobileLandingStep === "overview" ? (
             <div className="mobile-landing-step mobile-landing-overview">
               <div className="mobile-overview-scroll">
-                {/* Brand Header */}
-                <div className="mobile-overview-brand">
-                  <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate" className="mobile-brand-icon" />
-                  <span className="mobile-brand-title">ClassMate</span>
+                {/* Brand Header with 3D Emblem and ClassMate typography */}
+                <div className="mobile-overview-brand-header">
+                  <img src="/logo.png" alt="ClassMate emblem" className="mobile-overview-brand-emblem" />
+                  <span className="mobile-overview-brand-text">ClassMate</span>
                 </div>
 
                 {/* Eyebrow */}
@@ -541,16 +541,6 @@ function SessionApp() {
                 <p className="mobile-overview-desc">
                   Timetables, learning resources, and campus updates, together in ClassMate.
                 </p>
-
-                {/* 3D Hero Artwork Emblem */}
-                <div className="mobile-overview-hero-stage">
-                  <div className="mobile-hero-disc" />
-                  <img
-                    src="/logo.png"
-                    alt="ClassMate"
-                    className="mobile-hero-emblem"
-                  />
-                </div>
 
                 {/* 4 Feature Capability Cards */}
                 <div className="mobile-feature-grid">
@@ -588,10 +578,8 @@ function SessionApp() {
                     <p>Batch attendance records, funds, and announcements.</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Sticky Bottom Action Bar */}
-              <div className="mobile-overview-sticky-bar">
+                {/* Continue to Sign In Button (Prominent, solid blue, fully visible above bottom bar) */}
                 <button
                   type="button"
                   className="mobile-overview-continue-btn"
@@ -650,7 +638,8 @@ function SessionApp() {
 
                 {/* Primary Google Button */}
                 <button
-                  className="primary google-signin-button"
+                  type="button"
+                  className="mobile-google-btn"
                   disabled={!configured()}
                   onClick={handleGoogleSignIn}
                 >
