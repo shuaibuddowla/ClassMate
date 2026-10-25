@@ -20,7 +20,6 @@ import {
   Copy,
   Check,
   Languages,
-  Sparkles,
   LoaderCircle,
   ArrowLeft,
   X,
@@ -35,7 +34,6 @@ import { dhakaToday, formatStamp, parseDate, dateKey } from "@/lib/calendar";
 import type { Context } from "./app";
 import { Avatar, Confirm, Empty, ErrorBox, Form, Modal, Skeleton } from "./ui";
 import { Comments } from "./notice-comments";
-import { AICompose } from "./classmate-ai";
 type Page = {
   entries: Row[];
   details: Row;
@@ -561,9 +559,6 @@ function NoticeComposer({
   allowed?: Row;
   done: (created?: Row) => Promise<void>;
 }) {
-  const aiAllowed =
-    ctx.owner || (ctx.profile.is_cr && ctx.profile.cr_batch_id === ctx.batch);
-  const [tabMode, setTabMode] = useState<"manual" | "ai">("manual");
   const [type, setType] = useState<"general" | "cancelled" | "vacation">("general");
 
   // Image attachment state matching Android PostNoticeActivity
@@ -602,52 +597,29 @@ function NoticeComposer({
 
   return (
     <>
-      <div className="segment notice-compose-tabs" style={{ marginBottom: "14px" }}>
+      <div className="notice-compose-subtypes">
         <button
           type="button"
-          className={tabMode === "manual" ? "selected" : ""}
-          onClick={() => setTabMode("manual")}
+          className={type === "general" ? "selected" : ""}
+          onClick={() => setType("general")}
         >
-          <FileText size={16} /> Manual
+          General Notice
         </button>
-        {aiAllowed && (
-          <button
-            type="button"
-            className={tabMode === "ai" ? "selected" : ""}
-            onClick={() => setTabMode("ai")}
-          >
-            <Sparkles size={16} /> ✨ AI compose
-          </button>
-        )}
+        <button
+          type="button"
+          className={type === "cancelled" ? "selected" : ""}
+          onClick={() => setType("cancelled")}
+        >
+          Class Cancellation
+        </button>
+        <button
+          type="button"
+          className={type === "vacation" ? "selected" : ""}
+          onClick={() => setType("vacation")}
+        >
+          <Palmtree size={14} style={{ display: "inline", marginRight: "4px" }} /> Vacation
+        </button>
       </div>
-
-      {tabMode === "ai" ? (
-        <AICompose ctx={ctx} done={done} />
-      ) : (
-        <>
-          <div className="segment notice-compose-subtypes" style={{ display: "flex", gap: "6px", marginBottom: "16px" }}>
-            <button
-              type="button"
-              className={type === "general" ? "selected" : ""}
-              onClick={() => setType("general")}
-            >
-              Normal notice
-            </button>
-            <button
-              type="button"
-              className={type === "cancelled" ? "selected" : ""}
-              onClick={() => setType("cancelled")}
-            >
-              Class cancellation
-            </button>
-            <button
-              type="button"
-              className={type === "vacation" ? "selected" : ""}
-              onClick={() => setType("vacation")}
-            >
-              <Palmtree size={14} style={{ display: "inline", marginRight: "4px" }} /> Vacation
-            </button>
-          </div>
 
           <Form
             key={type}
@@ -927,8 +899,6 @@ function NoticeComposer({
               await done(created || undefined);
             }}
           />
-        </>
-      )}
     </>
   );
 }
@@ -972,6 +942,153 @@ function truncateSafely(str: string, maxLen: number): string {
     cutoff = boundary;
   }
   return str.slice(0, cutoff).trimEnd();
+}
+
+
+export function NoticeImageLightbox({
+  src,
+  fileName,
+  onClose,
+}: {
+  src: string;
+  fileName?: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="notice-lightbox-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 99999,
+        background: "rgba(0, 0, 0, 0.94)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "zoom-out",
+      }}
+    >
+      <div
+        className="notice-lightbox-topbar"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "64px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 20px",
+          background: "linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent)",
+          zIndex: 2,
+          pointerEvents: "auto",
+          cursor: "default",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span
+          style={{
+            color: "#ffffff",
+            fontSize: "14px",
+            fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: "70vw",
+          }}
+          title={fileName}
+        >
+          {fileName || "Notice Attachment"}
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open original"
+            style={{
+              color: "#ffffff",
+              background: "rgba(255, 255, 255, 0.16)",
+              border: "none",
+              borderRadius: "50%",
+              width: "38px",
+              height: "38px",
+              display: "grid",
+              placeItems: "center",
+              textDecoration: "none",
+            }}
+          >
+            <ExternalLink size={18} />
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close (Esc)"
+            style={{
+              color: "#ffffff",
+              background: "rgba(255, 255, 255, 0.16)",
+              border: "none",
+              borderRadius: "50%",
+              width: "38px",
+              height: "38px",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "68px 16px 24px",
+          boxSizing: "border-box",
+        }}
+      >
+        <img
+          src={src}
+          alt={fileName || "Notice attachment"}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: "96vw",
+            maxHeight: "88vh",
+            objectFit: "contain",
+            borderRadius: "6px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+            userSelect: "none",
+            cursor: "default",
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function NoticeCard({
@@ -1234,15 +1351,11 @@ function NoticeCard({
           </div>
         )}
         {zoomAttachment && (
-          <Modal title={attachment?.fileName || "Attachment preview"} close={() => setZoomAttachment(null)}>
-            <div style={{ display: "flex", justifyContent: "center", padding: "10px" }}>
-              <img
-                src={zoomAttachment}
-                alt="Enlarged attachment"
-                style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: "10px" }}
-              />
-            </div>
-          </Modal>
+          <NoticeImageLightbox
+            src={zoomAttachment}
+            fileName={attachment?.fileName}
+            onClose={() => setZoomAttachment(null)}
+          />
         )}
         <div className="timestamp">
           <CalendarClock size={14} />
@@ -1726,6 +1839,7 @@ export function NoticeDetailModal({
   close: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [zoomLightbox, setZoomLightbox] = useState(false);
 
   const copyNotice = () => {
     const text = `${notice.title || ""}\n\n${notice.body || ""}`.trim();
@@ -1783,7 +1897,9 @@ export function NoticeDetailModal({
               <img
                 src={attachment.url}
                 alt={attachment.fileName || "Notice attachment"}
-                style={{ width: "100%", maxHeight: "450px", objectFit: "contain", background: "black" }}
+                style={{ width: "100%", maxHeight: "450px", objectFit: "contain", background: "black", cursor: "pointer" }}
+                onClick={() => setZoomLightbox(true)}
+                title="Click to view full screen"
               />
               <div
                 style={{
@@ -1883,6 +1999,13 @@ export function NoticeDetailModal({
           </button>
         </div>
       </div>
+      {zoomLightbox && attachment?.url && (
+        <NoticeImageLightbox
+          src={attachment.url}
+          fileName={attachment.fileName}
+          onClose={() => setZoomLightbox(false)}
+        />
+      )}
     </Modal>
   );
 }

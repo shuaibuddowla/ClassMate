@@ -5161,6 +5161,467 @@ dialog:has(.friend-profile-content) {
 }
 
 /* ==========================================================================
+   Mobile Landing Page (Two-Step Experience: Overview & Sign-In)
+   Active on mobile/tablet devices (< 1024px)
+   ========================================================================== */
+
+.mobile-landing-step {
+  animation: landingStepFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes landingStepFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-landing-overview {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.mobile-overview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: max(16px, env(safe-area-inset-top, 16px)) 20px calc(88px + env(safe-area-inset-bottom, 16px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-overview-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--blue) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--blue) 22%, var(--border));
+  margin-bottom: 12px;
+}
+
+.mobile-brand-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.mobile-brand-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: -0.01em;
+}
+
+.mobile-overview-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+.mobile-overview-headline {
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+.mobile-headline-accent {
+  color: var(--blue);
+}
+
+.mobile-overview-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 auto 16px;
+  max-width: 330px;
+}
+
+.mobile-overview-hero-stage {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  margin: 4px auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-hero-disc {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--blue) 14%, transparent) 0%, transparent 70%);
+  border: 1px dashed color-mix(in srgb, var(--blue) 28%, transparent);
+}
+
+.mobile-hero-emblem {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  position: relative;
+  z-index: 2;
+  animation: emblemPulseGlow 3.6s ease-in-out infinite;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mobile-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  margin-top: 4px;
+}
+
+@media (max-width: 340px) {
+  .mobile-feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mobile-feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+}
+
+.mobile-feature-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mobile-feature-head svg {
+  flex-shrink: 0;
+}
+
+.mobile-feature-card p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.mobile-feature-head.text-blue {
+  color: var(--blue);
+}
+
+.mobile-feature-head.text-amber {
+  color: #d97706;
+}
+
+:root[data-theme="dark"] .mobile-feature-head.text-amber {
+  color: #f59e0b;
+}
+
+.mobile-feature-head.text-emerald {
+  color: var(--green);
+}
+
+.mobile-feature-head.text-purple {
+  color: #7c3aed;
+}
+
+:root[data-theme="dark"] .mobile-feature-head.text-purple {
+  color: #a78bfa;
+}
+
+.mobile-overview-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px max(14px, env(safe-area-inset-bottom, 14px));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.mobile-overview-continue-btn {
+  width: 100%;
+  max-width: 440px;
+  height: 50px;
+  border-radius: 16px;
+  background: var(--blue);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--blue) 35%, transparent);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.mobile-overview-continue-btn:active {
+  transform: scale(0.98);
+}
+
+.mobile-landing-signin {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--bg);
+  padding: max(16px, env(safe-area-inset-top, 16px)) 16px max(24px, env(safe-area-inset-bottom, 24px));
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.mobile-signin-modal {
+  width: 100%;
+  max-width: 390px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 20px 20px 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  margin: auto;
+  animation: modalPop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme="dark"] .mobile-signin-modal {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.mobile-signin-header-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.mobile-signin-back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.mobile-signin-back-pill:hover,
+.mobile-signin-back-pill:active {
+  background: color-mix(in srgb, var(--blue) 12%, var(--soft));
+  transform: translateX(-2px);
+}
+
+.mobile-signin-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.mobile-signin-hero {
+  margin-bottom: 14px;
+}
+
+.mobile-signin-hero .signin-emblem {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  margin: 6px auto 8px;
+  border-radius: 16px;
+  display: block;
+  animation: emblemPulseGlow 3.6s ease-in-out infinite;
+}
+
+.mobile-signin-hero h2 {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.mobile-signin-hero p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 auto;
+  max-width: 280px;
+}
+
+.mobile-signin-modal .signin-role-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--soft, #f1f5f9);
+  padding: 4px;
+  border-radius: 999px;
+  margin: 14px auto 14px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.mobile-signin-modal .role-tab {
+  padding: 7px 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-signin-modal .role-tab:hover {
+  color: var(--text, #0f172a);
+}
+
+.mobile-signin-modal .role-tab.active {
+  background: var(--surface, #ffffff);
+  color: var(--blue, #2563eb);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] .mobile-signin-modal .signin-role-toggle {
+  background: var(--soft);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .mobile-signin-modal .role-tab.active {
+  background: var(--surface);
+  color: #60a5fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-signin-modal .google-signin-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  min-height: 48px;
+  margin: 0 auto 10px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+  background: var(--blue);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--blue) 30%, transparent);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.mobile-signin-modal .google-signin-button:active {
+  transform: scale(0.98);
+}
+
+.mobile-signin-modal .role-requirement-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--soft);
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin: 0 auto 14px;
+}
+
+.mobile-signin-modal .install-web-app {
+  margin: 0 auto 12px;
+}
+
+.mobile-signin-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0 12px;
+}
+
+.mobile-signin-modal .signin-public-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.mobile-signin-modal .signin-public-links a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.mobile-signin-modal .signin-public-links a:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+:root[data-theme="dark"] .mobile-feature-card {
+  box-shadow: none;
+}
+
+/* ==========================================================================
    Desktop Landing Page (Reference Visual Source of Truth)
    Active exclusively on screens >= 1024px.
    Mobile screens (< 1024px) remain 100% untouched.
@@ -10271,4 +10732,77 @@ dialog:has(.notice-detail-modal-shell) > header {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+
+/* Notice Lightbox Animation */
+@keyframes noticeLightboxFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+.notice-lightbox-overlay {
+  animation: noticeLightboxFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Post Notice - 3 Subtypes Grid (General Notice, Class Cancellation, Vacation) */
+.notice-compose-subtypes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: var(--soft);
+  padding: 5px;
+  border-radius: 14px;
+  margin: 0 0 16px 0;
+  border: 1px solid var(--border);
+}
+
+.notice-compose-subtypes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 6px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.notice-compose-subtypes button:hover {
+  color: var(--text);
+}
+
+.notice-compose-subtypes button.selected {
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 600px) {
+  .notice-compose-subtypes {
+    padding: 3px;
+    gap: 3px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  .notice-compose-subtypes button {
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 7px 2px;
+    min-height: 38px;
+    white-space: normal;
+    word-break: normal;
+    letter-spacing: -0.2px;
+  }
+  .notice-compose-subtypes button svg {
+    width: 13px;
+    height: 13px;
+  }
 }

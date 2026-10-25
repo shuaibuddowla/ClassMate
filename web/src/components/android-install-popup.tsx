@@ -68,17 +68,23 @@ export function AndroidInstallPopup() {
           };
         }
 
-        // Slight entrance delay for smooth loading
+        // Smooth entrance delay after user enters app ecosystem
         const timer = setTimeout(() => {
           setVisible(true);
-        }, 700);
+        }, 2400);
 
         return () => {
           clearTimeout(timer);
           window.removeEventListener("classmate:open-android-install", handleManualOpen);
         };
       } catch {
-        setVisible(true);
+        const timer = setTimeout(() => {
+          setVisible(true);
+        }, 2400);
+        return () => {
+          clearTimeout(timer);
+          window.removeEventListener("classmate:open-android-install", handleManualOpen);
+        };
       }
     }
 

@@ -33,6 +33,8 @@ import {
   Lock,
   QrCode,
   Radio,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -153,7 +155,8 @@ function SessionApp() {
     [pushError, setPushError] = useState<unknown>(null),
     [enablingPush, setEnablingPush] = useState(false),
     [theme, setTheme] = useState("light"),
-    [roleMode, setRoleMode] = useState<"student" | "faculty">("student");
+    [roleMode, setRoleMode] = useState<"student" | "faculty">("student"),
+    [mobileLandingStep, setMobileLandingStep] = useState<"overview" | "signin">("overview");
   const qc = useQueryClient();
   const activeUser = useRef<string | null>(null);
   useEffect(() => {
@@ -351,7 +354,6 @@ function SessionApp() {
   if (!user || !profile)
     return (
       <>
-        <AndroidInstallPopup />
         {/* Desktop / Large Tablet Presentation (Visual Source of Truth) */}
         <div className="desktop-landing-root">
           <div className="desktop-bg-atmosphere" aria-hidden="true">
@@ -403,7 +405,7 @@ function SessionApp() {
                 <strong className="desktop-brand-name">ClassMate</strong>
               </div>
 
-              <span className="desktop-eyebrow">CAMPUS COMPANION • CSE, MBSTU</span>
+              <span className="desktop-eyebrow">CAMPUS COMPANION • MBSTU</span>
 
               <h1 className="desktop-headline">
                 <span className="desktop-headline-blue">Never miss</span> a class,
@@ -517,90 +519,181 @@ function SessionApp() {
 
         {/* Mobile Presentation — 100% untouched layout & styles */}
         <div className="landing-mobile-root">
-          <main className="landing">
-            <aside className="signin-story">
-              <span className="eyebrow">CAMPUS COMPANION • CSE, MBSTU</span>
-              <h1>
-                Never miss a class,
-                <br />
-                notice, or slide.
-              </h1>
-              <p>
-                Timetables, learning resources, and campus updates, together in ClassMate.
-              </p>
-              <div className="signin-features">
-                <span>📅 Live Routine</span>
-                <span>📢 Verified Notices</span>
-                <span>📚 Semester Library</span>
-              </div>
-            </aside>
-            <section className="login card">
-              <div className="signin-brand">
-                <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate logo" />
-                <strong>ClassMate</strong>
-              </div>
-              <img className="signin-emblem" src="/logo.png" alt="" />
-              <h2>Sign in to ClassMate</h2>
+          {mobileLandingStep === "overview" ? (
+            <div className="mobile-landing-step mobile-landing-overview">
+              <div className="mobile-overview-scroll">
+                {/* Brand Header */}
+                <div className="mobile-overview-brand">
+                  <img src="/brand/classmate-sidebar-logo.png" alt="ClassMate" className="mobile-brand-icon" />
+                  <span className="mobile-brand-title">ClassMate</span>
+                </div>
 
-              <div className="signin-role-toggle" role="tablist" aria-label="Select your role">
+                {/* Eyebrow */}
+                <span className="mobile-overview-eyebrow">CAMPUS COMPANION • MBSTU</span>
+
+                {/* Headline */}
+                <h1 className="mobile-overview-headline">
+                  <span className="mobile-headline-accent">Never miss</span> a class,<br />
+                  notice, or slide.
+                </h1>
+
+                {/* University-wide Summary Description */}
+                <p className="mobile-overview-desc">
+                  Timetables, learning resources, and campus updates, together in ClassMate.
+                </p>
+
+                {/* 3D Hero Artwork Emblem */}
+                <div className="mobile-overview-hero-stage">
+                  <div className="mobile-hero-disc" />
+                  <img
+                    src="/logo.png"
+                    alt="ClassMate"
+                    className="mobile-hero-emblem"
+                  />
+                </div>
+
+                {/* 4 Feature Capability Cards */}
+                <div className="mobile-feature-grid">
+                  <div className="mobile-feature-card">
+                    <div className="mobile-feature-head text-blue">
+                      <CalendarTileIcon />
+                      <strong>Live Routine</strong>
+                    </div>
+                    <p>Class timetables, university bus schedules &amp; academic calendar.</p>
+                  </div>
+
+                  <div className="mobile-feature-card">
+                    <div className="mobile-feature-head text-amber">
+                      <MegaphoneTileIcon />
+                      <strong>Notices</strong>
+                    </div>
+                    <p>Instant class alerts and batch notices.</p>
+                  </div>
+
+                  <div className="mobile-feature-card">
+                    <div className="mobile-feature-head text-emerald">
+                      <BookTileIcon />
+                      <strong>Resources</strong>
+                    </div>
+                    <p>Course materials, lecture slides &amp; question banks.</p>
+                  </div>
+
+                  <div className="mobile-feature-card">
+                    <div className="mobile-feature-head text-purple">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                      <strong>Batch Community</strong>
+                    </div>
+                    <p>Batch attendance records, funds, and announcements.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sticky Bottom Action Bar */}
+              <div className="mobile-overview-sticky-bar">
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={roleMode === "student"}
-                  className={`role-tab ${roleMode === "student" ? "active" : ""}`}
-                  onClick={() => setRoleMode("student")}
+                  className="mobile-overview-continue-btn"
+                  onClick={() => setMobileLandingStep("signin")}
                 >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={roleMode === "faculty"}
-                  className={`role-tab ${roleMode === "faculty" ? "active" : ""}`}
-                  onClick={() => setRoleMode("faculty")}
-                >
-                  Faculty
+                  <span>Continue to Sign In</span>
+                  <ChevronRight size={18} />
                 </button>
               </div>
+            </div>
+          ) : (
+            <div className="mobile-landing-step mobile-landing-signin">
+              <div className="mobile-signin-modal card">
+                {/* Top Header Row with Back Button */}
+                <div className="mobile-signin-header-row">
+                  <button
+                    type="button"
+                    className="mobile-signin-back-pill"
+                    onClick={() => setMobileLandingStep("overview")}
+                    aria-label="Back to overview"
+                  >
+                    <ArrowLeft size={15} />
+                    <span>Overview</span>
+                  </button>
+                </div>
 
-              <ErrorBox error={error} />
+                {/* Centered Title & Subtitle (No logo per request) */}
+                <div className="mobile-signin-hero">
+                  <h2>Sign in to ClassMate</h2>
+                  <p>Access your department routines, notices, and academic materials.</p>
+                </div>
 
-              <button
-                className="primary google-signin-button"
-                disabled={!configured()}
-                onClick={handleGoogleSignIn}
-              >
-                <GoogleIcon />
-                <span>Continue with Google</span>
-              </button>
+                {/* Role Switcher */}
+                <div className="signin-role-toggle" role="tablist" aria-label="Select your role">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={roleMode === "student"}
+                    className={`role-tab ${roleMode === "student" ? "active" : ""}`}
+                    onClick={() => setRoleMode("student")}
+                  >
+                    Student
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={roleMode === "faculty"}
+                    className={`role-tab ${roleMode === "faculty" ? "active" : ""}`}
+                    onClick={() => setRoleMode("faculty")}
+                  >
+                    Faculty
+                  </button>
+                </div>
 
-              <p className="role-requirement-note">
-                <Lock size={12} aria-hidden="true" />
-                <span>
-                  {roleMode === "student"
-                    ? "Requires @mbstu.ac.bd account"
-                    : "Requires verified mail account"}
-                </span>
-              </p>
+                <ErrorBox error={error} />
 
-              <InstallWebApp />
-              <nav className="signin-public-links" aria-label="About and policies">
-                <a href="/about">About ClassMate</a>
-                <a href="/privacy">Privacy Policy</a>
-                <a href="/terms">Terms of Service</a>
-              </nav>
-              {!configured() && (
-                <p>Server setup is required before sign-in is available.</p>
-              )}
-            </section>
-          </main>
+                {/* Primary Google Button */}
+                <button
+                  className="primary google-signin-button"
+                  disabled={!configured()}
+                  onClick={handleGoogleSignIn}
+                >
+                  <GoogleIcon />
+                  <span>Continue with Google</span>
+                </button>
+
+                {/* Domain Requirement Pill */}
+                <p className="role-requirement-note">
+                  <Lock size={12} aria-hidden="true" />
+                  <span>
+                    {roleMode === "student"
+                      ? "Requires @mbstu.ac.bd account"
+                      : "Requires verified mail account"}
+                  </span>
+                </p>
+
+                {/* Install Web App */}
+                <InstallWebApp />
+
+                <div className="mobile-signin-divider" />
+
+                {/* Three public links */}
+                <nav className="signin-public-links" aria-label="About and policies">
+                  <a href="/about">About ClassMate</a>
+                  <a href="/privacy">Privacy Policy</a>
+                  <a href="/terms">Terms of Service</a>
+                </nav>
+
+                {!configured() && (
+                  <p className="desktop-unconfigured-note">
+                    Server setup is required before sign-in is available.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </>
     );
   if (profile.verification_status !== "active")
     return (
       <>
-        <AndroidInstallPopup />
         <main className="boot">
         <h1>
           {!profile.department_id
