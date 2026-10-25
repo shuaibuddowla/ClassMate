@@ -102,7 +102,7 @@ export function Comments({
       await rpc("save_notice_comment", {
         target_notice: notice.id,
         target_body: text,
-        target_parent: editingComment ? null : (replyingTo?.id || null),
+        target_parent: editingComment ? null : (replyingTo?.parent_id || replyingTo?.id || null),
         target_id: editingComment?.id || null,
         target_request: requestRef.current,
       });

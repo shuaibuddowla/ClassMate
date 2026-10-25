@@ -204,6 +204,14 @@ function getTimetableAnimation(closureTitle?: string | null, isWeekend?: boolean
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function parseTimeToMinutes(t?: string): number {
+  if (!t) return 0;
+  const parts = t.trim().split(":");
+  const h = parseInt(parts[0] || "0", 10);
+  const m = parseInt(parts[1] || "0", 10);
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+
 function dhakaNowTime() {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Dhaka",
@@ -310,7 +318,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
 
   useEffect(() => {
     const channel = supabase()
-      .channel("web:attendance-listener")
+      .channel("web:schedule-listener")
       .on(
         "postgres_changes",
         { event: "*", schema: "classmate", table: "attendance_sessions" },
@@ -320,6 +328,32 @@ export function Schedule({ ctx }: { ctx: Context }) {
         "postgres_changes",
         { event: "*", schema: "classmate", table: "attendance_records" },
         () => sessionCounts.refetch(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "routine_slots" },
+        () => {
+          routine.refetch();
+          details.refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "academic_calendar_events" },
+        () => {
+          calendar.refetch();
+          details.refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "class_changes" },
+        () => details.refetch(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "classmate", table: "bus_schedules" },
+        () => buses.refetch(),
       )
       .subscribe();
 
@@ -458,21 +492,13 @@ export function Schedule({ ctx }: { ctx: Context }) {
     if (mode !== "routine" || date !== dhakaToday() || closed) return false;
     const detail = details.data?.find((d) => d.semester_course_id === s.semester_course_id);
     if (detail?.cancelled) return false;
-    return Boolean(
-      s.start_time &&
-        s.end_time &&
-        s.start_time.slice(0, 5) <= currentTime &&
-        currentTime < s.end_time.slice(0, 5)
-    );
+    const nowMin = parseTimeToMinutes(currentTime);
+    const startMin = parseTimeToMinutes(s.start_time);
+    const endMin = parseTimeToMinutes(s.end_time);
+    return startMin > 0 && endMin > startMin && startMin <= nowMin && nowMin < endMin;
   };
 
-  const sortedEntries =
-    mode === "routine" && date === dhakaToday() && !closed
-      ? [
-          ...entries.filter(isSlotLive),
-          ...entries.filter((s) => !isSlotLive(s)),
-        ]
-      : entries;
+  const sortedEntries = entries;
 
   const showCalendar = true;
   useEffect(() => {
@@ -583,7 +609,49 @@ export function Schedule({ ctx }: { ctx: Context }) {
             date={date}
             setDate={setDate}
             events={events}
+            routineSlots={routine.data || []}
           />
+          {/* Selected Date Class Routine & Events Sync */}
+          <div className="card calendar-selected-day-card">
+            <div className="calendar-selected-day-header">
+              <div>
+                <span className="eyebrow">
+                  {parseDate(date).toLocaleDateString("en", { weekday: "long" }).toUpperCase()} · {date}
+                </span>
+                <h3>
+                  {classesClosed(date, events)
+                    ? "Classes Closed"
+                    : `${(routine.data || []).filter((s) => s.day_of_week === parseDate(date).getDay()).length} Classes Scheduled`}
+                </h3>
+              </div>
+              <button
+                className="pill-button"
+                onClick={() => setMode("routine")}
+              >
+                Open in Timetable →
+              </button>
+            </div>
+            {classesClosed(date, events) ? (
+              <p className="calendar-selected-day-note">
+                {events.filter((e) => e.start_date <= date && e.end_date >= date && ["university", "classes"].includes(e.scope)).map((e) => e.title).join(" · ") || "University weekly holiday"}
+              </p>
+            ) : (
+              <div className="calendar-mini-routine">
+                {(routine.data || [])
+                  .filter((s) => s.day_of_week === parseDate(date).getDay())
+                  .map((s) => (
+                    <div key={s.id} className="calendar-mini-slot">
+                      <strong>{formatTime(s.start_time)} – {formatTime(s.end_time)}</strong>
+                      <span>{s.course?.course_title || "Course"}</span>
+                      {s.room && s.room !== "null" && <small>Room {s.room}</small>}
+                    </div>
+                  ))}
+                {(routine.data || []).filter((s) => s.day_of_week === parseDate(date).getDay()).length === 0 && (
+                  <p className="calendar-selected-day-note">No classes scheduled on {parseDate(date).toLocaleDateString("en", { weekday: "long" })}.</p>
+                )}
+              </div>
+            )}
+          </div>
           <div className="section-heading calendar-events-heading">
             <h2>Holidays & events</h2>
             {ctx.owner && (
@@ -772,17 +840,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                           ? busPermission.data
                           : editable.data?.[s.semester_course_id];
                       const isToday = date === dhakaToday();
-                      const isLive =
-                        mode === "routine" &&
-                        isToday &&
-                        !detail?.cancelled &&
-                        !closed &&
-                        Boolean(
-                          s.start_time &&
-                            s.end_time &&
-                            s.start_time.slice(0, 5) <= currentTime &&
-                            currentTime < s.end_time.slice(0, 5),
-                        );
+                      const isLive = isSlotLive(s);
 
                       const isTeacher =
                         ctx.profile.role === "teacher" &&
@@ -897,10 +955,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                 <Clock3 size={13} />
                                 {Math.max(
                                   0,
-                                  Number(s.end_time?.slice(0, 2)) * 60 +
-                                    Number(s.end_time?.slice(3, 5)) -
-                                    (Number(s.start_time?.slice(0, 2)) * 60 +
-                                      Number(s.start_time?.slice(3, 5))),
+                                  parseTimeToMinutes(s.end_time) - parseTimeToMinutes(s.start_time),
                                 )}{" "}
                                 min
                               </small>
@@ -968,6 +1023,21 @@ export function Schedule({ ctx }: { ctx: Context }) {
                           })),
                       },
                       {
+                        name: "day",
+                        label: "Day of week",
+                        required: true,
+                        value: String(editing.day_of_week ?? day),
+                        options: [
+                          { value: "0", label: "Sunday" },
+                          { value: "1", label: "Monday" },
+                          { value: "2", label: "Tuesday" },
+                          { value: "3", label: "Wednesday" },
+                          { value: "4", label: "Thursday" },
+                          { value: "5", label: "Friday" },
+                          { value: "6", label: "Saturday" },
+                        ],
+                      },
+                      {
                         name: "start",
                         label: "Starts",
                         type: "time",
@@ -996,10 +1066,11 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 else {
                   if (d.start >= d.end)
                     throw new Error("End time must be after start time.");
+                  const targetDay = d.day !== undefined ? Number(d.day) : (editing.day_of_week ?? day);
                   await rpc("save_routine_slot", {
                     target_id: editing.id || null,
                     target_semester_course: d.course,
-                    target_day: editing.day_of_week ?? day,
+                    target_day: targetDay,
                     target_start: d.start,
                     target_end: d.end,
                     target_room: d.room,
@@ -1131,12 +1202,14 @@ function CalendarPanel({
   date,
   setDate,
   events,
+  routineSlots = [],
 }: {
   month: Date;
   setMonth: (d: Date) => void;
   date: string;
   setDate: (d: string) => void;
   events: Row[];
+  routineSlots?: Row[];
 }) {
   const count = events.filter(
     (e) =>
@@ -1208,18 +1281,27 @@ function CalendarPanel({
               onClick={() => setDate(d)}
             >
               <strong>{parseDate(d).getDate()}</strong>
-              <span className="dots">
-                {classesClosed(d, events) && (
-                  <i
-                    className={
-                      scopes.has("classes") && !scopes.has("university")
-                        ? "green"
-                        : "red"
-                    }
-                  />
-                )}{" "}
-                {scopes.has("observance") && <i />}
-              </span>
+              {(() => {
+                const dayOfWeek = parseDate(d).getDay();
+                const isClosed = classesClosed(d, events);
+                const hasClasses = !isClosed && routineSlots.some((s) => s.day_of_week === dayOfWeek);
+                return (
+                  <span className="dots">
+                    {isClosed ? (
+                      <i
+                        className={
+                          scopes.has("classes") && !scopes.has("university")
+                            ? "green"
+                            : "red"
+                        }
+                      />
+                    ) : hasClasses ? (
+                      <i className="blue" />
+                    ) : null}
+                    {scopes.has("observance") && <i className="event" />}
+                  </span>
+                );
+              })()}
             </button>
           ) : (
             <span className="date-empty" key={i} />
@@ -1227,6 +1309,10 @@ function CalendarPanel({
         })}
       </div>
       <div className="legend">
+        <span>
+          <i className="blue" />
+          Classes
+        </span>
         <span>
           <i className="red" />
           Closed
@@ -1236,7 +1322,7 @@ function CalendarPanel({
           Class holiday
         </span>
         <span>
-          <i />
+          <i className="event" />
           Event
         </span>
       </div>

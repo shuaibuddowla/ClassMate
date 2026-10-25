@@ -116,7 +116,8 @@ export function parseRawFundText(
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const results: ParsedTransactionItem[] = [];
   let currentSectionType: "inflow" | "outflow" = "inflow";
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   // Patterns supporting leading or trailing currency signs and separators
   const endAmountPattern = /(?:[-–:]\s*)?(?:(?:tk|taka|টাকা|৳)\s*)?([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:tk|taka|টাকা|৳)?\s*$/i;

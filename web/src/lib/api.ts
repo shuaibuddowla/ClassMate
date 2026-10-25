@@ -82,8 +82,28 @@ export async function openFile(resource: string | Row) {
   }
   const id = typeof resource === "string" ? resource : String(resource?.id);
   return openResource(async () => {
-    const result = await edge("signed-classmate-resource", { resource_id: id });
-    return result.url;
+    // 1. Check if resource is a link or has public metadata
+    try {
+      const { data } = await supabase()
+        .schema("classmate")
+        .rpc("get_public_resource", { target_identifier: id });
+      if (data?.link_url) {
+        return String(data.link_url);
+      }
+    } catch {
+      // Continue to signed resource / direct download
+    }
+
+    // 2. Try the edge signing function
+    try {
+      const result = await edge("signed-classmate-resource", { resource_id: id });
+      if (result?.url) return String(result.url);
+    } catch {
+      // Fallback
+    }
+
+    // 3. Fallback to server-side public download route
+    return `/api/public-download/${id}?mode=inline`;
   });
 }
 export async function uploadFile(file: File, metadata: Row) {

@@ -33,12 +33,18 @@ export function Friends({ ctx }: { ctx: Context }) {
   }, [alert, ctx.active, ctx.user, ctx.batch, qc]);
   useEffect(() => {
     const update=()=>{
-      if(location.hash.startsWith("#friends/blood") || location.hash.startsWith("#batch/blood")) setBlood(true);
-      if(location.hash.startsWith("#friends/fund") || location.hash.startsWith("#batch/fund")) setSubTab("fund");
+      const isBlood = location.hash.startsWith("#friends/blood") || location.hash.startsWith("#batch/blood");
+      const isFund = location.hash.startsWith("#friends/fund") || location.hash.startsWith("#batch/fund");
+      setBlood(isBlood);
+      setSubTab(isFund ? "fund" : "batchmates");
     };
     update();
     window.addEventListener("hashchange",update);
-    return()=>window.removeEventListener("hashchange",update);
+    window.addEventListener("popstate",update);
+    return()=>{
+      window.removeEventListener("hashchange",update);
+      window.removeEventListener("popstate",update);
+    };
   },[]);
   const [input, setInput] = useState(""),
     [search, setSearch] = useState(""),

@@ -79,10 +79,11 @@ export default function Manage({
   });
   const semesters = useQuery({
     queryKey: [ctx.user, ctx.batch, "semesters"],
-    enabled: ctx.owner && section === "structure",
+    enabled: Boolean(ctx.batch && (ctx.owner || ctx.profile.is_cr || section === "structure")),
     queryFn: () =>
       rows("semesters", { batch_id: ctx.batch }, "*", "semester_number"),
   });
+  const activeSemester = (semesters.data || []).find((s) => s.status === "active");
   const health = useQuery({
     queryKey: [ctx.user, "health"],
     enabled: ctx.owner && section === "health",
@@ -185,6 +186,152 @@ export default function Manage({
       />
       {section === "courses" && (
         <>
+          {!activeSemester && !semesters.isPending && (
+            <div
+              className="card cr-step-banner warning"
+              style={{
+                borderLeft: "4px solid #f59e0b",
+                background: "rgba(245, 158, 11, 0.08)",
+                marginBottom: "18px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: "1rem", color: "var(--foreground)" }}>
+                  ⚠️ Step 1: Set your Batch's Running Semester
+                </strong>
+                <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--muted)" }}>
+                  No active semester is set for this batch yet. Select which semester is currently running to activate your curriculum, routine slots, and course files.
+                </p>
+              </div>
+              <div>
+                <button
+                  className="primary"
+                  onClick={() =>
+                    setAction({
+                      title: "Set Running Semester",
+                      name: "publish_semester",
+                      fields: [
+                        {
+                          name: "target_semester",
+                          label: "Choose running semester",
+                          required: true,
+                          options: (semesters.data || []).map((s) => ({
+                            value: s.id,
+                            label: `Semester ${s.semester_number} (${s.status === "completed" ? "Completed" : "Draft"})`,
+                          })),
+                        },
+                      ],
+                    })
+                  }
+                >
+                  <GraduationCap size={16} style={{ marginRight: 6 }} /> Choose Running Semester
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSemester && (
+            <div
+              className="card cr-active-semester-bar"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "rgba(37, 99, 235, 0.08)",
+                border: "1px solid rgba(37, 99, 235, 0.2)",
+                borderRadius: "12px",
+                padding: "10px 16px",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <GraduationCap size={18} style={{ color: "var(--primary)" }} />
+                <span style={{ fontSize: "0.9rem" }}>
+                  Active Semester: <strong style={{ color: "var(--primary)" }}>Semester {activeSemester.semester_number}</strong>
+                </span>
+              </div>
+              {(ctx.owner || ctx.profile.is_cr) && (
+                <button
+                  className="secondary"
+                  style={{ fontSize: "0.8rem", padding: "4px 10px" }}
+                  onClick={() =>
+                    setAction({
+                      title: "Switch Running Semester",
+                      name: "publish_semester",
+                      fields: [
+                        {
+                          name: "target_semester",
+                          label: "Select new running semester",
+                          required: true,
+                          value: activeSemester.id,
+                          options: (semesters.data || []).map((s) => ({
+                            value: s.id,
+                            label: `Semester ${s.semester_number} · ${s.status === "active" ? "Currently Active ✓" : s.status}`,
+                          })),
+                        },
+                      ],
+                    })
+                  }
+                >
+                  Switch Semester
+                </button>
+              )}
+            </div>
+          )}
+
+          {activeSemester && ctx.courses.length === 0 && (
+            <div
+              className="card cr-step-banner info"
+              style={{
+                borderLeft: "4px solid #10b981",
+                background: "rgba(16, 185, 129, 0.08)",
+                marginBottom: "18px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: "1rem", color: "var(--foreground)" }}>
+                  🎉 Step 2: Semester {activeSemester.semester_number} is active! Register your courses
+                </strong>
+                <p style={{ margin: "4px 0 0", fontSize: "0.875rem", color: "var(--muted)" }}>
+                  Add your courses, laboratory classes, and teacher names for this semester so your batch can access files and view the daily routine.
+                </p>
+              </div>
+              <div>
+                <button className="primary" onClick={() => courseAction()}>
+                  <Plus size={16} style={{ marginRight: 6 }} /> Register First Course
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSemester && ctx.courses.length > 0 && (
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.03)",
+                border: "1px dashed var(--border)",
+                borderRadius: "12px",
+                padding: "10px 16px",
+                marginBottom: "16px",
+                fontSize: "0.85rem",
+                color: "var(--muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>✅ <strong>Step 3:</strong> Build your daily timetable routine with these courses.</span>
+              <a href="#timetable" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                Go to Schedule →
+              </a>
+            </div>
+          )}
+
           <div className="section-heading">
             <h2>Batch courses</h2>
             <button className="primary" onClick={() => courseAction()}>
@@ -488,6 +635,21 @@ export default function Manage({
                     min: "0",
                     max: "99",
                   },
+                  {
+                    name: "target_initial_semester",
+                    label: "Initial running semester",
+                    options: [
+                      { value: "", label: "None (Draft / Inactive)" },
+                      { value: "1", label: "Semester 1" },
+                      { value: "2", label: "Semester 2" },
+                      { value: "3", label: "Semester 3" },
+                      { value: "4", label: "Semester 4" },
+                      { value: "5", label: "Semester 5" },
+                      { value: "6", label: "Semester 6" },
+                      { value: "7", label: "Semester 7" },
+                      { value: "8", label: "Semester 8" },
+                    ],
+                  },
                 ],
               })
             }
@@ -571,11 +733,14 @@ export default function Manage({
                 "target_batch_number",
                 "target_session",
                 "corrected_session",
+                "target_initial_semester",
               ])
                 if (key in args)
                   args[key] = key.endsWith("session")
                     ? sessionEnd(args[key])
-                    : Number(args[key]);
+                    : args[key] !== null && args[key] !== ""
+                      ? Number(args[key])
+                      : null;
               if ("target_active" in args)
                 args.target_active = args.target_active === "true";
               if ("target_email" in args)

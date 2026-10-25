@@ -10,8 +10,12 @@ export async function openResource(resolveUrl: () => Promise<string>) {
     tab.document.body.textContent = "Opening your file...";
   }
   try {
-    const url = new URL(await resolveUrl());
-    if (url.protocol !== "https:") throw new Error("Invalid file link.");
+    const raw = await resolveUrl();
+    const url = raw.startsWith("/")
+      ? new URL(raw, window.location.origin)
+      : new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:")
+      throw new Error("Invalid file link.");
     if (tab) tab.location.replace(url.toString());
     else window.location.assign(url.toString());
   } catch (error) {

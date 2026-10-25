@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   Palmtree,
   CalendarDays,
+  Share2,
 } from "lucide-react";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
@@ -954,6 +955,25 @@ export function canViewNoticeReaders(_notice?: Row, _ctx?: Context): boolean {
   return true;
 }
 
+const urlRegex =
+  /((?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|(?!\/)))/gi;
+
+const isUrl = (s: string) =>
+  /^(?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]$/i.test(s) ||
+  /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-])?$/i.test(s);
+
+function truncateSafely(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  let cutoff = maxLen;
+  const lastSpace = str.lastIndexOf(" ", cutoff);
+  const lastNewline = str.lastIndexOf("\n", cutoff);
+  const boundary = Math.max(lastSpace, lastNewline);
+  if (boundary > maxLen * 0.6) {
+    cutoff = boundary;
+  }
+  return str.slice(0, cutoff).trimEnd();
+}
+
 function NoticeCard({
   notice: n,
   ctx,
@@ -992,6 +1012,7 @@ function NoticeCard({
   markRead: () => void;
 }) {
   const [zoomAttachment, setZoomAttachment] = useState<string | null>(null);
+  const [copiedShare, setCopiedShare] = useState(false);
   const [expanded, setExpanded] = useState(false),
     [menu, setMenu] = useState(false),
     [liked, setLiked] = useState(!!state.is_liked),
@@ -1060,9 +1081,9 @@ function NoticeCard({
     if (expanded || !isOverflow) return body;
     if (hasLineOverflow) {
       const preview = rawLines.slice(0, 5).join("\n");
-      return preview.length > 280 ? preview.slice(0, 280) + "…" : preview + "…";
+      return preview.length > 280 ? truncateSafely(preview, 280) : preview;
     }
-    return body.slice(0, 280) + "…";
+    return truncateSafely(body, 280);
   })();
 
   const handleLinkClick = (e: React.MouseEvent) => {
@@ -1079,12 +1100,7 @@ function NoticeCard({
     }
   };
 
-  const urlRegex =
-    /((?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|(?!\/)))/gi;
 
-  const isUrl = (s: string) =>
-    /^(?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]$/i.test(s) ||
-    /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(?:com|org|net|edu|gov|mil|app|dev|io|co|me|bd|ai|tech|xyz|info|biz|tv|cc|live|online|site|page|link|store|cloud|space|uk|us|ca|de|in|eu|au|fr|jp|gg|so|gl|ly|to|mobi|pro|name|asia|int|arpa)(?::[0-9]{1,5})?(?:\/[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-])?$/i.test(s);
 
   return (
     <article ref={ref} className={`notice-card ${kind}`}>
@@ -1299,7 +1315,7 @@ function NoticeCard({
           onClick={onReminder}
         >
           <span className="notice-mobile-label">
-            <BellRing size={20} />
+            {state.reminder_at ? <BellRing size={20} /> : <Bell size={20} />}
           </span>
           <span className="notice-desktop-label">
             {state.reminder_at ? <BellRing size={20} /> : <Bell size={20} />}
@@ -1385,7 +1401,47 @@ function NoticeCard({
             <MessageSquare className="notice-mobile-label" size={19} />
             <span>{state.comment_count || 0}</span>
           </button>
+          <button
+            aria-label="Share notice"
+            title="Share notice"
+            onClick={async (e) => {
+              e.stopPropagation();
+              const shareUrl = `https://classmatebd.vercel.app/n/${n.id}`;
+              if (typeof navigator !== "undefined" && navigator.share) {
+                try {
+                  await navigator.share({
+                    title: n.title,
+                    text: n.title,
+                    url: shareUrl,
+                  });
+                  return;
+                } catch (err: unknown) {
+                  if (err instanceof Error && err.name === "AbortError") {
+                    return;
+                  }
+                  // Fallback to clipboard
+                }
+              }
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                await navigator.clipboard.writeText(shareUrl);
+                setCopiedShare(true);
+                setTimeout(() => setCopiedShare(false), 2000);
+              }
+            }}
+          >
+            {copiedShare ? (
+              <Check size={18} color="#10b981" />
+            ) : (
+              <Share2 size={18} />
+            )}
+            <span className="notice-desktop-label">{copiedShare ? "Copied" : "Share"}</span>
+          </button>
         </div>
+        {copiedShare && (
+          <div className="notice-copy-toast" role="status">
+            <Check size={14} /> Notice link copied!
+          </div>
+        )}
       </footer>
     </article>
   );
@@ -1692,11 +1748,15 @@ export function NoticeDetailModal({
         <div className="notice-detail-body-scroll">
           {notice.body && (
             <div className="notice-detail-content">
-              {notice.body.split(/((?:https?:\/\/|www\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;]*[a-zA-Z0-9+&@#/%=~_|])/g).map((part: string, i: number) =>
-                /^(?:https?:\/\/|www\.)/.test(part) ? (
+              {notice.body.split(urlRegex).map((part: string, i: number) =>
+                isUrl(part) ? (
                   <a
                     key={i}
-                    href={part.startsWith("www.") ? `https://${part}` : part}
+                    href={
+                      part.startsWith("http://") || part.startsWith("https://")
+                        ? part
+                        : `https://${part}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -1785,11 +1845,41 @@ export function NoticeDetailModal({
           </button>
           <button
             type="button"
+            className="notice-detail-copy-btn"
+            onClick={async () => {
+              const shareUrl = `https://classmatebd.vercel.app/n/${notice.id}`;
+              if (typeof navigator !== "undefined" && navigator.share) {
+                try {
+                  await navigator.share({
+                    title: notice.title || "Notice",
+                    text: notice.title || "Notice",
+                    url: shareUrl,
+                  });
+                  return;
+                } catch (err: unknown) {
+                  if (err instanceof Error && err.name === "AbortError") {
+                    return;
+                  }
+                  // Fallback
+                }
+              }
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                await navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }
+            }}
+          >
+            {copied ? <Check size={16} /> : <Share2 size={16} />}
+            <span>{copied ? "Link Copied!" : "Share Link"}</span>
+          </button>
+          <button
+            type="button"
             className={`notice-detail-copy-btn ${copied ? "copied" : ""}`}
             onClick={copyNotice}
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
-            <span>{copied ? "Copied!" : "Copy"}</span>
+            <span>{copied ? "Copied!" : "Copy Text"}</span>
           </button>
         </div>
       </div>

@@ -77,7 +77,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
   const university = summary.data?.university || "MBSTU";
 
   // Share statement
-  const handleShareSummary = () => {
+  const handleShareSummary = async () => {
     const text =
       `📊 *${batchName} • ${university} Batch Fund Statement*\n\n` +
       `💰 *Current Balance:* ৳ ${currentBalance.toLocaleString()}\n` +
@@ -85,9 +85,15 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
       `📉 *Total Spent:* ৳ ${totalSpent.toLocaleString()}\n\n` +
       `ℹ️ _${fundDescription}_\n` +
       `_Updated via ClassMate_`;
-    navigator.clipboard.writeText(text);
-    setCopiedToast(true);
-    setTimeout(() => setCopiedToast(false), 2500);
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setCopiedToast(true);
+        setTimeout(() => setCopiedToast(false), 2500);
+      }
+    } catch (_) {}
   };
 
   return (
@@ -442,7 +448,6 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
           batchId={ctx.batch}
           close={() => setShowAddModal(false)}
           onSuccess={() => {
-            setShowAddModal(false);
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-summary"],
             });
@@ -661,14 +666,18 @@ function AddFundModal({
 
     setSubmitting(true);
     try {
+      const now = new Date();
+      const localTodayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
       await rpc("record_batch_fund_transaction", {
         target_batch: batchId,
         trans_type: transType,
         trans_amount: numericAmount,
         trans_title: title.trim(),
         trans_student_name: transType === "inflow" ? selectedStudent?.full_name : null,
+        trans_student_id: transType === "inflow" ? (selectedStudent?.student_id || null) : null,
         trans_student_profile_id: transType === "inflow" ? selectedStudent?.id : null,
-        trans_date: new Date().toISOString().slice(0, 10),
+        trans_date: localTodayStr,
       });
 
       onSuccess();
@@ -975,17 +984,29 @@ function EditTransactionModal({
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const numericAmt = parseFloat(amount);
+    if (isNaN(numericAmt) || numericAmt <= 0) {
+      setError("Please enter a valid amount greater than 0.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Please enter a title or purpose.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
+      const match = type === "inflow" ? roster.find((s) => s.id === studentProfileId) : null;
       await rpc("update_batch_fund_transaction", {
         trans_id: tx.id,
         trans_type: type,
-        trans_amount: parseFloat(amount),
+        trans_amount: numericAmt,
         trans_title: title.trim(),
-        trans_student_name: studentName.trim() || null,
-        trans_date: date,
-        trans_student_profile_id: studentProfileId || null,
+        trans_student_name: type === "inflow" ? (studentName.trim() || null) : null,
+        trans_student_id: match?.student_id || null,
+        trans_date: date ? String(date).slice(0, 10) : null,
+        trans_student_profile_id: type === "inflow" ? (studentProfileId || null) : null,
       });
       onSuccess();
     } catch (err: any) {
