@@ -375,19 +375,25 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
             >
               <span>All Collections</span>
             </button>
-            {collections.data?.map((c) => (
-              <button
-                type="button"
-                key={c.collection_title}
-                className={`collection-chip ${selectedCollection === c.collection_title ? "active" : ""}`}
-                onClick={() => setSelectedCollection(c.collection_title)}
-              >
-                <span>{c.collection_title}</span>
-                {Number(c.transaction_count || 0) > 0 && (
-                  <span className="collection-chip-count">{c.transaction_count}</span>
-                )}
-              </button>
-            ))}
+            {collections.data?.map((c) => {
+              const colTitle = (c.title || c.collection_title || "").toString().trim();
+              if (!colTitle) return null;
+              const count = Number(c.payment_count || c.transaction_count || 0);
+              const isActive = selectedCollection !== "all" && selectedCollection.toLowerCase() === colTitle.toLowerCase();
+              return (
+                <button
+                  type="button"
+                  key={colTitle}
+                  className={`collection-chip ${isActive ? "active" : ""}`}
+                  onClick={() => setSelectedCollection(colTitle)}
+                >
+                  <span>{colTitle}</span>
+                  {count > 0 && (
+                    <span className="collection-chip-count">{count}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {payers.isPending ? (
