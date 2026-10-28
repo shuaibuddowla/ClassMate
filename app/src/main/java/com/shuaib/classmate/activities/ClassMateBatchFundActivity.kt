@@ -346,7 +346,11 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     // ==========================================
     // ADD FUND SHEET (DIRECT MANUAL ENTRY & INSTANT ROSTER SEARCH)
     // ==========================================
-    private fun showAddFundSheet() {
+    private fun showAddFundSheet(
+        prefillProfileId: String? = null,
+        prefillStudentName: String? = null,
+        prefillTitle: String? = null
+    ) {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.dialog_add_fund_sheet, null, false)
         dialog.setContentView(view)
@@ -373,8 +377,8 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val btnSaveAndAddAnother = view.findViewById<MaterialButton>(R.id.btnSaveAndAddAnother)
         val btnSaveManual = view.findViewById<MaterialButton>(R.id.btnSaveManual)
 
-        var selectedStudentProfileId: String? = null
-        var selectedStudentName: String? = null
+        var selectedStudentProfileId: String? = prefillProfileId
+        var selectedStudentName: String? = prefillStudentName
 
         // Quick reason chips
         val commonReasons = listOf("Monthly Fund", "Jersey", "Tour", "Picnic", "Farewell", "Batch Feast")
@@ -411,6 +415,15 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, studentOptions)
         actvStudent.setAdapter(adapter)
+
+        if (!prefillStudentName.isNullOrBlank()) {
+            actvStudent.setText(prefillStudentName, false)
+            actvStudent.setSelection(prefillStudentName.length)
+        }
+        if (!prefillTitle.isNullOrBlank()) {
+            etTitle.setText(prefillTitle)
+            etTitle.setSelection(prefillTitle.length)
+        }
 
         actvStudent.setOnItemClickListener { parent, _, position, _ ->
             val opt = parent.getItemAtPosition(position) as? StudentOption
@@ -669,19 +682,33 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     }
 
     // ==========================================
-    // PAYERS TRACKER SHEET
+    // PAYERS TRACKER SHEET (COLLECTION CHIPS + UNIFIED PAID/UNPAID)
     // ==========================================
     private fun showPayersSheet() {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.dialog_fund_payers_sheet, null, false)
         dialog.setContentView(view)
 
+        dialog.setOnShowListener {
+            val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            if (bottomSheet != null) {
+                val behavior = BottomSheetBehavior.from(bottomSheet)
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                behavior.skipCollapsed = true
+            }
+        }
+
+        val chipGroupCollections = view.findViewById<ChipGroup>(R.id.chipGroupPayersCollections)
         val etSearch = view.findViewById<TextInputEditText>(R.id.etPayersSearch)
         val container = view.findViewById<LinearLayout>(R.id.payersItemsContainer)
         val tvEmpty = view.findViewById<TextView>(R.id.tvPayersEmpty)
         val progressBar = view.findViewById<ProgressBar>(R.id.payersProgressBar)
 
-        var allPayers = mutableListOf<JSONObject>()
+        var selectedCollection = "all"
+        var currentSearchQuery = ""
+        var payersJob: Job? = null
+        var searchDebounceJob: Job? = null
+        val allPayers = mutableListOf<JSONObject>()
 
         fun renderList(query: String) {
             container.removeAllViews()
@@ -693,111 +720,224 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
             if (filtered.isEmpty()) {
                 tvEmpty.visibility = View.VISIBLE
-            } else {
-                tvEmpty.visibility = View.GONE
-                for (payer in filtered) {
-                    val name = payer.optString("full_name")
-                    val sid = payer.optString("student_id")
-                    val totalPaid = payer.optDouble("total_paid", 0.0)
-                    val count = payer.optInt("payment_count", 0)
+                return
+            }
+            tvEmpty.visibility = View.GONE
 
-                    val card = LinearLayout(this).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = Gravity.CENTER_VERTICAL
-                        setPadding(dp(14), dp(12), dp(14), dp(12))
-                        background = getDrawable(R.drawable.bg_fund_card)
-                        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
-                    }
+            // Unified list: Paid classmates first, Unpaid classmates below
+            val paidList = filtered.filter { it.optDouble("total_paid", 0.0) > 0 }
+            val unpaidList = filtered.filter { it.optDouble("total_paid", 0.0) <= 0 }
+            val unifiedList = paidList + unpaidList
 
-                    // Avatar
-                    val avatar = FrameLayout(this).apply {
-                        val size = dp(38)
-                        layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(12) }
-                        background = GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(if (totalPaid > 0) 0xFFDCFCE7.toInt() else 0xFFF1F5F9.toInt())
-                        }
-                    }
-                    val tvInit = TextView(this).apply {
-                        text = name.take(1).uppercase()
-                        setTextColor(if (totalPaid > 0) 0xFF16A34A.toInt() else 0xFF64748B.toInt())
-                        textSize = 15f
-                        typeface = Typeface.DEFAULT_BOLD
-                        gravity = Gravity.CENTER
-                        layoutParams = FrameLayout.LayoutParams(-1, -1)
-                    }
-                    avatar.addView(tvInit)
-                    card.addView(avatar)
+            for (payer in unifiedList) {
+                val name = payer.optString("full_name")
+                val sid = payer.optString("student_id")
+                val totalPaid = payer.optDouble("total_paid", 0.0)
+                val count = payer.optInt("payment_count", 0)
+                val isPaid = totalPaid > 0
 
-                    // Info
-                    val info = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL
-                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                    }
-                    val tvName = TextView(this).apply {
-                        text = name
-                        setTextColor(getColor(R.color.cm_text_primary))
-                        textSize = 15f
-                        typeface = Typeface.DEFAULT_BOLD
-                    }
-                    val tvSid = TextView(this).apply {
-                        text = if (sid.isNotBlank() && sid != "null") "ID: $sid • $count deposits" else "$count deposits"
-                        setTextColor(getColor(R.color.cm_text_secondary))
-                        textSize = 12f
-                    }
-                    info.addView(tvName)
-                    info.addView(tvSid)
-                    card.addView(info)
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                    background = getDrawable(R.drawable.bg_fund_card)
+                    val lp = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+                    layoutParams = lp
+                    isClickable = true
+                    isFocusable = true
+                }
 
-                    // Paid Badge
+                // Avatar
+                val avatar = FrameLayout(this).apply {
+                    val size = dp(38)
+                    layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(12) }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(if (isPaid) 0xFFDCFCE7.toInt() else 0xFFF1F5F9.toInt())
+                    }
+                }
+                val tvInit = TextView(this).apply {
+                    text = name.take(1).uppercase()
+                    setTextColor(if (isPaid) 0xFF16A34A.toInt() else 0xFF64748B.toInt())
+                    textSize = 15f
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    layoutParams = FrameLayout.LayoutParams(-1, -1)
+                }
+                avatar.addView(tvInit)
+                card.addView(avatar)
+
+                // Info
+                val info = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                }
+                val tvName = TextView(this).apply {
+                    text = name
+                    setTextColor(getColor(R.color.cm_text_primary))
+                    textSize = 15f
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                val tvSid = TextView(this).apply {
+                    val sidText = if (sid.isNotBlank() && sid != "null") "ID: $sid" else ""
+                    val depositText = if (isPaid) {
+                        "$count ${if (count == 1) "deposit" else "deposits"}"
+                    } else {
+                        "No deposits"
+                    }
+                    text = if (sidText.isNotBlank()) "$sidText • $depositText" else depositText
+                    setTextColor(getColor(R.color.cm_text_secondary))
+                    textSize = 12f
+                }
+                info.addView(tvName)
+                info.addView(tvSid)
+                card.addView(info)
+
+                // Paid / Unpaid Status Badge
+                if (isPaid) {
                     val tvPaid = TextView(this).apply {
-                        text = if (totalPaid > 0) "৳ ${formatMoney(totalPaid)}" else "Unpaid"
-                        setTextColor(if (totalPaid > 0) 0xFF16A34A.toInt() else 0xFF94A3B8.toInt())
+                        text = "৳ ${formatMoney(totalPaid)}"
+                        setTextColor(0xFF16A34A.toInt())
                         textSize = 14f
                         typeface = Typeface.DEFAULT_BOLD
                     }
                     card.addView(tvPaid)
+                } else {
+                    val tvUnpaid = TextView(this).apply {
+                        text = "Unpaid"
+                        setTextColor(0xFFDC2626.toInt())
+                        textSize = 12.5f
+                        typeface = Typeface.DEFAULT_BOLD
+                        setPadding(dp(8), dp(3), dp(8), dp(3))
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            cornerRadius = dp(6).toFloat()
+                            setColor(0xFFFEE2E2.toInt())
+                        }
+                    }
+                    card.addView(tvUnpaid)
+                }
 
-                    card.isClickable = true
-                    card.isFocusable = true
-                    card.setOnClickListener {
+                // Interaction
+                card.setOnClickListener {
+                    if (isPaid) {
                         dialog.dismiss()
                         showLedgerSheet(name)
+                    } else if (isCr) {
+                        dialog.dismiss()
+                        val colTitle = if (selectedCollection != "all") selectedCollection else "Monthly Fund"
+                        showAddFundSheet(
+                            prefillProfileId = payer.optString("profile_id").ifBlank { null },
+                            prefillStudentName = name,
+                            prefillTitle = colTitle
+                        )
+                    } else {
+                        val colName = if (selectedCollection != "all") selectedCollection else "batch fund"
+                        Toast.makeText(this@ClassMateBatchFundActivity, "$name has not paid for $colName.", Toast.LENGTH_SHORT).show()
                     }
+                }
 
-                    container.addView(card)
+                container.addView(card)
+            }
+        }
+
+        fun fetchPayers() {
+            payersJob?.cancel()
+            progressBar.visibility = View.VISIBLE
+            tvEmpty.visibility = View.GONE
+
+            payersJob = lifecycleScope.launch {
+                try {
+                    val params = JSONObject().apply {
+                        put("target_batch", batchId)
+                        if (selectedCollection != "all") {
+                            put("target_collection", selectedCollection)
+                        }
+                    }
+                    val response = ClassMateAuthApi.rpcText("batch_fund_payers", params)
+                    val array = JSONArray(response)
+                    val seenPayers = HashSet<String>()
+                    allPayers.clear()
+                    for (i in 0 until array.length()) {
+                        val payer = array.getJSONObject(i)
+                        val pid = payer.optString("profile_id").ifBlank { payer.optString("student_id") }
+                        if (pid.isNotBlank() && !seenPayers.add(pid)) continue
+                        allPayers.add(payer)
+                    }
+                    progressBar.visibility = View.GONE
+                    renderList(currentSearchQuery)
+                } catch (e: Exception) {
+                    if (e is CancellationException) return@launch
+                    progressBar.visibility = View.GONE
+                    container.removeAllViews()
+                    tvEmpty.visibility = View.VISIBLE
+                    tvEmpty.text = "Error loading payers: ${e.message}"
                 }
             }
         }
 
+        // Fetch dynamic collection titles
         lifecycleScope.launch {
-            progressBar.visibility = View.VISIBLE
-            tvEmpty.visibility = View.GONE
             try {
-                val response = ClassMateAuthApi.rpcText(
-                    "batch_fund_payers",
+                val colResponse = ClassMateAuthApi.rpcText(
+                    "batch_fund_collections",
                     JSONObject().put("target_batch", batchId)
                 )
-                val array = JSONArray(response)
-                val seenPayers = HashSet<String>()
-                allPayers.clear()
-                for (i in 0 until array.length()) {
-                    val payer = array.getJSONObject(i)
-                    val pid = payer.optString("profile_id").ifBlank { payer.optString("student_id") }
-                    if (pid.isNotBlank() && !seenPayers.add(pid)) continue
-                    allPayers.add(payer)
+                val colArray = JSONArray(colResponse)
+                chipGroupCollections.removeAllViews()
+
+                // All Collections chip
+                val allChip = Chip(this@ClassMateBatchFundActivity).apply {
+                    text = "All Collections"
+                    isCheckable = true
+                    isChecked = true
+                    setOnClickListener {
+                        if (selectedCollection != "all") {
+                            selectedCollection = "all"
+                            fetchPayers()
+                        }
+                    }
                 }
-                progressBar.visibility = View.GONE
-                renderList("")
-            } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                tvEmpty.visibility = View.VISIBLE
-                tvEmpty.text = "Error loading payers: ${e.message}"
-            }
+                chipGroupCollections.addView(allChip)
+
+                for (i in 0 until colArray.length()) {
+                    val item = colArray.getJSONObject(i)
+                    val colTitle = item.optString("title").trim()
+                    if (colTitle.isBlank()) continue
+                    val pCount = item.optInt("payment_count", 0)
+
+                    val chip = Chip(this@ClassMateBatchFundActivity).apply {
+                        text = "$colTitle ($pCount)"
+                        isCheckable = true
+                        isChecked = false
+                        setOnClickListener {
+                            if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
+                                selectedCollection = colTitle
+                                fetchPayers()
+                            }
+                        }
+                    }
+                    chipGroupCollections.addView(chip)
+                }
+            } catch (_: Exception) {}
+
+            fetchPayers()
         }
 
         etSearch.doAfterTextChanged {
-            renderList(it?.toString()?.trim().orEmpty())
+            val q = it?.toString()?.trim().orEmpty()
+            if (q == currentSearchQuery) return@doAfterTextChanged
+            currentSearchQuery = q
+            searchDebounceJob?.cancel()
+            searchDebounceJob = lifecycleScope.launch {
+                delay(200)
+                renderList(currentSearchQuery)
+            }
+        }
+
+        dialog.setOnDismissListener {
+            payersJob?.cancel()
+            searchDebounceJob?.cancel()
         }
 
         dialog.show()

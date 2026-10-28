@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="600dp"
+    android:layout_height="640dp"
     android:orientation="vertical"
     android:background="@drawable/bg_bottom_sheet"
     android:padding="20dp">
@@ -24,18 +24,36 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/tvPayersSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Track all batchmates' aggregate fund contributions."
+        android:text="Track all batchmates' contributions &amp; dues by collection title."
         android:textColor="@color/cm_text_secondary"
         android:textSize="13sp"
         android:layout_marginTop="2dp" />
+
+    <!-- Collection Filter Chips (Horizontally Scrollable) -->
+    <HorizontalScrollView
+        android:id="@+id/hsvPayersCollections"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:scrollbars="none"
+        android:overScrollMode="never">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupPayersCollections"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true" />
+    </HorizontalScrollView>
 
     <!-- Search Box -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="10dp"
         app:boxBackgroundMode="outline"
         app:startIconDrawable="@drawable/ic_search_modern">
 
@@ -82,4 +100,3 @@
     </androidx.core.widget.NestedScrollView>
 
 </LinearLayout>
-

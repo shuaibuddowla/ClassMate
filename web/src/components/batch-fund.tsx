@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -39,6 +39,11 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
   const [showEditDescModal, setShowEditDescModal] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Row | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [selectedCollection, setSelectedCollection] = useState<string>("all");
+  const [addFundPrefill, setAddFundPrefill] = useState<{
+    student?: { id: string; full_name: string; student_id?: string | null } | null;
+    title?: string | null;
+  } | null>(null);
 
   // Queries
   const summary = useQuery({
@@ -60,9 +65,19 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
     enabled: !!ctx.batch,
   });
 
+  const collections = useQuery({
+    queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
+    queryFn: () => rpc<Row[]>("batch_fund_collections", { target_batch: ctx.batch }),
+    enabled: !!ctx.batch && activeTab === "payers",
+  });
+
   const payers = useQuery({
-    queryKey: [ctx.user, ctx.batch, "batch-fund-payers"],
-    queryFn: () => rpc<Row[]>("batch_fund_payers", { target_batch: ctx.batch }),
+    queryKey: [ctx.user, ctx.batch, "batch-fund-payers", selectedCollection],
+    queryFn: () =>
+      rpc<Row[]>("batch_fund_payers", {
+        target_batch: ctx.batch,
+        target_collection: selectedCollection === "all" ? undefined : selectedCollection,
+      }),
     enabled: !!ctx.batch && activeTab === "payers",
   });
 
@@ -348,9 +363,32 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
           </div>
 
           <p className="fund-subview-hint">
-            Overview of batchmates and their total recorded contributions to
-            the batch fund.
+            Filter by collection title or view overall deposits. Paid classmates appear first, followed by unpaid classmates sorted by roll.
           </p>
+
+          {/* Dynamic Collection Filter Chips */}
+          <div className="fund-collection-chips" role="tablist" aria-label="Collection filters">
+            <button
+              type="button"
+              className={`collection-chip ${selectedCollection === "all" ? "active" : ""}`}
+              onClick={() => setSelectedCollection("all")}
+            >
+              <span>All Collections</span>
+            </button>
+            {collections.data?.map((c) => (
+              <button
+                type="button"
+                key={c.collection_title}
+                className={`collection-chip ${selectedCollection === c.collection_title ? "active" : ""}`}
+                onClick={() => setSelectedCollection(c.collection_title)}
+              >
+                <span>{c.collection_title}</span>
+                {Number(c.transaction_count || 0) > 0 && (
+                  <span className="collection-chip-count">{c.transaction_count}</span>
+                )}
+              </button>
+            ))}
+          </div>
 
           {payers.isPending ? (
             <Skeleton />
@@ -360,8 +398,20 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
             <div className="fund-payers-list">
               {payers.data.map((p) => {
                 const paid = Number(p.total_paid || 0);
+                const isPaid = paid > 0;
                 return (
-                  <div className="payer-row" key={p.profile_id}>
+                  <div
+                    className={`payer-row ${!isPaid ? "is-unpaid" : "clickable"}`}
+                    key={p.profile_id}
+                    onClick={() => {
+                      if (isPaid) {
+                        setLedgerSearch(p.full_name);
+                        setLedgerFilter("inflow");
+                        setActiveTab("ledger");
+                      }
+                    }}
+                    title={isPaid ? "Click to view deposits in Ledger" : undefined}
+                  >
                     <div className="payer-avatar">
                       {p.full_name?.charAt(0)?.toUpperCase() || "S"}
                     </div>
@@ -370,17 +420,42 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
                       <span>ID: {p.student_id || "—"}</span>
                     </div>
                     <div className="payer-status">
-                      {paid > 0 ? (
-                        <span className="paid-badge">
-                          + ৳ {paid.toLocaleString()}
-                        </span>
+                      {isPaid ? (
+                        <>
+                          <span className="paid-badge">
+                            + ৳ {paid.toLocaleString()}
+                          </span>
+                          {p.payment_count > 0 && (
+                            <small className="payer-count">
+                              {p.payment_count} deposit(s)
+                            </small>
+                          )}
+                        </>
                       ) : (
-                        <span className="unpaid-badge">No deposit</span>
-                      )}
-                      {p.payment_count > 0 && (
-                        <small className="payer-count">
-                          {p.payment_count} payment(s)
-                        </small>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                          <span className="unpaid-badge-chip">Unpaid</span>
+                          {isCr && (
+                            <button
+                              type="button"
+                              className="btn-quick-record"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAddFundPrefill({
+                                  student: {
+                                    id: p.profile_id,
+                                    full_name: p.full_name,
+                                    student_id: p.student_id,
+                                  },
+                                  title: selectedCollection === "all" ? "" : selectedCollection,
+                                });
+                                setShowAddModal(true);
+                              }}
+                              title="Record deposit for this student"
+                            >
+                              <Plus size={13} /> Deposit
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -446,13 +521,21 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
       {showAddModal && (
         <AddFundModal
           batchId={ctx.batch}
-          close={() => setShowAddModal(false)}
+          close={() => {
+            setShowAddModal(false);
+            setAddFundPrefill(null);
+          }}
+          initialStudent={addFundPrefill?.student}
+          initialTitle={addFundPrefill?.title}
           onSuccess={() => {
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-summary"],
             });
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-transactions"],
+            });
+            qc.invalidateQueries({
+              queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
             });
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-payers"],
@@ -474,6 +557,9 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
             });
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-transactions"],
+            });
+            qc.invalidateQueries({
+              queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
             });
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-payers"],
@@ -576,23 +662,41 @@ function AddFundModal({
   batchId,
   close,
   onSuccess,
+  initialStudent,
+  initialTitle,
 }: {
   batchId: string;
   close: () => void;
   onSuccess: () => void;
+  initialStudent?: { id: string; full_name: string; student_id?: string | null } | null;
+  initialTitle?: string | null;
 }) {
   const [transType, setTransType] = useState<"inflow" | "outflow">("inflow");
-  const [selectedStudent, setSelectedStudent] = useState<RosterStudent | null>(null);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<RosterStudent | null>(
+    initialStudent
+      ? {
+          id: initialStudent.id,
+          full_name: initialStudent.full_name,
+          student_id: initialStudent.student_id,
+        }
+      : null
+  );
+  const [studentSearch, setStudentSearch] = useState(initialStudent?.full_name || "");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle || "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const studentInputRef = useRef<HTMLInputElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialStudent) {
+      setTimeout(() => amountInputRef.current?.focus(), 80);
+    }
+  }, [initialStudent]);
 
   const commonReasons = [
     "Monthly Fund",
