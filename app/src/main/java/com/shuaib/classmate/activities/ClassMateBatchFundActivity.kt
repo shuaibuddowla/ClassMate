@@ -37,6 +37,9 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -315,9 +318,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
         val tvSub = TextView(this).apply {
             val subText = if (studentName.isNotBlank() && studentName != "null") {
-                "$title • $dateStr"
+                val subTitle = if (title.isNotBlank() && !title.equals(studentName, ignoreCase = true)) title else (if (isInflow) "Deposit" else "Expense")
+                if (dateStr.isNotBlank() && dateStr != "null") "$subTitle • $dateStr" else subTitle
             } else {
-                "From batch fund • $dateStr"
+                if (dateStr.isNotBlank() && dateStr != "null") "From batch fund • $dateStr" else "From batch fund"
             }
             text = subText
             setTextColor(getColor(R.color.cm_text_secondary))
@@ -455,7 +459,8 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 if (selectedStudentProfileId.isNullOrBlank()) {
                     val matched = studentOptions.firstOrNull {
                         it.fullName.equals(studentRawName, ignoreCase = true) ||
-                        it.display.equals(studentRawName, ignoreCase = true)
+                        it.display.equals(studentRawName, ignoreCase = true) ||
+                        (it.studentId != null && it.studentId.equals(studentRawName, ignoreCase = true))
                     }
                     if (matched != null) {
                         selectedStudentProfileId = matched.profileId
@@ -499,6 +504,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             put("trans_amount", amt)
                             put("trans_title", title)
                             put("trans_student_name", sName)
+                            put("trans_student_id", if (isDeposit) studentOptions.firstOrNull { it.profileId == selectedStudentProfileId || it.fullName.equals(sName, ignoreCase = true) }?.studentId else null)
                             put("trans_date", todayStr)
                             if (isDeposit && !selectedStudentProfileId.isNullOrBlank()) {
                                 put("trans_student_profile_id", selectedStudentProfileId)
@@ -539,7 +545,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     // ==========================================
     // VIEW LEDGER SHEET
     // ==========================================
-    private fun showLedgerSheet() {
+    private fun showLedgerSheet(initialQuery: String = "") {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.dialog_fund_ledger_sheet, null, false)
         dialog.setContentView(view)
@@ -560,14 +566,17 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val progressBar = view.findViewById<ProgressBar>(R.id.ledgerProgressBar)
 
         var currentFilter = "all"
-        var currentQuery = ""
+        var currentQuery = initialQuery.trim()
+        var ledgerJob: Job? = null
+        var searchDebounceJob: Job? = null
+        var isInitializingTabs = true
 
         fun fetchLedger() {
+            ledgerJob?.cancel()
             progressBar.visibility = View.VISIBLE
-            container.removeAllViews()
             tvEmpty.visibility = View.GONE
 
-            lifecycleScope.launch {
+            ledgerJob = lifecycleScope.launch {
                 try {
                     val response = ClassMateAuthApi.rpcText(
                         "batch_fund_transactions",
@@ -581,12 +590,21 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     )
                     progressBar.visibility = View.GONE
                     val array = JSONArray(response)
+
+                    // Clear views right before populating to eliminate race condition duplicates
+                    container.removeAllViews()
+
                     if (array.length() == 0) {
                         tvEmpty.visibility = View.VISIBLE
                     } else {
                         tvEmpty.visibility = View.GONE
+                        val seenIds = HashSet<String>()
                         for (i in 0 until array.length()) {
                             val tx = array.getJSONObject(i)
+                            val id = tx.optString("id")
+                            if (id.isNotBlank() && !seenIds.add(id)) {
+                                continue
+                            }
                             val row = createTransactionRow(tx)
                             if (isCr) {
                                 row.setOnClickListener {
@@ -598,7 +616,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) return@launch
                     progressBar.visibility = View.GONE
+                    container.removeAllViews()
                     tvEmpty.visibility = View.VISIBLE
                     tvEmpty.text = "Error loading ledger: ${e.message}"
                 }
@@ -607,20 +627,41 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         tabFilter.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                currentFilter = when (tab?.position) {
+                if (isInitializingTabs) return
+                val newFilter = when (tab?.position) {
                     1 -> "inflow"
                     2 -> "outflow"
                     else -> "all"
                 }
-                fetchLedger()
+                if (newFilter != currentFilter) {
+                    currentFilter = newFilter
+                    fetchLedger()
+                }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
+        isInitializingTabs = false
 
         etSearch.doAfterTextChanged {
-            currentQuery = it?.toString()?.trim().orEmpty()
-            fetchLedger()
+            val query = it?.toString()?.trim().orEmpty()
+            if (query == currentQuery) return@doAfterTextChanged
+            currentQuery = query
+            searchDebounceJob?.cancel()
+            searchDebounceJob = lifecycleScope.launch {
+                delay(250) // 250ms debounce
+                fetchLedger()
+            }
+        }
+
+        if (initialQuery.isNotBlank()) {
+            etSearch.setText(initialQuery)
+            etSearch.setSelection(initialQuery.length)
+        }
+
+        dialog.setOnDismissListener {
+            ledgerJob?.cancel()
+            searchDebounceJob?.cancel()
         }
 
         fetchLedger()
@@ -717,6 +758,13 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     }
                     card.addView(tvPaid)
 
+                    card.isClickable = true
+                    card.isFocusable = true
+                    card.setOnClickListener {
+                        dialog.dismiss()
+                        showLedgerSheet(name)
+                    }
+
                     container.addView(card)
                 }
             }
@@ -731,9 +779,13 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     JSONObject().put("target_batch", batchId)
                 )
                 val array = JSONArray(response)
+                val seenPayers = HashSet<String>()
                 allPayers.clear()
                 for (i in 0 until array.length()) {
-                    allPayers.add(array.getJSONObject(i))
+                    val payer = array.getJSONObject(i)
+                    val pid = payer.optString("profile_id").ifBlank { payer.optString("student_id") }
+                    if (pid.isNotBlank() && !seenPayers.add(pid)) continue
+                    allPayers.add(payer)
                 }
                 progressBar.visibility = View.GONE
                 renderList("")
@@ -826,11 +878,16 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val etTitle = view.findViewById<TextInputEditText>(R.id.etEditTitle)
         val etStudent = view.findViewById<TextInputEditText>(R.id.etEditStudentName)
 
-        etAmount.setText(tx.optDouble("amount").toString())
+        val isDeposit = tx.optString("type", "inflow") == "inflow"
+        val curAmt = tx.optDouble("amount", 0.0)
+        etAmount.setText(if (curAmt == curAmt.toLong().toDouble()) curAmt.toLong().toString() else curAmt.toString())
         etTitle.setText(tx.optString("title"))
         val currentStudent = tx.optString("student_name")
         if (currentStudent.isNotBlank() && currentStudent != "null") {
             etStudent.setText(currentStudent)
+        }
+        if (!isDeposit) {
+            (etStudent.parent?.parent as? View)?.visibility = View.GONE
         }
 
         MaterialAlertDialogBuilder(this)
@@ -844,6 +901,23 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 if (newAmt <= 0 || newTitle.isBlank()) {
                     Toast.makeText(this, "Invalid amount or title", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
+                }
+
+                val origStudent = tx.optString("student_name").trim()
+                var updatedProfileId = tx.optString("student_profile_id").ifBlank { null }
+                var updatedStudentId = tx.optString("student_id").ifBlank { null }
+                if (isDeposit) {
+                    if (!newStudent.equals(origStudent, ignoreCase = true)) {
+                        val matched = batchRoster.firstOrNull {
+                            it.optString("full_name").trim().equals(newStudent, ignoreCase = true) ||
+                            it.optString("student_id").trim().equals(newStudent, ignoreCase = true)
+                        }
+                        updatedProfileId = matched?.let { it.optString("id").ifBlank { it.optString("profile_id") }.ifBlank { null } }
+                        updatedStudentId = matched?.optString("student_id")?.takeIf { s -> s.isNotBlank() && s != "null" }
+                    }
+                } else {
+                    updatedProfileId = null
+                    updatedStudentId = null
                 }
 
                 lifecycleScope.launch {
@@ -860,9 +934,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                                 put("new_title", newTitle)
                                 put("trans_student_name", newStudent.ifBlank { null })
                                 put("new_student_name", newStudent.ifBlank { null })
-                                put("trans_student_id", tx.optString("student_id").ifBlank { null })
+                                put("trans_student_id", updatedStudentId)
                                 put("trans_date", tx.optString("transacted_at").ifBlank { null })
-                                put("trans_student_profile_id", tx.optString("student_profile_id").ifBlank { null })
+                                put("trans_student_profile_id", updatedProfileId)
                             }
                         )
                         Toast.makeText(this@ClassMateBatchFundActivity, "Transaction updated!", Toast.LENGTH_SHORT).show()
@@ -938,9 +1012,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
     private fun formatMoney(amount: Double): String {
         return if (amount == amount.toLong().toDouble()) {
-            String.format("%,d", amount.toLong())
+            String.format(java.util.Locale.US, "%,d", amount.toLong())
         } else {
-            String.format("%,.2f", amount)
+            String.format(java.util.Locale.US, "%,.2f", amount)
         }
     }
 }
