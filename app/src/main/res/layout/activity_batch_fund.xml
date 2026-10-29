@@ -318,16 +318,10 @@
                     android:focusable="true" />
             </LinearLayout>
 
-            <!-- Empty Activity placeholder -->
-            <TextView
-                android:id="@+id/tvEmptyActivity"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="No transactions recorded yet."
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="14sp"
-                android:gravity="center"
-                android:padding="24dp"
+            <!-- Modern Empty Activity placeholder -->
+            <include
+                android:id="@+id/emptyStateOverview"
+                layout="@layout/view_empty_state"
                 android:visibility="gone" />
 
             <!-- Recent Activity List Container -->
