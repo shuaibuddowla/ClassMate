@@ -75,15 +75,9 @@
         android:layout_marginTop="20dp"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/tvLedgerEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="No transactions match this filter."
-        android:textColor="@color/cm_text_secondary"
-        android:textSize="14sp"
-        android:gravity="center"
-        android:padding="20dp"
+    <include
+        android:id="@+id/emptyStateLedger"
+        layout="@layout/view_empty_state"
         android:visibility="gone" />
 
     <androidx.core.widget.NestedScrollView
