@@ -324,6 +324,12 @@
                 layout="@layout/view_empty_state"
                 android:visibility="gone" />
 
+            <!-- Shimmer Placeholder for Recent Activity -->
+            <include
+                android:id="@+id/shimmerRecentActivity"
+                layout="@layout/shimmer_fund_list"
+                android:visibility="gone" />
+
             <!-- Recent Activity List Container -->
             <LinearLayout
                 android:id="@+id/recentActivityContainer"

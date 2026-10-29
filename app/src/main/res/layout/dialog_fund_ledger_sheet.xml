@@ -67,12 +67,10 @@
             android:textColor="@color/cm_text_primary" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <ProgressBar
-        android:id="@+id/ledgerProgressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="20dp"
+    <!-- Shimmer Skeleton Loading -->
+    <include
+        android:id="@+id/shimmerLedger"
+        layout="@layout/shimmer_fund_list"
         android:visibility="gone" />
 
     <include

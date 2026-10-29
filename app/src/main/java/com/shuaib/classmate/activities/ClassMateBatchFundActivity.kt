@@ -35,6 +35,7 @@ import com.google.android.material.tabs.TabLayout
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.facebook.shimmer.ShimmerFrameLayout
 import com.shuaib.classmate.R
 import com.shuaib.classmate.utils.EmptyStateHelper
 import com.shuaib.classmate.utils.HapticHelper
@@ -71,6 +72,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     private lateinit var ivEditDescHint: View
     private lateinit var recentActivityContainer: LinearLayout
     private lateinit var emptyStateOverview: View
+    private lateinit var shimmerRecentActivity: ShimmerFrameLayout
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
 
@@ -104,6 +106,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         ivEditDescHint = findViewById(R.id.ivEditDescHint)
         recentActivityContainer = findViewById(R.id.recentActivityContainer)
         emptyStateOverview = findViewById(R.id.emptyStateOverview)
+        shimmerRecentActivity = findViewById(R.id.shimmerRecentActivity)
 
         toolbar.setNavigationOnClickListener { finish() }
         toolbar.inflateMenu(R.menu.menu_batch_fund_options)
@@ -239,6 +242,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     }
 
     private suspend fun loadRecentTransactions() {
+        shimmerRecentActivity.visibility = View.VISIBLE
+        shimmerRecentActivity.startShimmer()
+        EmptyStateHelper.hide(emptyStateOverview)
+        recentActivityContainer.visibility = View.GONE
         try {
             val responseText = ClassMateAuthApi.rpcText(
                 "batch_fund_transactions",
@@ -250,6 +257,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     put("page_limit", 5)
                 }
             )
+            shimmerRecentActivity.stopShimmer()
+            shimmerRecentActivity.visibility = View.GONE
+            recentActivityContainer.visibility = View.VISIBLE
             val txArray = JSONArray(responseText)
             recentActivityContainer.removeAllViews()
 
@@ -268,6 +278,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 }
             }
         } catch (e: Exception) {
+            shimmerRecentActivity.stopShimmer()
+            shimmerRecentActivity.visibility = View.GONE
+            recentActivityContainer.visibility = View.VISIBLE
             recentActivityContainer.removeAllViews()
             EmptyStateHelper.showError(
                 emptyStateOverview,
@@ -598,7 +611,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val etSearch = view.findViewById<TextInputEditText>(R.id.etLedgerSearch)
         val container = view.findViewById<LinearLayout>(R.id.ledgerItemsContainer)
         val emptyStateLedger = view.findViewById<View>(R.id.emptyStateLedger)
-        val progressBar = view.findViewById<ProgressBar>(R.id.ledgerProgressBar)
+        val shimmerLedger = view.findViewById<ShimmerFrameLayout>(R.id.shimmerLedger)
 
         var currentFilter = "all"
         var currentQuery = initialQuery.trim()
@@ -608,8 +621,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         fun fetchLedger() {
             ledgerJob?.cancel()
-            progressBar.visibility = View.VISIBLE
+            shimmerLedger.visibility = View.VISIBLE
+            shimmerLedger.startShimmer()
             EmptyStateHelper.hide(emptyStateLedger)
+            container.visibility = View.GONE
 
             ledgerJob = lifecycleScope.launch {
                 try {
@@ -623,7 +638,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             put("page_limit", 500)
                         }
                     )
-                    progressBar.visibility = View.GONE
+                    shimmerLedger.stopShimmer()
+                    shimmerLedger.visibility = View.GONE
+                    container.visibility = View.VISIBLE
                     val array = JSONArray(response)
 
                     // Clear views right before populating to eliminate race condition duplicates
@@ -657,7 +674,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) return@launch
-                    progressBar.visibility = View.GONE
+                    shimmerLedger.stopShimmer()
+                    shimmerLedger.visibility = View.GONE
+                    container.visibility = View.VISIBLE
                     container.removeAllViews()
                     EmptyStateHelper.showError(
                         emptyStateLedger,
@@ -734,7 +753,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val etSearch = view.findViewById<TextInputEditText>(R.id.etPayersSearch)
         val container = view.findViewById<LinearLayout>(R.id.payersItemsContainer)
         val emptyStatePayers = view.findViewById<View>(R.id.emptyStatePayers)
-        val progressBar = view.findViewById<ProgressBar>(R.id.payersProgressBar)
+        val shimmerPayers = view.findViewById<ShimmerFrameLayout>(R.id.shimmerPayers)
 
         var selectedCollection = "all"
         var currentSearchQuery = ""
@@ -880,8 +899,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         fun fetchPayers() {
             payersJob?.cancel()
-            progressBar.visibility = View.VISIBLE
+            shimmerPayers.visibility = View.VISIBLE
+            shimmerPayers.startShimmer()
             EmptyStateHelper.hide(emptyStatePayers)
+            container.visibility = View.GONE
 
             payersJob = lifecycleScope.launch {
                 try {
@@ -901,11 +922,15 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         if (pid.isNotBlank() && !seenPayers.add(pid)) continue
                         allPayers.add(payer)
                     }
-                    progressBar.visibility = View.GONE
+                    shimmerPayers.stopShimmer()
+                    shimmerPayers.visibility = View.GONE
+                    container.visibility = View.VISIBLE
                     renderList(currentSearchQuery)
                 } catch (e: Exception) {
                     if (e is CancellationException) return@launch
-                    progressBar.visibility = View.GONE
+                    shimmerPayers.stopShimmer()
+                    shimmerPayers.visibility = View.GONE
+                    container.visibility = View.VISIBLE
                     container.removeAllViews()
                     EmptyStateHelper.showError(
                         emptyStatePayers,
