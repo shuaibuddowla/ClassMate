@@ -1,604 +1,609 @@
-import {createRemoteJWKSet, jwtVerify, type JWTPayload} from "jose";
-
-interface Env {
-  FIREBASE_PROJECT_ID: string;
-  GEMINI_API_KEY: string;
-  GROQ_API_KEY: string;
-  GITHUB_LIBRARY_TOKEN: string;
-  GITHUB_OWNER: string;
-  GITHUB_REPO: string;
-  GITHUB_RELEASE_TAG: string;
-  TELEGRAM_BOT_TOKEN: string;
-  TELEGRAM_CHANNEL_ID: string;
-  ONESIGNAL_REST_API_KEY: string;
-  ONESIGNAL_APP_ID: string;
-  ARCHIVE_API_URL: string;
-  ARCHIVE_INTEGRATION_SECRET: string;
-  SUPABASE_URL: string;
-  SUPABASE_PUBLISHABLE_KEY: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-}
-
-interface AuthContext {
-  token: string;
-  uid: string;
-  claims: JWTPayload;
-}
-
-interface UserAccess {
-  role: string;
-  permissions: Record<string, boolean>;
-  batchId: string;
-  adminBatchIds: string[];
-}
-
-const firebaseKeys = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
-);
-
-const geminiModels = new Set([
-  "gemini-2.5-flash",
-  "gemini-3.5-flash",
-  "gemini-2.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-]);
-
-const groqModels = new Set([
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it",
-]);
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === "OPTIONS") return cors(new Response(null, {status: 204}));
-
-    const url = new URL(request.url);
-    if (url.pathname === "/health" && request.method === "GET") {
-      return json({ok: true, service: "classmate-secure-api"});
-    }
-
-    try {
-      if (url.pathname === "/internal/archive-sync" && request.method === "POST") {
-        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
-          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
-        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
-          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
-        if (!integrationAuthorized && !serviceAuthorized) {
-          throw new HttpError(403, "Archive sync access denied");
-        }
-        return json(await syncArchiveCatalog(env, url.searchParams.get("dryRun") !== "1"));
-      }
-      if (url.pathname === "/internal/telegram-broadcast" && request.method === "POST") {
-        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
-          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
-        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
-          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
-        const dispatchSecret = "8585add686336dcd1c11ae7fff130b98d9ee1615b01f73d57e7c88550b36014c";
-        const dispatchAuthorized = request.headers.get("X-Dispatch-Secret") === dispatchSecret;
-        if (!serviceAuthorized && !integrationAuthorized && !dispatchAuthorized) {
-          throw new HttpError(403, "Telegram broadcast access denied");
-        }
-        return await broadcastResourceTelegram(request, env);
-      }
-      if (url.pathname === "/internal/telegram-test" && request.method === "POST") {
-        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
-          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
-        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
-          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
-        if (!serviceAuthorized && !integrationAuthorized) {
-          throw new HttpError(403, "Telegram test access denied");
-        }
-        const resp = await testTelegram(env);
-        return json(await resp.json().catch(() => ({ok: resp.ok})));
-      }
-      const auth = await authenticate(request, env);
-
-      if (url.pathname === "/v1/ai/gemini" && request.method === "POST") {
-        return cors(await proxyGemini(request, env));
-      }
-      if (url.pathname === "/v1/ai/groq" && request.method === "POST") {
-        return cors(await proxyGroq(request, env));
-      }
-      if (url.pathname === "/v1/notifications" && request.method === "POST") {
-        return cors(await sendNotification(request, env, auth));
-      }
-      if (url.pathname.startsWith("/v1/archive/")) {
-        return cors(await proxyArchive(request, url, env, auth));
-      }
-      if (url.pathname === "/v1/telegram/upload" && request.method === "POST") {
-        await requireBatchPermission(request, env, auth, ["canUploadPDF", "canUploadLibrary"]);
-        return cors(await proxyTelegramUpload(request, env));
-      }
-      if (url.pathname === "/v1/telegram/test" && request.method === "POST") {
-        await requireSuperAdmin(env, auth);
-        return cors(await testTelegram(env));
-      }
-      if (url.pathname.startsWith("/v1/telegram/files/") && request.method === "GET") {
-        const fileId = decodeURIComponent(url.pathname.slice("/v1/telegram/files/".length));
-        return cors(await downloadTelegramFile(fileId, env));
-      }
-      if (url.pathname === "/v1/github/upload" && request.method === "POST") {
-        await requireBatchPermission(request, env, auth, ["canUploadPDF", "canUploadLibrary"]);
-        return cors(await uploadGitHubAsset(request, url, env));
-      }
-      if (url.pathname.startsWith("/v1/github/assets/") && request.method === "GET") {
-        const assetId = url.pathname.slice("/v1/github/assets/".length);
-        return cors(await downloadGitHubAsset(assetId, env));
-      }
-
-      return cors(json({error: "Not found"}, 404));
-    } catch (error) {
-      const status = error instanceof HttpError ? error.status : 500;
-      const message = error instanceof Error ? error.message : "Internal server error";
-      return cors(json({error: message}, status));
-    }
-  },
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(syncArchiveCatalog(env, true).then(() => undefined));
-  },
-} satisfies ExportedHandler<Env>;
-
-async function syncArchiveCatalog(env: Env, apply: boolean): Promise<unknown> {
-  if (!env.ARCHIVE_INTEGRATION_SECRET || !env.SUPABASE_SERVICE_ROLE_KEY ||
-      !env.ARCHIVE_API_URL || !env.SUPABASE_URL) {
-    throw new HttpError(503, "Archive reconciliation is not configured");
-  }
-  const source = await fetch(`${env.ARCHIVE_API_URL.replace(/\/$/, "")}/sync/catalog`, {
-    headers: {"X-ClassMate-Integration": env.ARCHIVE_INTEGRATION_SECRET},
-  });
-  if (!source.ok) throw new HttpError(502, `Archive catalogue unavailable (${source.status})`);
-  const snapshot = await source.json<{
-    batches?: Array<{id: string}>;
-    courses?: Array<{id: string}>;
-  }>();
-  if (!Array.isArray(snapshot.batches) || !snapshot.batches.length ||
-      !Array.isArray(snapshot.courses)) {
-    throw new HttpError(502, "Archive returned an incomplete catalogue");
-  }
-  const target = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/sync_archive_catalog`, {
-    method: "POST",
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({snapshot, apply_changes: apply}),
-  });
-  if (!target.ok) throw new HttpError(502, `Supabase reconciliation failed (${target.status})`);
-  return target.json();
-}
-
-async function authenticate(request: Request, env: Env): Promise<AuthContext> {
-  const header = request.headers.get("Authorization") ?? "";
-  if (!header.startsWith("Bearer ")) throw new HttpError(401, "Authentication required");
-  const token = header.slice(7).trim();
-  if (!token) throw new HttpError(401, "Authentication required");
-
-  try {
-    const issuer = `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`;
-    const {payload} = await jwtVerify(token, firebaseKeys, {
-      algorithms: ["RS256"],
-      audience: env.FIREBASE_PROJECT_ID,
-      issuer,
-    });
-    if (!payload.sub) throw new Error("Missing subject");
-    return {token, uid: payload.sub, claims: payload};
-  } catch {
-    throw new HttpError(401, "Invalid or expired Firebase session");
-  }
-}
-
-async function loadUserAccess(env: Env, auth: AuthContext): Promise<UserAccess> {
-  const project = encodeURIComponent(env.FIREBASE_PROJECT_ID);
-  const uid = encodeURIComponent(auth.uid);
-  const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`,
-    {headers: {Authorization: `Bearer ${auth.token}`}},
-  );
-  if (!response.ok) throw new HttpError(403, "Unable to verify user permissions");
-  const document = await response.json<Record<string, unknown>>() as {
-    fields?: Record<string, {
-      stringValue?: string;
-      mapValue?: {fields?: Record<string, {booleanValue?: boolean}>};
-      arrayValue?: {values?: Array<{stringValue?: string}>};
-    }>;
-  };
-  const fields = document.fields ?? {};
-  const permissionFields = fields.permissions?.mapValue?.fields ?? {};
-  const permissions: Record<string, boolean> = {};
-  for (const [key, value] of Object.entries(permissionFields)) permissions[key] = value.booleanValue === true;
-  const adminBatchIds = (fields.adminBatchIds?.arrayValue?.values ?? [])
-    .map((value) => value.stringValue?.trim().toLowerCase())
-    .filter((value): value is string => Boolean(value));
-  return {
-    role: fields.role?.stringValue ?? "student",
-    permissions,
-    batchId: fields.batchId?.stringValue?.trim().toLowerCase() ?? "",
-    adminBatchIds,
-  };
-}
-
-async function requirePermission(env: Env, auth: AuthContext, allowed: string[]): Promise<void> {
-  const access = await loadUserAccess(env, auth);
-  if (access.role === "admin" || access.role === "superadmin") return;
-  if (allowed.some((permission) => access.permissions[permission])) return;
-  throw new HttpError(403, "You do not have permission for this action");
-}
-
-async function requireSuperAdmin(env: Env, auth: AuthContext): Promise<void> {
-  const access = await loadUserAccess(env, auth);
-  if (!isGlobalSuperAdmin(access)) throw new HttpError(403, "Global superadmin access required");
-}
-
-function isGlobalSuperAdmin(access: UserAccess): boolean {
-  // Keep the legacy spelling only while existing accounts are migrated.
-  return access.role === "global_super_admin" || access.role === "global_superadmin";
-}
-
-function canManageBatch(access: UserAccess, batchId: string): boolean {
-  return isGlobalSuperAdmin(access) ||
-    ((access.role === "admin" || access.role === "superadmin" || access.role === "super_admin") &&
-      access.adminBatchIds.includes(batchId));
-}
-
-function targetContext(request: Request): {batchId: string; semesterId: string} {
-  const batchId = (request.headers.get("X-Batch-Id") ?? "").trim().toLowerCase();
-  const semesterId = (request.headers.get("X-Semester-Id") ?? "").trim().toLowerCase();
-  if (!/^[a-z0-9_-]{2,30}$/.test(batchId) || !/^[a-z0-9_-]{1,30}$/.test(semesterId)) {
-    throw new HttpError(400, "A valid batch and semester context are required");
-  }
-  return {batchId, semesterId};
-}
-
-async function requireBatchPermission(
-  request: Request,
-  env: Env,
-  auth: AuthContext,
-  allowed: string[],
-): Promise<{batchId: string; semesterId: string}> {
-  const context = targetContext(request);
-  const access = await loadUserAccess(env, auth);
-  const permitted = canManageBatch(access, context.batchId) ||
-    (access.batchId === context.batchId && allowed.some((permission) => access.permissions[permission]));
-  if (!permitted) throw new HttpError(403, "You are not authorized for this batch");
-  return context;
-}
-
-async function proxyArchive(
-  request: Request,
-  url: URL,
-  env: Env,
-  auth: AuthContext,
-): Promise<Response> {
-  if (!env.ARCHIVE_API_URL || !env.ARCHIVE_INTEGRATION_SECRET) {
-    throw new HttpError(503, "Archive integration is not configured");
-  }
-  const relativePath = url.pathname.slice("/v1/archive".length);
-  const readAllowed = request.method === "GET" &&
-    (/^\/(archive|public|resources|search)$/.test(relativePath) ||
-      /^\/(resource|download)\/[A-Za-z0-9_-]+$/.test(relativePath));
-  const courseCreate = request.method === "POST" && relativePath === "/courses";
-  const courseManage = request.method === "POST" &&
-    /^\/courses\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
-  const onboarding = request.method === "POST" && relativePath === "/onboarding";
-  const uploadMutation = request.method === "POST" &&
-    (relativePath === "/uploads" || /^\/uploads\/[A-Za-z0-9_-]+\/(complete|cancel)$/.test(relativePath));
-  const resourceAdmin = request.method === "POST" &&
-    /^\/resources\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
-  if (!readAllowed && !courseCreate && !courseManage && !onboarding && !uploadMutation && !resourceAdmin) {
-    throw new HttpError(404, "Archive endpoint not found");
-  }
-
-  const context = targetContext(request);
-  const action = uploadMutation ? "upload" : "read";
-  if (!await canAccessV2ArchiveBatch(env, auth, context.batchId, action)) {
-    throw new HttpError(403, "Your Supabase role does not allow this Archive action for the selected batch");
-  }
-
-  const endpoint = env.ARCHIVE_API_URL.replace(/\/$/, "") + relativePath + url.search;
-  const headers = new Headers();
-  const contentType = request.headers.get("Content-Type");
-  if (contentType) headers.set("Content-Type", contentType);
-  headers.set("X-ClassMate-Integration", env.ARCHIVE_INTEGRATION_SECRET);
-  headers.set("X-ClassMate-Uid", auth.uid);
-  headers.set("X-ClassMate-Email", String(auth.claims.email ?? ""));
-  headers.set("X-ClassMate-Name", encodeURIComponent(String(auth.claims.name ?? "ClassMate user")));
-  headers.set("X-ClassMate-Batch", context.batchId);
-  headers.set("X-ClassMate-Semester", context.semesterId);
-  if (courseManage || resourceAdmin) {
-    headers.set("X-ClassMate-Can-Manage", String(
-      await canAccessV2ArchiveBatch(env, auth, context.batchId, "resource_manage"),
-    ));
-  }
-  const response = await fetch(endpoint, {
-    method: request.method,
-    headers,
-    body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
-    redirect: "manual",
-  });
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type": response.headers.get("Content-Type") ?? "application/json",
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
-async function canAccessV2ArchiveBatch(
-  env: Env,
-  auth: AuthContext,
-  batchId: string,
-  action: string,
-): Promise<boolean> {
-  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
-    throw new HttpError(503, "Supabase authorization is not configured");
-  }
-  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_access_v2_archive_batch`, {
-    method: "POST",
-    headers: {
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${auth.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({target_batch_code: batchId, target_action: action}),
-  });
-  if (!response.ok) throw new HttpError(503, "Unable to verify Supabase Archive access");
-  return await response.json<unknown>() === true;
-}
-
-async function proxyGemini(request: Request, env: Env): Promise<Response> {
-  requireJsonSize(request, 96_000);
-  const model = request.headers.get("X-AI-Model") ?? "gemini-2.5-flash";
-  if (!geminiModels.has(model)) throw new HttpError(400, "Unsupported Gemini model");
-  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY},
-    body: request.body,
-  });
-}
-
-async function proxyGroq(request: Request, env: Env): Promise<Response> {
-  requireJsonSize(request, 96_000);
-  const body = await request.text();
-  let parsed: {model?: string};
-  try {
-    parsed = JSON.parse(body) as {model?: string};
-  } catch {
-    throw new HttpError(400, "Invalid JSON body");
-  }
-  if (!parsed.model || !groqModels.has(parsed.model)) throw new HttpError(400, "Unsupported Groq model");
-  return fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {"Content-Type": "application/json", Authorization: `Bearer ${env.GROQ_API_KEY}`},
-    body,
-  });
-}
-
-async function sendNotification(request: Request, env: Env, auth: AuthContext): Promise<Response> {
-  requireJsonSize(request, 32_000);
-  const payload = await request.json<Record<string, unknown>>();
-  const data = (payload.data ?? {}) as Record<string, unknown>;
-  const type = String(data.type ?? "");
-
-  if (type === "chat_message") {
-    if (String(data.senderId ?? "") !== auth.uid) throw new HttpError(403, "Sender identity mismatch");
-    if (payload.included_segments && String(data.roomId ?? "") !== "group_main") {
-      throw new HttpError(403, "Only the main group chat can target a broadcast segment");
-    }
-  } else {
-    const permissions = type === "poll"
-      ? ["canCreatePolls"]
-      : type === "cancellation" || type === "substitute"
-        ? ["canSendClassCancel"]
-        : type === "resource"
-          ? ["canUploadPDF", "canUploadLibrary"]
-          : ["canPostNotices"];
-    const batchId = String(data.batchId ?? "").trim().toLowerCase();
-    const context = targetContext(request);
-    if (batchId !== context.batchId) throw new HttpError(400, "Notification batch does not match request context");
-    const v2Authorized = ["notice", "cancellation", "substitute", "resource"].includes(type) &&
-      await canSendV2Notification(env, auth, batchId);
-    let permitted = v2Authorized;
-    if (!permitted) {
-      const access = await loadUserAccess(env, auth);
-      permitted = canManageBatch(access, batchId) ||
-        (access.batchId === batchId && permissions.some((permission) => access.permissions[permission]));
-    }
-    if (!permitted) throw new HttpError(403, "You are not authorized for this notification batch");
-    // Never forward caller-controlled broadcast segments or filters. Batch
-    // delivery is derived solely from the verified tenant context.
-    delete payload.included_segments;
-    delete payload.filters;
-    payload.filters = [{field: "tag", key: "batchId", relation: "=", value: batchId}];
-  }
-
-  payload.app_id = env.ONESIGNAL_APP_ID;
-  return fetch("https://api.onesignal.com/notifications", {
-    method: "POST",
-    headers: {"Content-Type": "application/json", Authorization: `Key ${env.ONESIGNAL_REST_API_KEY}`},
-    body: JSON.stringify(payload),
-  });
-}
-
-async function canSendV2Notification(env: Env, auth: AuthContext, batchId: string): Promise<boolean> {
-  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return false;
-  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_send_v2_batch_notification`, {
-    method: "POST",
-    headers: {
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${auth.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({target_batch_code: batchId}),
-  });
-  if (!response.ok) return false;
-  const result: unknown = await response.json();
-  return result === true || (Array.isArray(result) && result[0] === true);
-}
-
-async function proxyTelegramUpload(request: Request, env: Env): Promise<Response> {
-  const contentType = request.headers.get("Content-Type");
-  if (!contentType?.startsWith("multipart/form-data")) throw new HttpError(400, "Multipart upload required");
-  return fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, {
-    method: "POST",
-    headers: {"Content-Type": contentType},
-    body: request.body,
-  });
-}
-
-async function testTelegram(env: Env): Promise<Response> {
-  return fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({chat_id: env.TELEGRAM_CHANNEL_ID, text: "✅ ClassMate bot is connected and working!"}),
-  });
-}
-
-interface TelegramBroadcastPayload {
-  resource_id: string;
-  title: string;
-  category?: string;
-  course_title?: string | null;
-  course_code?: string | null;
-  uploader_name?: string | null;
-  file_type?: string | null;
-  batch_number?: number | null;
-  slug?: string | null;
-}
-
-function escapeTelegramHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-async function broadcastResourceTelegram(request: Request, env: Env): Promise<Response> {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHANNEL_ID) {
-    throw new HttpError(503, "Telegram credentials not configured");
-  }
-  const payload = await request.json<TelegramBroadcastPayload>().catch(() => null);
-  if (!payload || !payload.resource_id || !payload.title) {
-    throw new HttpError(400, "Missing required payload fields");
-  }
-
-  // Strictly broadcast for batch 22 (CSE 22)
-  if (payload.batch_number !== undefined && payload.batch_number !== null && payload.batch_number !== 22) {
-    return json({ skipped: true, reason: "Non-22 batch" });
-  }
-
-  const rawSlug = (payload.slug && payload.slug.trim()) || payload.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || payload.resource_id;
-  let slug = rawSlug;
-  let queryString = "";
-  if (rawSlug.includes("?")) {
-    const parts = rawSlug.split("?");
-    slug = parts[0];
-    queryString = "?" + parts.slice(1).join("?");
-  }
-  const publicUrl = `https://classmatebd.vercel.app/r/${encodeURIComponent(slug)}${queryString}`;
-
-  const bodyData = {
-    chat_id: env.TELEGRAM_CHANNEL_ID,
-    text: publicUrl,
-    link_preview_options: {
-      is_disabled: false,
-      url: publicUrl,
-      prefer_large_media: true,
-      show_above_text: false,
-    },
-  };
-
-  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(bodyData),
-  });
-
-  const responseBody = await response.json<Record<string, unknown>>().catch(() => ({}));
-  if (!response.ok) {
-    return json({ ok: false, error: responseBody }, response.status);
-  }
-  return json({ ok: true, result: responseBody });
-}
-
-async function downloadTelegramFile(fileId: string, env: Env): Promise<Response> {
-  if (!fileId || fileId.length > 512) throw new HttpError(400, "Invalid Telegram file ID");
-  const metadata = await fetch(
-    `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`,
-  );
-  const result = await metadata.json<{ok?: boolean; result?: {file_path?: string}}>();
-  const path = result.result?.file_path;
-  if (!metadata.ok || !result.ok || !path) throw new HttpError(502, "Unable to resolve Telegram file");
-  return fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${path}`);
-}
-
-async function uploadGitHubAsset(request: Request, url: URL, env: Env): Promise<Response> {
-  const name = url.searchParams.get("name")?.trim();
-  if (!name || name.length > 180 || name.includes("/") || name.includes("\\")) {
-    throw new HttpError(400, "Invalid asset name");
-  }
-  const headers = githubHeaders(env);
-  const release = await fetch(
-    `https://api.github.com/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}/releases/tags/${encodeURIComponent(env.GITHUB_RELEASE_TAG)}`,
-    {headers},
-  );
-  if (!release.ok) return release;
-  const releaseJson = await release.json<{upload_url?: string}>();
-  const uploadBase = releaseJson.upload_url?.split("{")[0];
-  if (!uploadBase) throw new HttpError(502, "GitHub release has no upload URL");
-  return fetch(`${uploadBase}?name=${encodeURIComponent(name)}`, {
-    method: "POST",
-    headers: {...headers, "Content-Type": request.headers.get("Content-Type") ?? "application/octet-stream"},
-    body: request.body,
-  });
-}
-
-async function downloadGitHubAsset(assetId: string, env: Env): Promise<Response> {
-  if (!/^\d+$/.test(assetId)) throw new HttpError(400, "Invalid GitHub asset ID");
-  return fetch(
-    `https://api.github.com/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}/releases/assets/${assetId}`,
-    {headers: {...githubHeaders(env), Accept: "application/octet-stream"}, redirect: "follow"},
-  );
-}
-
-function githubHeaders(env: Env): Record<string, string> {
-  return {
-    Authorization: `Bearer ${env.GITHUB_LIBRARY_TOKEN}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "ClassMate-Cloudflare-Worker",
-  };
-}
-
-function requireJsonSize(request: Request, maxBytes: number): void {
-  const type = request.headers.get("Content-Type") ?? "";
-  if (!type.startsWith("application/json")) throw new HttpError(415, "JSON body required");
-  const length = Number(request.headers.get("Content-Length") ?? "0");
-  if (length > maxBytes) throw new HttpError(413, "Request body is too large");
-}
-
-function json(value: unknown, status = 200): Response {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: {"Content-Type": "application/json; charset=utf-8"},
-  });
-}
-
-function cors(response: Response): Response {
-  const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-AI-Model, X-Batch-Id, X-Semester-Id");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  headers.set("Cache-Control", "no-store");
-  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
-}
-
-class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
-}
+import {createRemoteJWKSet, jwtVerify, type JWTPayload} from "jose";
+
+interface Env {
+  FIREBASE_PROJECT_ID: string;
+  GEMINI_API_KEY: string;
+  GROQ_API_KEY: string;
+  GITHUB_LIBRARY_TOKEN: string;
+  GITHUB_OWNER: string;
+  GITHUB_REPO: string;
+  GITHUB_RELEASE_TAG: string;
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_CHANNEL_ID: string;
+  ONESIGNAL_REST_API_KEY: string;
+  ONESIGNAL_APP_ID: string;
+  ARCHIVE_API_URL: string;
+  ARCHIVE_INTEGRATION_SECRET: string;
+  SUPABASE_URL: string;
+  SUPABASE_PUBLISHABLE_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+  CLASSMATE_DISPATCH_SECRET?: string;
+}
+
+interface AuthContext {
+  token: string;
+  uid: string;
+  claims: JWTPayload;
+}
+
+interface UserAccess {
+  role: string;
+  permissions: Record<string, boolean>;
+  batchId: string;
+  adminBatchIds: string[];
+}
+
+const firebaseKeys = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
+);
+
+const geminiModels = new Set([
+  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-pro",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+]);
+
+const groqModels = new Set([
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768",
+  "gemma2-9b-it",
+]);
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === "OPTIONS") return cors(new Response(null, {status: 204}));
+
+    const url = new URL(request.url);
+    if (url.pathname === "/health" && request.method === "GET") {
+      return json({ok: true, service: "classmate-secure-api"});
+    }
+
+    try {
+      if (url.pathname === "/internal/archive-sync" && request.method === "POST") {
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        if (!integrationAuthorized && !serviceAuthorized) {
+          throw new HttpError(403, "Archive sync access denied");
+        }
+        return json(await syncArchiveCatalog(env, url.searchParams.get("dryRun") !== "1"));
+      }
+      if (url.pathname === "/internal/telegram-broadcast" && request.method === "POST") {
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        const dispatchSecret = env.CLASSMATE_DISPATCH_SECRET;
+        const dispatchAuthorized = Boolean(dispatchSecret) && request.headers.get("X-Dispatch-Secret") === dispatchSecret;
+        if (!serviceAuthorized && !integrationAuthorized && !dispatchAuthorized) {
+          throw new HttpError(403, "Telegram broadcast access denied");
+        }
+        return await broadcastResourceTelegram(request, env);
+      }
+      if (url.pathname === "/internal/telegram-test" && request.method === "POST") {
+        const serviceAuthorized = Boolean(env.SUPABASE_SERVICE_ROLE_KEY) &&
+          request.headers.get("Authorization") === `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`;
+        const integrationAuthorized = Boolean(env.ARCHIVE_INTEGRATION_SECRET) &&
+          request.headers.get("X-ClassMate-Integration") === env.ARCHIVE_INTEGRATION_SECRET;
+        if (!serviceAuthorized && !integrationAuthorized) {
+          throw new HttpError(403, "Telegram test access denied");
+        }
+        const resp = await testTelegram(env);
+        return json(await resp.json().catch(() => ({ok: resp.ok})));
+      }
+      const auth = await authenticate(request, env);
+
+      if (url.pathname === "/v1/ai/gemini" && request.method === "POST") {
+        return cors(await proxyGemini(request, env));
+      }
+      if (url.pathname === "/v1/ai/groq" && request.method === "POST") {
+        return cors(await proxyGroq(request, env));
+      }
+      if (url.pathname === "/v1/notifications" && request.method === "POST") {
+        return cors(await sendNotification(request, env, auth));
+      }
+      if (url.pathname.startsWith("/v1/archive/")) {
+        return cors(await proxyArchive(request, url, env, auth));
+      }
+      if (url.pathname === "/v1/telegram/upload" && request.method === "POST") {
+        await requireBatchPermission(request, env, auth, ["canUploadPDF", "canUploadLibrary"]);
+        return cors(await proxyTelegramUpload(request, env));
+      }
+      if (url.pathname === "/v1/telegram/test" && request.method === "POST") {
+        await requireSuperAdmin(env, auth);
+        return cors(await testTelegram(env));
+      }
+      if (url.pathname.startsWith("/v1/telegram/files/") && request.method === "GET") {
+        const fileId = decodeURIComponent(url.pathname.slice("/v1/telegram/files/".length));
+        return cors(await downloadTelegramFile(fileId, env));
+      }
+      if (url.pathname === "/v1/github/upload" && request.method === "POST") {
+        await requireBatchPermission(request, env, auth, ["canUploadPDF", "canUploadLibrary"]);
+        return cors(await uploadGitHubAsset(request, url, env));
+      }
+      if (url.pathname.startsWith("/v1/github/assets/") && request.method === "GET") {
+        const assetId = url.pathname.slice("/v1/github/assets/".length);
+        return cors(await downloadGitHubAsset(assetId, env));
+      }
+
+      return cors(json({error: "Not found"}, 404));
+    } catch (error) {
+      const status = error instanceof HttpError ? error.status : 500;
+      const message = error instanceof Error ? error.message : "Internal server error";
+      return cors(json({error: message}, status));
+    }
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(syncArchiveCatalog(env, true).then(() => undefined));
+  },
+} satisfies ExportedHandler<Env>;
+
+async function syncArchiveCatalog(env: Env, apply: boolean): Promise<unknown> {
+  if (!env.ARCHIVE_INTEGRATION_SECRET || !env.SUPABASE_SERVICE_ROLE_KEY ||
+      !env.ARCHIVE_API_URL || !env.SUPABASE_URL) {
+    throw new HttpError(503, "Archive reconciliation is not configured");
+  }
+  const source = await fetch(`${env.ARCHIVE_API_URL.replace(/\/$/, "")}/sync/catalog`, {
+    headers: {"X-ClassMate-Integration": env.ARCHIVE_INTEGRATION_SECRET},
+  });
+  if (!source.ok) throw new HttpError(502, `Archive catalogue unavailable (${source.status})`);
+  const snapshot = await source.json<{
+    batches?: Array<{id: string}>;
+    courses?: Array<{id: string}>;
+  }>();
+  if (!Array.isArray(snapshot.batches) || !snapshot.batches.length ||
+      !Array.isArray(snapshot.courses)) {
+    throw new HttpError(502, "Archive returned an incomplete catalogue");
+  }
+  const target = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/sync_archive_catalog`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({snapshot, apply_changes: apply}),
+  });
+  if (!target.ok) throw new HttpError(502, `Supabase reconciliation failed (${target.status})`);
+  return target.json();
+}
+
+async function authenticate(request: Request, env: Env): Promise<AuthContext> {
+  const header = request.headers.get("Authorization") ?? "";
+  if (!header.startsWith("Bearer ")) throw new HttpError(401, "Authentication required");
+  const token = header.slice(7).trim();
+  if (!token) throw new HttpError(401, "Authentication required");
+
+  try {
+    const issuer = `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`;
+    const {payload} = await jwtVerify(token, firebaseKeys, {
+      algorithms: ["RS256"],
+      audience: env.FIREBASE_PROJECT_ID,
+      issuer,
+    });
+    if (!payload.sub) throw new Error("Missing subject");
+    return {token, uid: payload.sub, claims: payload};
+  } catch {
+    throw new HttpError(401, "Invalid or expired Firebase session");
+  }
+}
+
+async function loadUserAccess(env: Env, auth: AuthContext): Promise<UserAccess> {
+  const project = encodeURIComponent(env.FIREBASE_PROJECT_ID);
+  const uid = encodeURIComponent(auth.uid);
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}`,
+    {headers: {Authorization: `Bearer ${auth.token}`}},
+  );
+  if (!response.ok) throw new HttpError(403, "Unable to verify user permissions");
+  const document = await response.json<Record<string, unknown>>() as {
+    fields?: Record<string, {
+      stringValue?: string;
+      mapValue?: {fields?: Record<string, {booleanValue?: boolean}>};
+      arrayValue?: {values?: Array<{stringValue?: string}>};
+    }>;
+  };
+  const fields = document.fields ?? {};
+  const permissionFields = fields.permissions?.mapValue?.fields ?? {};
+  const permissions: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(permissionFields)) permissions[key] = value.booleanValue === true;
+  const adminBatchIds = (fields.adminBatchIds?.arrayValue?.values ?? [])
+    .map((value) => value.stringValue?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+  return {
+    role: fields.role?.stringValue ?? "student",
+    permissions,
+    batchId: fields.batchId?.stringValue?.trim().toLowerCase() ?? "",
+    adminBatchIds,
+  };
+}
+
+async function requirePermission(env: Env, auth: AuthContext, allowed: string[]): Promise<void> {
+  const access = await loadUserAccess(env, auth);
+  if (access.role === "admin" || access.role === "superadmin") return;
+  if (allowed.some((permission) => access.permissions[permission])) return;
+  throw new HttpError(403, "You do not have permission for this action");
+}
+
+async function requireSuperAdmin(env: Env, auth: AuthContext): Promise<void> {
+  const access = await loadUserAccess(env, auth);
+  if (!isGlobalSuperAdmin(access)) throw new HttpError(403, "Global superadmin access required");
+}
+
+function isGlobalSuperAdmin(access: UserAccess): boolean {
+  // Keep the legacy spelling only while existing accounts are migrated.
+  return access.role === "global_super_admin" || access.role === "global_superadmin";
+}
+
+function canManageBatch(access: UserAccess, batchId: string): boolean {
+  return isGlobalSuperAdmin(access) ||
+    ((access.role === "admin" || access.role === "superadmin" || access.role === "super_admin") &&
+      access.adminBatchIds.includes(batchId));
+}
+
+function targetContext(request: Request): {batchId: string; semesterId: string} {
+  const batchId = (request.headers.get("X-Batch-Id") ?? "").trim().toLowerCase();
+  const semesterId = (request.headers.get("X-Semester-Id") ?? "").trim().toLowerCase();
+  if (!/^[a-z0-9_-]{2,30}$/.test(batchId) || !/^[a-z0-9_-]{1,30}$/.test(semesterId)) {
+    throw new HttpError(400, "A valid batch and semester context are required");
+  }
+  return {batchId, semesterId};
+}
+
+async function requireBatchPermission(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+  allowed: string[],
+): Promise<{batchId: string; semesterId: string}> {
+  const context = targetContext(request);
+  const access = await loadUserAccess(env, auth);
+  const permitted = canManageBatch(access, context.batchId) ||
+    (access.batchId === context.batchId && allowed.some((permission) => access.permissions[permission]));
+  if (!permitted) throw new HttpError(403, "You are not authorized for this batch");
+  return context;
+}
+
+async function proxyArchive(
+  request: Request,
+  url: URL,
+  env: Env,
+  auth: AuthContext,
+): Promise<Response> {
+  if (!env.ARCHIVE_API_URL || !env.ARCHIVE_INTEGRATION_SECRET) {
+    throw new HttpError(503, "Archive integration is not configured");
+  }
+  const relativePath = url.pathname.slice("/v1/archive".length);
+  const readAllowed = request.method === "GET" &&
+    (/^\/(archive|public|resources|search)$/.test(relativePath) ||
+      /^\/(resource|download)\/[A-Za-z0-9_-]+$/.test(relativePath));
+  const courseCreate = request.method === "POST" && relativePath === "/courses";
+  const courseManage = request.method === "POST" &&
+    /^\/courses\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
+  const onboarding = request.method === "POST" && relativePath === "/onboarding";
+  const uploadMutation = request.method === "POST" &&
+    (relativePath === "/uploads" || /^\/uploads\/[A-Za-z0-9_-]+\/(complete|cancel)$/.test(relativePath));
+  const resourceAdmin = request.method === "POST" &&
+    /^\/resources\/[A-Za-z0-9_-]+\/(edit|delete)$/.test(relativePath);
+  if (!readAllowed && !courseCreate && !courseManage && !onboarding && !uploadMutation && !resourceAdmin) {
+    throw new HttpError(404, "Archive endpoint not found");
+  }
+
+  const context = targetContext(request);
+  const action = uploadMutation ? "upload" : "read";
+  if (!await canAccessV2ArchiveBatch(env, auth, context.batchId, action)) {
+    throw new HttpError(403, "Your Supabase role does not allow this Archive action for the selected batch");
+  }
+
+  const endpoint = env.ARCHIVE_API_URL.replace(/\/$/, "") + relativePath + url.search;
+  const headers = new Headers();
+  const contentType = request.headers.get("Content-Type");
+  if (contentType) headers.set("Content-Type", contentType);
+  headers.set("X-ClassMate-Integration", env.ARCHIVE_INTEGRATION_SECRET);
+  headers.set("X-ClassMate-Uid", auth.uid);
+  headers.set("X-ClassMate-Email", String(auth.claims.email ?? ""));
+  headers.set("X-ClassMate-Name", encodeURIComponent(String(auth.claims.name ?? "ClassMate user")));
+  headers.set("X-ClassMate-Batch", context.batchId);
+  headers.set("X-ClassMate-Semester", context.semesterId);
+  if (courseManage || resourceAdmin) {
+    headers.set("X-ClassMate-Can-Manage", String(
+      await canAccessV2ArchiveBatch(env, auth, context.batchId, "resource_manage"),
+    ));
+  }
+  const response = await fetch(endpoint, {
+    method: request.method,
+    headers,
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+    redirect: "manual",
+  });
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type": response.headers.get("Content-Type") ?? "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function canAccessV2ArchiveBatch(
+  env: Env,
+  auth: AuthContext,
+  batchId: string,
+  action: string,
+): Promise<boolean> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
+    throw new HttpError(503, "Supabase authorization is not configured");
+  }
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_access_v2_archive_batch`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({target_batch_code: batchId, target_action: action}),
+  });
+  if (!response.ok) throw new HttpError(503, "Unable to verify Supabase Archive access");
+  return await response.json<unknown>() === true;
+}
+
+async function proxyGemini(request: Request, env: Env): Promise<Response> {
+  requireJsonSize(request, 96_000);
+  const model = request.headers.get("X-AI-Model") ?? "gemini-2.5-flash";
+  if (!geminiModels.has(model)) throw new HttpError(400, "Unsupported Gemini model");
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY},
+    body: request.body,
+  });
+}
+
+async function proxyGroq(request: Request, env: Env): Promise<Response> {
+  requireJsonSize(request, 96_000);
+  const body = await request.text();
+  let parsed: {model?: string};
+  try {
+    parsed = JSON.parse(body) as {model?: string};
+  } catch {
+    throw new HttpError(400, "Invalid JSON body");
+  }
+  if (!parsed.model || !groqModels.has(parsed.model)) throw new HttpError(400, "Unsupported Groq model");
+  return fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", Authorization: `Bearer ${env.GROQ_API_KEY}`},
+    body,
+  });
+}
+
+async function sendNotification(request: Request, env: Env, auth: AuthContext): Promise<Response> {
+  requireJsonSize(request, 32_000);
+  const payload = await request.json<Record<string, unknown>>();
+  const data = (payload.data ?? {}) as Record<string, unknown>;
+  const type = String(data.type ?? "");
+
+  if (type === "chat_message") {
+    if (String(data.senderId ?? "") !== auth.uid) throw new HttpError(403, "Sender identity mismatch");
+    // Strip arbitrary client segments to prevent global broadcast hijacks
+    delete payload.included_segments;
+    const roomId = String(data.roomId ?? "").trim();
+    if (roomId && roomId !== "group_main") {
+      delete payload.filters;
+      payload.filters = [{field: "tag", key: "chat_room", relation: "=", value: roomId}];
+    }
+  } else {
+    const permissions = type === "poll"
+      ? ["canCreatePolls"]
+      : type === "cancellation" || type === "substitute"
+        ? ["canSendClassCancel"]
+        : type === "resource"
+          ? ["canUploadPDF", "canUploadLibrary"]
+          : ["canPostNotices"];
+    const batchId = String(data.batchId ?? "").trim().toLowerCase();
+    const context = targetContext(request);
+    if (batchId !== context.batchId) throw new HttpError(400, "Notification batch does not match request context");
+    const v2Authorized = ["notice", "cancellation", "substitute", "resource"].includes(type) &&
+      await canSendV2Notification(env, auth, batchId);
+    let permitted = v2Authorized;
+    if (!permitted) {
+      const access = await loadUserAccess(env, auth);
+      permitted = canManageBatch(access, batchId) ||
+        (access.batchId === batchId && permissions.some((permission) => access.permissions[permission]));
+    }
+    if (!permitted) throw new HttpError(403, "You are not authorized for this notification batch");
+    // Never forward caller-controlled broadcast segments or filters. Batch
+    // delivery is derived solely from the verified tenant context.
+    delete payload.included_segments;
+    delete payload.filters;
+    payload.filters = [{field: "tag", key: "batchId", relation: "=", value: batchId}];
+  }
+
+  payload.app_id = env.ONESIGNAL_APP_ID;
+  return fetch("https://api.onesignal.com/notifications", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", Authorization: `Key ${env.ONESIGNAL_REST_API_KEY}`},
+    body: JSON.stringify(payload),
+  });
+}
+
+async function canSendV2Notification(env: Env, auth: AuthContext, batchId: string): Promise<boolean> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return false;
+  const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/rpc/can_send_v2_batch_notification`, {
+    method: "POST",
+    headers: {
+      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({target_batch_code: batchId}),
+  });
+  if (!response.ok) return false;
+  const result: unknown = await response.json();
+  return result === true || (Array.isArray(result) && result[0] === true);
+}
+
+async function proxyTelegramUpload(request: Request, env: Env): Promise<Response> {
+  const contentType = request.headers.get("Content-Type");
+  if (!contentType?.startsWith("multipart/form-data")) throw new HttpError(400, "Multipart upload required");
+  return fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, {
+    method: "POST",
+    headers: {"Content-Type": contentType},
+    body: request.body,
+  });
+}
+
+async function testTelegram(env: Env): Promise<Response> {
+  return fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({chat_id: env.TELEGRAM_CHANNEL_ID, text: "✅ ClassMate bot is connected and working!"}),
+  });
+}
+
+interface TelegramBroadcastPayload {
+  resource_id: string;
+  title: string;
+  category?: string;
+  course_title?: string | null;
+  course_code?: string | null;
+  uploader_name?: string | null;
+  file_type?: string | null;
+  batch_number?: number | null;
+  slug?: string | null;
+}
+
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+async function broadcastResourceTelegram(request: Request, env: Env): Promise<Response> {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHANNEL_ID) {
+    throw new HttpError(503, "Telegram credentials not configured");
+  }
+  const payload = await request.json<TelegramBroadcastPayload>().catch(() => null);
+  if (!payload || !payload.resource_id || !payload.title) {
+    throw new HttpError(400, "Missing required payload fields");
+  }
+
+  // Strictly broadcast for batch 22 (CSE 22)
+  if (payload.batch_number !== undefined && payload.batch_number !== null && payload.batch_number !== 22) {
+    return json({ skipped: true, reason: "Non-22 batch" });
+  }
+
+  const rawSlug = (payload.slug && payload.slug.trim()) || payload.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || payload.resource_id;
+  let slug = rawSlug;
+  let queryString = "";
+  if (rawSlug.includes("?")) {
+    const parts = rawSlug.split("?");
+    slug = parts[0];
+    queryString = "?" + parts.slice(1).join("?");
+  }
+  const publicUrl = `https://classmatebd.vercel.app/r/${encodeURIComponent(slug)}${queryString}`;
+
+  const bodyData = {
+    chat_id: env.TELEGRAM_CHANNEL_ID,
+    text: publicUrl,
+    link_preview_options: {
+      is_disabled: false,
+      url: publicUrl,
+      prefer_large_media: true,
+      show_above_text: false,
+    },
+  };
+
+  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyData),
+  });
+
+  const responseBody = await response.json<Record<string, unknown>>().catch(() => ({}));
+  if (!response.ok) {
+    return json({ ok: false, error: responseBody }, response.status);
+  }
+  return json({ ok: true, result: responseBody });
+}
+
+async function downloadTelegramFile(fileId: string, env: Env): Promise<Response> {
+  if (!fileId || fileId.length > 512) throw new HttpError(400, "Invalid Telegram file ID");
+  const metadata = await fetch(
+    `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`,
+  );
+  const result = await metadata.json<{ok?: boolean; result?: {file_path?: string}}>();
+  const path = result.result?.file_path;
+  if (!metadata.ok || !result.ok || !path) throw new HttpError(502, "Unable to resolve Telegram file");
+  return fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${path}`);
+}
+
+async function uploadGitHubAsset(request: Request, url: URL, env: Env): Promise<Response> {
+  const name = url.searchParams.get("name")?.trim();
+  if (!name || name.length > 180 || name.includes("/") || name.includes("\\")) {
+    throw new HttpError(400, "Invalid asset name");
+  }
+  const headers = githubHeaders(env);
+  const release = await fetch(
+    `https://api.github.com/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}/releases/tags/${encodeURIComponent(env.GITHUB_RELEASE_TAG)}`,
+    {headers},
+  );
+  if (!release.ok) return release;
+  const releaseJson = await release.json<{upload_url?: string}>();
+  const uploadBase = releaseJson.upload_url?.split("{")[0];
+  if (!uploadBase) throw new HttpError(502, "GitHub release has no upload URL");
+  return fetch(`${uploadBase}?name=${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: {...headers, "Content-Type": request.headers.get("Content-Type") ?? "application/octet-stream"},
+    body: request.body,
+  });
+}
+
+async function downloadGitHubAsset(assetId: string, env: Env): Promise<Response> {
+  if (!/^\d+$/.test(assetId)) throw new HttpError(400, "Invalid GitHub asset ID");
+  return fetch(
+    `https://api.github.com/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}/releases/assets/${assetId}`,
+    {headers: {...githubHeaders(env), Accept: "application/octet-stream"}, redirect: "follow"},
+  );
+}
+
+function githubHeaders(env: Env): Record<string, string> {
+  return {
+    Authorization: `Bearer ${env.GITHUB_LIBRARY_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "ClassMate-Cloudflare-Worker",
+  };
+}
+
+function requireJsonSize(request: Request, maxBytes: number): void {
+  const type = request.headers.get("Content-Type") ?? "";
+  if (!type.startsWith("application/json")) throw new HttpError(415, "JSON body required");
+  const length = Number(request.headers.get("Content-Length") ?? "0");
+  if (length > maxBytes) throw new HttpError(413, "Request body is too large");
+}
+
+function json(value: unknown, status = 200): Response {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: {"Content-Type": "application/json; charset=utf-8"},
+  });
+}
+
+function cors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-AI-Model, X-Batch-Id, X-Semester-Id");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Cache-Control", "no-store");
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
+}
+
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}

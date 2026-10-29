@@ -42,6 +42,7 @@ interface MatrixStudent {
   present_count: number;
   total_sessions: number;
   percentage: number;
+  is_readd?: boolean;
 }
 
 interface MatrixResponse {
@@ -186,9 +187,12 @@ export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
     );
   }
 
-  // Sorted by natural roll number (CE25001...) or lowest % first for the roster tab
+  // Sorted by natural roll number (CE25001...) with re-add students last, or lowest % first for the roster tab
   const sortedStudents = [...(matrixQuery.data?.students || [])].sort((a, b) => {
     if (rosterSortBy === "roll") {
+      const aReadd = Boolean(a.is_readd);
+      const bReadd = Boolean(b.is_readd);
+      if (aReadd !== bReadd) return aReadd ? 1 : -1;
       return compareStudentRolls(a.roll, b.roll) || a.full_name.localeCompare(b.full_name);
     }
     return (a.percentage - b.percentage) || compareStudentRolls(a.roll, b.roll);

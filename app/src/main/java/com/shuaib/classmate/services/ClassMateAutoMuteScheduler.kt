@@ -30,9 +30,12 @@ object ClassMateAutoMuteScheduler {
             "select=id,day_of_week,start_time,end_time&semester_course_id=in.(${ids.joinToString(",")})")
         val pendingCodes = mutableSetOf<String>()
         val today = LocalDate.now()
+        val calendarData = com.shuaib.classmate.activities.ClassMateCalendarData(context) { "" }
         for (offset in 0..7) {
             val date = today.plusDays(offset.toLong())
             val day = date.dayOfWeek.value % 7
+            // Automatically sync with calendar: skip mute if classes are closed on this date
+            if (calendarData.classClosure(date) != null) continue
             for (i in 0 until slots.length()) {
                 val slot = slots.getJSONObject(i)
                 if (slot.optInt("day_of_week") != day) continue

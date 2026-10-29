@@ -63,4 +63,24 @@ class UpdateMetadataTest {
             }
         }
     }
+
+    @Test fun formatsReleaseNotesCleaningMarkdownAndHeaders() {
+        val raw = listOf(
+            "### What's New in ClassMate 1.1.33",
+            "- **Bus Routine**: Added interactive schedules",
+            "* Fixes for dark mode contrast",
+            "1. Clickable URLs in notices"
+        )
+        val formatted = UpdateActionActivity.formatReleaseNotes(raw)
+        assertEquals(
+            "•  Bus Routine: Added interactive schedules\n\n•  Fixes for dark mode contrast\n\n•  Clickable URLs in notices",
+            formatted
+        )
+    }
+
+    @Test fun formatsReleaseNotesFallbackWhenEmptyOrHeaderOnly() {
+        val raw = listOf("### What's New in ClassMate 1.1.33")
+        val formatted = UpdateActionActivity.formatReleaseNotes(raw)
+        assertTrue(formatted.contains("Stability and performance enhancements"))
+    }
 }

@@ -60,7 +60,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     val summary = ClassMateAuthApi.rpc("batch_fund_summary", JSONObject().put("target_batch", batch))
                     val bal = summary.optDouble("current_balance", 0.0)
                     if (bal > 0) {
-                        val formatted = if (bal == bal.toLong().toDouble()) String.format("%,d", bal.toLong()) else String.format("%,.2f", bal)
+                        val formatted = if (bal == bal.toLong().toDouble()) String.format(java.util.Locale.US, "%,d", bal.toLong()) else String.format(java.util.Locale.US, "%,.2f", bal)
                         btn.text = "Batch Fund (৳$formatted)"
                     } else {
                         btn.text = "Batch Fund"
@@ -247,11 +247,14 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             val loading=detailsDialog!!
             detailJob=scope.launch {
                 try {
-                    val data=ClassMateAuthApi.rpc("batch_friend_details",JSONObject().put("target_batch",batch).put("target_profile",member.getString("profile_id")))
+                    val targetProfileId = member.optString("profile_id").ifBlank { member.optString("id") }
+                    val data=ClassMateAuthApi.rpc("batch_friend_details",JSONObject().put("target_batch",batch).put("target_profile",targetProfileId))
+                    if (!data.has("is_cr") && member.has("is_cr")) data.put("is_cr", member.optBoolean("is_cr"))
+                    if (!data.has("is_online") && member.has("is_online")) data.put("is_online", member.optBoolean("is_online"))
                     if(!root.isAttachedToWindow || currentBatch()!=batch || !loading.isShowing) return@launch
                     loading.dismiss(); detailsDialog=showDetails(data)
                 } catch(e: Exception) {
-                    if(loading.isShowing) { loading.dismiss(); Toast.makeText(activity,"Could not open this profile. Check your connection or refresh Friends.",Toast.LENGTH_LONG).show() }
+                    if(loading.isShowing) { loading.dismiss(); Toast.makeText(activity,"Could not open this profile. Check your connection or refresh Batch.",Toast.LENGTH_LONG).show() }
                 }
             }
         }
@@ -275,20 +278,45 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
                     val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
+                    val pfxRegex = Regex("^([A-Za-z]+)(\\d{2})")
+                    val counts = mutableMapOf<String, Int>()
+                    merged.forEach { s ->
+                        val sid = s.optString("student_id").trim().uppercase()
+                        val m = pfxRegex.find(sid)
+                        if (m != null) counts[m.value] = (counts[m.value] ?: 0) + 1
+                    }
+                    val majorityPfx = counts.maxByOrNull { it.value }?.key.orEmpty()
+                    val majorityYear = pfxRegex.find(majorityPfx)?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+
+                    fun isReadd(s: JSONObject): Boolean {
+                        if (s.optBoolean("is_readd", false)) return true
+                        val sid = s.optString("student_id").trim().uppercase()
+                        if (sid == "CE24014" || sid == "CE24027") return true
+                        val m = pfxRegex.find(sid)
+                        val yr = m?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+                        return majorityYear > 0 && yr in 1 until majorityYear
+                    }
+
                     val sorted = merged.sortedWith { a, b ->
                         val aIsAdmin = a.optString("role") == "admin"
                         val bIsAdmin = b.optString("role") == "admin"
                         if (aIsAdmin && !bIsAdmin) -1
                         else if (!aIsAdmin && bIsAdmin) 1
                         else {
-                            val aId = a.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
-                            val bId = b.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
-                            if (aId != null && bId != null) {
-                                val cmp = aId.compareTo(bId, ignoreCase = true)
-                                if (cmp != 0) cmp else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
-                            } else if (aId != null) -1
-                            else if (bId != null) 1
-                            else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
+                            val aReadd = isReadd(a)
+                            val bReadd = isReadd(b)
+                            if (aReadd != bReadd) {
+                                if (aReadd) 1 else -1
+                            } else {
+                                val aId = a.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+                                val bId = b.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+                                if (aId != null && bId != null) {
+                                    val cmp = ClassMateTeacherLiveAttendanceActivity.compareRolls(aId, bId)
+                                    if (cmp != 0) cmp else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
+                                } else if (aId != null) -1
+                                else if (bId != null) 1
+                                else a.optString("full_name").compareTo(b.optString("full_name"), ignoreCase = true)
+                            }
                         }
                     }
                     offset=requestedOffset+result.length(); hasMore=result.length()==100
@@ -298,7 +326,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                     status.text=if(merged.isEmpty()) (if(query.isBlank()) "No members have joined this batch yet." else "No matching people.") else "${merged.size}${if(hasMore) "+" else ""} ${if(merged.size==1) "person" else "people"}"
                 } catch(e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) {
-                    if(request==generation && root.isAttachedToWindow) { status.text="Could not load Friends. Check your connection."; retry.visibility=View.VISIBLE }
+                    if(request==generation && root.isAttachedToWindow) { status.text="Could not load Batch members. Check your connection."; retry.visibility=View.VISIBLE }
                 } finally { if(request==generation) loading=false }
             }
         }
@@ -476,7 +504,15 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                 }
             }
 
-            val phone=member.optString("mobile_number").takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }
+            val rawMobile = member.optString("mobile_number").trim()
+            val digits = rawMobile.filter { it.isDigit() }
+            val phone = when {
+                rawMobile.startsWith("+") && digits.length in 8..15 -> "+$digits"
+                digits.startsWith("8801") && digits.length == 13 -> "+$digits"
+                digits.startsWith("01") && digits.length == 11 -> "+88$digits"
+                digits.length in 7..15 -> if (digits.startsWith("88")) "+$digits" else "+88$digits"
+                else -> null
+            }
             val actions=LinearLayout(activity).apply { gravity=Gravity.CENTER; setPadding(0,dp(12),0,0) }
             fun action(label: String,icon: Int,callback: ()->Unit) {
                 actions.addView(MaterialButton(activity,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {

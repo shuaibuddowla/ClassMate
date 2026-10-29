@@ -111,9 +111,11 @@ class UpdateActionActivity : AppCompatActivity() {
 
         if (isMandatory) {
             binding.tvUpdateTitle.text = "Update Required"
+            binding.tvUpdateSubtitle.text = "This version is no longer supported. Please update ClassMate to continue."
             binding.btnUpdateLater.visibility = View.GONE
         } else {
             binding.tvUpdateTitle.text = "New Update Available"
+            binding.tvUpdateSubtitle.text = "A newer version of ClassMate is ready with new features, stability fixes, and improvements."
             binding.btnUpdateLater.visibility = View.VISIBLE
             binding.btnUpdateLater.setOnClickListener {
                 dialog.dismiss()
@@ -121,26 +123,7 @@ class UpdateActionActivity : AppCompatActivity() {
             }
         }
 
-        val cleanNotes = metadata.releaseNotes
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { it.startsWith("#") || it.contains("what's new", ignoreCase = true) }
-            .map { line ->
-                line.removePrefix("- ")
-                    .removePrefix("* ")
-                    .removePrefix("• ")
-                    .replace(Regex("""^\d+\.\s*"""), "")
-                    .replace(Regex("""\*\*(.*?)\*\*"""), "$1")
-                    .trim()
-            }
-            .filter { it.isNotBlank() }
-
-        val notes = if (cleanNotes.isNotEmpty()) {
-            cleanNotes.joinToString("\n\n") { "•  $it" }
-        } else {
-            "•  Stability and performance improvements."
-        }
-        binding.tvUpdateChangelog.text = notes
+        binding.tvUpdateChangelog.text = formatReleaseNotes(metadata.releaseNotes)
 
         binding.nsvChangelog.post {
             val maxPx = (150 * resources.displayMetrics.density).toInt()
@@ -216,6 +199,12 @@ class UpdateActionActivity : AppCompatActivity() {
         }
 
         dialog.show()
+        dialog.window?.let { window ->
+            val displayMetrics = resources.displayMetrics
+            val maxWidth = (400 * displayMetrics.density).toInt()
+            val targetWidth = (displayMetrics.widthPixels * 0.90).toInt().coerceAtMost(maxWidth)
+            window.setLayout(targetWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
     }
 
     private fun showPermissionExplanation() {
@@ -252,5 +241,40 @@ class UpdateActionActivity : AppCompatActivity() {
         const val ACTION_RETRY = "com.shuaib.classmate.update.RETRY"
         const val ACTION_CHECK = "com.shuaib.classmate.update.CHECK"
         const val ACTION_MANDATORY = "com.shuaib.classmate.update.MANDATORY"
+
+        fun formatReleaseNotes(releaseNotes: List<String>): String {
+            val allLines = releaseNotes
+                .flatMap { it.split(Regex("""[\r\n]+""")) }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .filterNot { line ->
+                    line.startsWith("#") ||
+                    line.startsWith("===") ||
+                    line.startsWith("---") ||
+                    line.contains("what's new", ignoreCase = true) ||
+                    line.contains("release notes", ignoreCase = true) ||
+                    line.contains("changelog", ignoreCase = true) ||
+                    Regex("""^v?\d+\.\d+(\.\d+)?.*""", RegexOption.IGNORE_CASE).matches(line)
+                }
+                .map { line ->
+                    line.removePrefix("- ")
+                        .removePrefix("* ")
+                        .removePrefix("• ")
+                        .removePrefix("+ ")
+                        .replace(Regex("""^\d+[\.\)]\s*"""), "")
+                        .replace(Regex("""\*\*(.*?)\*\*"""), "$1")
+                        .replace(Regex("""\*(.*?)\*"""), "$1")
+                        .replace(Regex("""`([^`]+)`"""), "$1")
+                        .replace(Regex("""\[(.*?)\]\(.*?\)"""), "$1")
+                        .trim()
+                }
+                .filter { it.isNotBlank() }
+
+            return if (allLines.isNotEmpty()) {
+                allLines.joinToString("\n\n") { "•  $it" }
+            } else {
+                "•  Stability and performance enhancements.\n\n•  User interface refinements and bug fixes."
+            }
+        }
     }
 }

@@ -499,6 +499,18 @@ class NoticeAdapter(
                 it.animateSpringScale(1.2f)
                 onPinClick(notice)
             }
+            binding.btnShare.setOnClickListener {
+                HapticHelper.lightPop(it)
+                val shareUrl = "https://classmatebd.vercel.app/n/${notice.id}"
+                val shareText = "${notice.title}\n$shareUrl"
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, notice.title)
+                    setType("text/plain")
+                }
+                it.context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Notice"))
+            }
 
 
             binding.cardRoot.animate().cancel()

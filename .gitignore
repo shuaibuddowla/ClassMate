@@ -70,3 +70,9 @@ scripts/web/__pycache__/
 /web/tsconfig.tsbuildinfo
 release_build.log
 deliverables/
+
+classmate-react-native/
+
+*.pdf
+attendance_tracker_presentation.html
+

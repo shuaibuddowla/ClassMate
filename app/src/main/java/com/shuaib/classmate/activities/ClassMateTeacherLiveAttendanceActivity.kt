@@ -66,7 +66,8 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         val rollNumber: String,
         var isPresent: Boolean,
         val markedAt: String?,
-        val method: String?
+        val method: String?,
+        val isReadd: Boolean = false
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -244,10 +245,16 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                 )
             }
 
-            // Natural roll sorting: CE25001 < CE25002 < ... < CE25032 < ... < CE25060
+            // Natural roll sorting with Re-add students at the very last
             members.sortWith { a, b ->
-                val rollCmp = compareRolls(a.rollNumber, b.rollNumber)
-                if (rollCmp != 0) rollCmp else a.fullName.compareTo(b.fullName, ignoreCase = true)
+                val aReadd = a.isReadd
+                val bReadd = b.isReadd
+                if (aReadd != bReadd) {
+                    if (aReadd) 1 else -1
+                } else {
+                    val rollCmp = compareRolls(a.rollNumber, b.rollNumber)
+                    if (rollCmp != 0) rollCmp else a.fullName.compareTo(b.fullName, ignoreCase = true)
+                }
             }
 
             rosterList = members
@@ -351,16 +358,29 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                         ClassMateAuthApi.rpc("get_session_summary", JSONObject().put("target_session", sid))
                     }
                     val roster = summary.optJSONArray("roster") ?: JSONArray()
+                    val studentList = mutableListOf<JSONObject>()
+                    for (i in 0 until roster.length()) studentList.add(roster.getJSONObject(i))
+                    studentList.sortWith { a, b ->
+                        val aReadd = a.optBoolean("is_readd", false)
+                        val bReadd = b.optBoolean("is_readd", false)
+                        if (aReadd != bReadd) {
+                            if (aReadd) 1 else -1
+                        } else {
+                            compareRolls(a.optString("roll_number"), b.optString("roll_number"))
+                        }
+                    }
+
                     val csv = StringBuilder()
-                    csv.append("SL,Roll Number,Student Name,Status,Scan Time,Method\n")
-                    for (i in 0 until roster.length()) {
-                        val s = roster.getJSONObject(i)
+                    csv.append("Roll Number,Student Name,Status,Scan Time,Method\n")
+                    for (i in 0 until studentList.size) {
+                        val s = studentList[i]
                         val roll = s.optString("roll_number").replace(",", " ")
                         val name = s.optString("full_name").replace(",", " ")
-                        val status = if (s.optString("status") == "present") "PRESENT" else "ABSENT"
+                        val rawSt = s.optString("status")
+                        val status = if (rawSt.equals("present", ignoreCase = true) || rawSt.equals("p", ignoreCase = true)) "P" else "—"
                         val time = s.optString("marked_at")
                         val method = s.optString("method", "RFID").uppercase(Locale.US)
-                        csv.append("${i + 1},\"$roll\",\"$name\",$status,\"$time\",$method\n")
+                        csv.append("\"$roll\",\"$name\",$status,\"$time\",$method\n")
                     }
                     val fileName = "Attendance_${cleanCode}_$dateStr.csv"
                     val file = File(dir, fileName)

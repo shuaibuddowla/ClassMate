@@ -3110,10 +3110,10 @@ To provide a static credential, Android requires **Host Card Emulation (HCE)**:
 
 ---
 
-## 85. Current System Verification & Production Deployment State (Oct 23, 2026)
+## 85. System Verification & Production Deployment State (Oct 23, 2026)
 
 ### A. Production Cloud Deployments
-- **Supabase Backend**: All four recent migrations successfully applied across Staging and Production:
+- **Supabase Backend**: All four initial migrations successfully applied across Staging and Production:
   - `202610230001_telegram_bot_and_drive_notices.sql`
   - `202610230002_resource_push_notifications.sql`
   - `202610230003_remove_resource_category.sql`
@@ -3131,5 +3131,1078 @@ To provide a static credential, Android requires **Host Card Emulation (HCE)**:
   - Streamlined resource publishing with category removal and full-width subject dropdown.
   - Deep linking from Telegram `/r/{id}` into Android app.
   - 2-segment routine toggle and course name subtitles in file lists.
+
+---
+
+## 86. Title-Based Public Resource Slugs (`/r/[slug]`) & Redesigned Dual-Action Preview UI
+
+### A. The Title Slug Requirement & Motivation
+- **User Request**: *"Let's look at the URL, classmatebd.vercel.app/r/${id}. But I think here we can improve it. What if we use the resource's title or the file title as the admin or CR's enters while uploading it? I think this would be better. And for the dialog that opens when the link is clicked, it shows Download/Open File and another option, Open in ClassMate. Change it to two ways: one is Open, two is Download. You may place them beside. And also, under the layout, write down the little text From ClassMate... And the ClassMate text here should exactly look like as it appears in the Timetable Home Screen in the header."*
+- **Problem**: Cryptic 36-character UUID URLs (e.g. `/r/a1b2c3d4-...`) looked untrustworthy in chat previews and messaging channels. Furthermore, the existing landing page had confusing, stacked actions ("Open in ClassMate" button taking users to the web app even when the native Android app was installed) and scattered metadata.
+
+### B. Database Schema & Auto-Slug Generation (`202610230005_resource_title_slugs.sql`)
+1. **Schema Extension**:
+   - Added column `slug text unique` to `classmate.file_metadata`.
+   - Created index `idx_file_metadata_slug` on `classmate.file_metadata(slug)`.
+2. **Slugification Logic (`classmate.slugify`)**:
+   - Strips non-alphanumeric characters, converts to lowercase, replaces whitespace/underscores with hyphens, and truncates to 90 characters maximum.
+3. **Auto-Deduplication (`classmate.generate_unique_resource_slug`)**:
+   - Checks existing slugs in `classmate.file_metadata`.
+   - On collisions, automatically appends `-1`, `-2`, etc.
+4. **Trigger Integration**:
+   - Trigger `file_metadata_auto_slug` fires before `INSERT` or `UPDATE OF title` to keep slugs automatically synchronized without manual intervention.
+5. **Universal Public Resolver (`classmate.get_public_resource`)**:
+   - Updated RPC parameter to `target_identifier text`.
+   - Resolves by matching `slug = target_identifier` first, and if not found, falls back to `id = target_identifier::uuid` if valid UUID syntax.
+   - 100% backward compatibility with all previously shared links.
+
+### C. Redesigned Public Resource Landing Page (`web/src/app/r/[id]/page.tsx`)
+- **Visual Design & Layout**:
+  - **Course Banner**: Rounded blue banner with course icon, full course name, and high-contrast course code badge (e.g. `CSE 2101`).
+  - **Hero Area**: High-fidelity 3D folded-corner PDF icon or multi-color Google Drive vector icon placed beside the bold resource title and subtitle ("Official Course Curriculum" or "Google Drive Resource").
+  - **Structured Bento Metadata Row**: 3 compact chips displaying **Size** (formatted KB/MB or "Link"), **Batch** (e.g. `CSE 22`), and **Shared** (formatted date).
+  - **Dual Side-by-Side Action Buttons**:
+    1. **Open Button**: Royal blue accent button with external link icon. Opens files inline in browser or launches Google Drive in a new tab.
+    2. **Download Button**: Dark slate button with download icon. Triggers direct attachment download with the original filename and extension.
+  - **Under-Layout Brand Footer**:
+    - Displays two centered lines: `from` and `classmate.`
+    - Typography matches the Android Timetable header: `Plus Jakarta Sans 800`, letter-spacing `-0.03em`, and primary blue dot `.`.
+    - Clickable App Deep Link (`intent://classmatebd.vercel.app/r/{id}#Intent;scheme=https;package=com.shuaib.classmate;S.browser_fallback_url=...;end`): Launches the native ClassMate Android app directly to the resource viewer if installed, or smoothly falls back to the web portal.
+
+### D. Edge OpenGraph Image Engine & Satori SVG Text Node Fix (`opengraph-image.tsx`)
+- **Pixel-Perfect Telegram Cards**:
+  - Dynamically renders 1200x630 OpenGraph preview cards using Next.js `ImageResponse` (Satori).
+  - Matches the exact visual layout of the live resource page: course banner, hero icon, bold title, bento metadata, dual action buttons, and `from classmate.` branding.
+- **Critical Debugging Resolution (Satori Unsupported SVG Text Node)**:
+  - *Bug*: Satori crashed with a fatal rendering error when processing the PDF icon due to an inline SVG `<text x="28" y="47.5">PDF</text>` element and linear gradient coordinate syntax.
+  - *Fix*: Replaced SVG `<text>` elements with an absolute-positioned HTML `<div>` pill with CSS styling (`fontSize: 13px`, `fontWeight: 900`, `backgroundColor: #ffffff`, `color: #dc2626`, `borderRadius: 5px`).
+  - *Result*: Zero-crash OpenGraph image generation verified live in Telegram chat previews.
+- **Telegram Broadcast Polish**:
+  - Configured channel broadcast for `@Class_Mate_ff_bot` (`Note CSE 22` channel).
+  - Quote-formatted messages: first line formatted with markdown quote (`>`), redundant duplicate "ClassMate" headers removed, and previews forced to clean light mode.
+
+---
+
+## 87. Cloudflare R2 Storage Monitoring & 9.9 GB Quota Enforcement Subsystem
+
+### A. Context & Quota Constraints
+- ClassMate utilizes Cloudflare R2 for storing academic materials and lecture notes, operating under a 10 GB free tier limit.
+- Exceeding 10 GB triggers unexpected billing or service cutoff.
+- Requirement: Provide comprehensive storage visibility for administrators and CRs in both Android and Web, and enforce a strict **9.9 GB hard limit** (10,630,044,057 bytes) to guarantee quota safety.
+
+### B. Database Schema & RPC (`202610230006_r2_storage_monitoring.sql`)
+- Implemented `classmate.get_r2_storage_stats()`:
+  - Security: `SECURITY DEFINER` restricted to `admin`, `superadmin`, `owner`, and `is_cr`.
+  - Metrics returned:
+    - `total_bytes`: Sum of `size_bytes` for active files with `r2_object_key is not null`.
+    - `total_files`: Count of active files.
+    - `quota_bytes`: `10,737,418,240` (10 GB).
+    - `limit_bytes`: `10,630,044,057` (9.9 GB hard cutoff).
+    - `warning_bytes`: `8,589,934,592` (8.0 GB warning threshold).
+    - `status`: `'normal'` (< 8.0 GB), `'warning'` (8.0 GB – 9.89 GB), or `'exceeded'` (>= 9.9 GB).
+    - `courses`: Top 15 courses ranked by storage usage (`course_title`, `course_code`, `file_count`, `total_bytes`).
+    - `uploaders`: Top 15 contributors ranked by storage usage (`full_name`, `role`, `file_count`, `total_bytes`).
+  - Public RPC wrapper `public.get_r2_storage_stats()` with schema reload notification.
+
+### C. Multi-Tier 9.9 GB Quota Enforcement Gate
+1. **Server-Side Gate (`supabase/functions/upload-classmate-resource/index.ts`)**:
+   - On `action === "start"`, calculates `current_total + incoming_size`.
+   - If total $\ge 9.9\text{ GB}$, immediately rejects the upload with HTTP 400:
+     `{"error": "Storage quota reached. 9.9 GB limit exceeded."}`.
+2. **Client-Side Pre-Flight Blocker**:
+   - **Android (`ClassMateAcademicScreensSupabase.kt`)**: Verifies storage health before file selection; disables upload triggers and displays explanatory dialog when storage limit is reached.
+   - **Web (`web/src/components/library.tsx`)**: Disables dropzone, file picker, and upload submit button when status is `exceeded`.
+
+### D. Native Android Storage UI (`R2StorageDialog.kt`, `dialog_r2_storage_sheet.xml`)
+- **Settings Entry Point (`fragment_profile.xml`, `classmate_profile.xml`)**:
+  - Added "Cloudflare R2 Storage" row under **UTILITIES & STORAGE** (visible for Admin and CR).
+  - Displays cloud icon (`ic_cloud.xml`), title, and live subtitle with usage pill (`X GB / 10 GB used`).
+- **Interactive Bottom Sheet (`R2StorageDialog.kt`)**:
+  - **Storage Progress Meter**: Dynamic horizontal bar with color-coded states:
+    - Normal (< 8.0 GB): Emerald green (`#10B981`)
+    - Warning (8.0 – 9.89 GB): Amber (`#F59E0B`)
+    - Exceeded ($\ge 9.9\text{ GB}$): Red (`#EF4444`)
+  - **Status Pill**: "Storage Healthy", "Approaching Limit", or "Limit Reached".
+  - **Summary Metric Cards**: Storage Used, Active Files, Quota Percentage, Remaining Capacity.
+  - **Course Breakdown**: Scrollable list of courses with file counts and human-readable byte sizes.
+  - **Top Uploaders**: Contributor names, roles (`CR`, `ADMIN`, `MEMBER`), file counts, and byte sizes.
+
+### E. Web Client Storage UI (`web/src/components/r2-storage-modal.tsx`)
+- TanStack Query hook `useQuery(["r2-storage-stats"])` with 60-second caching.
+- Modal dialog presenting identical progress bar, metric cards, course breakdown, and top uploader rankings in ClassMate dark/light theme tokens.
+
+---
+
+## 88. In-App Self-Hosted Update Dialog Visual Polish & Release 1.1.33 (v33)
+
+### A. Release Overview (v1.1.33, versionCode 33)
+- Built and published release APK `classmate-1.1.33.apk` with version code `33`.
+- Bundles dark mode routine contrast fixes, Settings layout clearance, R2 storage monitoring, notice linkification, and in-app update UI polish.
+
+### B. Update Dialog Visual Overhaul (`UpdateActionActivity.kt`, `dialog_app_update.xml`)
+1. **Version Transition Contrast Enhancement**:
+   - Replaced default low-contrast backgrounds with dedicated assets:
+     - `bg_version_container.xml`: subtle rounded container card.
+     - `bg_version_pill_installed.xml`: high-contrast surface for installed version (`v1.1.32`).
+     - `bg_version_pill_target.xml`: gradient background for target version (`v1.1.33`).
+   - Ensures crisp readability across light mode and AMOLED dark mode.
+2. **Changelog Surface & Markdown Parsing**:
+   - Replaced flat shimmer rectangle with `bg_changelog_card.xml`.
+   - Polished release notes parser in `UpdateActionActivity.kt`:
+     - Strips markdown formatting headers (`#`), bullet indicators (`- `, `* `, `1. `), and bold syntax (`**text**`).
+     - Filters out redundant headers like `"what's new"`.
+     - Formats notes into bullet points with consistent 4dp extra line spacing (`•  ...`).
+     - Dynamically caps `nsvChangelog` height to `150dp` on overflow, enabling vertical scrolling without breaking modal layout.
+3. **Action Button Layout**:
+   - Rebalanced button weights: "Later" (`weight 0.8`) and "Update Now" (`weight 1.2`).
+   - Added single-line text constraint, end-ellipsize protection, and generous touch targets.
+4. **Publishing Script Verification (`scripts/publish-classmate-github-update.ps1`)**:
+   - Added automated release notes splitting and whitespace normalization during GitHub Release manifest creation.
+
+---
+
+## 89. Mobile Web UX Polish — Compact Headers, Docked Bottom Nav, & Attendance Subview Architecture
+
+### A. Mobile Viewport Space Optimization (`web/src/app/globals.css`)
+- **Problem**: On mobile devices, the web client header consumed excessive vertical height, pushing routine tables and notice cards below the screen fold.
+- **Fix**:
+  - Reduced header padding and typography scaling on mobile viewports (`<= 768px`).
+  - Replaced redundant welcome greetings in the Timetable header with the authentic lowercase `classmate.` brand mark matching native Android.
+  - Courses & Batch headers compacted, docking the search icon directly beside the "Add File" button.
+
+### B. System Navigation Bar Collision Resolution
+- **Problem**: The floating bottom navigation bar collided with Android 3-button system bars and gesture navigation bars, causing background gaps and obscuring bottom content.
+- **Fix**:
+  - Docked bottom navigation bar securely to the viewport bottom.
+  - Added safe area padding using `env(safe-area-inset-bottom)`, eliminating blue gaps and preventing touch conflicts with Android gesture bars.
+
+### C. Admin Attendance Roster Refactoring (`web/src/components/admin-attendance.tsx`)
+- **Problem**: Expanding student attendance rosters inside the main management view created an excessively long single-page scroll, making the page unmanageable on mobile.
+- **Fix**:
+  - Converted the student attendance roster into a dedicated subview / slide-in drawer.
+  - Roster browsing, individual student check-in toggles, and manual attendance overrides now operate within an isolated, scrollable subview that dismisses cleanly.
+
+---
+
+## 90. Mobile Web In-Place Android APK Download Popup & Smart Suppression Engine
+
+### A. Motivation & Requirements
+- **User Request**: *"bro for classmate webmobile, everytime a user opens it. it should show a popup of telling the user to download classmate app with a little prompt and a download & install android app also tell after finishing installing classmate app tell him to uninstall web version.. make sure he can download and install it from there(webmobile) without going another page or anywhere. if it possible. one more things once a user installs classmate andriod app then if he visits the classmate web the popup shouldnt come again. and it should remind user after times when a user visits webmobile to install classmate app."*
+- **Objective**: Guide mobile web visitors on Android devices to switch to the high-performance native APK (120Hz smooth scrolling, hardware attendance tracking, reliable push notifications, offline schedules) without disrupting their browsing experience or opening blank tabs.
+
+### B. Component Architecture (`web/src/components/android-install-popup.tsx`)
+1. **Targeting & Platform Detection**:
+   - `isAndroidMobileDevice()`: Regex check on User-Agent (`/Android/i.test(navigator.userAgent)`) combined with mobile screen width (`<= 768px` or touch support).
+   - Completely dormant on desktop and iOS devices.
+2. **In-Place Download Mechanism**:
+   - Injects a hidden `<iframe>` pointed at `/download/android`.
+   - Android OS browser triggers the APK download notification immediately in the background without navigating away, reloading, or opening blank browser tabs.
+3. **Two-Stage Dynamic Modal**:
+   - **Step 1 (Prompt)**:
+     - ClassMate glowing app icon + "Official Android App" badge.
+     - Value highlights:
+       - ⚡ **Instant Speed**: Fluid 120Hz native navigation & zero tab reload lag.
+       - 🔔 **Real-Time Notifications**: Class cancellations & timetable alerts instantly.
+       - 📴 **Offline Resilience**: Daily schedule & documents accessible without data.
+       - 📡 **Attendance Hardware Sync**: Instant RFID and device scanning.
+     - Primary button: **"Download & Install Android App"** (triggers background download).
+     - Secondary buttons: **"I already have the app"** (permanent suppress) and **"Maybe later"** (3-day snooze).
+   - **Step 2 (Installation & Web App Uninstall Guide)**:
+     - Step 1: *"Tap 'Open' on your browser's download notification to install the APK."*
+     - Step 2: *"After installation, uninstall or remove the web app from your home screen to avoid duplicate alerts."*
+     - Confirmation button: **"Done, I've Installed It"** (records installation and dismisses).
+     - Fallback link: *"Didn't start? Tap here to retry download"*.
+4. **Smart Persistence & Suppression Engine**:
+   - `classmate_android_app_installed`: Set to `"true"` in `localStorage` when user confirms installation or states they already have the app. Completely suppresses future popups.
+   - `classmate_android_prompt_snooze`: Set to 3 days in the future (`Date.now() + 3 * 86400000`) when dismissed with "Maybe later".
+   - Manual Reopen: Settings / Profile "ClassMate for Android" row dispatches custom event `classmate:open-android-install` to open prompt on demand.
+5. **Visual Styling (`web/src/app/globals.css`)**:
+   - Centered modal dialog with backdrop blur (`backdrop-filter: blur(10px)`).
+   - Smooth entrance animation (`@keyframes modalPop`).
+   - Full dark mode and light mode compatibility.
+
+---
+
+## 91. Current System Verification & Production Deployment State (Oct 24, 2026)
+
+### A. Production Cloud Deployments
+- **Supabase Backend**: All seven migrations applied and operational:
+  - `202610230001_telegram_bot_and_drive_notices.sql`
+  - `202610230002_resource_push_notifications.sql`
+  - `202610230003_remove_resource_category.sql`
+  - `202610230004_public_resource_access.sql`
+  - `202610230005_resource_title_slugs.sql`
+  - `202610230006_r2_storage_monitoring.sql`
+  - `202610230007_attendance_service_role_and_matrix_grants.sql`
+- **Cloudflare Worker**: Production deployment active at `classmate-secure-api.shuaibuddowla-personal.workers.dev`:
+  - Telegram bot broadcasting operational for channel `Note CSE 22` (`-100...`).
+- **Cloudflare R2 Bucket**: Active storage monitored under 9.9 GB hard cutoff with automatic Edge Function upload gate.
+- **Web Client**: Deployed live to Vercel Production at **`https://classmatebd.vercel.app`**:
+  - Public resource page (`/r/[slug]`) operational with dual Open/Download actions and deep linking.
+  - OpenGraph cards (`/r/[slug]/opengraph-image`) rendering via Satori with SVG text node fix.
+  - Android APK install popup with in-place download and 3-day snooze live in production (Deployment: `dpl_D8jBxtxCoCteSch33dyexZqUuzdp`).
+  - Mobile web compact headers, docked bottom nav, and attendance roster subview active.
+
+### B. Android Native Builds & Distribution
+- **Production APK**: `classmate-1.1.33.apk` (versionCode `33`) published via self-hosted GitHub Releases pipeline.
+- **Features Verified on Physical Hardware**:
+  - In-app update dialog with polished version pills, card changelog, and clean markdown bullets.
+  - Cloudflare R2 storage monitoring sheet under Settings -> Utilities & Storage.
+  - Telegram link deep linking directly into native PDF/Drive viewer.
+  - Timetable dark mode typography contrast and edge-to-edge navigation padding.
+
+---
+
+## 92. Batch Tab Full-Stack Bug Audit & Architectural Resolutions
+
+### A. Context & Objectives
+A full-spectrum audit of the **Batch** tab was performed across the native Android app (`ClassMateFriendsScreen.kt`, `ClassMateBatchFundActivity.kt`, `ClassMateAuthActivity.kt`), Web companion client (`friends.tsx`, `batch-fund.tsx`, `batch-fund-parser.ts`), and Supabase PostgreSQL RPCs. Ten critical, high, and medium priority defects were uncovered and resolved in Migration `202610240001_batch_fund_and_friends_fixes.sql`.
+
+### B. Issues Identified & Applied Solutions
+
+1. **Bangladeshi Mobile Phone & WhatsApp Normalization (Android)**:
+   - **Root Cause**: `ClassMateFriendsScreen.kt` and `ClassMateAuthActivity.kt` evaluated phone numbers against a strict E.164 regex: `Regex("\+[1-9][0-9]{7,14}")`.
+   - **Impact**: In Bangladesh, 99% of students input phone numbers starting with `01...` (11 digits) or `8801...` (13 digits) without a leading `+`. The regex failed, resolving `phone` to `null`. As a consequence, the **Call** and **WhatsApp** action buttons were permanently grayed out for nearly all classmates, and phone calls aborted silently.
+   - **Fix**: Implemented smart phone number sanitization extracting numeric digits:
+     ```kotlin
+     val digits = rawMobile.filter { it.isDigit() }
+     val phone = when {
+         rawMobile.startsWith("+") && digits.length in 8..15 -> "+$digits"
+         digits.startsWith("8801") && digits.length == 13 -> "+$digits"
+         digits.startsWith("01") && digits.length == 11 -> "+88$digits"
+         digits.length in 7..15 -> if (digits.startsWith("88")) "+$digits" else "+88$digits"
+         else -> null
+     }
+     ```
+   - **Result**: Native dialer intent and WhatsApp deep links (`wa.me/8801...`) are reliably enabled for all enrolled students.
+
+2. **"Save & Add Another" Modal Preservation (Web)**:
+   - **Root Cause**: In `AddFundModal` (`batch-fund.tsx`), clicking "Save & Add Another" invoked `onSuccess()`. However, the parent component had bound:
+     `onSuccess={() => { setShowAddModal(false); ... }}`.
+   - **Impact**: Instead of remaining open with empty fields for recording the next batchmate's contribution, the modal abruptly closed, forcing CRs to repeatedly reopen the dialog.
+   - **Fix**: Decoupled modal closure from query invalidation in `onSuccess()`. The modal now resets its input fields and invalidates React Query caches (`batch-fund-summary`) in the background while keeping the modal open until the CR explicitly closes it.
+
+3. **Quick Actions Batch Context Binding (Android)**:
+   - **Root Cause**: Quick Action cards ("Batch Fund" and "Record Fund Entry") in `ClassMateAuthActivity.kt` launched `ClassMateBatchFundActivity` using an empty intent without batch extras.
+   - **Impact**: For admins or students switching between batches, `batchId` fell back to `initializeProfile().optString("batch_id")`. For system admins where `profile.batch_id` is null, `batchId` was empty, causing `loadData()` to abort and render an empty screen.
+   - **Fix**: Attached `.putExtra("batch_id", selectedBatchId)` and `.putExtra("batch_label", selectedBatchLabel)` across all Batch Fund quick action launch paths.
+
+4. **Browser Back Button & URL Navigation Trap (Web)**:
+   - **Root Cause**: In `friends.tsx`, hash listener logic only tested whether the hash started with `#friends/blood` or `#friends/fund` and set state to `true` or `"fund"`.
+   - **Impact**: When a user tapped their browser's Back button (returning URL to `/#batch`), `setBlood(false)` and `setSubTab("batchmates")` were never called. The user remained permanently trapped on the Fund or Blood view.
+   - **Fix**: Added comprehensive two-way state reconciliation:
+     ```tsx
+     const isBlood = location.hash.startsWith("#friends/blood") || location.hash.startsWith("#batch/blood");
+     const isFund = location.hash.startsWith("#friends/fund") || location.hash.startsWith("#batch/fund");
+     setBlood(isBlood);
+     setSubTab(isFund ? "fund" : "batchmates");
+     ```
+     Subscribed to both `hashchange` and `popstate` events.
+
+5. **Accurate Transaction Editing & Notifications (Android)**:
+   - **Root Cause**: When editing an existing transaction in `ClassMateBatchFundActivity.kt`, the payload retained the original `student_profile_id` even if the CR changed the student name. Furthermore, editing expenses kept student data attached.
+   - **Impact**: Updating a misattributed deposit sent an FCM update notification to the previous student and kept the transaction tied to their profile.
+   - **Fix**: Re-matches `newStudent` against the active batch roster on submit to retrieve new `trans_student_profile_id` and `trans_student_id`. Automatically clears student fields for expenses (`outflow`) and hides the student picker when expense mode is active.
+
+6. **Student ID Persistence in Transactions (Android & Web & Supabase)**:
+   - **Root Cause**: Both Android and Web clients omitted `trans_student_id` when invoking `record_batch_fund_transaction`, leaving `classmate.batch_fund_transactions.student_id` as `NULL`.
+   - **Impact**: Searching the financial ledger by student roll number (e.g. `21012`) failed to return transactions.
+   - **Fix**: Updated both clients to pass `trans_student_id`. In `202610240001_batch_fund_and_friends_fixes.sql`, enhanced `record_batch_fund_transaction` and `update_batch_fund_transaction` to automatically look up and populate `student_id` and `student_name` from `classmate.profiles` whenever `student_profile_id` is present.
+
+7. **Direct Student ID Match in Autocomplete (Android)**:
+   - **Root Cause**: In `ClassMateBatchFundActivity.kt`, fallback validation only matched against student full names:
+     `it.fullName.equals(studentRawName, true) || it.display.equals(studentRawName, true)`.
+   - **Impact**: If a CR entered a student's ID (e.g. `21012`) and pressed Save without clicking the dropdown item, validation rejected the input with `"Please select a student from your batch"`.
+   - **Fix**: Added `it.studentId.equals(studentRawName, ignoreCase = true)` to the match conditions.
+
+8. **Preserved CR Badge & Online Status in Details (Backend & Android)**:
+   - **Root Cause**: RPC `classmate.batch_friend_details` omitted `is_cr` and `is_online` in its returned JSON object.
+   - **Impact**: Clicking a batch member marked as "· Class representative" opened a profile modal where `is_cr` and `is_online` defaulted to false, dropping the badge.
+   - **Fix**: Migration `202610240001_batch_fund_and_friends_fixes.sql` added `'is_cr', p.is_cr` and `'is_online'` presence subquery to `batch_friend_details`. Android `ClassMateFriendsScreen.kt` also carries forward list item attributes as fallback.
+
+9. **Local Date Formatting for Midnight–6 AM BST (Web)**:
+   - **Root Cause**: In `batch-fund.tsx` and `batch-fund-parser.ts`, transaction dates were generated using `new Date().toISOString().slice(0, 10)`, which outputs UTC date.
+   - **Impact**: In Bangladesh (BST, UTC+6), transactions recorded between 12:00 AM and 5:59 AM local time were erroneously stamped with yesterday's calendar date.
+   - **Fix**: Switched to local calendar date computation:
+     ```ts
+     const now = new Date();
+     const localTodayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+     ```
+
+10. **Legacy String Polish & US Locale Number Formatting (Android)**:
+    - Replaced lingering "Friends" error strings with "Batch" in `ClassMateFriendsScreen.kt`.
+    - Enforced `java.util.Locale.US` in all `String.format` currency calls to prevent locale-specific digit conversion bugs.
+
+---
+
+## 93. Notices Tab Full-Stack Bug Audit & Threaded Comment System Polish
+
+### A. Context & Objectives
+An in-depth bug audit of the **Notices** and **Social Comments** subsystem was conducted, identifying 7 critical and medium severity defects across Android (`ClassMateAcademicScreensSupabase.kt`, `ClassMateNoticeText.kt`, `ClassMateComments.kt`), Web (`notices.tsx`, `notice-comments.tsx`), and Supabase PostgreSQL functions (`202610240002_notice_fixes_and_attachments.sql`).
+
+### B. Issues Identified & Applied Solutions
+
+1. **Android Reminder Bell Click Hookup**:
+   - **Root Cause**: In `ClassMateAcademicScreensSupabase.kt`, `btnReminder` was visible and styled via `setReminderAppearance()`, but `btnReminder.setOnClickListener` was never set. The helper method `showReminderOptions()` was declared but unreferenced.
+   - **Fix**: Connected `btnReminder.setOnClickListener { showReminderOptions(root, card, item) }`. Notice reminders can now be scheduled, modified, and cleared directly from the card.
+
+2. **Android Text Selection vs. Link Movement Collision**:
+   - **Root Cause**: In `ClassMateNoticeText.kt`, `SelectableLinkMovementMethod.onTouchEvent` unconditionally executed `Selection.removeSelection(buffer)` on `MotionEvent.ACTION_UP` whenever a clickable link was not directly hit.
+   - **Impact**: When students selected text using Android's native text selection handles, lifting their finger (`ACTION_UP`) immediately wiped out the selection, preventing copying.
+   - **Fix**: Removed `Selection.removeSelection(buffer)` on `ACTION_UP` and `ACTION_CANCEL`. User text selections remain active for native copy/share actions.
+   - **Additional Text Protections**:
+     - Added `view.doOnLayout` for expanded notices so `"see less"` reliably renders after layout measurement when bound dynamically.
+     - In `makeCandidate(cutoff)`, added `WEB_URL_PATTERN` intersection checks so preview cutoffs never truncate in the middle of a URL.
+     - Added boundary protection in `findSpanAt` to avoid `IndexOutOfBoundsException` when layout lines are empty.
+
+3. **Notice Title URL Clickability & Click Conflict (Android)**:
+   - **Root Cause**: `tvTitle` in `item_notice_modern.xml` was configured with `setTextIsSelectable(true)` alongside an expansion click listener, which hijacked user taps. Furthermore, `tvTitle.movementMethod` was null, preventing URLs in notice titles from being opened.
+   - **Fix**: Removed conflicting click listener from `tvTitle` and attached `ClassMateNoticeText.newMovementMethod()`, enabling native link clicks in titles.
+
+4. **Deterministic Cancellation Notice Styling (Android)**:
+   - **Root Cause**: Supabase notice select queries in `ClassMateAcademicScreensSupabase.kt` omitted `class_change_id`. Card binding had to rely entirely on title regex matching against English keywords (`noticeCancellationPattern`).
+   - **Impact**: Cancellation notices translated into Bengali or worded differently failed the regex check and were rendered as generic notices rather than cancellation cards.
+   - **Fix**: Added `class_change_id` to Supabase queries. Notice binding now checks `item.optString("class_change_id").isNotBlank()` for deterministic cancellation styling.
+
+5. **Single-Level Threaded Comment Nesting (Android, Web & Supabase)**:
+   - **Root Cause**: When a user tapped "Reply" on a nested reply, the client set `target_parent` to that child reply's UUID. However, database integrity rules enforce single-level nesting (`p.parent_id is null`).
+   - **Impact**: Replying to a child reply crashed with a Postgres exception: `'Reply to an available comment in this notice'`.
+   - **Fix**:
+     - **Client-Side**: In `ClassMateComments.kt` and `notice-comments.tsx`, client resolves `target_parent = replyingTo.parent_id ?: replyingTo.id`.
+     - **Database-Side (`202610240002_notice_fixes_and_attachments.sql`)**: Updated `classmate.save_notice_comment` to auto-resolve to root comment:
+       ```sql
+       select coalesce(p.parent_id, p.id) into resolved_parent
+       from classmate.notice_comments p
+       where p.id = target_parent and p.notice_id = target_notice and p.deleted_at is null;
+       ```
+     - **Android Polish**: Comment badge now counts total comments (`1 + reply_count`), matching notice card counters. Preserved typed drafts in `etComment` when cancelling reply mode.
+
+6. **Web Truncation Safety & Mobile Ringing Bell Glitch**:
+   - **Root Cause**: `NoticeCard` in `notices.tsx` sliced notice previews at character 280 naively (`body.slice(0, 280) + "…"`), chopping URLs in half and generating broken 404 links. Additionally, `.notice-mobile-label` rendered `<BellRing size={20} />` unconditionally on mobile devices.
+   - **Fix**: Implemented `truncateSafely(maxLen)` finding the nearest whitespace or newline boundary before cutting. Fixed mobile bell icon to check `{state.reminder_at ? <BellRing /> : <Bell />}`.
+   - Standardized URL parsing in `NoticeDetailModal` using global `urlRegex`.
+
+7. **Notice Image Attachment Schema Reconciliation (`202610240002_notice_fixes_and_attachments.sql`)**:
+   - Reconciled foreign keys and RLS policies on `public.notice_attachments` to reference `classmate.notices(id)` instead of legacy tables.
+   - Updated `public.prepare_notice_image` and `public.discard_failed_notice_upload` to check author permissions against `classmate.notices`, enabling image uploads on Web.
+
+---
+
+## 94. Timetable & Academic Calendar Real-Time Synchronization & Routine Engine Polish
+
+### A. Context & Objectives
+To ensure seamless coordination between classes and campus events, a unified synchronization mechanism was engineered between the **Class Routine** (Timetable) and the **Academic Calendar** across Web (`schedule.tsx`, `globals.css`) and Android (`ClassMateAcademicScreensSupabase.kt`, `ClassMateCalendarUi.kt`, `ClassMatePeriodEditorActivity.kt`, `ClassMateAutoMuteScheduler.kt`).
+
+### B. Core Architectural Features & Enhancements
+
+1. **Postgres Realtime Multi-Entity Synchronization (Web)**:
+   - In `schedule.tsx`, upgraded the Supabase Realtime channel (`web:schedule-listener`) to monitor changes across:
+     - `routine_slots`: Routine slot additions, updates, or deletions trigger immediate refetch.
+     - `academic_calendar_events`: Holiday additions or date updates instantly reflect across timetable and calendar.
+     - `class_changes`: Cancellation updates invalidate details queries.
+     - `bus_schedules`: Bus timetable updates sync live.
+
+2. **Routine Integration into the Monthly Calendar Grid (Web)**:
+   - `CalendarPanel` receives `routineSlots`. Every day cell in the monthly grid evaluates scheduled classes versus calendar closures and displays status indicator dots:
+     - **Blue dot (`.dots .blue`)**: Normal scheduled classes exist for this day of the week.
+     - **Red dot (`.dots .red`)**: University is closed (general holiday / campus closure).
+     - **Green dot (`.dots .green`)**: Classes suspended / class-specific holiday.
+     - **Muted dot (`.dots .event`)**: University observance / event.
+   - **Selected Day Routine Sync Card**:
+     - Selecting any date in the calendar displays a card summarizing the routine for that day (e.g. `3 Classes Scheduled`), with period times, course codes, and room numbers.
+     - Features a 1-click **"Open in Timetable →"** navigation button that switches tabs with that exact date preselected.
+
+3. **Calendar-to-Timetable Navigation & Date Sync (Android)**:
+   - In `ClassMateCalendarUi.kt`, added `onOpenTimetable` callback and a `"View timetable"` button in the heading when inspecting a date with open classes.
+   - In `ClassMateAcademicScreensSupabase.kt`, toggling between the Calendar and Routine views preserves the active date, eliminating navigation disconnects.
+
+4. **Auto-Mute Scheduler Holiday Sync (Android)**:
+   - In `ClassMateAutoMuteScheduler.kt`, the background scheduler now queries `ClassMateCalendarData.classClosure(date)`.
+   - If classes are suspended or the university is closed on a date, period alarms are skipped, preventing students' phones from being muted on holidays.
+
+### C. Timetable Tab Bug Fixes
+
+1. **Quick Action 1-Day Day-of-Week Shift Bug (Android)**:
+   - In `ClassMateAuthActivity.kt`, the quick action card "Add Routine Period" computed `LocalDate.now().dayOfWeek.value % 7 + 1`.
+   - The extra `+ 1` shifted the day forward by 1 (Sunday opened Monday, Saturday gave index 7 out of bounds).
+   - Fixed to `LocalDate.now().dayOfWeek.value % 7`.
+
+2. **Single-Digit Hour Parsing & Duration `NaN min` / `0 min` Bug (Web & Android)**:
+   - In `schedule.tsx`, time comparisons like `s.start_time.slice(0, 5) <= currentTime` and duration calculations using `Number(s.start_time.slice(0, 2))` broke for single-digit hours (e.g. `"9:00"`), resulting in `NaN min` durations and broken live period detection (`"9:00" <= "09:30"` was false in ASCII). Implemented `parseTimeToMinutes()` for numeric minute calculations.
+   - In `ClassMateAcademicScreensSupabase.kt` and `ClassMatePeriodEditorActivity.kt`, `LocalTime.parse("9:00")` threw `DateTimeParseException`. Implemented `parseLocalTime()` handling both single- and double-digit hour formats safely.
+
+3. **Live Class Period Chronological Order (Web)**:
+   - In `schedule.tsx`, `sortedEntries` previously pushed live classes to index 0, scrambling the chronological routine order (e.g. 10:00 AM class placed before 8:30 AM class). Maintained chronological sorting by `start_time` while keeping distinct `LIVE NOW` card highlighting.
+
+4. **Day of Week Selector in Routine Slot Editor (Web & Android)**:
+   - In both `schedule.tsx` and `ClassMatePeriodEditorActivity.kt`, editing an existing routine slot previously locked it to the current day.
+   - Added an explicit Day of Week exposed dropdown selector (`dayBox` / `dayDropdown`), allowing CRs and teachers to reschedule periods across days.
+
+5. **Day Selector View Thrashing & Pill Indicator Tint (Android)**:
+   - In `ClassMateAcademicScreensSupabase.kt`, tapping a day card previously invoked `setupTimetable()`, completely destroying and recreating all 7 view cards on every tap. Refactored to update selection state in-place via `updateDayPills(root)` and `loadTimetable(root)`.
+   - Fixed indicator tint logic in `updateDayPills()`: selecting a holiday card retains a clean white indicator rather than rendering a red error dot over the blue pill background.
+
+---
+
+## 95. Course Resource Publishing Polish, Attendance Card Dues Subsystem & v1.1.34 Release State
+
+### A. Course File Sharing & Cloudflare R2 Upload Polish (`ClassMatePublishActivity.kt`)
+- **Drive Link Sharing Stuck Submission Fix**:
+  - *Bug*: In `ClassMatePublishActivity.kt`, sharing a Google Drive resource for a course caused the activity to become unresponsive without saving or finishing.
+  - *Fix*: Properly scoped `busy = true` and status indicators for link versus direct file uploads, added clear user feedback toasts (`"Drive link shared successfully"`, `"Changes saved"`), and ensured `finish()` is cleanly invoked upon `RESULT_OK`.
+- **Version Bump**:
+  - Incremented Android build configuration in `app/build.gradle.kts`:
+    - `appVersionCode = 34`
+    - `versionCode = 34`
+    - `versionName = "1.1.34"`
+
+### B. Attendance Card Dues Report Generator (`scripts/generate_attendance_card_unpaid_pdf.py`)
+- **Purpose**: Developed a Python automation script using ReportLab to audit payments for the ClassMate RFID Hardware Attendance Cards across Batch 22 (`de0b3379-54a0-4275-a526-5970295c787e`).
+- **Data Flow**:
+  - Queries active student profiles from `classmate.profiles`.
+  - Queries deposit records matching attendance keywords (`%attend%`) from `classmate.batch_fund_transactions`.
+  - Filters out admin profiles.
+- **Deliverable**:
+  - Generates a professional, publication-quality A4 PDF document: `Attendance_Card_Unpaid_Students_List.pdf`.
+  - Features two-pass dynamic page numbering (`Page X of Y`), running header and departmental footer, university insignia, student ID, student name, and mobile contact numbers for tracking outstanding hardware dues.
+
+### C. Current System Verification & Production Deployment State (Oct 25, 2026)
+- **Supabase Backend**: Migrations `202610240001_batch_fund_and_friends_fixes.sql` and `202610240002_notice_fixes_and_attachments.sql` applied and active in production.
+- **Web Client**: Verified with `npm --prefix web run build` (0 TypeScript / Next.js errors) and `npm --prefix web test` (38/38 unit tests passing).
+- **Android Native Client**: Verified with Gradle `compileDebugKotlin` (`BUILD SUCCESSFUL`) and `testDebugUnitTest` (all 35 unit test suites passing). Ready for production release v1.1.34 (code 34).
+
+---
+
+## 96. Universal Notice Sharing & Instant Deep-Linking Subsystem
+
+### A. Context & User Requirement
+- Implemented a viral, Facebook-style **Notice Sharing & Instant Deep-Linking** architecture across Android and Web.
+- When an academic notice is shared to WhatsApp, Messenger, Telegram, or Facebook:
+  - **App Installed**: Tapping the link immediately launches the native ClassMate Android app, smoothly scrolls to the specific notice in the feed, automatically expands it to show full details, and highlights it with an accent pulse.
+  - **No App Installed / Browser Fallback**: Opens a clean, dedicated public page (`https://classmatebd.vercel.app/n/<id>`) that **requires zero login or sign-up** to read. It displays the full notice details with two clear bottom action buttons: **"Download ClassMate Android App"** and **"Continue to Web"**.
+
+### B. Supabase RPC (`supabase/migrations/202610250001_public_notice_sharing.sql`)
+- Created `classmate.get_public_notice(target_identifier text)` returning JSONB:
+  - Validates UUID syntax.
+  - Joins `classmate.notices`, `classmate.departments`, `classmate.batches`, `classmate.profiles`, `auth.users`, `classmate.semester_courses`, `classmate.courses`, `classmate.class_changes`, and `classmate.file_metadata`.
+  - Exposed via public PostgREST wrappers: `public.get_public_notice(text)` and `public.get_public_notice(uuid)`.
+  - Permissions: `REVOKE ALL FROM public; GRANT EXECUTE TO anon, authenticated, service_role;`.
+
+### C. Web Implementation (`web/src/app/n/[id]/`)
+1. **Public Route (`web/src/app/n/[id]/page.tsx`)**:
+   - Zero-login barrier: renders the notice without session tokens or redirects.
+   - Dynamic OpenGraph and Twitter card metadata for WhatsApp/Messenger/Telegram link previews.
+   - Formatted body with whitespace preservation and clickable links.
+   - Notice status tags: cancellation banner (red), course badge (blue), or general academic badge.
+   - Resource attachment pill with direct open action.
+   - Bottom Action Buttons: **Download ClassMate Android App** (`/download/android`) and **Continue to Web** (`/`).
+   - App Link floating banner with `intent://` fallback.
+2. **Dynamic OpenGraph Image Engine (`web/src/app/n/[id]/opengraph-image.tsx`)**:
+   - 1200x630 dynamic canvas using Next.js `ImageResponse` (Satori).
+   - Generates high-fidelity preview cards with notice title, body snippet, author avatar, department/batch info, and ClassMate branding.
+3. **Web Notice Card Share Button (`web/src/components/notices.tsx`)**:
+   - Added minimal `<Share2 size={18} />` button to both feed cards and the notice detail modal.
+   - Invokes `navigator.share()` on mobile devices or copies `https://classmatebd.vercel.app/n/<id>` with a toast notification.
+
+### D. Android Native Implementation
+1. **Layout & Icon (`app/src/main/res/layout/item_notice_modern.xml`, `ic_share.xml`)**:
+   - Added `btnShare` (`ivShareIcon` with `@drawable/ic_share`) in the 48dp footer alongside `btnLike` and `btnComment`.
+2. **Card Binding & Chooser (`ClassMateAcademicScreensSupabase.kt`, `NoticeAdapter.kt`)**:
+   - `btnShare` triggers haptic feedback and launches native `Intent.ACTION_SEND` chooser with notice title and `https://classmatebd.vercel.app/n/<id>`.
+3. **Deep Link Interception (`ClassMateAuthActivity.kt`)**:
+   - `handleDeepLinkIntent` intercepts `https://classmatebd.vercel.app/n/<id>` and query parameter `?notice=<id>`.
+   - Switches the bottom navigation to Notices via `selectHomeTab(R.id.nav_notices)`.
+   - Dispatches `academicScreens.openDirectNotice(noticeId)`.
+4. **Feed Navigation & Highlighting (`ClassMateAcademicScreensSupabase.kt`)**:
+   - `openDirectNotice(noticeId)` adds the notice ID to `expandedNoticeIds` for inline expansion.
+   - Sets `highlightedNoticeId` and triggers `highlightNoticeCard(card)` which pulses the card scale and animates the primary accent stroke for 2 seconds.
+   - If the notice is not in the active batch feed, fetches it on-the-fly via `get_public_notice` RPC and prepends it to `noticeFeed`.
+   - Smoothly scrolls `rvNotices` to the target notice position.
+
+### E. Verification
+- `npm --prefix web run build`: Passed (0 errors, `/n/[id]` and `/n/[id]/opengraph-image` server-rendered).
+- `npm --prefix web test`: Passed (38/38 tests passing).
+- `./gradlew.bat compileDebugKotlin`: Passed (`BUILD SUCCESSFUL`).
+- `./gradlew.bat testDebugUnitTest`: Passed (`BUILD SUCCESSFUL`, 35 test suites passing).
+
+### F. Production Deployment Status (Oct 25, 2026)
+- **Supabase Production Database**:
+  - `202610240001_batch_fund_and_friends_fixes.sql`: Applied & verified.
+  - `202610240002_notice_fixes_and_attachments.sql`: Applied & verified.
+  - `202610250001_public_notice_sharing.sql`: Applied & verified (`classmate.get_public_notice` RPC active).
+- **Vercel Production Deployment**:
+  - Deployment ID: `dpl_6x5qCuyT8PVAnpuyffE2itMhLC2d`
+  - Canonical URL: `https://classmatebd.vercel.app`
+  - Live verification test on `https://classmatebd.vercel.app/n/59c2cba3-8114-4c56-9d78-9cf9c9c1b522`: HTTP 200 OK, full notice content rendered, zero-login active, bottom action buttons verified.
+
+### G. Notice Resource Attachment Resolution Bugfix
+- **Symptom**: On `classmatebd.vercel.app`, clicking the "Open resource" attachment button on a notice card generated an alert: `"This file is unavailable or your access has changed"`. However, the same resource opened successfully from the Courses tab.
+- **Root Cause**:
+  - In the Courses tab (`library.tsx`), the full file row object `f` (which contains `link_url`) was passed to `openFile(f)`. Since `f.link_url` was present, `openFile` opened the Google Drive URL directly.
+  - In the Notices tab (`notices.tsx`), only `n.resource_id` (a UUID string) was passed to `openFile(n.resource_id)`.
+  - When `openFile` received a string, it bypassed the link check and directly called `edge("signed-classmate-resource")`. Because link-type resources have `r2_object_key = null`, the edge function failed, causing the alert.
+- **Fix**:
+  - In `web/src/lib/api.ts`, updated `openFile(resource)`: when passed a resource ID without `link_url`, it first queries the public RPC `get_public_resource(id)`. If `link_url` is present, it resolves and opens the link directly without contacting the R2 signing function.
+  - In `web/src/lib/file-navigation.ts`, updated `openResource` to safely support both relative paths (e.g. `/api/public-download/...`) and absolute URLs via `new URL(raw, window.location.origin)`.
+  - In Android `ClassMateAcademicScreensSupabase.kt`, updated `openFile(file)` to also fetch `get_public_resource` if `file.link_url` is blank.
+  - Deployed to Vercel production: `dpl_GXBVJ1BbQQSuuWG5qzuftU7hjhVb`.
+
+## 97. Full-Stack Security Vulnerability Audit & Ecosystem Hardening
+
+### A. Comprehensive Forensic Audit (`classmate_bug_and_security_audit_report.md`)
+A static and architectural security audit was conducted across 100% of the ClassMate ecosystem, inspecting Android (72 Kotlin source files), Next.js 16 Web Platform, Cloudflare Workers, Supabase Deno Edge Functions, and PostgreSQL schema/RLS rules.
+
+### B. Critical Security Vulnerabilities Remediated
+1. **[CRITICAL-WEB-01] Authentication Inversion & Attendance Data Leakage (`web/src/app/api/export-attendance/route.ts`)**:
+   - *Vulnerability*: The ternary `jwt ? supabaseAnonKey : supabaseServiceKey` defaulted to `SUPABASE_SERVICE_ROLE_KEY` if the `Authorization` header was missing or empty! Any unauthenticated caller on the web could dump full student rosters, rolls, and semester attendance records as `.xlsx`.
+   - *Fix*: Strictly validates bearer JWT: returns HTTP 401 if missing, and only instantiates client with `supabaseAnonKey` passing the caller's JWT.
+2. **[CRITICAL-WEB-02] Unauthenticated Remote RFID Attendance Forgery (`web/src/app/api/scan/route.ts`)**:
+   - *Vulnerability*: `/api/scan` accepted unauthenticated requests and passed arbitrary `card_uid` directly to `process_rfid_scan` using `SUPABASE_SERVICE_ROLE_KEY`.
+   - *Fix*: Restricted endpoint with cryptographic pre-shared hardware key validation (`X-Device-Key`), and revoked direct anonymous execution on `classmate.process_rfid_scan`.
+3. **[CRITICAL-EDGE-01] Hardcoded Production Dispatch Secret (`cloudflare-worker/src/index.ts`)**:
+   - *Vulnerability*: `dispatchSecret = "8585add686336dcd1c11ae7fff130b98d9ee1615b01f73d57e7c88550b36014c"` was hardcoded in source.
+   - *Fix*: Rotated production secret and replaced hardcoded string with environment variable `env.CLASSMATE_DISPATCH_SECRET`.
+4. **[CRITICAL-EDGE-02] Global Push Notification Broadcast Hijack (`cloudflare-worker/src/index.ts`, `supabase/functions/send-notification/index.ts`)**:
+   - *Vulnerability*: For `type === "chat_message"` where `roomId === "group_main"`, caller-provided `included_segments` and `filters` were not deleted, allowing any student to broadcast unsolicited push notifications university-wide.
+   - *Fix*: Unconditionally stripped `included_segments` on all user-initiated requests and strictly enforced verified batch tag filtering.
+
+### C. High & Medium Priority Defect Resolutions
+1. **[HIGH-EDGE-01] Batch UUID Format Interruption**:
+   - In `supabase/functions/send-notification/index.ts`, validation regex `^[a-z0-9_-]{2,30}$` failed for 36-character Supabase UUIDs, dropping notifications for all newly created batches.
+   - Updated regex to `^[a-zA-Z0-9_-]{2,64}$`.
+2. **[HIGH-WEB-01] Stored XSS & Open Redirect via Library Links**:
+   - In `web/src/components/library.tsx`, `web/src/app/r/[id]/page.tsx`, and `web/src/app/api/public-download/[id]/route.ts`, implemented `sanitizeHttpUrl` enforcing `^https?://` schemes to reject `javascript:` or untrusted pseudo-protocols.
+3. **[HIGH-DB-02 & Migration 202610250002] Attendance Hardware Device Multitenancy Lockdown**:
+   - The policy `update_attendance_devices` checked `is_cr = true` without scoping to department or batch, permitting CRs to tamper with RFID scanner devices belonging to other batches.
+   - Migration `202610250002_rfid_index_and_device_security.sql` dropped this policy and restricted hardware device management exclusively to Owners, Admins, and Teachers.
+4. **[MEDIUM-DB-01 & Migration 202610250002] RFID High-Frequency Scan Index Alignment**:
+   - Existing functional index was on `lower(rfid_card_uid)`, but scan processor queried `where upper(rfid_card_uid) = norm_card`, forcing full sequential table scans on every card tap.
+   - Migration `202610250002_rfid_index_and_device_security.sql` created unique functional index `profiles_rfid_card_uid_upper_idx` on `upper(rfid_card_uid)`, accelerating scan processing to < 2ms.
+5. **[HIGH-ANDROID-01] Room Offline Attendance Cache Protection (`ClassMateDatabase.kt`)**:
+   - Removed `.fallbackToDestructiveMigration(true)` which previously wiped local SQLite tables on database version increments, ensuring un-synced offline student attendance scans are never destroyed.
+6. **[HIGH-ANDROID-02] Main-Thread Synchronous Task Blocking (`BackendApiClient.kt`)**:
+   - Replaced blocking `Tasks.await(user.getIdToken(false), 20, TimeUnit.SECONDS)` with non-blocking Kotlin coroutines `user.getIdToken(false).await()`, completely eliminating Android ANR dialogs.
+7. **[HIGH-ANDROID-03 & 04] Manifest Security & Android 14 Compliance (`AndroidManifest.xml`)**:
+   - Set `android:exported="false"` on `LoginActivity` (which lacked intent-filters).
+   - Enforced HTTPS network security by setting `android:usesCleartextTraffic="false"`.
+   - Added `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` child property under `ShakeToTorchService` to satisfy Android 14 (API 34) foreground service compliance.
+8. **[MEDIUM-WEB-01] Next.js App Router Error Boundaries (`web/src/app/error.tsx`, `not-found.tsx`)**:
+   - Added global error and 404 boundaries with friendly retry controls, preventing unhandled server exceptions from crashing client navigation.
+
+---
+
+## 98. Realtime Sync Infrastructure & Multi-Department Batch Progression Subsystem
+
+### A. Postgres Realtime Multi-Entity Publication (`202610250003_notices_realtime_sync.sql`)
+- Set `replica identity full` on core academic tables:
+  - `classmate.notices`
+  - `classmate.class_changes`
+  - `classmate.routine_slots`
+  - `classmate.academic_calendar_events`
+  - `classmate.bus_schedules`
+- Enrolled all five tables into the `supabase_realtime` publication:
+  - Allows Web (`web:schedule-listener`, `web:notices-listener`) and native Android clients to listen to live PostgreSQL WAL events.
+  - Changes to class cancellations, routine periods, and announcements reflect across active student devices within milliseconds without manual polling or pull-to-refresh.
+
+### B. Multi-Department Running Semester Support & CR Progression (`202610250004_batch_semester_and_cr_progression.sql`)
+- **Problem**: When newly added departments (e.g., BGE, TE, Pharmacy) were onboarded, the system previously defaulted their initial running semester to Semester 3.
+- **Enhanced Batch Creation**:
+  - `classmate.create_batch(target_department, target_batch_number, target_session, target_initial_semester)`:
+  - Accepts `target_initial_semester` (values 1 through 8).
+  - Automatically activates the selected semester upon creation, sets `published_at = now()`, and inserts an event into `classmate.notification_outbox`.
+- **CR Running Semester Management & Progression**:
+  - Updated `classmate.semesters` RLS: Granted active batch CRs (`classmate.can_manage_batch(batch_id)`) permission to read draft semesters in their assigned batch.
+  - Updated `classmate.publish_semester(target_semester)`: Allowed both Admins and the batch's active CR to advance the running semester (marking old semester as `completed`, new semester as `active`, and dispatching notifications).
+
+---
+
+## 99. CR Allowlist Pre-Assignment Engine & First Sign-In Role Elevation
+
+### A. Context & Motivation
+- When onboarding a new department or batch, Administrators frequently need to designate a student (e.g. `bg25004@mbstu.ac.bd` for BGE Batch 20) as the Class Representative (CR) **before** the student has ever signed in, authenticated with Google OAuth, or generated a profile record.
+- In the legacy flow, the admin had to wait for the student to sign in, discover their profile in the database, and manually toggle their CR status, creating an onboarding bottleneck.
+
+### B. Database Schema & RPC (`supabase/migrations/202610260001_cr_allowlist_and_preassignment.sql`)
+1. **Core Table: `classmate.cr_allowlist`**:
+   - `email`: Text PRIMARY KEY (strictly lowercase with `@mbstu.ac.bd` domain constraint).
+   - `department_id`: UUID NOT NULL REFERENCES `classmate.departments(id)`.
+   - `batch_id`: UUID NOT NULL.
+   - `student_id`: Text NOT NULL (e.g. `'BG25004'`).
+   - `academic_session`: Smallint NOT NULL.
+   - `active`: Boolean NOT NULL DEFAULT true.
+   - `created_at` / `updated_at`: Timestamptz NOT NULL DEFAULT `now()`.
+   - Composite foreign key: `(batch_id, department_id)` REFERENCES `classmate.batches(id, department_id)`.
+2. **Allowlist Management RPC (`classmate.set_cr_allowlist`)**:
+   - Enforces `classmate.require_owner()`.
+   - Validates email regex `^([a-z]+)([0-9]{2})([0-9]{3,4})@mbstu[.]ac[.]bd$`.
+   - Extracts canonical student ID (e.g. `bg` + `25` + `004` -> `BG25004`).
+   - Inserts or updates the allowlist record.
+   - If the user already has an active profile in `classmate.profiles`, immediately upgrades them to `role = 'student'`, `is_cr = true`, `cr_batch_id = batch_id`, and `verification_status = 'active'`.
+
+### C. Automatic First Sign-In Elevation (`classmate.create_or_initialize_profile()`)
+- Updated the primary profile initialization trigger:
+  - When an allowlisted student logs in via Google OAuth for the first time:
+  - Queries `classmate.cr_allowlist` where `email = lower(u.email) and active = true`.
+  - If a match exists:
+    - Sets `role = 'student'`
+    - Sets `department_id = cr.department_id`
+    - Sets `batch_id = cr.batch_id`
+    - Sets `student_id = cr.student_id`
+    - Sets `academic_session = cr.academic_session`
+    - Sets `is_cr = true`
+    - Sets `cr_batch_id = cr.batch_id`
+    - Sets `verification_status = 'active'`
+  - **Result**: The student is immediately recognized as their batch's Class Representative upon their very first login with zero manual intervention required.
+  - Successfully pre-assigned `bg25004@mbstu.ac.bd` as active CR for BGE Batch 20.
+
+---
+
+## 100. Notice Sharing Link Duplicate URL Bugfix & Post Notice UI Streamlining
+
+### A. Notice Sharing Double-URL Resolution (`web/src/components/notices.tsx`)
+- **Issue**: When sharing notices via the web client or Android Chrome to external messaging apps (WhatsApp, Telegram, Messenger), the notice URL was being duplicated twice in the pasted message (e.g., `Notice Title
+https://classmatebd.vercel.app/n/...
+https://classmatebd.vercel.app/n/...`).
+- **Root Cause**:
+  - `web/src/components/notices.tsx` previously constructed the share payload as:
+    ```typescript
+    await navigator.share({
+      title: n.title,
+      text: `${n.title}
+${shareUrl}`, // <--- FLAW: Appended shareUrl into text
+      url: shareUrl,                   // <--- FLAW: Operating systems automatically append url to text!
+    });
+    ```
+  - Native Android and iOS Web Share sheets automatically concatenate the `url` property onto the end of the `text` string, causing the URL to appear twice.
+- **Fix**:
+  - Removed `shareUrl` from the `text` parameter:
+    ```typescript
+    await navigator.share({
+      title: n.title,
+      text: n.title,
+      url: shareUrl,
+    });
+    ```
+  - For non-Web Share desktop environments, the clipboard fallback strictly writes `shareUrl` without extraneous concatenation.
+
+### B. Post Notice UI Streamlining & AI Compose Removal (`web/src/components/notices.tsx`, `ClassMatePublishActivity.kt`)
+- **User Mandate**: Completely remove the "AI Compose" tab from notice creation. Limit notice creation to 3 clear, deterministic tabs:
+  1. **General Notice** (renamed from "Notice" / "Normal Notice")
+  2. **Class Cancellation**
+  3. **Vacation**
+- **Mobile Web Responsive Layout**:
+  - Fixed toggle header wrapping on mobile viewports: streamlined button padding, active pill transitions, and compact typography ensure the three tabs display in a single row without wrapping or broken text.
+- **Image Attachment Display & Fullscreen Lightbox**:
+  - When notice creators attach an image (JPG, PNG, WebP), the image renders as an inline preview directly inside the feed notice card.
+  - Tapping the image opens a dedicated fullscreen zoomable lightbox modal (`.notice-fullscreen-image-modal`), allowing students to inspect schedules, routine charts, or campus notices with high clarity.
+
+---
+
+## 101. Mobile Web Landing Page Redesign, Auth Navigation Clearance & Smart Download Popup Delay
+
+### A. Mobile Web Landing Page & Sign-In Experience Overhaul (`web/src/app/globals.css`, `web/src/components/app.tsx`)
+- **Two-Step Mobile Landing Experience**:
+  - Consolidated scattered features into a focused, centered gravity modal module.
+  - Replaced redundant university community copy with clean, professional ClassMate branding.
+  - Repositioned the university emblem to the top brand header directly beside the bold lowercase `classmate.` logo.
+- **System Navigation Bar Clearance**:
+  - Resolved a severe mobile layout glitch where the "Continue to Sign In" button was hidden or clipped beneath mobile browser navigation bars and Android gesture pills.
+  - Added bottom padding with `calc(1rem + env(safe-area-inset-bottom))`, relative positioning, and elevated `z-index` layering.
+- **Capsule Role Switcher & Google Sign-In Styling**:
+  - Redesigned the Student vs Faculty selector into an authentic capsule toggle matching native mobile UI tokens.
+  - High-contrast Google Sign-In button with authentic Google 'G' iconography, subtle borders, and distinct hover/active states.
+  - Terminology updates:
+    - Library -> **Resources**
+    - Community -> **Batch Community**
+    - Notices -> **Instant class alerts or batch notices**
+    - Routine -> **Bus schedules and calendar**
+  - Added persistent footer links to **About ClassMate**, **Privacy Policy**, and **Terms of Service** directly on the sign-in screen.
+
+### B. Smart In-App Android APK Download Popup Delay
+- **Problem**: Previously, visiting `classmatebd.vercel.app` on an Android mobile browser immediately flashed the "Download ClassMate App" popup over the landing screen, disrupting login and discouraging new students from exploring.
+- **Solution (`web/src/components/android-install-popup.tsx`, `web/src/components/app.tsx`)**:
+  - The download prompt is now deferred until the user completes authentication and successfully enters the internal app ecosystem.
+  - **Dynamic Release Resolution & Anti-Cache Delivery (`web/src/app/download/android/route.ts`)**:
+    - Queries GitHub Releases API with fallback to latest tag.
+    - Emits response headers:
+      `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0`
+      `Pragma: no-cache`
+      `Expires: 0`
+    - Guarantees that mobile web visitors always download the freshest APK build without stale browser cache issues.
+
+---
+
+## 102. Comprehensive System Architecture Synthesis & Current Production State (Oct 26, 2026)
+
+### A. Architectural Topology Summary
+```mermaid
+flowchart TD
+    subgraph Clients
+        A["Android APK (v1.1.34 / Code 34)<br>ListAdapter Diffing · PackageInstaller · Offline Room"]
+        B["Next.js 16 Web Client<br>App Router · React 19 · TanStack Query v5 · Satori OG"]
+    end
+
+    subgraph CDN & Edge Layer
+        C["Cloudflare Worker<br>Telegram Bot Channel Broadcast · Telegram Webhooks"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug] & /n/[id] · Satori Canvas"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Enforcement Gate"]
+    end
+
+    subgraph Backend & Database Layer
+        F["Supabase PostgreSQL<br>80+ Migrations · Full Replica Identity Realtime"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Secret Rotation"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Real-Time Outbox Push Dispatch"]
+    end
+
+    A <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    F <--> G
+    G <--> H
+```
+
+### B. Recent Generated Artifacts & Deliverables
+1. **`ClassMate_Complete_Architecture_and_Tech_Stack.pdf`**:
+   - Comprehensive multi-page architectural reference document detailing backend (PostgreSQL, RLS, RPCs, Edge Functions, Cloudflare Workers), web companion client (Next.js 16, App Router, TanStack Query), and native Android application (Kotlin, ListAdapter diffing, PackageInstaller self-hosted updater). Exported and stored in Google Drive.
+2. **`Attendance_Card_Unpaid_Students_List.pdf`**:
+   - Automated A4 audit document generated via Python ReportLab (`scripts/generate_attendance_card_unpaid_pdf.py`). Audits student deposits matching `%attend%` in `classmate.batch_fund_transactions` across Batch 22, generating a structured report with student IDs, names, and contact numbers.
+
+### C. Verification & Diagnostic Status (Oct 26, 2026)
+- **Supabase Backend**:
+  - Migrations `202610250001_public_notice_sharing.sql`, `202610250002_rfid_index_and_device_security.sql`, `202610250003_notices_realtime_sync.sql`, `202610250004_batch_semester_and_cr_progression.sql`, and `202610260001_cr_allowlist_and_preassignment.sql` applied.
+  - Pre-assignment of `bg25004@mbstu.ac.bd` as CR for BGE Batch 20 active.
+  - RFID scan functional index `profiles_rfid_card_uid_upper_idx` active.
+- **Web Platform**:
+  - `npm --prefix web run build`: Passed (0 errors, `/n/[id]`, `/r/[id]`, `/download/android` routes verified).
+  - `npm --prefix web test`: Passed (38/38 unit tests passing).
+- **Android Native Platform**:
+  - Gradle `compileDebugKotlin`: Passed (`BUILD SUCCESSFUL`).
+  - Gradle `testDebugUnitTest`: Passed (`BUILD SUCCESSFUL`, all 35 test suites passing).
+  - Version: `versionCode = 34`, `versionName = "1.1.34"`.
+
+---
+
+## 103. ESP32 Hardware Attendance Station & 3D Printable Enclosure Engineering (Oct 26, 2026)
+
+### A. Context & Purpose
+The **ESP32 RFID Attendance Station** is an automated physical hardware kiosk built for university classroom and department deployment (initially MBSTU CSE). It integrates an ESP32 microcontroller, an RC522 Mini RFID card reader (13.56 MHz), an I2C 0.96" OLED display (SSD1306, 128x64), active buzzer for audio feedback, and dual status LEDs. It communicates directly with the ClassMate Edge API (`/api/scan`) to record student attendance punches in real-time.
+
+```mermaid
+flowchart LR
+    A["RFID Student Card<br>(13.56 MHz Mifare)"] -->|Tap| B["RC522 Mini Reader<br>(Under Thin Window)"]
+    B -->|SPI| C["ESP32 Microcontroller<br>(Station Firmware)"]
+    C -->|WiFi HTTPS /api/scan| D["ClassMate Edge / Next.js API"]
+    D -->|PostgREST RPC| E[("Supabase PostgreSQL<br>process_rfid_scan")]
+    E -->|JSON Response| D
+    D -->|Status and Name| C
+    C -->|I2C| F["0.96" OLED Display<br>(Name, Roll, Status)"]
+    C -->|GPIO| G["Buzzer & LEDs<br>(Audio/Visual Confirmation)"]
+```
+
+### B. Hardware Component Dimensions & Enclosure Constraints
+- **OLED Display Module**:
+  - PCB Dimensions: $25.0\text{ mm} \times 25.0\text{ mm}$ (with mounting hole pattern).
+  - Glass Display Unit: $18.0\text{ mm}$ height $\times 27.0\text{ mm}$ width, raised above the PCB surface.
+  - Ribbon Cable: Flexible bottom connector requiring mechanical relief.
+- **RC522 Mini RFID Reader**:
+  - Board Dimensions: $38.0\text{ mm} \times 27.0\text{ mm}$.
+  - Header Pins: Left-side right-angle soldering pins raised higher than the board plane.
+  - Operating Frequency: $13.56\text{ MHz}$ (requires $<1.2\text{ mm}$ wall thickness for reliable RF coupling).
+- **Chassis Architecture**:
+  - Split two-part desktop snap-fit and M3 screw design:
+    - **Plate 1 (Front Panel)**: Houses OLED screen viewing window, card tapping target area, LED holes, and mounting clips.
+    - **Main Body (Back Enclosure)**: Houses ESP32 controller, wiring channels, wall-hanging keyholes, and desktop angled stand.
+
+### C. Mechanical Bugs Identified & Engineering Resolutions
+1. **RFID Reader Alignment Bug**:
+   - *Problem*: In initial CAD prototypes, the RFID reader snap pins were positioned on the left interior side, while the front panel graphical card tap indicator was placed in the center. Cards tapped on the designated graphic failed to read or required awkward offset positioning.
+   - *Resolution*: Shifted RC522 Mini mounting standoffs directly underneath the card tapping zone, ensuring 1:1 concentric alignment with the front graphic.
+2. **RF Attenuation & Panel Thickness**:
+   - *Problem*: Excessive front panel thickness ($>2.5\text{ mm}$) degraded the reading range of passive Mifare cards.
+   - *Resolution*: Designed an internal stepped relief cavity on the inner wall, reducing the plastic thickness over the antenna coil to $1.0\text{ mm}$ while maintaining overall structural rigidity.
+3. **OLED Glass Step Relief & 45° Viewing Chamfer**:
+   - *Problem*: The OLED glass height ($18.0\text{ mm}$) collided with the interior front panel, preventing the lid from closing flush.
+   - *Resolution*: Enlarged the dual-step internal glass pocket to $18.5\text{ mm} \times 27.2\text{ mm} \times 1.5\text{ mm}$ with a $45^\circ$ beveled viewing window ($23.5\text{ mm} \times 14.0\text{ mm}$) and dedicated ribbon cable relief slot. The screen sits perfectly flush with zero mechanical strain on the glass.
+4. **Eliminating 3D Print Bridging Defects via Recessed Sticker Pocket**:
+   - *Problem*: When printing the front panel face-down on the 3D print bed, fine engraved circular concentric wave lines and text caused bridging over air gaps on Layer 2 and filament elephant's foot spreading, resulting in ragged, messy surfaces.
+   - *Resolution*: Replaced engraved surface lines with an engineered, recessed vinyl sticker pocket ($52.0\text{ mm} \times 32.0\text{ mm} \times 0.40\text{ mm}$ — exactly 2 layers at $0.20\text{ mm}$ layer height) bordered by a $45^\circ$ chamfer. This allows a 100% solid, glassy face-down bed print with zero bridging, into which standard vinyl RFID contactless icon stickers are applied flush.
+
+### D. Deliverable 3D Print Assets
+- **`desktop_attendance_main_enclosure.stl`**: Desktop back body with angled stand and mounting bosses.
+- **`desktop_attendance_plate1_enclosure.stl`**: Front panel with flush sticker pocket and dual-step OLED bezel.
+- Stored permanently in `D:\Code & Scripts\attendence tracker\3D_Print\`.
+
+---
+
+## 104. Hardware RFID Scanner API Endpoint, Device Authorization & Session Auto-Binding (Oct 27, 2026)
+
+### A. Context & User Problem
+During live hardware testing, the user punched RFID cards into the station and observed:
+1. The OLED display repeatedly reported `Card not registered`, even for registered cards.
+2. The station remained locked to an old course session (`CSE-2105`), failing to pick up newly started attendance sessions when switching courses.
+
+### B. Root Cause 1: Endpoint Device Authorization Rejection
+- In `web/src/app/api/scan/route.ts`, an authorization guard was blocking incoming HTTP requests from the ESP32 hardware client.
+- **Resolution**:
+  - Updated `isAuthorized(request, deviceId)` to permit requests passing:
+    1. Valid `x-device-key` matching the registered device ID or environment secret `HARDWARE_DEVICE_SECRET`.
+    2. Bearer authorization token with active session credentials.
+    3. Service role dispatch secret.
+  - Re-enabled CORS headers (`Access-Control-Allow-Origin: *`) for station simulators and network devices.
+
+### C. Root Cause 2: Hardware Session Binding & Migration `202610270001`
+- When starting or resuming an attendance session via `classmate.start_attendance_session`, the session was created in `classmate.attendance_sessions`, but the active hardware device record in `classmate.attendance_devices` was never updated. As a result, the ESP32's periodic heartbeat poll (`GET /api/scan?device_id=ESP32-READER-01`) continued retrieving the old session ID or returned `SLEEP`.
+- **Database Migration `202610270001_rfid_hardware_endpoint_and_session_binding.sql`**:
+  - Automatically updates `classmate.attendance_devices`:
+    ```sql
+    update classmate.attendance_devices
+    set active_session_id = sess_id, last_heartbeat = now()
+    where id = 'ESP32-READER-01';
+    ```
+  - Automatically unlinks the hardware device on session close:
+    ```sql
+    update classmate.attendance_devices
+    set active_session_id = null
+    where active_session_id = target_session;
+    ```
+  - Restores CR permissions on `classmate.attendance_devices` policy `update_attendance_devices` so class representatives can start attendance without database permission errors.
+  - Explicitly grants `USAGE` on schema `classmate` and `EXECUTE` on `process_rfid_scan(text, text)` and `get_device_active_session(text)` to `anon`, `authenticated`, and `service_role`.
+
+---
+
+## 105. Full Roster Resolution for Ad-Hoc Sessions & Universal CR Management Subsystem (Oct 27, 2026)
+
+### A. Context & Bug Analysis
+The user reported:
+> *"Everything works fine bro but readed data isnt saving in database and i cant view roaster."*
+
+Upon investigation:
+1. **Ad-Hoc / Station Sessions Have `routine_slot_id = null`**:
+   - Sessions started manually from the Admin or Station menu are schedule-independent; they specify `semester_course_id` and `batch_id`, but `routine_slot_id` is null.
+2. **Inner Join Failure in `get_session_summary`**:
+   - Stored procedure `classmate.get_session_summary` originally performed:
+     ```sql
+     join classmate.routine_slots rs on rs.id = sess.routine_slot_id
+     ```
+   - Because `sess.routine_slot_id` was `null` for ad-hoc sessions, the join returned zero rows! The frontend and mobile apps received an empty roster, making it appear that student scans were not being recorded.
+
+### B. Database Migration `202610270002_fix_attendance_roster_and_adhoc_sessions.sql`
+1. **Helper Function `can_manage_attendance_session(target_session uuid)`**:
+   - Validates session permissions uniformly across both scheduled routine sessions and ad-hoc station sessions.
+   - Grants management rights to:
+     - Application Owners and Admins (`role = 'admin'`).
+     - Session creator (`started_by = auth.uid()`).
+     - Assigned course instructors (`teacher_course_assignments`).
+     - **Batch Class Representatives (CRs)** (`p.is_cr = true and p.batch_id = sess.batch_id`).
+2. **Robust Roster Resolution in `get_session_summary`**:
+   - Dynamically resolves course code, title, and batch ID from either `routine_slot_id` or `semester_course_id`:
+     ```sql
+     if sess.routine_slot_id is not null then
+       select sem.batch_id, ... from classmate.routine_slots ...
+     elsif sess.semester_course_id is not null then
+       select sem.batch_id, ... from classmate.semester_courses ...
+     end if;
+     ```
+   - Performs a `LEFT JOIN` on `classmate.attendance_records` against all enrolled batch students in `classmate.profiles`, returning the full roster with:
+     - `student_id`, `full_name`, `roll_number`
+     - `status`: `'present'` (if record exists) or `'absent'`
+     - `marked_at`, `method`, `confidence`, and `rfid_card_uid`.
+3. **Universal CR Empowerment**:
+   - Allowed Batch CRs to start and close ad-hoc attendance sessions (`start_adhoc_attendance_session`, `close_adhoc_attendance_session`).
+   - Allowed Batch CRs to manually toggle student presence (`toggle_student_attendance`).
+   - Allowed Batch CRs to view their batch's course overview (`teacher_course_attendance_overview`) and cumulative matrix (`course_attendance_matrix`).
+4. **Row-Level Security Overhaul**:
+   - Replaced restrictive RLS policies on `classmate.attendance_sessions` and `classmate.attendance_records` with permissive policies checking `can_manage_attendance_session(session_id)`.
+
+---
+
+## 106. 'P' (Present) vs '—' (Absent) Data Extraction Fix Across Database, Web & Android (Oct 27, 2026)
+
+### A. Context & User Bug Report
+The user requested:
+> *"One more thing, in the excel sheet that is being generated it should mark as p for present and keep empty or any other relevant value for absent. Make sure this shows up in the app and website everywhere in attendence option."*
+
+Following initial changes, the user tested the live system and reported:
+> *"p isn't showing for successful present! I checked bro. P cant be write in database maybe.. This problem was also there before."*
+
+### B. Root Cause Analysis
+1. **Database Scans Were Healthy**:
+   - Direct verification confirmed that attendance punches were saving perfectly in `classmate.attendance_records` with accurate timestamps and student foreign keys.
+2. **Data Structure Mismatch**:
+   - In `classmate.course_attendance_matrix`, the JSON records map aggregated session attendance as an object:
+     ```json
+     {
+       "19454a18-7ac7-423a-bacb-d7720a061a85": {
+         "present": true,
+         "method": "rfid",
+         "marked_at": "01:49 AM"
+       }
+     }
+     ```
+3. **Frontend & Mobile Type Assumptions**:
+   - **Web / TypeScript**: The matrix table and export scripts checked `status === "present"`. Because `status` was an `object` (`typeof status === "object"`), `status === "present"` was `false`.
+   - **Android / Java JSONObject**: In `ClassMateAdminAttendanceActivity.kt`, the code checked:
+     ```kotlin
+     val isPresent = records.optString(sessId) == "present"
+     ```
+     In Android's `org.json.JSONObject`, calling `.optString(key)` on a key containing an inner `JSONObject` returns the fallback empty string `""`! Consequently, `"" == "present"` evaluated to `false` for every single student.
+4. **Result**: Every attendee was incorrectly treated as absent, displaying `"—"` (or `0`) in the UI and Excel/CSV sheets.
+
+### C. Comprehensive Full-Stack Resolution
+
+#### 1. Database Migration `202610270003_course_matrix_rec_map_status.sql`
+- Applied to both **Staging** and **Production**.
+- Updated `classmate.course_attendance_matrix` to explicitly include `'status': 'P'` inside each session record object:
+  ```sql
+  jsonb_object_agg(
+    r.session_id::text,
+    jsonb_build_object(
+      'present', true,
+      'status', 'P',
+      'method', r.method,
+      'marked_at', to_char((r.marked_at at time zone 'Asia/Dhaka'), 'HH12:MI AM')
+    )
+  )
+  ```
+
+#### 2. Web Client Excel Generator (`web/src/lib/attendance-excel.ts`)
+- Added robust helper function:
+  ```ts
+  export function isRecordPresent(record: unknown): boolean {
+    if (!record) return false;
+    if (typeof record === "boolean") return record;
+    if (typeof record === "string") {
+      const s = record.trim().toLowerCase();
+      return s === "present" || s === "p" || s === "1" || s === "true";
+    }
+    if (typeof record === "object" && record !== null) {
+      const obj = record as Record<string, any>;
+      if (obj.present === true) return true;
+      if (typeof obj.status === "string") {
+        const st = obj.status.trim().toLowerCase();
+        return st === "present" || st === "p";
+      }
+    }
+    return false;
+  }
+  ```
+- In `downloadCourseMatrixExcel`: sets `row[colHeader] = isRecordPresent(rec) ? "P" : "—"`.
+- In `downloadSessionExcel`: sets `"Status": isRecordPresent(s.status) ? "P" : "—"`.
+
+#### 3. Web Backend API Export Endpoint (`web/src/app/api/export-attendance/route.ts`)
+- Added identical `isRecordPresent` evaluation helper.
+- Applied `"P"` vs `"—"` formatting across both Mode 1 (Cumulative Course Matrix) and Mode 2 (Single Session Roster) downloads.
+
+#### 4. Web Admin Attendance Preview Table (`web/src/components/admin-attendance.tsx`)
+- Updated table cell rendering:
+  ```tsx
+  const rec = stu.records?.[sess.session_id];
+  const isPresent =
+    rec === "present" ||
+    (typeof rec === "object" && rec !== null && (rec as any).present === true);
+  ```
+- Renders an emerald `"P"` badge for present students and a neutral `"—"` badge for absent students.
+
+#### 5. Android Admin Attendance Activity (`ClassMateAdminAttendanceActivity.kt`)
+- Added `isSessionPresent` helper handling both inner JSONObjects and fallback strings:
+  ```kotlin
+  private fun isSessionPresent(records: JSONObject, sessionId: String): Boolean {
+      val recObj = records.optJSONObject(sessionId)
+      if (recObj != null) return recObj.optBoolean("present", false)
+      val str = records.optString(sessionId, "")
+      return str.equals("present", ignoreCase = true) || str.equals("P", ignoreCase = true)
+  }
+  ```
+- In-app Table View: renders green `"P"` (`#10B981`) for attendees and red/neutral `"—"` (`#EF4444`) for absentees.
+- CSV Export: writes `,P` for attendees and `,—` for absentees.
+
+#### 6. Android Teacher Live Attendance Activity (`ClassMateTeacherLiveAttendanceActivity.kt`)
+- Updated single-session CSV export:
+  ```kotlin
+  val rawSt = s.optString("status")
+  val status = if (rawSt.equals("present", ignoreCase = true) || rawSt.equals("p", ignoreCase = true)) "P" else "—"
+  ```
+
+### D. Verification & Live Validation
+1. **Automated Live Production Database Verification**:
+   - Queried `course_attendance_matrix` on session `19454a18-7ac7-423a-bacb-d7720a061a85` using `isRecordPresent`:
+     ```
+     PRESENT students count: 3
+     PRESENT students:
+       - CE25001: Mehedi Hasan Zayed -> P
+       - CE25045: Mohammad Shuaib-Ud-Dowla -> P
+       - CE25054: Md. Imran Hossain -> P
+     ABSENT students count: 55 -> —
+     ```
+2. **Build & Deployment**:
+   - `npm --prefix web run build`: Passed (0 errors).
+   - Vercel Deployment: Deployed to production (`https://classmatebd.vercel.app`).
+
+---
+
+## 107. Comprehensive System Architecture Synthesis & Current Production State (Oct 27, 2026)
+
+### A. Architectural Topology Summary
+```mermaid
+flowchart TD
+    subgraph Kiosks & Hardware Layer
+        K["ESP32 RFID Station (ESP32-READER-01)<br>RC522 Mini · 0.96" OLED · Desktop Enclosure"]
+    end
+
+    subgraph Clients
+        A["Android APK (v1.1.34 / Code 34)<br>ListAdapter Diffing · PackageInstaller · Offline Room"]
+        B["Next.js 16 Web Client<br>App Router · React 19 · TanStack Query v5 · Satori OG"]
+    end
+
+    subgraph CDN & Edge Layer
+        C["Cloudflare Worker<br>Telegram Bot Broadcast · Webhooks"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug], /n/[id], /api/scan, /download/android"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Gate"]
+    end
+
+    subgraph Backend & Database Layer
+        F["Supabase PostgreSQL<br>85+ Migrations · Full Replica Identity Realtime"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Release Dispatch"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Push Notification Outbox"]
+    end
+
+    K <-->|HTTPS /api/scan| D
+    A <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    F <--> G
+    G <--> H
+```
+
+### B. Recent Generated Artifacts & Deliverables
+1. **`desktop_attendance_main_enclosure.stl` & `desktop_attendance_plate1_enclosure.stl`**:
+   - Production 3D printing enclosure files for the ESP32 RFID desktop attendance kiosk. Features flush sticker recess pocket, dual-step OLED bezel, and card tapping alignment. Stored in `D:\Code & Scripts\attendence tracker\3D_Print\`.
+2. **`ClassMate_Complete_Architecture_and_Tech_Stack.pdf`**:
+   - Multi-page comprehensive architectural reference document detailing backend (PostgreSQL, RLS, RPCs, Edge Functions, Cloudflare Workers), web companion client (Next.js 16, App Router, TanStack Query), and native Android application (Kotlin, ListAdapter diffing, PackageInstaller self-hosted updater). Exported to Google Drive.
+3. **`Attendance_Card_Unpaid_Students_List.pdf`**:
+   - Automated A4 audit document generated via Python ReportLab (`scripts/generate_attendance_card_unpaid_pdf.py`). Audits student deposits matching `%attend%` in `classmate.batch_fund_transactions` across Batch 22.
+
+### C. Verification & Diagnostic Status (Oct 27, 2026)
+- **Supabase Backend**:
+  - Migrations `202610270001_rfid_hardware_endpoint_and_session_binding.sql`, `202610270002_fix_attendance_roster_and_adhoc_sessions.sql`, and `202610270003_course_matrix_rec_map_status.sql` applied to both Staging and Production.
+  - Active device binding (`ESP32-READER-01`) enabled on attendance sessions.
+  - Full batch roster with `present`/`absent` status verified on ad-hoc sessions.
+  - Keyset pagination and real-time triggers fully operational.
+- **Web Platform**:
+  - `npm --prefix web run build`: Passed (0 errors, `/api/export-attendance`, `/api/scan`, `/n/[id]`, `/r/[id]`, `/download/android` verified).
+  - Vercel Deployment: Live at `https://classmatebd.vercel.app`.
+  - Excel and Matrix export verified: present students marked as `P`, absent students marked as `—`.
+- **Android Native Platform**:
+  - `ClassMateAdminAttendanceActivity.kt`: Matrix table and CSV export updated with `isSessionPresent`, displaying `P` and `—`.
+  - `ClassMateTeacherLiveAttendanceActivity.kt`: Single-session CSV export updated with `P` and `—`.
+  - Version: `versionCode = 34`, `versionName = "1.1.34"`.
 
 ---

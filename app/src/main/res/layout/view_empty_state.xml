@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layoutEmptyStateRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:paddingHorizontal="24dp"
+    android:paddingVertical="32dp">
+
+    <!-- Circular Icon Bubble -->
+    <FrameLayout
+        android:id="@+id/flEmptyIconContainer"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_empty_state_icon"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/ivEmptyIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/ic_sparkle"
+            app:tint="@color/cm_primary"
+            android:contentDescription="Empty state icon" />
+    </FrameLayout>
+
+    <!-- Empty State Title -->
+    <TextView
+        android:id="@+id/tvEmptyTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Nothing here yet"
+        android:textColor="@color/cm_text_primary"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <!-- Empty State Subtitle -->
+    <TextView
+        android:id="@+id/tvEmptySubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Check back later or pull down to refresh."
+        android:textColor="@color/cm_text_muted"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:lineSpacingExtra="3dp"
+        android:maxWidth="280dp" />
+
+    <!-- Optional Action Button (Retry / Add / Action) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnEmptyAction"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="Refresh"
+        android:textColor="@color/cm_primary"
+        app:backgroundTint="@color/cm_primary_soft"
+        app:cornerRadius="9999dp"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</LinearLayout>

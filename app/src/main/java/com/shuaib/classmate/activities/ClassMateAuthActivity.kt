@@ -174,7 +174,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                                 title = "Add Routine Period",
                                 subtitle = "Schedule a class slot for your batch",
                                 iconRes = R.drawable.ic_edit,
-                                onClick = { openPeriodEditor(null, LocalDate.now().dayOfWeek.value % 7 + 1) }
+                                onClick = { openPeriodEditor(null, LocalDate.now().dayOfWeek.value % 7) }
                             )
                         } else null
                     )
@@ -288,14 +288,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
                             title = "Batch Fund",
                             subtitle = "Track contributions, balances & ledger",
                             iconRes = R.drawable.ic_batch_friends,
-                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java)) }
+                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java).putExtra("batch_id", selectedBatchId).putExtra("batch_label", selectedBatchLabel)) }
                         ),
                         com.shuaib.classmate.ui.TabQuickAction(
                             title = "Record Fund Entry",
                             subtitle = "Add student deposit or batch expense",
                             iconRes = R.drawable.ic_edit,
                             onClick = {
-                                startActivity(Intent(this, ClassMateBatchFundActivity::class.java).putExtra("open_record_dialog", true))
+                                startActivity(Intent(this, ClassMateBatchFundActivity::class.java).putExtra("batch_id", selectedBatchId).putExtra("batch_label", selectedBatchLabel).putExtra("open_record_dialog", true))
                             }
                         ),
                         com.shuaib.classmate.ui.TabQuickAction(
@@ -312,7 +312,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                             title = "Batch Fund",
                             subtitle = "View contributions & fund balance",
                             iconRes = R.drawable.ic_batch_friends,
-                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java)) }
+                            onClick = { startActivity(Intent(this, ClassMateBatchFundActivity::class.java).putExtra("batch_id", selectedBatchId).putExtra("batch_label", selectedBatchLabel)) }
                         ),
                         com.shuaib.classmate.ui.TabQuickAction(
                             title = "Blood Network",
@@ -621,11 +621,19 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     private fun callFriend(phone: String) {
 
-        if(!phone.matches(Regex("\\+[1-9][0-9]{7,14}"))) return
+        val digits = phone.filter { it.isDigit() }
+        val targetPhone = when {
+            phone.startsWith("+") && digits.length in 8..15 -> "+$digits"
+            digits.startsWith("8801") && digits.length == 13 -> "+$digits"
+            digits.startsWith("01") && digits.length == 11 -> "+88$digits"
+            digits.length in 7..15 -> if (digits.startsWith("88")) "+$digits" else "+88$digits"
+            else -> phone.trim()
+        }
+        if (targetPhone.isBlank()) return
 
-        if(ContextCompat.checkSelfPermission(this,Manifest.permission.CALL_PHONE)==PackageManager.PERMISSION_GRANTED) launchPhoneCall(phone,true)
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.CALL_PHONE)==PackageManager.PERMISSION_GRANTED) launchPhoneCall(targetPhone,true)
 
-        else { pendingCallNumber=phone; callPermission.launch(Manifest.permission.CALL_PHONE) }
+        else { pendingCallNumber=targetPhone; callPermission.launch(Manifest.permission.CALL_PHONE) }
 
     }
 
@@ -2024,6 +2032,17 @@ class ClassMateAuthActivity : AppCompatActivity() {
     }
 
 
+
+    fun selectHomeTab(tabId: Int) {
+        val tab = com.shuaib.classmate.ui.ClassMateTab.fromId(tabId) ?: return
+        composeNavVisible = true
+        composeSelectedTab = tab
+        selectedTab = tabId
+        composeBadgeMap.remove(tab)
+        homeHost.post {
+            renderHomeTab(tabId)
+        }
+    }
 
     private fun renderHomeTab(tab: Int) {
 
@@ -4242,7 +4261,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
                     form("Create batch in ${department.optString("name")}",
 
-                        listOf("Batch number", "Academic session (e.g. 24-25)")) { values ->
+                        listOf("Batch number", "Academic session (e.g. 24-25)", "Running semester (1-8, optional)")) { values ->
 
                         runAction("Creating batch") {
 
@@ -4252,7 +4271,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
                                 .put("target_batch_number", values[0].toInt())
 
-                                .put("target_session", ClassMateAcademicSession.end(values[1])))
+                                .put("target_session", ClassMateAcademicSession.end(values[1]))
+
+                                .put("target_initial_semester", values.getOrNull(2)?.toIntOrNull() ?: JSONObject.NULL))
 
                             renderHomeTab(R.id.nav_manage)
 
@@ -4961,6 +4982,25 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val path = uri.path.orEmpty()
             val fragment = uri.fragment.orEmpty()
             val queryFile = uri.getQueryParameter("file") ?: uri.getQueryParameter("id")
+
+            val queryNotice = uri.getQueryParameter("notice")
+            val noticeId = when {
+                queryNotice != null && queryNotice.length == 36 -> queryNotice
+                path.startsWith("/n/") -> path.removePrefix("/n/").split("?")[0].split("/")[0].trim()
+                fragment.startsWith("notices/") -> fragment.removePrefix("notices/").split("?")[0].trim()
+                else -> null
+            }
+
+            if (!noticeId.isNullOrBlank()) {
+                targetIntent.data = null
+                selectHomeTab(R.id.nav_notices)
+                window.decorView.postDelayed({
+                    if (::academicScreens.isInitialized) {
+                        academicScreens.openDirectNotice(noticeId)
+                    }
+                }, 400)
+                return
+            }
 
             val fileId = when {
                 queryFile != null && queryFile.length == 36 -> queryFile

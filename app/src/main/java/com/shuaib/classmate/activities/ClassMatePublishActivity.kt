@@ -1136,10 +1136,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
             // Perform submission with duplicate detection
             fun executeSubmission(targetResourceId: String?) {
-                if (busy) return
-                busy = true
-                submit.isEnabled = false
-                status.visibility = View.VISIBLE
 
                 if (isLink) {
                     perform {
@@ -1178,6 +1174,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             null
                         }
                     } else if (uri != null) {
+                        if (busy) return
+                        busy = true
+                        submit.isEnabled = false
+                        status.visibility = View.VISIBLE
+                        status.text = "Preparing upload…"
                         lifecycleScope.launch(Dispatchers.IO) {
                             try {
                                 val stats = runCatching { ClassMateAuthApi.rpc("get_r2_storage_stats", JSONObject()) }.getOrNull()
@@ -1287,9 +1288,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 val data = Intent()
                 if (outcome != null) data.putExtra("created_notice", outcome.toString())
                 setResult(RESULT_OK, data)
+                val successMsg = if (upload && uploadMode == "link") "Drive link shared successfully" else if (editingFile != null) "Changes saved" else "Notice posted successfully"
+                Toast.makeText(this@ClassMatePublishActivity, successMsg, Toast.LENGTH_SHORT).show()
                 finish()
             } catch (e: Exception) {
-                status.text = e.message ?: "Could not complete. Try again."
+                val errMsg = e.message ?: "Could not complete. Try again."
+                status.text = errMsg
+                Toast.makeText(this@ClassMatePublishActivity, errMsg, Toast.LENGTH_LONG).show()
             } finally {
                 busy = false
                 submit.isEnabled = true

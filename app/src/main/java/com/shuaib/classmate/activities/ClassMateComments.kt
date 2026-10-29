@@ -85,7 +85,6 @@ internal object ClassMateComments {
 
         btnCancelReply.setOnClickListener {
             resetReplyOrEditMode()
-            etComment.setText("")
         }
 
         fun executeAsync(block: suspend () -> Unit) {
@@ -382,7 +381,9 @@ internal object ClassMateComments {
                                         commentsList.removeAt(pos)
                                         notifyItemRemoved(pos)
                                         tvEmptyComments.visibility = if (commentsList.isEmpty()) View.VISIBLE else View.GONE
-                                        tvCommentCountBadge.text = commentsList.size.toString()
+                                        val remaining = commentsList.sumOf { 1 + it.optInt("reply_count") }
+                                        tvCommentCountBadge.visibility = if (remaining > 0) View.VISIBLE else View.GONE
+                                        tvCommentCountBadge.text = remaining.toString()
                                     }
                                 }
                             }
@@ -415,9 +416,10 @@ internal object ClassMateComments {
                     }
                     adapter.notifyDataSetChanged()
                     tvEmptyComments.visibility = if (commentsList.isEmpty()) View.VISIBLE else View.GONE
-                    if (commentsList.isNotEmpty()) {
+                    val totalComments = commentsList.sumOf { 1 + it.optInt("reply_count") }
+                    if (totalComments > 0) {
                         tvCommentCountBadge.visibility = View.VISIBLE
-                        tvCommentCountBadge.text = commentsList.size.toString()
+                        tvCommentCountBadge.text = totalComments.toString()
                     } else {
                         tvCommentCountBadge.visibility = View.GONE
                     }
@@ -441,7 +443,8 @@ internal object ClassMateComments {
                 requestUuid = UUID.randomUUID().toString()
                 attemptedText = text
             }
-            val parentId = replyingToComment?.optString("id")
+            val parentId = replyingToComment?.optString("parent_id")?.takeIf { it.isNotBlank() && it != "null" }
+                ?: replyingToComment?.optString("id")?.takeIf { it.isNotBlank() && it != "null" }
 
             executeAsync {
                 ClassMateAuthApi.rpcText(

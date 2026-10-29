@@ -78,7 +78,17 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
         }
     }
     override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); out.putInt("day",day) }
-    private fun time(value:String):LocalTime = runCatching { LocalTime.parse(value.take(5)) }.getOrDefault(LocalTime.of(9,0))
+    private fun time(value: String): LocalTime = runCatching {
+        val trimmed = value.trim()
+        val parts = trimmed.split(":")
+        if (parts.size >= 2) {
+            val h = parts[0].toIntOrNull() ?: 9
+            val m = parts[1].take(2).toIntOrNull() ?: 0
+            LocalTime.of(h.coerceIn(0, 23), m.coerceIn(0, 59))
+        } else {
+            LocalTime.parse(trimmed.take(8))
+        }
+    }.getOrDefault(LocalTime.of(9, 0))
     private fun readCache() {
         val snapshot=ClassMateAcademicCache.read(this,profileId,batchId,"routine") ?: return
         val names=snapshot.optJSONObject("names") ?: JSONObject()
@@ -155,6 +165,20 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
     private fun openPeriod(slot: JSONObject?) {
         if(busy || editor?.isShowing==true || offerings.isEmpty()) return
         val dialogForm=ClassMateFormUi(this)
+        var selectedPeriodDay = slot?.optInt("day_of_week") ?: day
+        val dayBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
+            hint = "Day of week"; boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+        }
+        val dayDropdown = MaterialAutoCompleteTextView(dayBox.context).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setTextColor(getColor(R.color.cm_text_primary))
+            setAdapter(ArrayAdapter(this@ClassMatePeriodEditorActivity, android.R.layout.simple_dropdown_item_1line, days))
+        }
+        dayDropdown.setText(days[selectedPeriodDay], false)
+        dayDropdown.setOnItemClickListener { _, _, position, _ -> selectedPeriodDay = position }
+        dayBox.addView(dayDropdown)
+        dialogForm.panel.addView(dayBox)
         val box=TextInputLayout(this,null,com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply { hint="Course"; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_OUTLINE; setBoxCornerRadii(dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat()) }
         val course=MaterialAutoCompleteTextView(box.context).apply { inputType=android.text.InputType.TYPE_NULL; setTextColor(getColor(R.color.cm_text_primary)); setAdapter(ArrayAdapter(this@ClassMatePeriodEditorActivity,android.R.layout.simple_dropdown_item_1line,offerings.map { it.title })) }
         box.addView(course); dialogForm.panel.addView(box)
@@ -186,11 +210,11 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
                         slots.removeAll { it.optString("id")==slot.optString("id") }
                         ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",null,deletedId=slot.getString("id"))
                     } else {
-                        val saved=ClassMateAuthApi.rpc("save_routine_slot",JSONObject().put("target_id",slot?.optString("id") ?: JSONObject.NULL).put("target_semester_course",offering!!.id).put("target_day",day).put("target_start",from.toString()).put("target_end",to.toString()).put("target_room",room.text.toString().trim()))
+                        val saved=ClassMateAuthApi.rpc("save_routine_slot",JSONObject().put("target_id",slot?.optString("id") ?: JSONObject.NULL).put("target_semester_course",offering!!.id).put("target_day",selectedPeriodDay).put("target_start",from.toString()).put("target_end",to.toString()).put("target_room",room.text.toString().trim()))
                         slots.removeAll { it.optString("id")==saved.optString("id") }; slots.add(saved)
                         ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",saved,courseName=offering.name)
                     }
-                    setResult(RESULT_OK); renderSlots(); dialog.dismiss()
+                    day = selectedPeriodDay; setResult(RESULT_OK); renderDays(); renderSlots(); dialog.dismiss()
                 } catch(e:Exception) { error.text=e.message ?: "Could not save. Try again." }
                 finally { busy=false; dialog.setCancelable(true); listOf(-1,-2,-3).forEach { dialog.getButton(it)?.isEnabled=true } }
             }

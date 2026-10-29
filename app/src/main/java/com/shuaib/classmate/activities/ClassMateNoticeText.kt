@@ -163,6 +163,7 @@ internal object ClassMateNoticeText {
 
     fun findSpanAt(widget: TextView, buffer: Spannable, touchX: Float, touchY: Float): ClickableSpan? {
         val layout = widget.layout ?: return null
+        if (layout.lineCount == 0 || layout.height <= 0) return null
         val x = touchX.toInt() - widget.totalPaddingLeft + widget.scrollX
         val y = touchY.toInt() - widget.totalPaddingTop + widget.scrollY
         if (y < 0) return null
@@ -211,10 +212,8 @@ internal object ClassMateNoticeText {
                             return true
                         }
                     }
-                    Selection.removeSelection(buffer)
                 }
                 MotionEvent.ACTION_CANCEL -> {
-                    Selection.removeSelection(buffer)
                 }
             }
 
@@ -238,28 +237,46 @@ internal object ClassMateNoticeText {
 
         if (isExpanded) {
             view.maxLines = Int.MAX_VALUE
-            val full = styled(view, body, query)
-            val currentWidth = (view.width - view.totalPaddingLeft - view.totalPaddingRight)
-            val lineCount = if (currentWidth > 50) measureLineCount(view, full, currentWidth) else (body.count { it == '\n' } + 1)
-            if (lineCount > MAX_PREVIEW_LINES) {
-                val result = SpannableStringBuilder(full).append(SUFFIX_LESS)
-                val toggleSpan = object : ClickableSpan() {
-                    override fun onClick(widget: View) = onToggleExpand()
-                    override fun updateDrawState(ds: TextPaint) {
-                        ds.color = view.context.getColor(R.color.cm_primary)
-                        ds.isUnderlineText = false
-                        ds.isFakeBoldText = true
+            val formatExpanded = { width: Int ->
+                val full = styled(view, body, query)
+                val lineCount = if (width > 50) measureLineCount(view, full, width) else (body.count { it == '\n' } + 1)
+                if (lineCount > MAX_PREVIEW_LINES) {
+                    val result = SpannableStringBuilder(full).append(SUFFIX_LESS)
+                    val toggleSpan = object : ClickableSpan() {
+                        override fun onClick(widget: View) = onToggleExpand()
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.color = view.context.getColor(R.color.cm_primary)
+                            ds.isUnderlineText = false
+                            ds.isFakeBoldText = true
+                        }
                     }
+                    result.setSpan(
+                        toggleSpan,
+                        result.length - SUFFIX_LESS.length,
+                        result.length,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    view.text = result
+                } else {
+                    view.text = full
                 }
-                result.setSpan(
-                    toggleSpan,
-                    result.length - SUFFIX_LESS.length,
-                    result.length,
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-                view.text = result
+            }
+
+            val tag = Any()
+            view.tag = tag
+
+            val currentWidth = (view.width - view.totalPaddingLeft - view.totalPaddingRight)
+            if (currentWidth > 50) {
+                formatExpanded(currentWidth)
             } else {
-                view.text = full
+                view.text = styled(view, body, query)
+            }
+            view.doOnLayout { v ->
+                if (view.tag !== tag) return@doOnLayout
+                val measuredWidth = (v.width - (v as TextView).totalPaddingLeft - v.totalPaddingRight)
+                if (measuredWidth > 50) {
+                    formatExpanded(measuredWidth)
+                }
             }
             return
         }
@@ -281,6 +298,13 @@ internal object ClassMateNoticeText {
                 fun makeCandidate(cutoff: Int): SpannableStringBuilder {
                     var safeCutoff = cutoff.coerceIn(0, body.length)
                     if (safeCutoff > 0 && Character.isHighSurrogate(body[safeCutoff - 1])) safeCutoff--
+                    val matcher = WEB_URL_PATTERN.matcher(body)
+                    while (matcher.find()) {
+                        if (safeCutoff in (matcher.start() + 1)..matcher.end()) {
+                            safeCutoff = matcher.start()
+                            break
+                        }
+                    }
                     val prefix = body.take(safeCutoff).trimEnd()
                     val candidate = SpannableStringBuilder(styled(view, prefix, query)).append(SUFFIX_MORE)
                     val toggleSpan = object : ClickableSpan() {

@@ -17,22 +17,25 @@ import {
   AlertCircle,
   RefreshCw,
   BookOpen,
-  ChevronDown,
-  ChevronUp,
   ChevronRight,
   Check,
   X,
   Sparkles,
   ArrowLeft,
   FileSpreadsheet,
+  Wifi,
+  Activity,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
-import { downloadCourseMatrixExcel } from "@/lib/attendance-excel";
+import { downloadCourseMatrixExcel, isRecordPresent } from "@/lib/attendance-excel";
 
 interface StudentItem {
   student_id: string;
   roll: string;
   full_name: string;
   rfid_card_uid?: string | null;
+  is_readd?: boolean;
 }
 
 interface CourseItem {
@@ -63,10 +66,11 @@ interface MatrixData {
     student_id: string;
     roll: string;
     full_name: string;
-    records: Record<string, "present" | "absent">;
+    records: Record<string, any>;
     present_count: number;
     total_sessions: number;
     percentage: number;
+    is_readd?: boolean;
   }>;
 }
 
@@ -74,7 +78,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   const client = supabase();
   const batchId = ctx.batch;
 
-  // Navigation Sub-View
+  // View Mode: 'courses' (Matrix & Registers) vs 'cards' (RFID Enrollment Directory)
   const [activeView, setActiveView] = useState<"courses" | "cards">("courses");
 
   // Active ad-hoc session state
@@ -100,6 +104,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   const [detectedUid, setDetectedUid] = useState<string | null>(null);
   const [registeringCard, setRegisteringCard] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
+  const [copiedUid, setCopiedUid] = useState<string | null>(null);
 
   // Student Roster Card Directory Filter & Search
   const [cardFilter, setCardFilter] = useState<"all" | "registered" | "unregistered">("all");
@@ -170,7 +175,13 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
           target_batch: batchId,
         });
       if (err) throw err;
-      if (data) setCourses(data);
+      if (data) {
+        setCourses(data);
+        // Default select first course if none selected yet
+        if (data.length > 0 && !selectedCourseRoster) {
+          handleOpenCourseRoster(data[0]);
+        }
+      }
     } catch (e: any) {
       console.error("Error fetching courses:", e);
     } finally {
@@ -349,6 +360,12 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     }
   };
 
+  const handleCopyUid = (uid: string) => {
+    navigator.clipboard.writeText(uid);
+    setCopiedUid(uid);
+    setTimeout(() => setCopiedUid(null), 2000);
+  };
+
   // Filtered Students for Registration Autocomplete
   const filteredStudents = useMemo(() => {
     if (!studentSearch.trim()) return [];
@@ -370,7 +387,19 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     [students]
   );
 
-  // Filtered Roster for Directory Table
+  // Overall Batch Average Presence
+  const overallAvgPresence = useMemo(() => {
+    if (!courses.length) return 0;
+    const sum = courses.reduce((acc, c) => acc + (c.average_percentage || 0), 0);
+    return Math.round((sum / courses.length) * 10) / 10;
+  }, [courses]);
+
+  const totalClassesConducted = useMemo(() => {
+    if (!courses.length) return 0;
+    return courses.reduce((acc, c) => acc + (c.total_sessions || 0), 0);
+  }, [courses]);
+
+  // Filtered Matrix Students
   const filteredMatrixStudents = useMemo(() => {
     if (!matrixData?.students) return [];
     if (!matrixSearch.trim()) return matrixData.students;
@@ -382,8 +411,9 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     );
   }, [matrixData, matrixSearch]);
 
+  // Filtered Roster for Card Directory Table
   const filteredRoster = useMemo(() => {
-    return students.filter((s) => {
+    const list = students.filter((s) => {
       if (cardFilter === "registered" && !s.rfid_card_uid) return false;
       if (cardFilter === "unregistered" && s.rfid_card_uid) return false;
       if (rosterSearch.trim()) {
@@ -396,33 +426,43 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
       }
       return true;
     });
+
+    return [...list].sort((a, b) => {
+      const aReadd = Boolean(a.is_readd);
+      const bReadd = Boolean(b.is_readd);
+      if (aReadd !== bReadd) return aReadd ? 1 : -1;
+      return (a.roll || "").localeCompare(b.roll || "", undefined, { numeric: true });
+    });
   }, [students, cardFilter, rosterSearch]);
 
   return (
     <div
       style={{
         width: "100%",
-        maxWidth: 1040,
+        maxWidth: 1160,
         margin: "0 auto",
-        padding: "16px 8px 80px",
+        padding: "16px 12px 80px",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: 20,
         boxSizing: "border-box",
       }}
     >
-      {/* 1. Header Banner & Action */}
+      {/* ========================================================================= */}
+      {/* 1. BENTO COMMAND HEADER */}
+      {/* ========================================================================= */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
+          alignItems: "center",
           flexWrap: "wrap",
-          gap: 14,
+          gap: 16,
+          padding: "4px 0",
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <button
               type="button"
               onClick={() => {
@@ -434,46 +474,119 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 7,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
                 border: "1px solid var(--border)",
                 background: "var(--card)",
                 color: "var(--text)",
                 cursor: "pointer",
                 padding: 0,
+                transition: "all 0.15s ease",
               }}
             >
-              <ArrowLeft size={15} />
+              <ArrowLeft size={16} />
             </button>
             <span
               style={{
                 fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                padding: "2px 8px",
+                padding: "3px 10px",
                 borderRadius: 999,
-                background: "rgba(59, 130, 246, 0.15)",
-                color: "var(--primary)",
+                background: activeSession ? "rgba(16, 185, 129, 0.15)" : "var(--blue-soft)",
+                color: activeSession ? "#10b981" : "var(--primary)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              ADMIN WORKSPACE
+              {activeSession ? (
+                <>
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#10b981",
+                      boxShadow: "0 0 6px #10b981",
+                    }}
+                  />
+                  <span>LIVE: {activeSession.course_code}</span>
+                </>
+              ) : (
+                "ATTENDANCE HUB"
+              )}
             </span>
-            <span style={{ fontSize: 13, color: "var(--muted)" }}>
+            <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 500 }}>
               {ctx.batchInfo?.departments?.code?.toUpperCase()} Batch {ctx.batchInfo?.batch_number}
             </span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: "var(--text)" }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, color: "var(--text)", letterSpacing: "-0.02em" }}>
             Manage Attendance
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13.5, color: "var(--muted)" }}>
-            Schedule-independent attendance station, live card registration, and course matrices.
-          </p>
         </div>
 
-        {/* Top Actions: Take Attendance Button */}
-        <div>
+        {/* Top Actions: Live Session Controller & View Tabs */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* Segmented View Switcher */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 3,
+            }}
+          >
+            <button
+              onClick={() => setActiveView("courses")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 9,
+                fontSize: 12.5,
+                fontWeight: 700,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: activeView === "courses" ? "var(--primary)" : "transparent",
+                color: activeView === "courses" ? "#ffffff" : "var(--muted)",
+                boxShadow: activeView === "courses" ? "0 2px 8px rgba(37,99,235,0.25)" : "none",
+              }}
+            >
+              <BookOpen size={14} />
+              <span>Courses & Matrix</span>
+            </button>
+
+            <button
+              onClick={() => setActiveView("cards")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                borderRadius: 9,
+                fontSize: 12.5,
+                fontWeight: 700,
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: activeView === "cards" ? "var(--primary)" : "transparent",
+                color: activeView === "cards" ? "#ffffff" : "var(--muted)",
+                boxShadow: activeView === "cards" ? "0 2px 8px rgba(37,99,235,0.25)" : "none",
+              }}
+            >
+              <CreditCard size={14} />
+              <span>RFID Cards ({registeredCount}/{students.length})</span>
+            </button>
+          </div>
+
+          {/* Live Session Toggle */}
           {activeSession ? (
             <button
               onClick={handleCloseSession}
@@ -482,18 +595,18 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                padding: "10px 18px",
-                borderRadius: 10,
+                padding: "9px 16px",
+                borderRadius: 12,
                 border: "none",
                 background: "#ef4444",
                 color: "#fff",
                 fontWeight: 700,
-                fontSize: 13.5,
+                fontSize: 13,
                 cursor: stoppingSession ? "not-allowed" : "pointer",
-                boxShadow: "0 2px 8px rgba(239, 68, 68, 0.3)",
+                boxShadow: "0 2px 10px rgba(239, 68, 68, 0.3)",
               }}
             >
-              <Square size={16} fill="currentColor" />
+              <Square size={15} fill="currentColor" />
               <span>{stoppingSession ? "Closing..." : "Close Attendance"}</span>
             </button>
           ) : (
@@ -503,24 +616,25 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                padding: "10px 18px",
-                borderRadius: 10,
+                padding: "9px 18px",
+                borderRadius: 12,
                 border: "none",
                 background: "var(--primary)",
                 color: "#fff",
                 fontWeight: 700,
-                fontSize: 13.5,
+                fontSize: 13,
                 cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(37, 99, 235, 0.3)",
+                boxShadow: "0 2px 10px rgba(37, 99, 235, 0.3)",
               }}
             >
-              <Play size={16} fill="currentColor" />
+              <Play size={15} fill="currentColor" />
               <span>Take Attendance</span>
             </button>
           )}
         </div>
       </div>
 
+      {/* Error Alert Banner */}
       {error && (
         <div
           style={{
@@ -528,1031 +642,539 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
             alignItems: "center",
             gap: 10,
             padding: "12px 16px",
-            borderRadius: 10,
+            borderRadius: 12,
             background: "rgba(239, 68, 68, 0.12)",
             border: "1px solid rgba(239, 68, 68, 0.25)",
             color: "#ef4444",
-            fontSize: 13.5,
+            fontSize: 13,
           }}
         >
           <AlertCircle size={18} />
-          <span>{error}</span>
+          <span style={{ flex: 1 }}>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
-      {/* 2. Hardware Station Status Card */}
-      <div
-        className="card"
-        style={{
-          padding: 16,
-          borderRadius: 14,
-          background: activeSession
-            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.03))"
-            : "var(--surface)",
-          border: activeSession
-            ? "1.5px solid rgba(16, 185, 129, 0.35)"
-            : "1px solid var(--border)",
-        }}
-      >
+
+
+      {/* ========================================================================= */}
+      {/* 3. SUB-VIEW A: COURSES & MATRICES */}
+      {/* ========================================================================= */}
+      {activeView === "courses" && (
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 18,
+            alignItems: "start",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: activeSession ? "rgba(16, 185, 129, 0.2)" : "var(--soft)",
-                color: activeSession ? "#10b981" : "var(--muted)",
-                flexShrink: 0,
-              }}
-            >
-              <Radio size={22} className={activeSession ? "animate-pulse" : ""} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <strong style={{ fontSize: 15, color: "var(--text)" }}>
-                  ESP32 Station (ESP32-READER-01)
-                </strong>
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    padding: "2px 7px",
-                    borderRadius: 999,
-                    background: activeSession ? "rgba(16, 185, 129, 0.18)" : "var(--soft)",
-                    color: activeSession ? "#10b981" : "var(--muted)",
-                  }}
-                >
-                  {activeSession ? "ACTIVE · BROADCASTING" : "STATION ASLEEP"}
-                </span>
-              </div>
-              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>
-                {activeSession
-                  ? `Live in session: ${activeSession.course_code} - ${activeSession.course_title}`
-                  : "Device screen is asleep. Start an attendance session to wake OLED and show course marquee."}
-              </p>
-            </div>
-          </div>
-
-          {activeSession && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button
-                onClick={handleCloseSession}
-                disabled={stoppingSession}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  background: "rgba(239, 68, 68, 0.1)",
-                  color: "#ef4444",
-                  fontWeight: 600,
-                  fontSize: 12.5,
-                  cursor: "pointer",
-                }}
-              >
-                {stoppingSession ? "Stopping..." : "Stop Session"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 3. Segmented Navigation Switch (Pill Buttons) */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          padding: 4,
-          borderRadius: 12,
-          background: "var(--soft)",
-          border: "1px solid var(--border)",
-          width: "fit-content",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setActiveView("courses")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            borderRadius: 9,
-            border: "none",
-            background: activeView === "courses" ? "var(--surface)" : "transparent",
-            color: activeView === "courses" ? "var(--text)" : "var(--muted)",
-            boxShadow: activeView === "courses" ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-            fontWeight: activeView === "courses" ? 700 : 500,
-            fontSize: 13,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <BookOpen size={16} />
-          <span>Course Records &amp; Export</span>
-          <span
+          {/* Left Column: Course Selector Rail */}
+          <div
             style={{
-              fontSize: 11,
-              padding: "1px 6px",
-              borderRadius: 999,
-              background: activeView === "courses" ? "rgba(59, 130, 246, 0.15)" : "var(--soft)",
-              color: activeView === "courses" ? "var(--primary)" : "var(--muted)",
-              fontWeight: 700,
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              boxShadow: "var(--shadow)",
             }}
           >
-            {courses.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("cards")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            borderRadius: 9,
-            border: "none",
-            background: activeView === "cards" ? "var(--surface)" : "transparent",
-            color: activeView === "cards" ? "var(--text)" : "var(--muted)",
-            boxShadow: activeView === "cards" ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-            fontWeight: activeView === "cards" ? 700 : 500,
-            fontSize: 13,
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <CreditCard size={16} />
-          <span>Register RFID Cards</span>
-          <span
-            style={{
-              fontSize: 11,
-              padding: "1px 6px",
-              borderRadius: 999,
-              background: activeView === "cards" ? "rgba(16, 185, 129, 0.15)" : "var(--soft)",
-              color: activeView === "cards" ? "#10b981" : "var(--muted)",
-              fontWeight: 700,
-            }}
-          >
-            {registeredCount}/{students.length}
-          </span>
-        </button>
-      </div>
-
-      {/* 4. SUB-VIEW A: COURSE ATTENDANCE RECORDS */}
-      {activeView === "courses" && (
-        selectedCourseRoster ? (
-          /* DEDICATED COURSE ATTENDANCE ROSTER SUB-VIEW (No endless scrolling) */
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Top Back Navigation Bar */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCourseRoster(null);
-                  setMatrixData(null);
-                  setMatrixSearch("");
-                }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "var(--surface)",
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Back to All Courses</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fetchMatrix(selectedCourseRoster.semester_course_id)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "var(--surface)",
-                  color: "var(--text)",
-                  fontSize: 12.5,
-                  cursor: "pointer",
-                }}
-              >
-                <RefreshCw size={13} className={matrixLoading ? "spin" : ""} /> Refresh
-              </button>
-            </div>
-
-            {/* Course Summary Banner */}
-            <div
-              className="card"
-              style={{
-                borderRadius: 14,
-                padding: "16px 20px",
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      letterSpacing: "0.03em",
-                      padding: "3px 10px",
-                      borderRadius: 6,
-                      background: "rgba(59, 130, 246, 0.12)",
-                      color: "var(--primary)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    {selectedCourseRoster.course_code}
-                  </span>
-                  <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                    · {selectedCourseRoster.teacher_name}
-                  </span>
-                </div>
-                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>
-                  {selectedCourseRoster.enrolled_students} Enrolled
-                </span>
-              </div>
-
-              <h2
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  margin: "0 0 12px",
-                  color: "var(--text)",
-                  lineHeight: 1.3,
-                }}
-              >
-                {selectedCourseRoster.course_title}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+                Course Offerings
               </h2>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--border)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "5px 10px",
-                      borderRadius: 8,
-                      background: "var(--soft)",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "var(--text)",
-                    }}
-                  >
-                    <Calendar size={13} style={{ color: "var(--primary)" }} />
-                    <span>{selectedCourseRoster.total_sessions} Classes Held</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "5px 10px",
-                      borderRadius: 8,
-                      background: "rgba(16, 185, 129, 0.1)",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "#10b981",
-                    }}
-                  >
-                    <CheckCircle2 size={13} />
-                    <span>{selectedCourseRoster.average_percentage}% Avg Attendance</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => handleExport(e, selectedCourseRoster.semester_course_id)}
-                  disabled={exportingCourseId === selectedCourseRoster.semester_course_id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#10b981",
-                    color: "#fff",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                  title="Download full attendance matrix (.xlsx)"
-                >
-                  <FileSpreadsheet
-                    size={14}
-                    className={exportingCourseId === selectedCourseRoster.semester_course_id ? "spin" : ""}
-                  />
-                  <span>
-                    {exportingCourseId === selectedCourseRoster.semester_course_id
-                      ? "Exporting..."
-                      : "Download Excel Matrix (.xlsx)"}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Matrix Search & Session Count */}
-            {matrixData && matrixData.sessions.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 10,
-                }}
-              >
-                <div style={{ position: "relative", minWidth: 220, flex: 1, maxWidth: 360 }}>
-                  <Search
-                    size={14}
-                    style={{
-                      position: "absolute",
-                      left: 10,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      color: "var(--muted)",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search student roll or name..."
-                    value={matrixSearch}
-                    onChange={(e) => setMatrixSearch(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "7px 10px 7px 32px",
-                      borderRadius: 8,
-                      border: "1px solid var(--border)",
-                      background: "var(--surface)",
-                      color: "var(--text)",
-                      fontSize: 12.5,
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  {matrixSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setMatrixSearch("")}
-                      style={{
-                        position: "absolute",
-                        right: 8,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        border: "none",
-                        background: "transparent",
-                        color: "var(--muted)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                  Showing <strong>{filteredMatrixStudents.length}</strong> of {matrixData.students.length} students · <strong>{matrixData.sessions.length}</strong> sessions
-                </div>
-              </div>
-            )}
-
-            {/* Matrix Table with Capped Scrollable Height */}
-            {matrixLoading ? (
-              <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}>
-                <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px" }} />
-                <p style={{ fontSize: 13, margin: 0 }}>Loading day-wise matrix…</p>
-              </div>
-            ) : !matrixData || matrixData.sessions.length === 0 ? (
-              <div className="card" style={{ padding: 32, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}>
-                <Calendar size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
-                <p style={{ fontSize: 13, margin: 0 }}>No attendance sessions have been recorded for this course yet.</p>
-              </div>
-            ) : (
-              <div
-                style={{
-                  maxHeight: "calc(100vh - 360px)",
-                  minHeight: 280,
-                  overflow: "auto",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  background: "var(--card)",
-                }}
-              >
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 12.5,
-                    textAlign: "left",
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        background: "var(--soft)",
-                        borderBottom: "1px solid var(--border)",
-                        position: "sticky",
-                        top: 0,
-                        zIndex: 10,
-                      }}
-                    >
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          width: 44,
-                          position: "sticky",
-                          left: 0,
-                          top: 0,
-                          background: "var(--soft)",
-                          zIndex: 12,
-                        }}
-                      >
-                        #
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          minWidth: 90,
-                          position: "sticky",
-                          left: 44,
-                          top: 0,
-                          background: "var(--soft)",
-                          zIndex: 12,
-                        }}
-                      >
-                        Roll
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          minWidth: 150,
-                          position: "sticky",
-                          left: 134,
-                          top: 0,
-                          background: "var(--soft)",
-                          zIndex: 12,
-                          borderRight: "1px solid var(--border)",
-                        }}
-                      >
-                        Student Name
-                      </th>
-                      {matrixData.sessions.map((s, idx) => (
-                        <th
-                          key={s.session_id}
-                          style={{
-                            padding: "8px 10px",
-                            textAlign: "center",
-                            minWidth: 84,
-                            borderLeft: "1px solid var(--border)",
-                            background: "var(--soft)",
-                          }}
-                        >
-                          <div style={{ fontWeight: 700, fontSize: 11.5 }}>
-                            Day {idx + 1}
-                          </div>
-                          <div style={{ fontSize: 10, color: "var(--muted)" }}>
-                            {s.date}
-                          </div>
-                        </th>
-                      ))}
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "center",
-                          minWidth: 80,
-                          borderLeft: "1px solid var(--border)",
-                          background: "var(--soft)",
-                        }}
-                      >
-                        Present
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "center",
-                          minWidth: 70,
-                          borderLeft: "1px solid var(--border)",
-                          background: "var(--soft)",
-                        }}
-                      >
-                        %
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMatrixStudents.map((stu, sIdx) => (
-                      <tr
-                        key={stu.student_id}
-                        style={{
-                          borderBottom: "1px solid var(--border)",
-                          background:
-                            sIdx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding: "8px 12px",
-                            color: "var(--muted)",
-                            position: "sticky",
-                            left: 0,
-                            background: "var(--card)",
-                            zIndex: 2,
-                          }}
-                        >
-                          {sIdx + 1}
-                        </td>
-                        <td
-                          style={{
-                            padding: "8px 12px",
-                            fontWeight: 600,
-                            position: "sticky",
-                            left: 44,
-                            background: "var(--card)",
-                            zIndex: 2,
-                          }}
-                        >
-                          {stu.roll}
-                        </td>
-                        <td
-                          style={{
-                            padding: "8px 12px",
-                            position: "sticky",
-                            left: 134,
-                            background: "var(--card)",
-                            zIndex: 2,
-                            borderRight: "1px solid var(--border)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {stu.full_name}
-                        </td>
-                        {matrixData.sessions.map((sess) => {
-                          const isPresent =
-                            stu.records?.[sess.session_id] === "present";
-                          return (
-                            <td
-                              key={sess.session_id}
-                              style={{
-                                padding: "6px 8px",
-                                textAlign: "center",
-                                borderLeft: "1px solid var(--border)",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  width: 24,
-                                  height: 24,
-                                  lineHeight: "24px",
-                                  borderRadius: 6,
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  background: isPresent
-                                    ? "rgba(16, 185, 129, 0.15)"
-                                    : "var(--soft)",
-                                  color: isPresent ? "#10b981" : "var(--muted)",
-                                }}
-                              >
-                                {isPresent ? "1" : "0"}
-                              </span>
-                            </td>
-                          );
-                        })}
-                        <td
-                          style={{
-                            padding: "8px 12px",
-                            textAlign: "center",
-                            fontWeight: 700,
-                            borderLeft: "1px solid var(--border)",
-                          }}
-                        >
-                          {stu.present_count}/{matrixData.sessions.length}
-                        </td>
-                        <td
-                          style={{
-                            padding: "8px 12px",
-                            textAlign: "center",
-                            fontWeight: 700,
-                            borderLeft: "1px solid var(--border)",
-                            color: stu.percentage >= 75 ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {stu.percentage}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* COURSE LIST VIEW (Clean, compact cards without inline matrix expansion) */
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--text)" }}>
-                  Courses Attendance Directory
-                </h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
-                  Select a course to view detailed session rosters, or export full semester records to Excel.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={fetchCourses}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "var(--surface)",
-                  color: "var(--text)",
-                  fontSize: 12.5,
-                  cursor: "pointer",
-                }}
-              >
-                <RefreshCw size={13} className={coursesLoading ? "spin" : ""} /> Refresh
-              </button>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                {courses.length} courses
+              </span>
             </div>
 
             {coursesLoading ? (
-              <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-                <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px" }} />
-                <p style={{ fontSize: 13 }}>Loading course records…</p>
+              <div style={{ padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                Loading courses...
               </div>
             ) : courses.length === 0 ? (
-              <div
-                className="card"
-                style={{ padding: 32, textAlign: "center", color: "var(--muted)", borderRadius: 14 }}
-              >
-                <BookOpen size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
-                <p style={{ fontSize: 14, margin: 0 }}>No active courses found for this batch.</p>
+              <div style={{ padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                No active courses registered for this batch.
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {courses.map((c) => (
-                  <div
-                    key={c.semester_course_id}
-                    className="card"
-                    style={{
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <div style={{ padding: "16px 20px" }}>
-                      {/* Row 1: Course Code Pill + Teacher Name */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          flexWrap: "wrap",
-                          gap: 8,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {courses.map((course) => {
+                  const isSelected = selectedCourseRoster?.semester_course_id === course.semester_course_id;
+                  const isLiveCourse = activeSession?.course_code === course.course_code;
+
+                  return (
+                    <div
+                      key={course.semester_course_id}
+                      onClick={() => handleOpenCourseRoster(course)}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 14,
+                        border: isSelected
+                          ? "1.5px solid var(--primary)"
+                          : "1px solid var(--border)",
+                        background: isSelected ? "var(--blue-soft)" : "var(--surface)",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span
                             style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              letterSpacing: "0.03em",
-                              padding: "3px 10px",
-                              borderRadius: 6,
-                              background: "rgba(59, 130, 246, 0.12)",
-                              color: "var(--primary)",
-                              display: "inline-flex",
-                              alignItems: "center",
+                              fontSize: 12.5,
+                              fontWeight: 800,
+                              color: isSelected ? "var(--primary)" : "var(--text)",
                             }}
                           >
-                            {c.course_code}
+                            {course.course_code}
                           </span>
-                          <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                            · {c.teacher_name}
-                          </span>
+                          {isLiveCourse && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                padding: "1px 6px",
+                                borderRadius: 6,
+                                background: "rgba(16, 185, 129, 0.2)",
+                                color: "#10b981",
+                              }}
+                            >
+                              LIVE
+                            </span>
+                          )}
                         </div>
-                        <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>
-                          {c.enrolled_students} Enrolled
+
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color:
+                              (course.average_percentage || 0) >= 75
+                                ? "var(--green)"
+                                : (course.average_percentage || 0) >= 60
+                                ? "#f59e0b"
+                                : "var(--red)",
+                          }}
+                        >
+                          {course.average_percentage || 0}% avg
                         </span>
                       </div>
 
-                      {/* Row 2: Course Title */}
-                      <h3
+                      <div
                         style={{
-                          fontSize: 16,
-                          fontWeight: 700,
-                          margin: "0 0 14px",
+                          fontSize: 13,
+                          fontWeight: 600,
                           color: "var(--text)",
-                          lineHeight: 1.35,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
                         }}
                       >
-                        {c.course_title}
-                      </h3>
+                        {course.course_title}
+                      </div>
 
-                      {/* Row 3: Stats Chips & Action Buttons */}
                       <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
                           justifyContent: "space-between",
-                          flexWrap: "wrap",
-                          gap: 10,
-                          paddingTop: 12,
+                          alignItems: "center",
+                          fontSize: 11.5,
+                          color: "var(--muted)",
                           borderTop: "1px solid var(--border)",
+                          paddingTop: 6,
+                          marginTop: 2,
                         }}
                       >
-                        {/* Stat Chips */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <div
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "5px 10px",
-                              borderRadius: 8,
-                              background: "var(--soft)",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: "var(--text)",
-                            }}
-                          >
-                            <Calendar size={13} style={{ color: "var(--primary)" }} />
-                            <span>{c.total_sessions} Classes Held</span>
-                          </div>
-                          <div
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "5px 10px",
-                              borderRadius: 8,
-                              background: "rgba(16, 185, 129, 0.1)",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: "#10b981",
-                            }}
-                          >
-                            <CheckCircle2 size={13} />
-                            <span>{c.average_percentage}% Avg Attendance</span>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <button
-                            type="button"
-                            onClick={(e) => handleExport(e, c.semester_course_id)}
-                            disabled={exportingCourseId === c.semester_course_id}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              border: "1px solid var(--border)",
-                              background: "var(--surface)",
-                              color: "var(--text)",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                            }}
-                            title="Download full attendance matrix (.xlsx)"
-                          >
-                            <FileSpreadsheet
-                              size={14}
-                              className={exportingCourseId === c.semester_course_id ? "spin" : ""}
-                              style={{ color: "#10b981" }}
-                            />
-                            <span>
-                              {exportingCourseId === c.semester_course_id
-                                ? "Exporting..."
-                                : "Excel Export"}
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenCourseRoster(c)}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "6px 14px",
-                              borderRadius: 8,
-                              border: "1px solid var(--primary)",
-                              background: "var(--primary)",
-                              color: "#fff",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                            }}
-                          >
-                            <span>View Roster</span>
-                            <ChevronRight size={14} />
-                          </button>
-                        </div>
+                        <span>{course.total_sessions || 0} Sessions Held</span>
+                        <span>{course.teacher_name || "Instructor"}</span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
-        )
+
+          {/* Right Column: Attendance Matrix & Roster Viewer */}
+          <div
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              boxShadow: "var(--shadow)",
+              minHeight: 460,
+            }}
+          >
+            {selectedCourseRoster ? (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+                        {selectedCourseRoster.course_code}: {selectedCourseRoster.course_title}
+                      </h2>
+                    </div>
+                    <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
+                      Full Attendance Matrix & Collegiate Tracking • {matrixData?.sessions.length || 0} Sessions Logged
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      onClick={(e) => handleExport(e, selectedCourseRoster.semester_course_id)}
+                      disabled={exportingCourseId === selectedCourseRoster.semester_course_id}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "7px 14px",
+                        borderRadius: 10,
+                        border: "1px solid var(--border)",
+                        background: "var(--surface)",
+                        color: "var(--text)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: exportingCourseId ? "wait" : "pointer",
+                      }}
+                    >
+                      <FileSpreadsheet size={14} color="var(--green)" />
+                      <span>{exportingCourseId ? "Exporting..." : "Export Excel (.xlsx)"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar inside Matrix */}
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flex: 1,
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      padding: "6px 12px",
+                    }}
+                  >
+                    <Search size={14} color="var(--muted)" />
+                    <input
+                      type="text"
+                      placeholder="Search student roll or name..."
+                      value={matrixSearch}
+                      onChange={(e) => setMatrixSearch(e.target.value)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        outline: "none",
+                        color: "var(--text)",
+                        fontSize: 12.5,
+                        width: "100%",
+                      }}
+                    />
+                    {matrixSearch && (
+                      <button
+                        onClick={() => setMatrixSearch("")}
+                        style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Matrix Grid Table */}
+                {matrixLoading ? (
+                  <div style={{ padding: "60px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                    Loading attendance matrix...
+                  </div>
+                ) : !matrixData || !matrixData.sessions.length ? (
+                  <div
+                    style={{
+                      padding: "50px 20px",
+                      textAlign: "center",
+                      color: "var(--muted)",
+                      background: "var(--surface)",
+                      borderRadius: 14,
+                      border: "1px dashed var(--border)",
+                    }}
+                  >
+                    <Calendar size={28} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                      No Sessions Recorded Yet
+                    </div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>
+                      Start an attendance session or tap cards on ESP32-READER-01 to begin.
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      overflowX: "auto",
+                      border: "1px solid var(--border)",
+                      borderRadius: 12,
+                      maxHeight: "520px",
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        textAlign: "left",
+                        fontSize: 12,
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            background: "var(--surface)",
+                            borderBottom: "1px solid var(--border)",
+                            color: "var(--muted)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          <th style={{ padding: "10px 12px", position: "sticky", left: 0, background: "var(--surface)", zIndex: 2 }}>
+                            Roll
+                          </th>
+                          <th style={{ padding: "10px 12px", position: "sticky", left: 78, background: "var(--surface)", zIndex: 2 }}>
+                            Student Name
+                          </th>
+                          {matrixData.sessions.map((sess) => (
+                            <th key={sess.session_id} style={{ padding: "10px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
+                              {sess.date}
+                            </th>
+                          ))}
+                          <th style={{ padding: "10px 12px", textAlign: "right" }}>%</th>
+                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Eligibility</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMatrixStudents.map((st) => {
+                          const isCollegiate = st.percentage >= 75;
+                          const isNonCollegiate = st.percentage >= 60 && st.percentage < 75;
+
+                          return (
+                            <tr
+                              key={st.student_id}
+                              style={{
+                                borderBottom: "1px solid var(--border)",
+                                transition: "background 0.1s ease",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: "9px 12px",
+                                  fontWeight: 800,
+                                  color: "var(--text)",
+                                  position: "sticky",
+                                  left: 0,
+                                  background: "var(--card)",
+                                  zIndex: 1,
+                                }}
+                              >
+                                {st.roll}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "9px 12px",
+                                  fontWeight: 600,
+                                  color: "var(--text)",
+                                  whiteSpace: "nowrap",
+                                  position: "sticky",
+                                  left: 78,
+                                  background: "var(--card)",
+                                  zIndex: 1,
+                                }}
+                              >
+                                {st.full_name}
+                              </td>
+
+                              {/* Presence Cells */}
+                              {matrixData.sessions.map((sess) => {
+                                const rec = st.records ? st.records[sess.session_id] : null;
+                                const isPresent = isRecordPresent(rec);
+
+                                return (
+                                  <td key={sess.session_id} style={{ padding: "6px 8px", textAlign: "center" }}>
+                                    <span
+                                      style={{
+                                        display: "inline-block",
+                                        width: 26,
+                                        height: 26,
+                                        lineHeight: "26px",
+                                        borderRadius: 6,
+                                        fontWeight: 800,
+                                        fontSize: 11,
+                                        background: isPresent ? "rgba(16, 185, 129, 0.18)" : "rgba(239, 68, 68, 0.08)",
+                                        color: isPresent ? "#10b981" : "var(--muted)",
+                                      }}
+                                    >
+                                      {isPresent ? "P" : "—"}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+
+                              {/* Percentage */}
+                              <td
+                                style={{
+                                  padding: "9px 12px",
+                                  textAlign: "right",
+                                  fontWeight: 800,
+                                  color: isCollegiate
+                                    ? "var(--green)"
+                                    : isNonCollegiate
+                                    ? "#f59e0b"
+                                    : "var(--red)",
+                                }}
+                              >
+                                {st.percentage}%
+                              </td>
+
+                              {/* Collegiate Badge */}
+                              <td style={{ padding: "9px 12px", textAlign: "center" }}>
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    padding: "2px 8px",
+                                    borderRadius: 999,
+                                    background: isCollegiate
+                                      ? "rgba(16, 185, 129, 0.15)"
+                                      : isNonCollegiate
+                                      ? "rgba(245, 158, 11, 0.15)"
+                                      : "rgba(239, 68, 68, 0.15)",
+                                    color: isCollegiate
+                                      ? "#10b981"
+                                      : isNonCollegiate
+                                      ? "#f59e0b"
+                                      : "#ef4444",
+                                  }}
+                                >
+                                  {isCollegiate ? "Collegiate" : isNonCollegiate ? "Non-Coll" : "Discoll"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: "60px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+                Select a course on the left to inspect its attendance matrix.
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* 5. SUB-VIEW B: REGISTER STUDENT RFID CARDS */}
+      {/* ========================================================================= */}
+      {/* 4. SUB-VIEW B: RFID CARDS DIRECTORY & ENROLLMENT */}
+      {/* ========================================================================= */}
       {activeView === "cards" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* Pairing Workspace Card */}
-          <div className="card" style={{ padding: 20, borderRadius: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <CreditCard size={20} style={{ color: "var(--primary)" }} />
-              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "var(--text)" }}>
-                Pair Student with RFID Card
-              </h2>
-            </div>
-            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--muted)" }}>
-              Search for a student, tap their physical RFID card on the ESP32 station or enter the hex UID manually.
-            </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Card Linker Bento Box */}
+          <div
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 20,
+              boxShadow: "var(--shadow)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+                  Link RFID Student Card
+                </h2>
+                <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
+                  Tap card on ESP32-READER-01 for auto-detection or type the 8-character hex UID manually.
+                </p>
+              </div>
 
-            {detectedUid && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  background: "rgba(59, 130, 246, 0.12)",
-                  border: "1px solid rgba(59, 130, 246, 0.3)",
-                  color: "var(--primary)",
-                  marginBottom: 16,
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Sparkles size={16} />
-                  <span>
-                    <strong>Card Detected on Station:</strong> {detectedUid}
-                  </span>
+              {detectedUid && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    background: "rgba(16, 185, 129, 0.15)",
+                    color: "#10b981",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  <Sparkles size={14} />
+                  <span>Card Detected: {detectedUid}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCardUidInput(detectedUid)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: 6,
-                    border: "none",
-                    background: "var(--primary)",
-                    color: "#fff",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Use Detected UID
-                </button>
-              </div>
-            )}
+              )}
+            </div>
 
-            {registerSuccess && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  background: "rgba(16, 185, 129, 0.12)",
-                  border: "1px solid rgba(16, 185, 129, 0.25)",
-                  color: "#10b981",
-                  marginBottom: 16,
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>{registerSuccess}</span>
-              </div>
-            )}
-
-            <form
-              onSubmit={handleRegisterCard}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: 14,
-              }}
-            >
-              {/* Field 1: Student Roll / ID search */}
-              <div style={{ position: "relative" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  1. STUDENT ID / ROLL
+            {/* Registration Form */}
+            <form onSubmit={handleRegisterCard} style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              {/* Step 1: Select Student */}
+              <div style={{ flex: 1, minWidth: 260, position: "relative" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 5 }}>
+                  1. SELECT STUDENT (NAME OR ROLL)
                 </label>
-                <div style={{ position: "relative" }}>
-                  <Search
-                    size={15}
-                    style={{
-                      position: "absolute",
-                      left: 12,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      color: "var(--muted)",
-                    }}
-                  />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <Search size={14} color="var(--muted)" style={{ marginRight: 8 }} />
                   <input
                     type="text"
-                    placeholder={
-                      selectedStudent
-                        ? `${selectedStudent.roll} - ${selectedStudent.full_name}`
-                        : "Search roll or name..."
-                    }
-                    value={studentSearch}
+                    placeholder="Search roll or student name..."
+                    value={selectedStudent ? `${selectedStudent.roll} - ${selectedStudent.full_name}` : studentSearch}
                     onChange={(e) => {
+                      setSelectedStudent(null);
                       setStudentSearch(e.target.value);
-                      if (selectedStudent) setSelectedStudent(null);
                     }}
                     style={{
-                      width: "100%",
-                      padding: "9px 12px 9px 34px",
-                      borderRadius: 8,
-                      border: "1px solid var(--border)",
-                      background: "var(--soft)",
+                      border: "none",
+                      background: "transparent",
+                      outline: "none",
                       color: "var(--text)",
                       fontSize: 13,
-                      outline: "none",
-                      boxSizing: "border-box",
+                      width: "100%",
                     }}
                   />
                   {selectedStudent && (
@@ -1562,88 +1184,57 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                         setSelectedStudent(null);
                         setStudentSearch("");
                       }}
-                      style={{
-                        position: "absolute",
-                        right: 8,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        border: "none",
-                        background: "transparent",
-                        color: "var(--muted)",
-                        cursor: "pointer",
-                      }}
+                      style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
                     >
-                      <X size={15} />
+                      <X size={14} />
                     </button>
                   )}
                 </div>
 
-                {/* Suggestions Dropdown */}
-                {filteredStudents.length > 0 && !selectedStudent && (
+                {/* Autocomplete Dropdown */}
+                {!selectedStudent && filteredStudents.length > 0 && (
                   <div
                     style={{
                       position: "absolute",
                       top: "100%",
                       left: 0,
                       right: 0,
-                      zIndex: 50,
                       marginTop: 4,
-                      background: "var(--surface)",
+                      background: "var(--card)",
                       border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
+                      borderRadius: 12,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                      zIndex: 30,
                       maxHeight: 200,
                       overflowY: "auto",
                     }}
                   >
-                    {filteredStudents.map((s) => (
+                    {filteredStudents.map((st) => (
                       <div
-                        key={s.student_id}
+                        key={st.student_id}
                         onClick={() => {
-                          setSelectedStudent(s);
+                          setSelectedStudent(st);
                           setStudentSearch("");
-                          if (s.rfid_card_uid) setCardUidInput(s.rfid_card_uid);
                         }}
                         style={{
-                          padding: "8px 12px",
+                          padding: "10px 14px",
+                          borderBottom: "1px solid var(--border)",
                           cursor: "pointer",
-                          fontSize: 13,
-                          borderBottom: "1px solid var(--soft)",
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          fontSize: 12.5,
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--soft)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
                         <div>
-                          <strong>{s.roll}</strong> — {s.full_name}
+                          <strong style={{ color: "var(--text)" }}>{st.roll}</strong> - {st.full_name}
                         </div>
-                        {s.rfid_card_uid ? (
-                          <span
-                            style={{
-                              fontSize: 10.5,
-                              color: "#10b981",
-                              background: "rgba(16,185,129,0.1)",
-                              padding: "2px 7px",
-                              borderRadius: 4,
-                              fontWeight: 600,
-                            }}
-                          >
-                            Linked: ••••{s.rfid_card_uid.slice(-4)}
+                        {st.rfid_card_uid ? (
+                          <span style={{ fontSize: 11, color: "#10b981", fontWeight: 700 }}>
+                            Bound: {st.rfid_card_uid}
                           </span>
                         ) : (
-                          <span
-                            style={{
-                              fontSize: 10.5,
-                              color: "var(--muted)",
-                              background: "var(--soft)",
-                              padding: "2px 7px",
-                              borderRadius: 4,
-                            }}
-                          >
-                            No Card
-                          </span>
+                          <span style={{ fontSize: 11, color: "var(--muted)" }}>No card</span>
                         )}
                       </div>
                     ))}
@@ -1651,252 +1242,276 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 )}
               </div>
 
-              {/* Field 2: Card UID Input */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
+              {/* Step 2: Card UID Input */}
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 5 }}>
                   2. CARD UID (HEX)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 03E1AA05"
+                  placeholder="e.g. F9831C02"
                   value={cardUidInput}
                   onChange={(e) => setCardUidInput(e.target.value.toUpperCase())}
                   style={{
                     width: "100%",
-                    padding: "9px 12px",
-                    borderRadius: 8,
+                    background: "var(--surface)",
                     border: "1px solid var(--border)",
-                    background: "var(--soft)",
+                    borderRadius: 10,
+                    padding: "8px 12px",
                     color: "var(--text)",
                     fontSize: 13,
+                    fontWeight: 700,
                     fontFamily: "monospace",
-                    outline: "none",
+                    letterSpacing: "0.08em",
                     boxSizing: "border-box",
                   }}
                 />
               </div>
 
-              {/* Submit Button */}
+              {/* Step 3: Submit */}
               <div style={{ display: "flex", alignItems: "flex-end" }}>
                 <button
                   type="submit"
                   disabled={!selectedStudent || !cardUidInput.trim() || registeringCard}
                   style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    borderRadius: 8,
+                    padding: "9px 20px",
+                    borderRadius: 10,
                     border: "none",
-                    background:
-                      selectedStudent && cardUidInput.trim() ? "var(--primary)" : "var(--soft)",
-                    color: selectedStudent && cardUidInput.trim() ? "#fff" : "var(--muted)",
-                    fontSize: 13,
+                    background: !selectedStudent || !cardUidInput.trim() ? "var(--border)" : "var(--primary)",
+                    color: "#fff",
                     fontWeight: 700,
-                    cursor:
-                      selectedStudent && cardUidInput.trim() ? "pointer" : "not-allowed",
+                    fontSize: 13,
+                    cursor: !selectedStudent || !cardUidInput.trim() || registeringCard ? "not-allowed" : "pointer",
+                    height: 38,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    boxShadow: "0 2px 8px rgba(37,99,235,0.2)",
                   }}
                 >
-                  {registeringCard ? "Linking..." : "Register Card"}
+                  <CreditCard size={15} />
+                  <span>{registeringCard ? "Linking..." : "Link Card"}</span>
                 </button>
               </div>
             </form>
+
+            {/* Success Feedback */}
+            {registerSuccess && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "rgba(16, 185, 129, 0.15)",
+                  color: "#10b981",
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <span>{registerSuccess}</span>
+              </div>
+            )}
           </div>
 
-          {/* Batch Card Status & Enrollment Directory */}
-          <div className="card" style={{ padding: 20, borderRadius: 14 }}>
+          {/* Student Roster Directory Table */}
+          <div
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              padding: 18,
+              boxShadow: "var(--shadow)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+                  Enrolled Students Directory
+                </h3>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                  {filteredRoster.length} students shown
+                </span>
+              </div>
+
+              {/* Directory Filter Pills */}
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => setCardFilter("all")}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: "pointer",
+                    background: cardFilter === "all" ? "var(--primary)" : "var(--surface)",
+                    color: cardFilter === "all" ? "#fff" : "var(--muted)",
+                  }}
+                >
+                  All ({students.length})
+                </button>
+                <button
+                  onClick={() => setCardFilter("registered")}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: "pointer",
+                    background: cardFilter === "registered" ? "var(--primary)" : "var(--surface)",
+                    color: cardFilter === "registered" ? "#fff" : "var(--muted)",
+                  }}
+                >
+                  Bound ({registeredCount})
+                </button>
+                <button
+                  onClick={() => setCardFilter("unregistered")}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: "pointer",
+                    background: cardFilter === "unregistered" ? "#ef4444" : "var(--surface)",
+                    color: cardFilter === "unregistered" ? "#fff" : "var(--muted)",
+                  }}
+                >
+                  Missing ({unregisteredCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input */}
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                flexWrap: "wrap",
-                gap: 12,
-                marginBottom: 16,
-              }}
-            >
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--text)" }}>
-                  Batch Student Card Directory
-                </h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
-                  Review cards assigned to students. Click &quot;Pair Card&quot; on any student to load them into the form above.
-                </p>
-              </div>
-
-              {/* Roster Search */}
-              <div style={{ position: "relative", minWidth: 200 }}>
-                <Search
-                  size={14}
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "var(--muted)",
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Filter directory..."
-                  value={rosterSearch}
-                  onChange={(e) => setRosterSearch(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "6px 10px 6px 30px",
-                    borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--soft)",
-                    color: "var(--text)",
-                    fontSize: 12,
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {(["all", "registered", "unregistered"] as const).map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setCardFilter(filter)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: 6,
-                    border: "none",
-                    background: cardFilter === filter ? "var(--primary)" : "var(--soft)",
-                    color: cardFilter === filter ? "#fff" : "var(--muted)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {filter === "all"
-                    ? `All (${students.length})`
-                    : filter === "registered"
-                    ? `Registered (${registeredCount})`
-                    : `Unregistered (${unregisteredCount})`}
-                </button>
-              ))}
-            </div>
-
-            {/* Roster Table */}
-            <div
-              style={{
-                maxHeight: 520,
-                overflowY: "auto",
-                overflowX: "auto",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
+                gap: 8,
                 background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "6px 12px",
               }}
             >
-              <table
+              <Search size={14} color="var(--muted)" />
+              <input
+                type="text"
+                placeholder="Filter by roll, student name, or card UID..."
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
                 style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  color: "var(--text)",
                   fontSize: 12.5,
-                  textAlign: "left",
+                  width: "100%",
                 }}
-              >
+              />
+              {rosterSearch && (
+                <button
+                  onClick={() => setRosterSearch("")}
+                  style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12.5 }}>
                 <thead>
-                  <tr style={{ background: "var(--soft)", borderBottom: "1px solid var(--border)" }}>
-                    <th style={{ padding: "8px 12px", width: 50 }}>#</th>
-                    <th style={{ padding: "8px 12px", minWidth: 90 }}>Roll</th>
-                    <th style={{ padding: "8px 12px", minWidth: 160 }}>Student Name</th>
-                    <th style={{ padding: "8px 12px", minWidth: 140 }}>Card UID</th>
-                    <th style={{ padding: "8px 12px", width: 100, textAlign: "right" }}>Action</th>
+                  <tr style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>
+                    <th style={{ padding: "10px 14px", fontWeight: 700 }}>Roll</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 700 }}>Student Name</th>
+                    <th style={{ padding: "10px 14px", fontWeight: 700 }}>RFID Card Status</th>
+                    <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700 }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRoster.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}
-                      >
-                        No matching students found in directory.
+                  {filteredRoster.map((st) => (
+                    <tr key={st.student_id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "10px 14px", fontWeight: 800, color: "var(--text)" }}>
+                        {st.roll}
                       </td>
-                    </tr>
-                  ) : (
-                    filteredRoster.map((s, idx) => (
-                      <tr
-                        key={s.student_id}
-                        style={{
-                          borderBottom: "1px solid var(--border)",
-                          background: idx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
-                        }}
-                      >
-                        <td style={{ padding: "8px 12px", color: "var(--muted)" }}>{idx + 1}</td>
-                        <td style={{ padding: "8px 12px", fontWeight: 700 }}>{s.roll}</td>
-                        <td style={{ padding: "8px 12px" }}>{s.full_name}</td>
-                        <td style={{ padding: "8px 12px" }}>
-                          {s.rfid_card_uid ? (
+                      <td style={{ padding: "10px 14px", fontWeight: 600, color: "var(--text)" }}>
+                        {st.full_name}
+                      </td>
+                      <td style={{ padding: "10px 14px" }}>
+                        {st.rfid_card_uid ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <span
                               style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                padding: "2px 8px",
-                                borderRadius: 5,
-                                background: "rgba(16, 185, 129, 0.12)",
-                                color: "#10b981",
                                 fontFamily: "monospace",
+                                fontWeight: 800,
                                 fontSize: 12,
-                                fontWeight: 700,
-                              }}
-                            >
-                              <Check size={12} /> {s.rfid_card_uid}
-                            </span>
-                          ) : (
-                            <span
-                              style={{
                                 padding: "2px 8px",
-                                borderRadius: 5,
-                                background: "var(--soft)",
-                                color: "var(--muted)",
-                                fontSize: 11,
+                                borderRadius: 6,
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#10b981",
+                                letterSpacing: "0.06em",
                               }}
                             >
-                              Unregistered
+                              {st.rfid_card_uid}
                             </span>
-                          )}
-                        </td>
-                        <td style={{ padding: "8px 12px", textAlign: "right" }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedStudent(s);
-                              setCardUidInput(s.rfid_card_uid || detectedUid || "");
-                              window.scrollTo({ top: 180, behavior: "smooth" });
-                            }}
+                            <button
+                              onClick={() => handleCopyUid(st.rfid_card_uid!)}
+                              title="Copy Card UID"
+                              style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 2 }}
+                            >
+                              <Copy size={13} />
+                            </button>
+                            {copiedUid === st.rfid_card_uid && (
+                              <span style={{ fontSize: 10, color: "var(--green)" }}>Copied!</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span
                             style={{
-                              padding: "4px 10px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: "2px 8px",
                               borderRadius: 6,
-                              border: "1px solid var(--border)",
-                              background: "var(--surface)",
-                              color: "var(--primary)",
-                              fontWeight: 600,
-                              fontSize: 11.5,
-                              cursor: "pointer",
+                              background: "rgba(239, 68, 68, 0.12)",
+                              color: "#ef4444",
                             }}
                           >
-                            {s.rfid_card_uid ? "Edit Card" : "Pair Card"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                            NO CARD BOUND
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                        <button
+                          onClick={() => {
+                            setSelectedStudent(st);
+                            setCardUidInput(st.rfid_card_uid || "");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            border: "1px solid var(--border)",
+                            background: "var(--surface)",
+                            color: "var(--primary)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {st.rfid_card_uid ? "Change Card" : "Assign Card"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1904,51 +1519,58 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
         </div>
       )}
 
-      {/* 6. Take Attendance Modal */}
+      {/* ========================================================================= */}
+      {/* 5. MODAL: TAKE ATTENDANCE (AD-HOC COURSE PICKER) */}
+      {/* ========================================================================= */}
       {takeModalOpen && (
-        <div className="attendance-modal-overlay">
-          <div className="attendance-modal-container" style={{ maxWidth: 440, padding: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 14,
-              }}
-            >
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 20,
+              padding: 24,
+              maxWidth: 440,
+              width: "100%",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Play size={18} style={{ color: "var(--primary)" }} />
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--text)" }}>
-                  Take Attendance
+                <Play size={18} color="var(--primary)" fill="var(--primary)" />
+                <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+                  Start Attendance Session
                 </h3>
               </div>
               <button
                 onClick={() => setTakeModalOpen(false)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                }}
+                style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--muted)" }}>
-              Select a course to start attendance immediately. The ESP32 reader screen will wake up and display the course name marquee.
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+              Choose a course to begin attendance. The station <strong>ESP32-READER-01</strong> will immediately download the roster cache and display the course title for student card tapping.
             </p>
 
-            <div style={{ marginBottom: 18 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--muted)",
-                  marginBottom: 6,
-                }}
-              >
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 6 }}>
                 SELECT COURSE
               </label>
               <select
@@ -1956,17 +1578,17 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 onChange={(e) => setSelectedCourseForStart(e.target.value)}
                 style={{
                   width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
+                  padding: "10px 14px",
+                  borderRadius: 10,
                   border: "1px solid var(--border)",
-                  background: "var(--soft)",
+                  background: "var(--surface)",
                   color: "var(--text)",
                   fontSize: 13,
+                  fontWeight: 600,
                   outline: "none",
-                  boxSizing: "border-box",
                 }}
               >
-                <option value="">Choose course to launch...</option>
+                <option value="">-- Select Course Offering --</option>
                 {courses.map((c) => (
                   <option key={c.semester_course_id} value={c.semester_course_id}>
                     {c.course_code} - {c.course_title}
@@ -1975,24 +1597,25 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
               <button
                 type="button"
                 onClick={() => setTakeModalOpen(false)}
                 style={{
                   flex: 1,
                   padding: "10px 16px",
-                  borderRadius: 8,
+                  borderRadius: 10,
                   border: "1px solid var(--border)",
                   background: "var(--surface)",
                   color: "var(--text)",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: 13,
                   cursor: "pointer",
                 }}
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 onClick={handleStartSession}
@@ -2000,16 +1623,17 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 style={{
                   flex: 1,
                   padding: "10px 16px",
-                  borderRadius: 8,
+                  borderRadius: 10,
                   border: "none",
-                  background: "var(--primary)",
+                  background: !selectedCourseForStart ? "var(--border)" : "var(--primary)",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: !selectedCourseForStart || startingSession ? "not-allowed" : "pointer",
+                  boxShadow: "0 2px 10px rgba(37,99,235,0.3)",
                 }}
               >
-                {startingSession ? "Launching..." : "Start Station"}
+                {startingSession ? "Starting..." : "Begin Session"}
               </button>
             </div>
           </div>

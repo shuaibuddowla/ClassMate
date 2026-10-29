@@ -6,46 +6,54 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="16dp"
     app:cardBackgroundColor="@color/cm_surface"
-    app:cardCornerRadius="24dp"
+    app:cardCornerRadius="28dp"
     app:cardElevation="0dp"
-    app:strokeWidth="1.5dp"
+    app:strokeWidth="1dp"
     app:strokeColor="@color/cm_border">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="22dp"
         android:gravity="center_horizontal">
 
-        <!-- Glowing Badge Header -->
+        <!-- App Icon with Update Badge Header -->
         <FrameLayout
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="16dp">
 
-            <!-- Outer Glowing Ring -->
+            <!-- Rounded Squircle Icon Container -->
             <View
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_update_circle_glow"/>
-
-            <!-- Inner Gradient Circle -->
-            <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_gravity="center"
-                android:background="@drawable/bg_update_circle_gradient">
+                android:background="@drawable/bg_update_icon_container"/>
+
+            <!-- 3D ClassMate Logo -->
+            <ImageView
+                android:id="@+id/ivUpdateIcon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_classmate_logo"
+                android:importantForAccessibility="no"/>
+
+            <!-- Vibrant Update Indicator Badge -->
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="bottom|end"
+                android:background="@drawable/bg_update_badge">
 
                 <ImageView
-                    android:id="@+id/ivUpdateIcon"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_classmate_logo"
+                    android:src="@drawable/ic_upload_arrow"
                     android:importantForAccessibility="no"/>
             </FrameLayout>
         </FrameLayout>
@@ -62,11 +70,12 @@
             android:gravity="center"/>
 
         <TextView
+            android:id="@+id/tvUpdateSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="A new version of ClassMate is ready. Update now to enjoy the latest features and stability fixes."
+            android:text="A newer version of ClassMate is ready with new features, stability fixes, and improvements."
             android:textColor="@color/cm_text_secondary"
-            android:textSize="13sp"
+            android:textSize="13.5sp"
             android:gravity="center"
             android:lineSpacingExtra="2dp"
             android:layout_marginTop="6dp"
@@ -78,10 +87,10 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="18dp"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="6dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="16dp"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="5dp"
             android:background="@drawable/bg_version_container">
 
             <TextView
@@ -89,7 +98,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_version_pill_installed"
-                android:paddingHorizontal="10dp"
+                android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp"
                 android:textColor="@color/cm_version_pill_installed_text"
                 android:textSize="12sp"
@@ -99,9 +108,9 @@
             <ImageView
                 android:layout_width="16dp"
                 android:layout_height="16dp"
-                android:layout_marginHorizontal="10dp"
+                android:layout_marginHorizontal="8dp"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="@color/cm_text_muted"
+                app:tint="@color/cm_primary"
                 android:importantForAccessibility="no"/>
 
             <TextView
@@ -109,7 +118,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_version_pill_target"
-                android:paddingHorizontal="10dp"
+                android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp"
                 android:textColor="@android:color/white"
                 android:textSize="12sp"
@@ -123,18 +132,33 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_changelog_card"
-            android:padding="16dp"
-            android:layout_marginBottom="20dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp"
+            android:layout_marginBottom="18dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="WHAT'S NEW"
-                android:textColor="@color/cm_primary"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08"
-                android:layout_marginBottom="8dp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_sparkle"
+                    android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="no"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="WHAT'S NEW"
+                    android:textColor="@color/cm_primary"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"/>
+            </LinearLayout>
 
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/nsvChangelog"
@@ -151,7 +175,7 @@
                     android:textColor="@color/cm_text_primary"
                     android:textSize="13sp"
                     android:lineSpacingExtra="4dp"
-                    tools:text="• Added interactive bus schedules\n\n• UI design updates\n\n• Bug fixes"/>
+                    tools:text="•  Added interactive bus schedules\n\n•  UI design updates\n\n•  Bug fixes"/>
             </androidx.core.widget.NestedScrollView>
         </LinearLayout>
 
@@ -162,7 +186,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="18dp"
             tools:visibility="visible">
 
             <ProgressBar
@@ -195,27 +219,28 @@
             <Button
                 android:id="@+id/btnUpdateLater"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="0.8"
+                android:layout_height="50dp"
+                android:layout_weight="0.85"
                 android:background="@drawable/bg_update_btn_outline"
                 android:text="Later"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:textAllCaps="false"
-                android:layout_marginEnd="10dp"/>
+                android:layout_marginEnd="12dp"/>
 
             <Button
                 android:id="@+id/btnUpdateNow"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1.2"
-                android:background="@drawable/bg_gradient_button"
+                android:layout_height="50dp"
+                android:layout_weight="1.25"
+                android:background="@drawable/bg_update_btn_primary"
                 android:text="Update Now"
-                android:textColor="@color/cm_on_primary"
+                android:textColor="@android:color/white"
                 android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:singleLine="true"
+                android:maxLines="1"
                 android:ellipsize="end"
                 android:paddingHorizontal="10dp"
                 android:textAllCaps="false"/>

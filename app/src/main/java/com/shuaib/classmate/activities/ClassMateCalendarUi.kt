@@ -36,6 +36,8 @@ internal class ClassMateCalendarUi(
     private var request = 0
     private var error: String? = null
     private var motion: Int? = null
+    var onOpenTimetable: ((LocalDate) -> Unit)? = null
+    fun selectedDate(): LocalDate? = selected
     init { scroll.addView(panel) }
     private fun dp(value: Int) = (value * activity.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = activity.getColor(id)
@@ -98,7 +100,12 @@ internal class ClassMateCalendarUi(
         sectionTitle.addView(label(selected?.format(DateTimeFormatter.ofPattern("EEEE, d MMM")) ?: "This month",18f,true))
         sectionTitle.addView(label(if(selected==null) "Holidays & university events" else if(data.classClosure(selected!!)!=null) "Classes are closed" else "University events",11f).apply { setTextColor(color(R.color.cm_calendar_muted)); setPadding(0,dp(3),0,0) })
         heading.addView(sectionTitle, LinearLayout.LayoutParams(0, -2, 1f))
-        if (selected != null) heading.addView(quiet("All") { selected = null; render() }, LinearLayout.LayoutParams(-2, dp(48)))
+        if (selected != null) {
+            if (data.classClosure(selected!!) == null && onOpenTimetable != null) {
+                heading.addView(button("View timetable") { onOpenTimetable?.invoke(selected!!) }, LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(6) })
+            }
+            heading.addView(quiet("All") { selected = null; render() }, LinearLayout.LayoutParams(-2, dp(48)))
+        }
         if (owner()) heading.addView(icon(R.drawable.ic_add, "Add calendar event") { edit(null) }, LinearLayout.LayoutParams(dp(44), dp(44)))
         panel.addView(heading)
         val visible = if (selected == null) monthEvents else events.filter { ClassMateCalendarData.includes(it, selected!!) }

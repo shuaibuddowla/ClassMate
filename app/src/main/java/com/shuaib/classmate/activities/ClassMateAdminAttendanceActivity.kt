@@ -511,6 +511,17 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     }
 
     // 4. Course Matrix Dialog
+        private fun isSessionPresent(records: JSONObject, sessionId: String): Boolean {
+        val recObj = records.optJSONObject(sessionId)
+        if (recObj != null) {
+            if (recObj.optBoolean("present", false)) return true
+            val st = recObj.optString("status", "")
+            return st.equals("P", ignoreCase = true) || st.equals("present", ignoreCase = true)
+        }
+        val str = records.optString(sessionId, "")
+        return str.equals("present", ignoreCase = true) || str.equals("P", ignoreCase = true) || str == "1" || str.equals("true", ignoreCase = true)
+    }
+
     private fun showCourseMatrixDialog(course: JSONObject) {
         val courseOfferingId = course.optString("semester_course_id")
         val courseCode = course.optString("course_code")
@@ -577,6 +588,49 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         }
     }
 
+    private fun sortStudentsWithReaddLast(list: MutableList<JSONObject>) {
+        val pfxRegex = Regex("^([A-Za-z]+)(\\d{2})")
+        val counts = mutableMapOf<String, Int>()
+        list.forEach { s ->
+            val roll = s.optString("roll").ifEmpty { s.optString("roll_number") }.trim().uppercase()
+            val m = pfxRegex.find(roll)
+            if (m != null) counts[m.value] = (counts[m.value] ?: 0) + 1
+        }
+        val majorityPfx = counts.maxByOrNull { it.value }?.key.orEmpty()
+        val majorityYear = pfxRegex.find(majorityPfx)?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+
+        fun isReadd(s: JSONObject): Boolean {
+            if (s.optBoolean("is_readd", false)) return true
+            val roll = s.optString("roll").ifEmpty { s.optString("roll_number") }.trim().uppercase()
+            val m = pfxRegex.find(roll)
+            val yr = m?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+            return majorityYear > 0 && yr in 1 until majorityYear
+        }
+
+        list.sortWith { a, b ->
+            val aReadd = isReadd(a)
+            val bReadd = isReadd(b)
+            if (aReadd != bReadd) {
+                if (aReadd) 1 else -1
+            } else {
+                val rollA = a.optString("roll").ifEmpty { a.optString("roll_number") }
+                val rollB = b.optString("roll").ifEmpty { b.optString("roll_number") }
+                ClassMateTeacherLiveAttendanceActivity.compareRolls(rollA, rollB)
+            }
+        }
+    }
+
+    private fun formatSessionDateDDMM(dateStr: String): String {
+        val clean = dateStr.trim()
+        val parts = clean.split("-")
+        if (parts.size >= 3) {
+            val day = parts[2].take(2).padStart(2, '0')
+            val month = parts[1].padStart(2, '0')
+            return "$day-$month"
+        }
+        return clean.takeLast(5)
+    }
+
     private fun renderMatrixTable(table: TableLayout, sessions: JSONArray, students: JSONArray) {
         table.removeAllViews()
         val density = resources.displayMetrics.density
@@ -602,19 +656,18 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         headerRow.addView(cellText("Name", true))
         for (i in 0 until sessions.length()) {
             val sess = sessions.getJSONObject(i)
-            val d = sess.optString("date").takeLast(5) // MM-DD
+            val d = formatSessionDateDDMM(sess.optString("date"))
             headerRow.addView(cellText(d, true))
         }
-        headerRow.addView(cellText("Total", true))
-        headerRow.addView(cellText("%", true))
+        headerRow.addView(cellText("Attendance (%)", true))
         table.addView(headerRow)
 
-        // Sort students naturally by roll
+        // Sort students with re-add students at the very last
         val studentList = mutableListOf<JSONObject>()
         for (i in 0 until students.length()) {
             studentList.add(students.getJSONObject(i))
         }
-        studentList.sortBy { it.optString("roll") }
+        sortStudentsWithReaddLast(studentList)
 
         // Data Rows
         studentList.forEachIndexed { index, s ->
@@ -631,9 +684,9 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
             val records = s.optJSONObject("records") ?: JSONObject()
             for (i in 0 until sessions.length()) {
                 val sessId = sessions.getJSONObject(i).optString("session_id")
-                val isPresent = records.optString(sessId) == "present"
+                val isPresent = isSessionPresent(records, sessId)
                 val cell = cellText(
-                    if (isPresent) "1" else "0",
+                    if (isPresent) "P" else "—",
                     isHeader = false,
                     color = if (isPresent) Color.parseColor("#10B981") else Color.parseColor("#EF4444")
                 )
@@ -643,12 +696,10 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
             val pCount = s.optInt("present_count", 0)
             val total = s.optInt("total_sessions", sessions.length())
-            row.addView(cellText("$pCount/$total", false))
-
             val pct = s.optInt("percentage", 0)
-            val pctCell = cellText("$pct%", false, if (pct >= 75) Color.parseColor("#10B981") else Color.parseColor("#F59E0B"))
-            pctCell.typeface = Typeface.DEFAULT_BOLD
-            row.addView(pctCell)
+            val summaryCell = cellText("$pCount/$total ($pct%)", false, if (pct >= 75) Color.parseColor("#10B981") else Color.parseColor("#F59E0B"))
+            summaryCell.typeface = Typeface.DEFAULT_BOLD
+            row.addView(summaryCell)
 
             table.addView(row)
         }
@@ -720,31 +771,31 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     val students = matrix.optJSONArray("students") ?: JSONArray()
                     val studentList = mutableListOf<JSONObject>()
                     for (i in 0 until students.length()) studentList.add(students.getJSONObject(i))
-                    studentList.sortBy { it.optString("roll") }
+                    sortStudentsWithReaddLast(studentList)
 
                     val csv = StringBuilder()
-                    csv.append("SL,Student ID / Roll,Student Name")
+                    csv.append("Student ID / Roll,Student Name")
                     for (i in 0 until sessions.length()) {
                         val sess = sessions.getJSONObject(i)
-                        val d = sess.optString("date")
-                        csv.append(",Day ${i + 1} ($d)")
+                        val d = formatSessionDateDDMM(sess.optString("date"))
+                        csv.append(",$d")
                     }
-                    csv.append(",Total Present,Total Classes,Percentage (%)\n")
+                    csv.append(",Percentage (%)\n")
 
                     studentList.forEachIndexed { idx, s ->
                         val roll = s.optString("roll").replace(",", " ")
                         val name = s.optString("full_name").replace(",", " ")
-                        csv.append("${idx + 1},\"$roll\",\"$name\"")
+                        csv.append("\"$roll\",\"$name\"")
                         val records = s.optJSONObject("records") ?: JSONObject()
                         for (i in 0 until sessions.length()) {
                             val sid = sessions.getJSONObject(i).optString("session_id")
-                            val isP = records.optString(sid) == "present"
-                            csv.append(if (isP) ",1" else ",0")
+                            val isP = isSessionPresent(records, sid)
+                            csv.append(if (isP) ",P" else ",—")
                         }
                         val p = s.optInt("present_count", 0)
                         val tot = s.optInt("total_sessions", sessions.length())
                         val pct = s.optInt("percentage", 0)
-                        csv.append(",$p,$tot,$pct%\n")
+                        csv.append(",$p/$tot ($pct%)\n")
                     }
 
                     val fileName = "Attendance_${cleanCode}_$dateStr.csv"
@@ -788,6 +839,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 for (i in 0 until arr.length()) {
                     studentsList.add(arr.getJSONObject(i))
                 }
+                sortStudentsWithReaddLast(studentsList)
 
                 tvStudentDirectoryCount.text = "${studentsList.size} Students"
                 setupStudentAutocomplete()

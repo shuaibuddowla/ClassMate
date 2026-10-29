@@ -11,6 +11,19 @@ import android.view.View
 object HapticHelper {
 
     /**
+     * Subtle, tactile tick for tabs, filter chips, and selector pills.
+     */
+    fun selectionTick(view: View) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_TICK)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        } else {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+    }
+
+    /**
      * Light pop for small actions like Liking, Pinning, or Toggling switches.
      */
     fun lightPop(view: View) {
@@ -42,16 +55,50 @@ object HapticHelper {
     }
 
     /**
-     * Success vibration for when a process completes (e.g., notice posted).
+     * Success vibration for when a process completes (e.g., notice posted, attendance recorded, fund added).
      */
+    fun success(view: View) {
+        success(view.context)
+    }
+
     fun success(context: Context) {
-        val vibrator = getVibrator(context)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val effect = VibrationEffect.createWaveform(longArrayOf(0, 40, 100, 40), -1)
-            vibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(50)
+        try {
+            val vibrator = getVibrator(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val effect = VibrationEffect.createWaveform(longArrayOf(0, 35, 75, 45), -1)
+                vibrator.vibrate(effect)
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(40)
+            }
+        } catch (_: Exception) {
+            // Ignore if vibration permissions are restricted
+        }
+    }
+
+    /**
+     * Warning / Error vibration for input validation, network errors, or duplicate scans.
+     */
+    fun warning(view: View) {
+        warning(view.context)
+    }
+
+    fun warning(context: Context) {
+        try {
+            val vibrator = getVibrator(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val effect = VibrationEffect.createWaveform(longArrayOf(0, 50, 60, 60), -1)
+                vibrator.vibrate(effect)
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(60)
+            }
+        } catch (_: Exception) {
+            // Ignore if vibration permissions are restricted
         }
     }
 

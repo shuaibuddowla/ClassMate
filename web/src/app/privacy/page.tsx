@@ -1,18 +1,115 @@
 import type { Metadata } from "next";
 import PublicPage, { supportEmail } from "@/components/public-page";
 
-export const metadata: Metadata = { title: "Privacy Policy | ClassMate", description: "How ClassMate handles account, academic, notification and community information." };
+export const metadata: Metadata = {
+  title: "Privacy Policy | ClassMate",
+  description:
+    "How ClassMate handles account identity, automated RFID attendance, academic schedules, notifications, and campus community information.",
+};
 
 export default function PrivacyPage() {
-  return <PublicPage policy title="Privacy Policy" lead="This policy explains the information used by ClassMate on the web and Android, how it is shared, and the controls available to you.">
-    <section><h2>1. Who operates ClassMate</h2><p>ClassMate is operated by its developer, Mohammad Shuaib-Ud-Dowla, as an independent community application. For privacy questions, contact <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.</p></section>
-    <section><h2>2. Account and Google sign-in information</h2><p>Google sign-in provides your account identity, email address, name and profile photo. ClassMate uses these to authenticate you, identify your student account or approved teacher assignment, and display your profile. Google handles your password; ClassMate does not receive it. Signing in does not give ClassMate access to your Gmail messages or Google Drive files.</p><p>Our backend stores your profile, role, verification status, department, batch, session and course assignments. Administrators manage approvals and teacher access.</p></section>
-    <section><h2>3. Information you provide and activity records</h2><p>Your profile may contain a phone number, hometown, blood group and current residence. The service also stores notices, comments, replies, likes, read receipts, reminders, uploaded file metadata, teacher/course information, and academic schedules. Blood network features store requests, attendant contact details, volunteer responses and donation records.</p><p>This information supports academic coordination, community features, access checks, notification delivery and donation availability filtering. Avoid posting confidential patient details or information about another person without their permission.</p></section>
-    <section><h2>4. Who can see information</h2><p>Academic content and community activity are shown according to batch, assignment and role permissions. Authorized classmates can view shared profile details used by Friends and contact actions. Administrators can access information needed to manage the service; teachers access permitted classroom information. The developer profile is public.</p><p>University-wide bus schedules, calendar information and blood requests can be visible beyond your own batch. Blood request contact details are shared so people can offer help. Compatible donors can receive a targeted message, while other users may receive a general request. Notice read receipts and social activity may be visible to authorized members.</p><p>Private library files use permission-checked access and temporary download links. Someone who legitimately downloads a file may retain a copy outside ClassMate.</p></section>
-    <section><h2>5. Notifications and device storage</h2><p>With your permission, Firebase Cloud Messaging delivers push notifications. ClassMate stores device/browser registration tokens, notification preferences and delivery records to route messages to authorized recipients. Android and browser registrations are separate.</p><p>The web app uses authentication storage and account/batch-scoped local caches for the application shell and last-synced academic content, including timetables and notices. Friends contact details, authentication responses and signed file URLs are not included in the academic offline cache. Signing out clears private web academic caches and removes that browser’s push registration. Downloaded files and browser history may remain under your device’s controls.</p><p>You can change notification preferences in Profile and revoke permission through browser or Android settings. Browser storage and app/device settings also provide cache controls.</p></section>
-    <section><h2>6. AI assistance</h2><p>AI features send your input, relevant conversation history and permission-checked academic or administrative context to Google Gemini to generate answers, translations or proposed actions. Administrative context may include account names, emails and assignment information. Conversation history can be stored for your account. Write operations remain subject to server permissions.</p><p>Do not submit confidential or sensitive personal information to AI. When unpaid Gemini services are used, Google’s terms allow inputs and outputs to be used for product improvement and reviewed by humans; different data terms apply to paid services. See <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">Google’s Gemini API terms</a>. AI responses can be inaccurate.</p></section>
-    <section><h2>7. Service providers and external links</h2><p>ClassMate uses Supabase for authentication, database and backend functions; Google for sign-in, Firebase messaging and Gemini AI; Cloudflare R2 for resource storage; and Vercel for web hosting. GitHub hosts Android releases. These providers process data needed for their functions and may process it outside Bangladesh, subject to their own terms and privacy practices.</p><p>Hosting and backend services may collect operational logs for security, troubleshooting and reliability. External links, including WhatsApp, Facebook, GitHub and the developer portfolio, are governed by those services when you open them.</p></section>
-    <section><h2>8. Retention, access and deletion</h2><p>Account and shared content remain while needed to operate the service. Delivery, operational and backup records follow the applicable service lifecycle. Shared discussions, notices or audit records may need to be retained or anonymized when an account is removed.</p><p>You can edit available profile fields in the app. To request a copy, correction or deletion of account information, email <a href={`mailto:${supportEmail}`}>{supportEmail}</a> from your registered account. We may verify your identity before acting. Signing out removes local access; it does not delete your server account.</p></section>
-    <section><h2>9. Security and policy changes</h2><p>ClassMate uses authenticated requests, role/batch access checks and controlled file access. No online service can guarantee absolute security. Do not share accounts or access links with unauthorized people. We update this page when our practices change and show the effective date above.</p></section>
-  </PublicPage>;
+  return (
+    <PublicPage
+      policy
+      title="Privacy Policy"
+      lead="This policy explains the information used by ClassMate across our web platform and Android application, how academic and attendance data is handled, and the controls available to you."
+    >
+      <section>
+        <h2>1. Who Operates ClassMate</h2>
+        <p>
+          ClassMate is developed and operated by Mohammad Shuaib-Ud-Dowla as an independent smart campus companion and academic automation system for the Mawlana Bhashani Science and Technology University (MBSTU) community.
+        </p>
+        <p>
+          For privacy inquiries, account support, or data questions, contact{" "}
+          <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>2. Account Authentication & Identity</h2>
+        <p>
+          Google Sign-In provides your account email address, full name, and avatar picture. Students sign in with their eligible university institutional email (e.g. <code>@mbstu.ac.bd</code>). Course teachers authenticate using an administrator-approved email.
+        </p>
+        <p>
+          Authentication is verified securely against backend permissions. Google manages your password directly; ClassMate never receives or stores your Google password, nor does it request access to your private Gmail messages or personal Google Drive files.
+        </p>
+      </section>
+
+      <section>
+        <h2>3. Smart Attendance & RFID Tracking</h2>
+        <p>
+          ClassMate powers automated classroom attendance tracking for university courses. When students tap registered university RFID cards on connected classroom attendance readers, or when attendance is logged digitally by authorized teachers and CRs:
+        </p>
+        <ul style={{ paddingLeft: "20px", margin: "12px 0", lineHeight: "1.8", color: "var(--muted)" }}>
+          <li>The student’s ID, card UID, attendance session, and scan timestamp are recorded.</li>
+          <li>Session presence counts, individual attendance percentages, and collegiate eligibility status are calculated for the enrolled course.</li>
+          <li>Authorized course teachers and administrators can review attendance matrices and generate official course attendance reports (e.g., Excel spreadsheets) for departmental records.</li>
+        </ul>
+        <p>
+          RFID card IDs are used solely for classroom verification and session check-ins within your enrolled batch and courses.
+        </p>
+      </section>
+
+      <section>
+        <h2>4. Academic Content & Timetable Coordination</h2>
+        <p>
+          ClassMate maintains academic course schedules, routine slots, room numbers, and real-time class status updates (such as class cancellations or rescheduled periods) posted by course teachers and batch CRs.
+        </p>
+        <p>
+          Notices, academic documents, lecture materials, and question archives shared with your batch remain accessible based on your verified department, session, and course enrollments.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Campus Community & Emergency Blood Network</h2>
+        <p>
+          To assist fellow students in emergencies, optional profile information (such as your blood group, district, and contact number) may be registered. 
+        </p>
+        <p>
+          When an urgent blood request is created, compatible campus donors may be notified to facilitate fast volunteer coordination. Contact details are shared solely to connect the patient’s attendant with willing donors; final medical eligibility and screening are determined by qualified hospital healthcare professionals.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Push Notifications & Local Device Storage</h2>
+        <p>
+          With your explicit permission, Firebase Cloud Messaging (FCM) delivers urgent class cancellation alerts, new academic notices, and blood donor requests to your registered Android device or web browser.
+        </p>
+        <p>
+          To ensure reliable performance during slow internet connections, the application caches your active timetable, recent batch notices, and hardware roster check-ins locally on your device. You can revoke notification permissions or clear application cache at any time through your browser or Android system settings.
+        </p>
+      </section>
+
+      <section>
+        <h2>7. AI Academic Assistant</h2>
+        <p>
+          When utilizing the built-in AI academic assistant, queries and authorized course contexts are processed using the Google Gemini API to deliver instant timetable summaries, notice clarifications, or academic guidance. Do not input confidential personal documents or sensitive credentials into conversational AI prompts.
+        </p>
+      </section>
+
+      <section>
+        <h2>8. Service Providers & Infrastructure</h2>
+        <p>
+          ClassMate relies on trusted cloud infrastructure to deliver high availability:
+        </p>
+        <ul style={{ paddingLeft: "20px", margin: "12px 0", lineHeight: "1.8", color: "var(--muted)" }}>
+          <li><strong>Supabase:</strong> Encrypted PostgreSQL database, row-level security (RLS), and authentication.</li>
+          <li><strong>Vercel:</strong> Global edge content delivery and web application hosting.</li>
+          <li><strong>Google Cloud &amp; Firebase:</strong> OAuth authentication and push notification delivery.</li>
+          <li><strong>Cloudflare:</strong> High-performance serverless workers and encrypted resource distribution.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>9. Data Retention & Account Deletion</h2>
+        <p>
+          Your academic profile and attendance history are retained for the duration of your academic program to provide semester verification and attendance auditing. 
+        </p>
+        <p>
+          You may edit your public profile details at any time in the app settings. To request full deletion of your account and personal records, email{" "}
+          <a href={`mailto:${supportEmail}`}>{supportEmail}</a> from your registered university Google account.
+        </p>
+      </section>
+    </PublicPage>
+  );
 }
