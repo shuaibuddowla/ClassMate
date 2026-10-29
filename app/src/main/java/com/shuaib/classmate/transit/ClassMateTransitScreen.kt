@@ -2,6 +2,10 @@ package com.shuaib.classmate.transit
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
@@ -13,8 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -22,37 +24,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import okhttp3.*
-import org.json.JSONObject
-import kotlin.math.*
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 
-/**
- * Data model for MBSTU fleet vehicles.
- */
 data class MbstuBus(
     val id: String,
     val nameBn: String,
@@ -68,23 +60,21 @@ data class MbstuBus(
     var isDriving: Boolean = false,
     var nextStop: String = "Baby Stand",
     var etaMinutes: Int = 4,
-    val color: Color
+    val color: Color,
+    val hexColor: Int
 )
 
-/**
- * Real MBSTU Bus Fleet definitions.
- */
 val MBSTU_FLEET_SEED = listOf(
-    MbstuBus("SB0001", "গীতাঞ্জলি", "Gitanjali", 24.234833, 89.892358, 0, 171f, "MBSTU Standby", "MD. Mizanur Rahman", "01711234567", color = Color(0xFF6366F1)),
-    MbstuBus("SB0002", "অগ্নিবীণা", "Agnibeena", 24.237800, 89.894200, 28, 175f, "Campus ➔ Nirala (Tangail)", "MD. Rafiqul Islam", "01712345678", isDriving = true, nextStop = "Baby Stand", etaMinutes = 3, color = Color(0xFF0284C7)),
-    MbstuBus("SB0003", "সোনারতরী", "Sonartori", 24.244000, 89.907000, 34, 355f, "Nirala ➔ Campus", "MD. Kamal Hossain", "01713456789", isDriving = true, nextStop = "Campus Gate", etaMinutes = 5, color = Color(0xFF0D9488)),
-    MbstuBus("SB0004", "ধলেশ্বরী", "Dholeshwari", 24.235222, 89.890800, 0, 101f, "MBSTU Standby", "MD. Abdul Alim", "01714567890", color = Color(0xFFD97706)),
-    MbstuBus("SB0005", "যমুনা", "Jamuna", 24.235100, 89.891200, 0, 180f, "Campus ➔ New Bus Stand", "MD. Jahangir Alam", "01715678901", color = Color(0xFFEA580C)),
-    MbstuBus("SB0006", "মেঘনা", "Meghna", 24.234900, 89.891900, 0, 0f, "MBSTU Standby", "MD. Sirajul Islam", "01716789012", color = Color(0xFF2563EB)),
-    MbstuBus("SB0007", "সুরমা", "Surma", 24.235300, 89.892100, 0, 90f, "Campus ➔ Railway Station", "MD. Nazrul Islam", "01717890123", color = Color(0xFF7C3AED)),
-    MbstuBus("SB0008", "কর্ণফুলী", "Karnafuli", 24.235400, 89.891500, 0, 180f, "MBSTU Standby", "MD. Faruk Ahmed", "01718901234", color = Color(0xFFDB2777)),
-    MbstuBus("SB0009", "বনলতা", "Banalata", 24.235050, 89.891750, 0, 270f, "Campus ➔ Nirala", "MD. Habibur Rahman", "01719012345", color = Color(0xFF059669)),
-    MbstuBus("SB0010", "রক্তকরবী", "Raktakarabi", 24.235150, 89.891650, 0, 0f, "MBSTU Standby", "MD. Anisur Rahman", "01720123456", color = Color(0xFFE11D48))
+    MbstuBus("SB0001", "গীতাঞ্জলি", "Gitanjali", 24.234833, 89.892358, 0, 171f, "MBSTU Standby", "MD. Mizanur Rahman", "01711234567", color = Color(0xFF6366F1), hexColor = 0xFF6366F1.toInt()),
+    MbstuBus("SB0002", "অগ্নিবীণা", "Agnibeena", 24.237800, 89.894200, 28, 175f, "Campus ➔ Nirala (Tangail)", "MD. Rafiqul Islam", "01712345678", isDriving = true, nextStop = "Baby Stand", etaMinutes = 3, color = Color(0xFF0284C7), hexColor = 0xFF0284C7.toInt()),
+    MbstuBus("SB0003", "সোনারতরী", "Sonartori", 24.244000, 89.907000, 34, 355f, "Nirala ➔ Campus", "MD. Kamal Hossain", "01713456789", isDriving = true, nextStop = "Campus Gate", etaMinutes = 5, color = Color(0xFF0D9488), hexColor = 0xFF0D9488.toInt()),
+    MbstuBus("SB0004", "ধলেশ্বরী", "Dholeshwari", 24.235222, 89.890800, 0, 101f, "MBSTU Standby", "MD. Abdul Alim", "01714567890", color = Color(0xFFD97706), hexColor = 0xFFD97706.toInt()),
+    MbstuBus("SB0005", "যমুনা", "Jamuna", 24.235100, 89.891200, 0, 180f, "Campus ➔ New Bus Stand", "MD. Jahangir Alam", "01715678901", color = Color(0xFFEA580C), hexColor = 0xFFEA580C.toInt()),
+    MbstuBus("SB0006", "মেঘনা", "Meghna", 24.234900, 89.891900, 0, 0f, "MBSTU Standby", "MD. Sirajul Islam", "01716789012", color = Color(0xFF2563EB), hexColor = 0xFF2563EB.toInt()),
+    MbstuBus("SB0007", "সুরমা", "Surma", 24.235300, 89.892100, 0, 90f, "Campus ➔ Railway Station", "MD. Nazrul Islam", "01717890123", color = Color(0xFF7C3AED), hexColor = 0xFF7C3AED.toInt()),
+    MbstuBus("SB0008", "কর্ণফুলী", "Karnafuli", 24.235400, 89.891500, 0, 180f, "MBSTU Standby", "MD. Faruk Ahmed", "01718901234", color = Color(0xFFDB2777), hexColor = 0xFFDB2777.toInt()),
+    MbstuBus("SB0009", "বনলতা", "Banalata", 24.235050, 89.891750, 0, 270f, "Campus ➔ Nirala", "MD. Habibur Rahman", "01719012345", color = Color(0xFF059669), hexColor = 0xFF059669.toInt()),
+    MbstuBus("SB0010", "রক্তকরবী", "Raktakarabi", 24.235150, 89.891650, 0, 0f, "MBSTU Standby", "MD. Anisur Rahman", "01720123456", color = Color(0xFFE11D48), hexColor = 0xFFE11D48.toInt())
 )
 
 class ClassMateTransitScreen(
@@ -118,15 +108,15 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
     var buses by remember { mutableStateOf(MBSTU_FLEET_SEED) }
     var selectedBusId by remember { mutableStateOf("SB0002") }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("All") } // "All", "Moving", "Standby"
-    var mapZoom by remember { mutableStateOf(1f) }
-    var mapOffset by remember { mutableStateOf(Offset.Zero) }
-    var sheetTier by remember { mutableStateOf(1) } // 0: Peek (120dp), 1: Half (280dp), 2: Full (540dp)
+    var selectedFilter by remember { mutableStateOf("All") }
+    var sheetTier by remember { mutableStateOf(1) } // 0: Peek (140dp), 1: Mid (320dp), 2: Full (560dp)
     var isLiveSocketConnected by remember { mutableStateOf(false) }
+
+    var osmMapView by remember { mutableStateOf<MapView?>(null) }
 
     val selectedBus = buses.firstOrNull { it.id == selectedBusId } ?: buses.first()
 
-    // OkHttp WebSocket live listener
+    // OkHttp WebSocket live listener for real MBSTU telemetries
     DisposableEffect(Unit) {
         val client = OkHttpClient.Builder().build()
         val request = Request.Builder()
@@ -214,21 +204,61 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
             .background(Color(0xFF0F172A))
     ) {
 
-        // ================= 1. NATIVE INTERACTIVE VECTOR MAP =================
-        InteractiveVectorMap(
-            modifier = Modifier.fillMaxSize(),
-            buses = filteredBuses,
-            selectedBusId = selectedBusId,
-            zoom = mapZoom,
-            offset = mapOffset,
-            onTransform = { panChange, zoomChange ->
-                mapOffset += panChange
-                mapZoom = (mapZoom * zoomChange).coerceIn(0.6f, 3.5f)
+        // ================= 1. REAL OPENSTREETMAP NATIVE MAPVIEW =================
+        AndroidView(
+            factory = { ctx ->
+                Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                Configuration.getInstance().userAgentValue = ctx.packageName
+
+                MapView(ctx).apply {
+                    setTileSource(TileSourceFactory.MAPNIK)
+                    setMultiTouchControls(true)
+                    isTilesScaledToDpi = true
+                    controller.setZoom(15.5)
+                    controller.setCenter(GeoPoint(24.2356, 89.8918)) // MBSTU Campus
+
+                    // Draw Route Polyline from MBSTU Stand to Nirala
+                    val routePolyline = Polyline(this).apply {
+                        outlinePaint.color = android.graphics.Color.parseColor("#0284C7")
+                        outlinePaint.strokeWidth = 12f
+                        addPoint(GeoPoint(24.2349, 89.8916)) // MBSTU Stand
+                        addPoint(GeoPoint(24.2378, 89.8942)) // Santosh Gate / Bazaar
+                        addPoint(GeoPoint(24.2405, 89.9002)) // Baby Stand
+                        addPoint(GeoPoint(24.2440, 89.9070)) // Old Bus Stand
+                        addPoint(GeoPoint(24.2498, 89.9165)) // Nirala (Tangail)
+                    }
+                    overlayManager.add(routePolyline)
+
+                    osmMapView = this
+                }
             },
-            onBusClick = { busId ->
-                selectedBusId = busId
-                vibrateTick(context)
-            }
+            update = { map ->
+                // Clear previous vehicle markers, keep the polyline at index 0
+                while (map.overlays.size > 1) {
+                    map.overlays.removeAt(1)
+                }
+
+                // Add real bus markers
+                filteredBuses.forEach { bus ->
+                    val marker = Marker(map).apply {
+                        position = GeoPoint(bus.lat, bus.lon)
+                        title = "${bus.nameBn} (${bus.nameEn})"
+                        snippet = "${bus.routeName} • ${bus.speed} km/h"
+                        icon = createBusMarkerDrawable(context, bus, bus.id == selectedBusId)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        setOnMarkerClickListener { _, _ ->
+                            selectedBusId = bus.id
+                            map.controller.animateTo(position)
+                            vibrateTick(context)
+                            true
+                        }
+                    }
+                    map.overlays.add(marker)
+                }
+
+                map.invalidate()
+            },
+            modifier = Modifier.fillMaxSize()
         )
 
         // ================= 2. TOP FLOATING GOOGLE MAPS SEARCH & FILTERS =================
@@ -239,10 +269,9 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Glassmorphic Search Capsule
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = Color(0xE60F172A),
+                color = Color(0xF20F172A),
                 border = BorderStroke(1.dp, Color(0x6638BDF8)),
                 shadowElevation = 8.dp,
                 modifier = Modifier.fillMaxWidth()
@@ -284,11 +313,9 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Target / Recenter Button
                     IconButton(
                         onClick = {
-                            mapZoom = 1f
-                            mapOffset = Offset.Zero
+                            osmMapView?.controller?.animateTo(GeoPoint(24.2356, 89.8918), 16.0, 1000L)
                             vibrateTick(context)
                         },
                         modifier = Modifier
@@ -305,7 +332,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                 }
             }
 
-            // Quick Route & Status Filter Capsules
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -335,7 +361,7 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
         // Live Socket Pill (Top Right)
         Surface(
             shape = RoundedCornerShape(9999.dp),
-            color = Color(0xE60F172A),
+            color = Color(0xF20F172A),
             border = BorderStroke(1.dp, if (isLiveSocketConnected) Color(0xFF10B981) else Color(0xFFF59E0B)),
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -387,7 +413,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                     .fillMaxSize()
                     .padding(bottom = 76.dp) // bottom nav bar clearance
             ) {
-                // Drag handle bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -406,7 +431,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                     )
                 }
 
-                // Tier 1: Glanceable Header (Always Visible)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -460,7 +484,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                     }
                 }
 
-                // Tier 2 & 3: Stoppage Timeline, Driver Call & Fleet Overview
                 if (sheetTier >= 1) {
                     Divider(color = Color(0x33334155), modifier = Modifier.padding(vertical = 8.dp))
 
@@ -471,7 +494,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Stoppage Headway Timeline
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = Color(0x801E293B),
@@ -497,13 +519,10 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
-
-                                // Progress Line & Nodes
                                 StoppageProgressRow(selectedBus = selectedBus)
                             }
                         }
 
-                        // Driver Profile Card with Direct Call Button
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = Color(0x801E293B),
@@ -567,7 +586,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                             }
                         }
 
-                        // Campus Departure Alert Switch
                         var alertEnabled by remember {
                             mutableStateOf(ClassMateTransitManager.isAlertEnabled(context, selectedBus.id))
                         }
@@ -619,7 +637,6 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                             }
                         }
 
-                        // Fleet Horizontal Switcher Strip
                         Column(modifier = Modifier.padding(top = 4.dp)) {
                             Text(
                                 text = "ALL MBSTU BUSES",
@@ -640,6 +657,7 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
                                         ),
                                         modifier = Modifier.clickable {
                                             selectedBusId = bus.id
+                                            osmMapView?.controller?.animateTo(GeoPoint(bus.lat, bus.lon), 16.0, 800L)
                                             vibrateTick(context)
                                         }
                                     ) {
@@ -669,6 +687,42 @@ fun ClassMateTransitScreenContent(activity: AppCompatActivity) {
             }
         }
     }
+}
+
+/**
+ * Creates custom Google Maps style directional vehicle puck drawable for OpenStreetMap.
+ */
+private fun createBusMarkerDrawable(context: Context, bus: MbstuBus, isSelected: Boolean): BitmapDrawable {
+    val size = if (isSelected) 84 else 68
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // Outer glow if selected
+    if (isSelected) {
+        paint.color = bus.hexColor
+        paint.alpha = 80
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    }
+
+    // Circular Puck
+    paint.color = bus.hexColor
+    paint.alpha = 255
+    canvas.drawCircle(size / 2f, size / 2f, size * 0.38f, paint)
+
+    // White rim
+    paint.style = Paint.Style.STROKE
+    paint.color = android.graphics.Color.WHITE
+    paint.strokeWidth = 5f
+    canvas.drawCircle(size / 2f, size / 2f, size * 0.38f, paint)
+
+    // Center dot / bus glyph indicator
+    paint.style = Paint.Style.FILL
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(size / 2f, size / 2f, size * 0.14f, paint)
+
+    return BitmapDrawable(context.resources, bitmap)
 }
 
 @Composable
@@ -728,221 +782,6 @@ fun StoppageProgressRow(selectedBus: MbstuBus) {
                     modifier = Modifier.padding(top = 3.dp)
                 )
             }
-        }
-    }
-}
-
-/**
- * Native Vector Map Canvas with Hardware Acceleration, Roads, Geofence, and Directional Vehicle Pucks.
- */
-@Composable
-fun InteractiveVectorMap(
-    modifier: Modifier = Modifier,
-    buses: List<MbstuBus>,
-    selectedBusId: String,
-    zoom: Float,
-    offset: Offset,
-    onTransform: (Offset, Float) -> Unit,
-    onBusClick: (String) -> Unit
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "RadarPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 2.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "PulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "PulseAlpha"
-    )
-
-    Canvas(
-        modifier = modifier
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, gestureZoom, _ ->
-                    onTransform(pan, gestureZoom)
-                }
-            }
-    ) {
-        val w = size.width
-        val h = size.height
-
-        // Dark map canvas base
-        drawRect(Color(0xFF0F172A))
-
-        // Center map projection around MBSTU (24.2356 N, 89.8918 E)
-        val center = Offset(w * 0.5f, h * 0.42f) + offset
-
-        // 1. Campus Grounds (Lush Green Zone)
-        val campusPath = Path().apply {
-            moveTo(center.x - 180f * zoom, center.y - 120f * zoom)
-            lineTo(center.x + 120f * zoom, center.y - 100f * zoom)
-            lineTo(center.x + 140f * zoom, center.y + 160f * zoom)
-            lineTo(center.x - 160f * zoom, center.y + 180f * zoom)
-            close()
-        }
-        drawPath(campusPath, Color(0xFF142820))
-        drawPath(campusPath, Color(0xFF1A382C), style = Stroke(width = 1.5f * zoom))
-
-        // 2. Santosh Lake
-        val lakePath = Path().apply {
-            addOval(
-                androidx.compose.ui.geometry.Rect(
-                    center.x + 40f * zoom,
-                    center.y - 40f * zoom,
-                    center.x + 110f * zoom,
-                    center.y + 30f * zoom
-                )
-            )
-        }
-        drawPath(lakePath, Color(0xFF0F2D4A))
-        drawPath(lakePath, Color(0xFF1E4E7A), style = Stroke(width = 1.5f * zoom))
-
-        // 3. Grid Streets
-        for (i in -4..4) {
-            drawLine(
-                color = Color(0xFF1E293B),
-                start = Offset(center.x - 500f * zoom, center.y + i * 90f * zoom),
-                end = Offset(center.x + 500f * zoom, center.y + i * 90f * zoom),
-                strokeWidth = 3f * zoom
-            )
-            drawLine(
-                color = Color(0xFF1E293B),
-                start = Offset(center.x + i * 90f * zoom, center.y - 500f * zoom),
-                end = Offset(center.x + i * 90f * zoom, center.y + 500f * zoom),
-                strokeWidth = 3f * zoom
-            )
-        }
-
-        // 4. Main Arterial Highway: MBSTU Stand ➔ Gate ➔ Baby Stand ➔ Old Stand ➔ Nirala
-        val routePath = Path().apply {
-            moveTo(center.x - 10f * zoom, center.y - 60f * zoom) // Stand
-            quadraticBezierTo(
-                center.x + 20f * zoom, center.y + 50f * zoom,
-                center.x + 50f * zoom, center.y + 140f * zoom // Gate
-            )
-            quadraticBezierTo(
-                center.x + 80f * zoom, center.y + 240f * zoom,
-                center.x + 110f * zoom, center.y + 350f * zoom // Baby Stand
-            )
-            lineTo(center.x + 140f * zoom, center.y + 500f * zoom) // Nirala
-        }
-
-        // Highway Glow Casing
-        drawPath(
-            routePath,
-            color = Color(0x330284C7),
-            style = Stroke(width = 14f * zoom, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-        // Electric Transit Line
-        drawPath(
-            routePath,
-            color = Color(0xFF38BDF8),
-            style = Stroke(width = 4.5f * zoom, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-
-        // 5. Campus 300m Geofence
-        drawCircle(
-            color = Color(0x1A10B981),
-            radius = 110f * zoom,
-            center = Offset(center.x - 10f * zoom, center.y - 60f * zoom)
-        )
-        drawCircle(
-            color = Color(0xFF10B981),
-            radius = 110f * zoom,
-            center = Offset(center.x - 10f * zoom, center.y - 60f * zoom),
-            style = Stroke(width = 1.5f * zoom, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
-        )
-
-        // 6. Student Location Blue Puck with Accuracy Aura
-        val userPos = Offset(center.x + 48f * zoom, center.y + 135f * zoom)
-        drawCircle(
-            color = Color(0x333B82F6),
-            radius = 24f * zoom * pulseScale,
-            center = userPos,
-            alpha = pulseAlpha
-        )
-        drawCircle(
-            color = Color(0xFF3B82F6),
-            radius = 8f * zoom,
-            center = userPos
-        )
-        drawCircle(
-            color = Color.White,
-            radius = 8f * zoom,
-            center = userPos,
-            style = Stroke(width = 2.5f)
-        )
-
-        // 7. Directional Vehicle Pucks
-        buses.forEach { bus ->
-            // Map GPS coords to canvas space relative to MBSTU stand
-            val latDiff = (bus.lat - 24.2350) * 11000f
-            val lonDiff = (bus.lon - 89.8916) * 11000f
-            val busPos = Offset(
-                center.x + lonDiff.toFloat() * zoom,
-                center.y - latDiff.toFloat() * zoom
-            )
-
-            val isSelected = bus.id == selectedBusId
-
-            // Heading Cone Beam
-            if (bus.speed > 0) {
-                rotate(bus.heading, pivot = busPos) {
-                    val conePath = Path().apply {
-                        moveTo(busPos.x, busPos.y)
-                        lineTo(busPos.x - 22f * zoom, busPos.y - 48f * zoom)
-                        lineTo(busPos.x + 22f * zoom, busPos.y - 48f * zoom)
-                        close()
-                    }
-                    drawPath(
-                        conePath,
-                        brush = Brush.radialGradient(
-                            colors = listOf(bus.color.copy(alpha = 0.5f), Color.Transparent),
-                            center = busPos,
-                            radius = 50f * zoom
-                        )
-                    )
-                }
-            }
-
-            // Selection Glow
-            if (isSelected) {
-                drawCircle(
-                    color = bus.color.copy(alpha = 0.35f),
-                    radius = 26f * zoom,
-                    center = busPos
-                )
-            }
-
-            // Circular Vehicle Puck
-            drawCircle(
-                color = bus.color,
-                radius = 16f * zoom,
-                center = busPos
-            )
-            drawCircle(
-                color = Color.White,
-                radius = 16f * zoom,
-                center = busPos,
-                style = Stroke(width = 2.5f * zoom)
-            )
-
-            // Bus Icon in center
-            drawCircle(
-                color = Color.White,
-                radius = 5f * zoom,
-                center = busPos
-            )
         }
     }
 }
