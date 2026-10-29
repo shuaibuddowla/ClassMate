@@ -35,6 +35,7 @@ import com.shuaib.classmate.utils.AuthDebug
 import com.shuaib.classmate.utils.AuthErrorMapper
 import com.shuaib.classmate.utils.StudentIdUtils
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.setupStandardBackTransition
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -99,12 +100,12 @@ class RegisterActivity : AppCompatActivity() {
         setupPasswordStrength()
         setupKeyboardActions()
         setupStudentIdFormatting()
+        setupStandardBackTransition()
         showStep(0, focus = false)
 
         binding.btnRegister.applyClickAnimation { handlePrimaryAction() }
         binding.tvLogin.setOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
     }
 

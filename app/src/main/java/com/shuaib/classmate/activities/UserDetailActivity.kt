@@ -1,5 +1,8 @@
 package com.shuaib.classmate.activities
 
+import com.shuaib.classmate.utils.overrideCloseTransition
+import com.shuaib.classmate.utils.setupStandardBackTransition
+
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -56,9 +59,9 @@ class UserDetailActivity : AppCompatActivity() {
         binding = ActivityUserDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupStandardBackTransition()
         binding.toolbar.setNavigationOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
         binding.btnSave.setOnClickListener { saveChanges() }
 
@@ -215,7 +218,7 @@ class UserDetailActivity : AppCompatActivity() {
                 binding.btnSave.isEnabled = true
                 Toast.makeText(this, "User details updated", Toast.LENGTH_SHORT).show()
                 finish()
-                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                overrideCloseTransition()
             }
             .addOnFailureListener { e ->
                 binding.progressBar.visibility = View.GONE
@@ -268,10 +271,7 @@ class UserDetailActivity : AppCompatActivity() {
         return "$label: ${value.ifBlank { "Not set" }}"
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
-    }
+
 
     companion object {
         const val EXTRA_USER_ID = "extra_user_id"

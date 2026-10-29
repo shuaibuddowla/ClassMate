@@ -64,6 +64,7 @@ import com.shuaib.classmate.utils.Subject
 import com.shuaib.classmate.utils.SubjectList
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideOpenTransition
 import androidx.recyclerview.widget.LinearLayoutManager
 import java.io.File
 import kotlinx.coroutines.launch
@@ -171,12 +172,12 @@ class ProfileFragment : Fragment() {
 
         binding.cardAdminPanel.applyClickAnimation {
             startActivity(Intent(requireContext(), AdminPanelActivity::class.java))
-            requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            requireActivity().overrideOpenTransition()
         }
 
         binding.layoutUserManagement.setOnClickListener {
             startActivity(Intent(requireContext(), UserManagementActivity::class.java))
-            requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            requireActivity().overrideOpenTransition()
         }
 
         binding.layoutAddWidget.setOnClickListener {
@@ -527,7 +528,7 @@ class ProfileFragment : Fragment() {
     private fun setupAiSettings() {
         binding.cardAiSettings.applyClickAnimation {
             startActivity(Intent(requireContext(), AiSettingsActivity::class.java))
-            requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            requireActivity().overrideOpenTransition()
         }
     }
 

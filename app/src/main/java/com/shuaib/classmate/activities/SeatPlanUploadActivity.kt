@@ -16,6 +16,8 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivitySeatPlanUploadBinding
 import com.shuaib.classmate.utils.TelegramUploader
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideCloseTransition
+import com.shuaib.classmate.utils.setupStandardBackTransition
 
 class SeatPlanUploadActivity : AppCompatActivity() {
 
@@ -44,9 +46,9 @@ class SeatPlanUploadActivity : AppCompatActivity() {
 
         fetchAdminName()
 
+        setupStandardBackTransition()
         binding.toolbar.setNavigationOnClickListener { 
-            finish()
-            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
 
         binding.btnSelectPdf.applyClickAnimation {
@@ -129,7 +131,7 @@ class SeatPlanUploadActivity : AppCompatActivity() {
                 binding.progressBar.isVisible = false
                 Toast.makeText(this, "Seat plan deployed!", Toast.LENGTH_SHORT).show()
                 finish()
-                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                overrideCloseTransition()
             }
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
@@ -138,8 +140,5 @@ class SeatPlanUploadActivity : AppCompatActivity() {
             }
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
-    }
+
 }

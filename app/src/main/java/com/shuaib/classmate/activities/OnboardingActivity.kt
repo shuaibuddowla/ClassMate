@@ -12,6 +12,7 @@ import com.shuaib.classmate.databinding.ActivityOnboardingBinding
 import com.shuaib.classmate.models.OnboardingSlide
 import com.shuaib.classmate.utils.AppPreferences
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideOpenTransition
 
 class OnboardingActivity : AppCompatActivity() {
 
@@ -69,7 +70,7 @@ class OnboardingActivity : AppCompatActivity() {
     private fun completeOnboarding() {
         AppPreferences(this).setOnboardingComplete()
         startActivity(Intent(this, com.shuaib.classmate.activities.LoginActivity::class.java))
-        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        overrideOpenTransition()
         finish()
     }
 }

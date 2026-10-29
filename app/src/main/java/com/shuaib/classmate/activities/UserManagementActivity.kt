@@ -3,6 +3,9 @@
  */
 package com.shuaib.classmate.activities
 
+import com.shuaib.classmate.utils.overrideOpenTransition
+import com.shuaib.classmate.utils.setupStandardBackTransition
+
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -32,9 +35,9 @@ class UserManagementActivity : AppCompatActivity() {
         binding = ActivityUserManagementBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupStandardBackTransition()
         binding.toolbar.setNavigationOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
 
         firestore = FirebaseFirestore.getInstance()
@@ -72,7 +75,7 @@ class UserManagementActivity : AppCompatActivity() {
                 Intent(this, UserDetailActivity::class.java)
                     .putExtra(UserDetailActivity.EXTRA_USER_ID, user.uid)
             )
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            overrideOpenTransition()
         }
 
         userAdapter.onUserLongClick = { targetUser ->
@@ -296,8 +299,5 @@ class UserManagementActivity : AppCompatActivity() {
             }
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
-    }
+
 }

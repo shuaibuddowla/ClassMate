@@ -18,6 +18,8 @@ import com.shuaib.classmate.models.User
 import com.shuaib.classmate.network.BackendApiClient
 import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideOpenTransition
+import com.shuaib.classmate.utils.setupStandardBackTransition
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -47,6 +49,7 @@ class AdminPanelActivity : AppCompatActivity() {
             testTelegramConnection()
         }
 
+        setupStandardBackTransition()
         checkPermissionsAndSetupUI()
     }
 
@@ -107,7 +110,7 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardPostNotice.visibility = View.VISIBLE
             binding.cardPostNotice.applyClickAnimation {
                 startActivity(Intent(this, PostNoticeActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
 
@@ -116,19 +119,19 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardEditTimetable.visibility = View.VISIBLE
             binding.cardEditTimetable.applyClickAnimation {
                 startActivity(Intent(this, TimetableManagementActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
 
             binding.cardAcademicCalendar.visibility = View.VISIBLE
             binding.cardAcademicCalendar.applyClickAnimation {
                 startActivity(Intent(this, AcademicCalendarActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
 
             binding.cardManageBusSchedule.visibility = View.VISIBLE
             binding.cardManageBusSchedule.applyClickAnimation {
                 startActivity(Intent(this, BusScheduleManagementActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
 
@@ -137,7 +140,7 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardUploadPDF.visibility = View.VISIBLE
             binding.cardUploadPDF.applyClickAnimation {
                 startActivity(Intent(this, PdfUploadActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
 
@@ -146,7 +149,7 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardUploadSeatPlan.visibility = View.VISIBLE
             binding.cardUploadSeatPlan.applyClickAnimation {
                 startActivity(Intent(this, SeatPlanUploadActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
 
@@ -155,7 +158,7 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardUploadResult.visibility = View.VISIBLE
             binding.cardUploadResult.applyClickAnimation {
                 startActivity(Intent(this, ResultUploadActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
 
@@ -163,7 +166,7 @@ class AdminPanelActivity : AppCompatActivity() {
             binding.cardManageUsers.visibility = View.VISIBLE
             binding.cardManageUsers.applyClickAnimation {
                 startActivity(Intent(this, UserManagementActivity::class.java))
-                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                overrideOpenTransition()
             }
         }
     }
@@ -223,8 +226,5 @@ class AdminPanelActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
-    }
+
 }

@@ -16,6 +16,8 @@ import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityResultUploadBinding
 import com.shuaib.classmate.utils.TelegramUploader
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideCloseTransition
+import com.shuaib.classmate.utils.setupStandardBackTransition
 
 class ResultUploadActivity : AppCompatActivity() {
 
@@ -44,9 +46,9 @@ class ResultUploadActivity : AppCompatActivity() {
 
         fetchAdminName()
 
+        setupStandardBackTransition()
         binding.toolbar.setNavigationOnClickListener { 
-            finish()
-            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
 
         binding.btnSelectFile.applyClickAnimation {
@@ -130,7 +132,7 @@ class ResultUploadActivity : AppCompatActivity() {
                 binding.progressBar.isVisible = false
                 Toast.makeText(this, "Result uploaded!", Toast.LENGTH_SHORT).show()
                 finish()
-                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                overrideCloseTransition()
             }
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
@@ -139,8 +141,5 @@ class ResultUploadActivity : AppCompatActivity() {
             }
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
-    }
+
 }

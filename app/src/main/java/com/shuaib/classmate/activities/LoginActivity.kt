@@ -35,6 +35,7 @@ import com.shuaib.classmate.utils.AnimUtils
 import com.shuaib.classmate.utils.AuthDebug
 import com.shuaib.classmate.utils.AuthErrorMapper
 import com.shuaib.classmate.utils.applyClickAnimation
+import com.shuaib.classmate.utils.overrideOpenTransition
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -115,7 +116,7 @@ class LoginActivity : AppCompatActivity() {
         // Register link
         binding.tvRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
-            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            overrideOpenTransition()
         }
 
         // Keyboard done action on password field triggers sign-in
@@ -459,7 +460,7 @@ class LoginActivity : AppCompatActivity() {
         Log.d("AuthTrace", "Navigation to MainActivity started")
         Toast.makeText(this, "Signed in successfully", Toast.LENGTH_SHORT).show()
         startActivity(Intent(this, MainActivity::class.java))
-        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        overrideOpenTransition()
         finishAffinity()
     }
 

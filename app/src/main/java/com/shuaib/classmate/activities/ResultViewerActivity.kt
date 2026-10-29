@@ -1,6 +1,8 @@
 // com/shuaib/classmate/activities/ResultViewerActivity.kt
 package com.shuaib.classmate.activities
 
+import com.shuaib.classmate.utils.setupStandardBackTransition
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -27,9 +29,9 @@ class ResultViewerActivity : AppCompatActivity() {
         binding = ActivityResultViewerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupStandardBackTransition()
         binding.toolbar.setNavigationOnClickListener { 
-            finish()
-            overridePendingTransition(com.shuaib.classmate.R.anim.slide_in_left, com.shuaib.classmate.R.anim.slide_out_right)
+            onBackPressedDispatcher.onBackPressed()
         }
 
         firestore = FirebaseFirestore.getInstance()
@@ -109,8 +111,5 @@ class ResultViewerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        super.onBackPressed()
-        overridePendingTransition(com.shuaib.classmate.R.anim.slide_in_left, com.shuaib.classmate.R.anim.slide_out_right)
-    }
+
 }

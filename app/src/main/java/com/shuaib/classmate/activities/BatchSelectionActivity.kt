@@ -38,6 +38,12 @@ class BatchSelectionActivity : AppCompatActivity() {
         binding = ActivityBatchSelectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // Enforce mandatory selection - back button exits the app rather than bypassing batch selection
+                finishAffinity()
+            }
+        })
         setupRecyclerView()
         loadBatches()
 
@@ -110,10 +116,7 @@ class BatchSelectionActivity : AppCompatActivity() {
             }
     }
 
-    override fun onBackPressed() {
-        // Enforce mandatory selection - back button exits the app rather than bypassing batch selection
-        finishAffinity()
-    }
+
 
     private inner class BatchSelectionAdapter(
         private val items: List<Batch>,
