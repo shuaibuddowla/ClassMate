@@ -1769,9 +1769,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         }
 
-        nav.menu.findItem(R.id.nav_friends).isVisible=selectedBatchId.isNotBlank() && profile?.optString("verification_status")=="active"
-
-        nav.menu.findItem(R.id.nav_friends).title=if(profile?.optString("role")=="teacher") "Students" else "Batch"
+        nav.menu.findItem(R.id.nav_friends).isVisible = false
 
         nav.menu.findItem(R.id.nav_manage).isVisible = false
 
@@ -1791,24 +1789,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             val isTeacher = role == "teacher"
 
-            val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
-
-            val visibleTabs = androidx.compose.runtime.remember(showBatch) {
-
-                listOfNotNull(
-
+            val visibleTabs = androidx.compose.runtime.remember {
+                listOf(
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
-
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
-
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
-
-                    if (showBatch) com.shuaib.classmate.ui.ClassMateTab.BATCH else null,
-
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
-
                 )
-
             }
 
             com.shuaib.classmate.ui.ClassMateFloatingNavigationBar(

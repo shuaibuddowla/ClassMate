@@ -41,7 +41,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,private val scope: CoroutineScope,
-    private val currentBatch: ()->String,private val onCall: (String)->Unit,private val teacher: ()->Boolean = {false}) {
+    private val currentBatch: ()->String,private val onCall: (String)->Unit,private val teacher: ()->Boolean = {false},
+    private val onBack: (() -> Unit)? = null) {
     private var cachedBatch=""
     private var cachedRoot: LinearLayout?=null
     private var tvToggleBatchFund: TextView?=null
@@ -89,6 +90,25 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         val header=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(2),dp(16),dp(4)) }
         val titleContainer = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val titleRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        if (onBack != null) {
+            val btnBackNav = ImageView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                    marginEnd = dp(10)
+                }
+                setImageResource(R.drawable.ic_arrow_back)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
+                setBackgroundResource(R.drawable.bg_settings_icon)
+                setPadding(dp(9), dp(9), dp(9), dp(9))
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Back"
+                setOnClickListener {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    onBack.invoke()
+                }
+            }
+            titleRow.addView(btnBackNav)
+        }
         titleRow.addView(text(if(teacher()) "Students" else "Batch",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
 
         val btnSearch = ImageView(activity).apply {

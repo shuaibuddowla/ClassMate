@@ -5365,6 +5365,29 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+        val showBatchOption = batchId().isNotBlank() && account.optString("verification_status") == "active"
+        root.v<View>(R.id.cardProfileBatch).apply {
+            visibility = if (showBatchOption) View.VISIBLE else View.GONE
+            root.v<View>(R.id.dividerProfileBatch).visibility = visibility
+
+            text(root, R.id.tvBatchDirectoryTitle, if (isTeacher) "Students Directory" else "Batch & Classmates")
+            text(root, R.id.tvBatchDirectorySub, if (isTeacher) "Department student roster and profiles" else "Classmates, contacts, and Batch Fund")
+
+            if (showBatchOption) {
+                setOnClickListener {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    val intent = Intent(activity, ClassMateBatchActivity::class.java).apply {
+                        putExtra("EXTRA_BATCH_ID", batchId())
+                        putExtra("EXTRA_BATCH_LABEL", effectiveBatch)
+                        putExtra("EXTRA_ROLE", account.optString("role"))
+                    }
+                    activity.startActivity(intent)
+                }
+            } else {
+                setOnClickListener(null)
+            }
+        }
+
         root.v<View>(R.id.cardProfileManage).apply {
 
             visibility = if (initialCanManage) View.VISIBLE else View.GONE
