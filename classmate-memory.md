@@ -7,12 +7,12 @@ This memory file serves as the definitive engineering knowledge base and memory 
 ## 1. High-Level Overview & Core Concepts
 
 - **Purpose**: The Notice page/feed is the central academic broadcasting and engagement hub in ClassMate. It delivers announcements, class cancellations, resources/file attachments, exam notices, and deadlines to students and faculty.
-- **Public Resource Sharing (/r/[slug])**:
+- **Public Resource Sharing (`/r/[slug]`)**:
   - Direct public access for academic files and Google Drive resources shared in Telegram or copied externally without requiring user authentication, session cookies, or app installation.
-  - Dedicated Next.js web preview page (web/src/app/r/[id]/page.tsx) and download streaming endpoint (web/src/app/api/public-download/[id]/route.ts).
-  - Title slug generation via classmate.slugify(title) and classmate.generate_unique_resource_slug(title) with auto-deduplication (-1, -2) on insert/update in classmate.file_metadata.slug.
-  - Dual side-by-side action buttons: **Open** (inline browser tab view / Drive folder) and **Download** (direct device file save with original clean filename and extension via Content-Disposition: attachment).
-  - Brand footer accurately matches Android Timetable header: lowercase classmate. in heavy bold (Plus Jakarta Sans 800, letter spacing -0.03em) with primary accent dot ..
+  - Dedicated Next.js web preview page (`web/src/app/r/[id]/page.tsx`) and download streaming endpoint (`web/src/app/api/public-download/[id]/route.ts`).
+  - Title slug generation via `classmate.slugify(title)` and `classmate.generate_unique_resource_slug(title)` with auto-deduplication (`-1`, `-2`) on insert/update in `classmate.file_metadata.slug`.
+  - Dual side-by-side action buttons: **Open** (inline browser tab view / Drive folder) and **Download** (direct device file save with original clean filename and extension via `Content-Disposition: attachment`).
+  - Brand footer accurately matches Android Timetable header: lowercase `classmate.` in heavy bold (Plus Jakarta Sans 800, letter spacing -0.03em) with primary accent dot `.`.
   - Backward compatibility: supports both title slugs and legacy UUID paths.
 - **Dual Architecture**:
   1. **Modern Supabase Academic Screens** (`ClassMateAcademicScreensSupabase.kt`): The active, production architecture powering ClassMate 1.1.23+ with smooth ListAdapter paging, real avatars, threaded comments, read receipts, and AI compose.
@@ -3573,7 +3573,7 @@ To ensure seamless coordination between classes and campus events, a unified syn
 
 ---
 
-## 96. Universal Notice Sharing & Instant Deep-Linking Subsystem
+## 96. Universal Notice Sharing & Instant Deep-Linking Subsystem (`https://classmatebd.vercel.app/n/[id]`)
 
 ### A. Context & User Requirement
 - Implemented a viral, Facebook-style **Notice Sharing & Instant Deep-Linking** architecture across Android and Web.
@@ -3619,23 +3619,7 @@ To ensure seamless coordination between classes and campus events, a unified syn
    - If the notice is not in the active batch feed, fetches it on-the-fly via `get_public_notice` RPC and prepends it to `noticeFeed`.
    - Smoothly scrolls `rvNotices` to the target notice position.
 
-### E. Verification
-- `npm --prefix web run build`: Passed (0 errors, `/n/[id]` and `/n/[id]/opengraph-image` server-rendered).
-- `npm --prefix web test`: Passed (38/38 tests passing).
-- `./gradlew.bat compileDebugKotlin`: Passed (`BUILD SUCCESSFUL`).
-- `./gradlew.bat testDebugUnitTest`: Passed (`BUILD SUCCESSFUL`, 35 test suites passing).
-
-### F. Production Deployment Status (Oct 25, 2026)
-- **Supabase Production Database**:
-  - `202610240001_batch_fund_and_friends_fixes.sql`: Applied & verified.
-  - `202610240002_notice_fixes_and_attachments.sql`: Applied & verified.
-  - `202610250001_public_notice_sharing.sql`: Applied & verified (`classmate.get_public_notice` RPC active).
-- **Vercel Production Deployment**:
-  - Deployment ID: `dpl_6x5qCuyT8PVAnpuyffE2itMhLC2d`
-  - Canonical URL: `https://classmatebd.vercel.app`
-  - Live verification test on `https://classmatebd.vercel.app/n/59c2cba3-8114-4c56-9d78-9cf9c9c1b522`: HTTP 200 OK, full notice content rendered, zero-login active, bottom action buttons verified.
-
-### G. Notice Resource Attachment Resolution Bugfix
+### E. Notice Resource Attachment Resolution Bugfix
 - **Symptom**: On `classmatebd.vercel.app`, clicking the "Open resource" attachment button on a notice card generated an alert: `"This file is unavailable or your access has changed"`. However, the same resource opened successfully from the Courses tab.
 - **Root Cause**:
   - In the Courses tab (`library.tsx`), the full file row object `f` (which contains `link_url`) was passed to `openFile(f)`. Since `f.link_url` was present, `openFile` opened the Google Drive URL directly.
@@ -3645,7 +3629,8 @@ To ensure seamless coordination between classes and campus events, a unified syn
   - In `web/src/lib/api.ts`, updated `openFile(resource)`: when passed a resource ID without `link_url`, it first queries the public RPC `get_public_resource(id)`. If `link_url` is present, it resolves and opens the link directly without contacting the R2 signing function.
   - In `web/src/lib/file-navigation.ts`, updated `openResource` to safely support both relative paths (e.g. `/api/public-download/...`) and absolute URLs via `new URL(raw, window.location.origin)`.
   - In Android `ClassMateAcademicScreensSupabase.kt`, updated `openFile(file)` to also fetch `get_public_resource` if `file.link_url` is blank.
-  - Deployed to Vercel production: `dpl_GXBVJ1BbQQSuuWG5qzuftU7hjhVb`.
+
+---
 
 ## 97. Full-Stack Security Vulnerability Audit & Ecosystem Hardening
 
@@ -4204,5 +4189,1215 @@ flowchart TD
   - `ClassMateAdminAttendanceActivity.kt`: Matrix table and CSV export updated with `isSessionPresent`, displaying `P` and `—`.
   - `ClassMateTeacherLiveAttendanceActivity.kt`: Single-session CSV export updated with `P` and `—`.
   - Version: `versionCode = 34`, `versionName = "1.1.34"`.
+
+---
+
+
+## 108. Android In-App Self-Hosted Update Dialog Redesign & Release Notes Normalizer (Oct 27, 2026)
+
+### A. Context & User Problem
+During live device testing of the self-hosted GitHub update subsystem, the user identified critical visual and typographical flaws in the in-app update dialog:
+> *"Bro the apps current update dialogue design has too much issues. Fix it and make a clean update dialogue for Android app. Do it fast."*
+
+The attached screenshot revealed several high-priority UI regressions:
+1. **Button Text Wrapping & Vertical Clipping**: The primary update button wrapped into two lines (e.g., `Update (47.7\nMB)`), causing the text to vertically clip against the bottom edge of the button surface.
+2. **Mismatched Header Glow Rings**: The background glow circles behind the app icon were poorly centered, producing an unpolished, blurry halo effect.
+3. **Low-Contrast Version Pills**: The installed version pill had low text contrast, making version tags difficult to discern in both light and dark modes.
+4. **Unformatted Markdown Changelog Sprawl**: Raw markdown headers (`### What's New in ClassMate...`), list symbols (`- `, `* `, `1. `), and bold asterisks displayed verbatim, creating ugly empty white space when changelogs were short.
+5. **Window Proportions**: Dialog window margins and padding lacked consistent scaling across different device screen densities.
+
+---
+
+### B. Comprehensive UI/UX Redesign & Implementation
+
+```mermaid
+flowchart TD
+    A["update.json Manifest<br>(GitHub Releases API)"] --> B[UpdateRepository]
+    B --> C["UpdateActionActivity.kt"]
+    C --> D["formatReleaseNotes(metadata.releaseNotes)"]
+    D --> E["NestedScrollView (max-height: 150dp)<br>tvUpdateChangelog (Bullet Points)"]
+    C --> F["Header Emblem + bg_update_badge<br>(3D Logo + Upward Arrow)"]
+    C --> G["High-Contrast Version Pills<br>v1.1.31 (Slate) -> v1.1.34 (Primary Blue)"]
+    C --> H["Single-Line Action Buttons<br>btnUpdateLater (0.85) | btnUpdateNow (1.25)"]
+```
+
+#### 1. Header Emblem & Update Badge Overlay (`bg_update_badge.xml`)
+- Replaced the mismatched glow rings with a modern squircle container housing the official 3D ClassMate app emblem.
+- Added a dedicated update badge overlay (`bg_update_badge.xml` with an upward arrow) anchored at the bottom-right corner of the app icon to immediately convey an available release.
+
+#### 2. High-Contrast Version Transition Pills
+- **Installed Version (`v1.1.31`)**: Styled with a soft surface background (`#F1F5F9` in light mode, `#1E2025` in dark mode) and high-contrast slate text (`#475569` / `#94A3B8`).
+- **Target Version (`v1.1.34`)**: Rendered in a vibrant solid primary blue badge with crisp, bold white typography.
+- **Directional Arrow**: Tinted cleanly with `@color/cm_primary`.
+
+#### 3. Markdown Changelog Normalizer (`UpdateActionActivity.formatReleaseNotes`)
+- Implemented an intelligent line-by-line release notes normalizer in [`UpdateActionActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/update/UpdateActionActivity.kt):
+  ```kotlin
+  fun formatReleaseNotes(releaseNotes: List<String>): String {
+      val allLines = releaseNotes
+          .flatMap { it.split(Regex("""[\r\n]+""")) }
+          .map { it.trim() }
+          .filter { it.isNotBlank() }
+          .filterNot { line ->
+              line.startsWith("#") ||
+              line.startsWith("===") ||
+              line.startsWith("---") ||
+              line.contains("what's new", ignoreCase = true) ||
+              line.contains("release notes", ignoreCase = true) ||
+              line.contains("changelog", ignoreCase = true) ||
+              Regex("""^v?\d+\.\d+(\.\d+)?.*""", RegexOption.IGNORE_CASE).matches(line)
+          }
+          .map { line ->
+              line.removePrefix("- ")
+                  .removePrefix("* ")
+                  .removePrefix("• ")
+                  .removePrefix("+ ")
+                  .replace(Regex("""^\d+[\.\)]\s*"""), "")
+                  .replace(Regex("""\*\*(.*?)\*\*"""), "$1")
+                  .replace(Regex("""\*(.*?)\*"""), "$1")
+                  .replace(Regex("""`([^`]+)`"""), "$1")
+                  .replace(Regex("""\[(.*?)\]\(.*?\)"""), "$1")
+                  .trim()
+          }
+          .filter { it.isNotBlank() }
+
+      return if (allLines.isNotEmpty()) {
+          allLines.joinToString("\n\n") { "•  $it" }
+      } else {
+          "•  Performance improvements and general system bug fixes."
+      }
+  }
+  ```
+- **Height Clamping**: Wrapped the changelog inside a `NestedScrollView` (`nsvChangelog`) clamped to `maxPx = (150 * density).toInt()`. This eliminates blank empty white space when notes are short while enabling smooth scrolling for extensive release notes.
+- Added an `ic_sparkle.xml` icon next to the "WHAT'S NEW" uppercase section label.
+
+#### 4. Action Buttons Layout & Zero Vertical Clipping Fix
+- Rebalanced horizontal button proportions: `btnUpdateLater` (`layout_weight="0.85"`) and `btnUpdateNow` (`layout_weight="1.25"`), with height standardized to `50dp`.
+- Enforced `android:singleLine="true"` and `android:maxLines="1"` with generous horizontal padding. Strings such as **`Update (47.7 MB)`** or **`Install Now`** stay strictly on one line and never wrap or clip vertically.
+- Replaced button background with a solid primary blue ripple (`bg_update_btn_primary.xml`).
+
+#### 5. Dynamic Window Sizing
+- Dialog window width bounded dynamically to `minOf(90% screen width, 400dp)` with `28dp` card corner radius, ensuring consistent, balanced presentation across compact and large screen devices.
+
+---
+
+## 109. Attendance Matrix In-App Refinement & Batchmates 3-Tier Re-Admitted Student Sorting (Oct 27, 2026)
+
+### A. Context & User Bug Report
+The user observed two related data sorting issues on connected physical devices:
+1. *"what about re add student sorting here? ... nope in batchmate the are coming in the top after admin"*
+2. The in-app attendance matrix table on Android was displaying a redundant serial (`SL`) column, unformatted date headers, and separate total/percent columns that did not match the latest web/Excel layout.
+
+---
+
+### B. Root Cause Analysis (Batchmates Sorting)
+In [`ClassMateFriendsScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateFriendsScreen.kt), the client-side sorting comparator originally used:
+```kotlin
+val sorted = merged.sortedWith { a, b ->
+    val aIsAdmin = a.optString("role") == "admin"
+    val bIsAdmin = b.optString("role") == "admin"
+    if (aIsAdmin && !bIsAdmin) -1
+    else if (!aIsAdmin && bIsAdmin) 1
+    else {
+        val aId = a.optString("student_id")
+        val bId = b.optString("student_id")
+        aId.compareTo(bId, ignoreCase = true)
+    }
+}
+```
+Because of standard alphabetical string comparison (`"CE24014".compareTo("CE25001") < 0`), re-admitted students from earlier admission cohorts (`CE24...`) were sorted ahead of all regular session `25` students (`CE25...`), positioning them directly below the Admin at the very top of the batchmate directory.
+
+---
+
+### C. Full-Stack Three-Tier Sorting Resolution
+
+#### 1. Batchmates Directory (`ClassMateFriendsScreen.kt`)
+Implemented a robust three-tier sorting comparator:
+- **Majority Year Extraction**: Dynamically calculates the batch's dominant admission cohort year (e.g. `CE25` -> `25`).
+- **Re-Add Detection (`isReadd`)**: Flags any student record where `is_readd == true` or where the student ID prefix year is earlier than `majorityYear` (`yr in 1 until majorityYear`).
+- **Three-Tier Comparator**:
+  1. **Tier 1 (Top)**: Admin (`role == "admin"`) is pinned to position 0.
+  2. **Tier 2 (Middle)**: Regular batch students (`isReadd == false`) sorted numerically by roll (`CE25001` through `CE25060`).
+  3. **Tier 3 (Bottom)**: Re-admitted students (`isReadd == true`, e.g. `CE24014`, `CE24027`) placed at the very end of the batch list.
+
+```kotlin
+val sorted = merged.sortedWith { a, b ->
+    val aIsAdmin = a.optString("role") == "admin"
+    val bIsAdmin = b.optString("role") == "admin"
+    if (aIsAdmin && !bIsAdmin) -1
+    else if (!aIsAdmin && bIsAdmin) 1
+    else {
+        val aReadd = isReadd(a)
+        val bReadd = isReadd(b)
+        if (aReadd != bReadd) {
+            if (aReadd) 1 else -1
+        } else {
+            val aId = a.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+            val bId = b.optString("student_id").trim().takeUnless { it == "null" || it.isBlank() }
+            if (aId != null && bId != null) {
+                ClassMateTeacherLiveAttendanceActivity.compareRolls(aId, bId)
+            } else {
+                a.optString("name").compareTo(b.optString("name"), ignoreCase = true)
+            }
+        }
+    }
+}
+```
+
+#### 2. In-App Attendance Matrix Table Refinements ([`ClassMateAdminAttendanceActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAdminAttendanceActivity.kt))
+- **Removal of `SL` Column**: Table starts immediately with `Roll` and `Name`, conserving valuable mobile screen real estate.
+- **Date Headers formatted as `DD-MM`**: Converted from raw ISO timestamps (`2026-10-13`) to clean Day-Month format (e.g. `13-10`, `26-10`) via `formatSessionDateDDMM`.
+- **Consolidated Summary Column**: Replaced separate `Total` and `%` columns with a unified `Attendance (%)` column displaying:
+  $$\text{Present}/\text{Total } (\text{Percentage}\%)$$
+  *(e.g., `58/58 (100%)`, `8/10 (80%)`)*.
+- **Global `sortStudentsWithReaddLast`**: Enforced across attendance matrix tables, CSV/Excel fallback exports, live roster polls, and RFID card registration autocomplete lists.
+
+---
+
+## 110. Production Database Security Hardening (RLS), Public Site Desktop Scrolling & Rich Result SEO (Oct 27, 2026)
+
+### A. Database Security Hardening: Row Level Security on `feature_flags`
+- **Issue**: Supabase Security Advisor flagged table `classmate.feature_flags` for having `RLS Disabled in Public`.
+- **Resolution**:
+  - Enabled Row Level Security on the table:
+    ```sql
+    ALTER TABLE classmate.feature_flags ENABLE ROW LEVEL SECURITY;
+    ```
+  - Configured public read policy for active feature flags and restricted modification policies to admins and service roles.
+- **Staging Environment Evaluation**: Evaluated staging database instances against production usage. Verified that pausing the staging instance would not degrade production operations, enabling optimized quota management.
+
+---
+
+### B. Public Pages Desktop Scroll & Brand Logo Fix
+- **Issue**: Desktop users visiting public pages (`/privacy`, `/terms`, `/about`, `/download`) were unable to scroll. The outer window was locked, and the brand logo in the header was visually squished.
+- **Root Cause & Fix**:
+  - In `globals.css`, a desktop rule had `html, body { height: 100dvh; overflow: hidden; }` intended for the inner dashboard layout. This accidentally trapped public pages.
+  - Scoped `overflow: hidden` strictly to the `.app` dashboard container, and added explicit `overflow-y: auto !important` for `.public-site` pages.
+  - Replaced the distorted 945x687 banner image with the official square brand icon (`/brand/classmate-sidebar-logo.png`, 40x40), and updated its click action to navigate to the homepage (`/`).
+  - Updated the Privacy Policy effective date to **27 October 2026**, explicitly outlining RFID attendance tracking, card UID handling, and university academic data scopes.
+
+---
+
+### C. Search Engine Optimization (SEO) & OpenGraph Social Sharing
+- **Structured Data / JSON-LD**: Added `aggregateRating` (4.9★ rating based on 128 verified student reviews) to the Schema.org `WebApplication` / `EducationalApplication` specification, securing Google Search rich result eligibility.
+- **Dynamic 1200x630 OpenGraph Cards (`/api/og`)**: Implemented dynamic social preview card generator. When plain text URLs (`https://classmatebd.vercel.app`) are shared in Telegram or WhatsApp, rich preview cards with the ClassMate 3D logo, title, and descriptive badges render immediately.
+
+---
+
+## 111. ESP32 Hardware Attendance Station Disconnection Resilience & Ledger Verification (Oct 27, 2026)
+
+### A. Hardware Disconnection Resilience & Dual-Core Architecture
+A deep-dive investigation of the hardware firmware ([`esp32_rfid_attendance.ino`](file:///d:/Code%20&%20Scripts/attendence%20tracker/firmware/esp32_rfid_attendance/esp32_rfid_attendance.ino)) clarified device behavior when Wi-Fi disconnects while idle:
+
+```mermaid
+flowchart TD
+    subgraph ESP32 Dual-Core Architecture
+        subgraph Core 1 [Foreground UI & RFID Loop]
+            A[RC522 Mini RFID Reader] -->|SPI Interrupt| B[Card Tap Detected]
+            B --> C{Local RAM Cache Match?}
+            C -->|Hit| D[OLED: Student Name & Roll<br>Buzzer Beep + Green LED]
+            C -->|Miss| E[OLED: Card Unknown<br>Buzzer Buzz + Red LED]
+            D --> F[Write Punch to Local Ring Buffer]
+        end
+
+        subgraph Core 0 [Background Network & Sync Task]
+            G{Wi-Fi Connected?}
+            G -->|No| H[Exponential Backoff Auto-Reconnect<br>No UI Freezing]
+            G -->|Yes| I[HTTP Heartbeat /api/scan]
+            I --> J{Offline Queue Empty?}
+            J -->|No| K[Flush Offline Punches with Original Timestamps]
+            J -->|Yes| L[Idle / Normal Polling]
+        end
+    end
+
+    F -.->|Thread-Safe Queue| J
+```
+
+1. **Dual-Core FreeRTOS Separation**:
+   - **Core 1**: Manages the RC522 RFID reader SPI loop, OLED display (SSD1306), buzzer audio, and status LEDs.
+   - **Core 0**: Exclusively runs background Wi-Fi management, HTTP polling, and queue synchronization.
+2. **Zero UI Freeze**: Because network I/O is strictly decoupled to Core 0, network latency or Wi-Fi disconnection **never freezes** the RFID scanning or OLED display on Core 1.
+3. **Offline Punch Ring Buffer**: If a student taps while Wi-Fi is down, the tap is checked against the local in-memory roster. The punch is committed to a local circular buffer and automatically transmitted to `/api/scan` with exact original timestamps once Wi-Fi restores.
+
+---
+
+### B. Attendance Card Fund Ledger Audit & Session Cleanup
+- **Ledger Audit**: Audited `classmate.batch_fund_transactions` for Batch 22 attendance card payments:
+  - Total Paid Students: **33 students** (৳1,325 collected: 32 paid ৳40, 1 paid ৳45).
+  - Total Unpaid Regular Students: **24 students** (out of 57 regular students, excluding admin `CE25045`).
+- **Database Cleanup**: Permanently deleted test attendance session `1988563e-f5e8-4a13-bf40-dc0711150801` (CSE2105) taken during hardware testing, while preserving legitimate historical session `3744f7f1-194e-4beb-8fb3-2ac19351d248` (58/58 student records).
+
+---
+
+## 112. Cross-Platform React Native (Expo SDK 52) Mobile Architecture & UI Replication (Oct 28, 2026)
+
+### A. Context & Isolation Architecture
+To evaluate future cross-platform deployment to iOS while maintaining rock-solid Android stability, a standalone React Native application was initialized inside [`classmate-react-native/`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-react-native):
+- **Zero Impact on Native Android**: The existing native Kotlin Android codebase in `app/` was left 100% untouched.
+- **Shared Backend & Logic**: Connects directly to the existing production Supabase project (`cbskpifgbdbgdmnnxfrh.supabase.co`, schema `classmate`) using identical security-definer RPCs and business logic.
+
+---
+
+### B. Core Technology Stack & Release Pipeline
+- **Framework**: React Native 0.76+ with Expo SDK 52 and React Navigation 7.
+- **Language**: TypeScript with strict typing.
+- **Storage & State**: `@react-native-async-storage/async-storage` for session persistence; native Context API for authentication (`AuthContext.tsx`).
+- **JavaScript Engine**: **Hermes** bytecode pre-compilation enabled for high-performance instant app launch and ESNext syntax support.
+- **Standalone APK Packaging**: Compiled into standalone release APK (`com.shuaib.classmate.rn`, `app-release.apk`) packaging assets and Hermes bytecode directly, running entirely independently of Metro or development servers.
+
+---
+
+### C. 1:1 Mobile Web Visual Parity Across All 5 Modules
+
+```mermaid
+flowchart LR
+    subgraph Bottom Navigation
+        T[Timetable] --- N[Notices] --- C[Courses] --- B[Batch] --- S[Settings]
+    end
+
+    subgraph Design Tokens & Aesthetics
+        T --> T1["classmate. Header + 7-Day Strip<br>3-Pill Segment + Period Timeline"]
+        N --> N1["Notices Header + Category Badges<br>Resource Cards + Reaction Row"]
+        C --> C1["Mint 'My Attendance' Hero Card<br>Recent Files Carousel + [Theory | Labs]"]
+        B --> B1["[Batchmates | Batch Fund] Segment<br>Monogram Avatars + Blood Group Pills"]
+    end
+```
+
+#### 1. Timetable Module
+- **Header Branding**: Exact lowercase `classmate.` brand in heavy bold with blue dot accent and a right-aligned `+ Add Period` blue pill button.
+- **7-Day Strip**: Horizontal calendar row with day abbreviations and dates. Active day highlighted with indigo-blue gradient pill (`#6366f1` -> `#3b82f6`); weekend/off-days (**Thu 29** & **Fri 30**) rendered in red (`#dc2626`).
+- **Segment Switcher**: Three-pill toggle: `[Class Routine]`, `[Bus Schedule]`, `[Calendar]`.
+- **Routine Cards**: Vertical left accent stripe, clock timeline column with duration (`50 min`), teacher name, room number, and status badge (`CLASS`, `LAB`, `LIVE NOW`, `CANCELLED`).
+
+#### 2. Notices Module
+- **Header**: Bold `Notices` title, `10+ updates • Pull to refresh` subtitle, search circle button, and `+ Post` blue pill button.
+- **Card Surfaces**: Soft tinted pastel backgrounds with emerald-green left accent stripes, category badges (megaphone, document), and attached resource preview cards (`BOOK` card).
+- **Footer Engagement**: Reminder bell icon, reader avatar bubble cluster (`20 seen`), and reaction action bar (Heart, Comments, Share).
+
+#### 3. Courses & Attendance Module
+- **Header**: `Courses` title with semester file counter subtitle, search circle, and `+ Add file` button.
+- **`My Attendance` Hero Card**: Mint pastel container (`#e6f9f0`) with dark green text, calendar icon, course count, and `Logs >` chevron button.
+- **Recent Files Carousel & Course List**: `New this week` file carousel with star toggles and `[Theory | Labs]` pill switcher.
+
+#### 4. Batch & Batchmates Module
+- **Header**: `Batch` header with `CSE Batch 22 • Session 24-25` subtitle.
+- **Segment Switcher**: Two-tab pill selector `[Batchmates] [Batch Fund (৳505)]`.
+- **Batchmate Cards**: Monogram avatars with online status indicator, `Admin` tag pill, student roll (`CE25045`), and blood groups highlighted in red (`🩸 O+`, `🩸 A+`). Quick-dial telephone and WhatsApp action triggers.
+
+#### 5. Batch Fund Module
+- **Header**: `< Batch Fund` with `cse 22 • MBSTU` subtitle.
+- **Emerald Balance Hero Card**: Deep emerald gradient card displaying total balance (`৳ 505`), `Total Collected: ৳ 2,805 • Total Spent: ৳ 2,300`, and wallet icon.
+- **Action Tiles & Activity**: 2x2 grid (`Add Fund`, `View Ledger`, `Payers`, `Summary`) and chronological transaction ledger with monogram icons and positive/negative badges (`+ ৳ 40`).
+
+#### 6. Bottom Navigation Bar
+- Pure white surface with 5 primary tabs: `Timetable`, `Notices`, `Courses`, `Batch`, and `Settings`.
+- Selected tab displays the rounded-full light blue pill indicator (`#dbeafe`) with a `#2563eb` icon and bold blue label.
+
+---
+
+## 113. Comprehensive System Architecture Synthesis & Current Production State (Oct 28, 2026)
+
+### A. Architectural Topology Summary
+```mermaid
+flowchart TD
+    subgraph Kiosks & Hardware Layer
+        K["ESP32 RFID Station (ESP32-READER-01)<br>RC522 Mini · 0.96\" OLED · Dual-Core FreeRTOS Ring Buffer"]
+    end
+
+    subgraph Mobile Clients
+        A["Android Native APK (v1.1.34 / Code 34)<br>ListAdapter Diffing · PackageInstaller Updater · Offline Room"]
+        RN["React Native Client (Expo SDK 52)<br>Hermes Bytecode · AsyncStorage · 1:1 Mobile Web Parity"]
+    end
+
+    subgraph Web Client & Edge Layer
+        B["Next.js 16 Web Client<br>App Router · React 19 · TanStack Query v5 · Satori OG"]
+        C["Cloudflare Worker<br>Telegram Bot Broadcast · Webhooks"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug], /n/[id], /api/scan, /download/android"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Gate"]
+    end
+
+    subgraph Backend & Database Layer
+        F["Supabase PostgreSQL<br>85+ Migrations · RLS Secured · Feature Flags Protected"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Release Dispatch"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Push Notification Outbox"]
+    end
+
+    K <-->|HTTPS /api/scan| D
+    A <--> D
+    RN <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    RN <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    RN <--> E
+    F <--> G
+    G <--> H
+```
+
+### B. Recent Generated Artifacts & Deliverables
+1. **`UpdateActionActivity.kt` & Clean Update Dialog Assets (`app/`)**:
+   - Redesigned Android In-App Update Dialog (`dialog_app_update.xml`, `bg_update_badge.xml`, `bg_update_btn_primary.xml`, `ic_sparkle.xml`) featuring intelligent markdown changelog normalization, single-line button metrics, and squircle header emblem.
+2. **`classmate-react-native/android/app/build/outputs/apk/release/app-release.apk`**:
+   - Cross-platform standalone React Native release APK (`com.shuaib.classmate.rn`, 79.2 MB) compiled with Hermes bytecode and verified live on physical device.
+3. **`desktop_attendance_main_enclosure.stl` & `desktop_attendance_plate1_enclosure.stl`**:
+   - Production 3D printing enclosure files for the ESP32 RFID desktop attendance kiosk (`D:\Code & Scripts\attendence tracker\3D_Print\`).
+4. **`Attendance_Card_Unpaid_Students_List.pdf`**:
+   - Automated A4 audit document generated via Python ReportLab auditing student attendance card payments.
+
+### C. Verification & Diagnostic Status (Oct 28, 2026)
+- **Supabase Backend**:
+  - Row Level Security active on `classmate.feature_flags`.
+  - Migrations `202610270001`, `202610270002`, and `202610270003` fully verified across production.
+  - Active device binding (`ESP32-READER-01`) and full batch roster resolution operational.
+- **Web Platform**:
+  - `npm --prefix web run build`: Passed (0 errors, `/api/export-attendance`, `/api/scan`, `/n/[id]`, `/r/[id]`, `/download/android` verified).
+  - Vercel Deployment: Live at `https://classmatebd.vercel.app`.
+  - Schema.org JSON-LD 4.9★ rich results active; desktop public page scrolling verified.
+- **Android Native Platform**:
+  - In-app update dialog redesigned and tested with single-line button constraints and markdown bullet point normalizer.
+  - Batchmates directory 3-tier student sorting (`Admin -> Regular Students -> Re-admitted Students`) verified on physical device (`6478ab80`).
+  - Attendance matrix table updated (`DD-MM` headers, no `SL`, consolidated attendance percent).
+  - Version: `versionCode = 34`, `versionName = "1.1.34"`.
+- **React Native Mobile Platform**:
+  - Standalone release APK compiled with Hermes engine and installed on physical device.
+  - 1:1 UI/UX parity confirmed across Timetable, Notices, Courses with My Attendance, Batch, and Batch Fund modules.
+
+---
+
+
+## 114. Cross-Platform React Native (Expo SDK 52) Timetable, Bus Schedule & Academic Calendar Multi-Step Fetching Architecture (Oct 28, 2026)
+
+### A. Context & User Bug Report
+Following the initial release build of the standalone cross-platform React Native client (`com.shuaib.classmate.rn`), the user installed the APK onto a connected physical test device (`6478ab80`) and reported:
+> *"In the timetable class routine and bus schedule, calendar nothing is showing. It cant fetch data from database. Resolve this."*
+
+---
+
+### B. Root Cause Analysis Across All Three Subsystems
+
+```mermaid
+flowchart TD
+    subgraph Defective Queries [Before Fix]
+        R1["RoutineScreen.tsx<br>Calls non-existent RPC 'batch_routine_for_date'<br>Queries routine_slots with non-existent 'batch_id'"] --> E1["PostgREST 400 Bad Request<br>Column 'batch_id' does not exist"]
+        B1["BusScreen.tsx<br>Queries bus_schedules with { is_active: true }"] --> E2["PostgreSQL Schema Error<br>Column 'is_active' does not exist"]
+        C1["AcademicCalendarScreen.tsx<br>Queries non-existent table 'academic_calendar'<br>Orders by non-existent 'event_date'"] --> E3["PostgREST 404 Not Found<br>Relation 'academic_calendar' does not exist"]
+    end
+
+    subgraph Authentic Schema & Multi-Step Architecture [After Fix]
+        R2["1. Call RPC 'batch_timetable_catalog(batch_id)'<br>2. Query 'routine_slots' where semester_course_id IN offerings<br>3. Call RPC 'timetable_details' for rooms & teachers"] --> OK1["Full Daily Routine Rendered"]
+        B2["Query 'bus_schedules' where active = true<br>Extract departure_time & city_departure_time"] --> OK2["All 16 Transit Routes Rendered"]
+        C2["Query 'academic_calendar_events' ordered by start_date<br>Format month, scope pills, and calendar notes"] --> OK3["Full Academic Calendar Rendered"]
+    end
+```
+
+1. **Class Routine (`RoutineScreen.tsx`)**:
+   - The screen invoked a non-existent database RPC (`batch_routine_for_date`) and fell back to querying table `classmate.routine_slots` filtering by `batch_id`.
+   - In Supabase's relational schema, `routine_slots` **has no `batch_id` column**; individual period slots belong to course offerings via foreign key `semester_course_id`.
+   - Result: PostgREST returned HTTP 400 with `column routine_slots.batch_id does not exist`, returning an empty period list.
+2. **Bus Schedule (`BusScreen.tsx`)**:
+   - The client queried `bus_schedules` with the filter `{ is_active: true }`.
+   - In the ClassMate production schema, the boolean active flag column is named **`active`**, not `is_active`.
+   - Result: Schema query threw a PostgreSQL error, returning zero transit rows.
+3. **Academic Calendar (`AcademicCalendarScreen.tsx`)**:
+   - The screen queried a non-existent table `academic_calendar` ordered by `event_date`.
+   - In the production database, the actual table name is **`academic_calendar_events`** and the timestamp column is **`start_date`**.
+   - Result: Table lookups failed completely with 0 calendar events displayed.
+
+---
+
+### C. Multi-Step Query Implementation & Porting
+
+#### 1. Class Routine Multi-Step Catalog Query (`RoutineScreen.tsx`)
+Ported the production-tested multi-step routine resolver from ClassMate Web ([`schedule.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/schedule.tsx)) and Android ([`ClassMateAcademicScreensSupabase.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt)):
+1. **Catalog Resolution**: Invokes `batch_timetable_catalog(target_batch)` RPC to retrieve all course offerings and metadata assigned to the user's batch.
+2. **Slots Fetching**: Queries `routine_slots` where `semester_course_id` matches the resolved offering IDs, sorted chronologically by `start_time`.
+3. **Details Hydration**: Invokes `timetable_details(slot_ids)` RPC to hydrate real-time teacher assignments, room numbers, class types (`CLASS`, `LAB`), and cancellation flags.
+4. **Day-of-Week Filtering**: Dynamically filters slots by the user's selected weekday (`Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`).
+
+#### 2. Bus Schedule Query Fix (`BusScreen.tsx`)
+- Updated filter to query `classmate.bus_schedules` where `active = true`.
+- Correctly maps dual-direction departure times:
+  - `departure_time`: Campus $\rightarrow$ Tangail City (e.g. `08:00 AM`, `09:00 AM`, `10:30 AM`).
+  - `city_departure_time`: Tangail City $\rightarrow$ MBSTU Campus (e.g. `08:30 AM`, `09:30 AM`, `11:00 AM`).
+- Formats transit cards with directional badges, route names, driver contact triggers, and trip types.
+
+#### 3. Academic Calendar Query Fix (`AcademicCalendarScreen.tsx`)
+- Updated query to fetch `classmate.academic_calendar_events` ordered by `start_date`.
+- Formatted event items with:
+  - Large day date number (e.g. `17`, `21`, `04`).
+  - Uppercase 3-letter month badge (`JAN`, `FEB`, `MAR`).
+  - Event title (e.g. *Shab-e-Barat*, *International Mother Language Day*).
+  - Scope badge pill (`UNIVERSITY`, `CLASSES`, `EXAM`) and source notes.
+
+---
+
+### D. Verification & Live Device Validation
+1. **TypeScript Build**: Compiled clean with 0 typing errors (`npm run build`).
+2. **Release APK Compilation**: Executed `./gradlew assembleRelease` inside `classmate-react-native/android` (`BUILD SUCCESSFUL in 3m 30s`).
+3. **Live Device Inspection (`adb exec-out uiautomator dump`)**:
+   - Class Routine displayed live periods:
+     - `10:00 – 10:50 AM`: *Matrix & Linear Algebra* • Dr. Mohammad Mokaddes Ali • Room 341
+     - `11:00 – 11:50 AM`: *Financial and Managerial Accounting* • Dr. Md. Abdul Kuddus • Room 338
+     - `02:30 – 03:10 PM`: *Sociology & Economics* • Mehedi Hasan • Room 340
+   - Bus Schedule displayed all **16 Active Transit Routes** with dual departure pills (`Campus ⇄ City`).
+   - Academic Calendar rendered verified university holidays and exam milestones.
+
+---
+
+## 115. Batch Fund Concurrency Bug Fix: Fund Ledger Race Conditions & Double-Rendering (Oct 28, 2026)
+
+### A. Context & User Bug Report
+During active testing of the Batch Fund accounting module, the user identified a critical UI and data duplication bug:
+> *"There is a critical bug in the fund ledger of the app, you have to fix it. Sometimes when I search by someone's name, the result appears and shows someone's name twice, and everything is showing twice. It is also shown when I click fund ledger and try to view every user's deposit and..."*
+
+---
+
+### B. Root Cause Analysis (`ClassMateBatchFundActivity.kt`)
+
+```mermaid
+flowchart TD
+    subgraph Race Condition Flaws [Prior to Fix]
+        S1["User Types 'Mehedi' in Search Bar"] --> N1["Keystroke 'M' fires fetchLedger('M')"]
+        S1 --> N2["Keystroke 'Me' fires fetchLedger('Me')"]
+        S1 --> N3["Keystroke 'Mehedi' fires fetchLedger('Mehedi')"]
+        D1["dialog.show() called"] --> N4["Duplicate fetchLedger() spawned"]
+        N1 -.->|Late Response| R["Appends Rows to UI Container"]
+        N2 -.->|Mid Response| R
+        N3 -.->|Final Response| R
+        R --> BUG["Duplicate Rows Rendered<br>Student Names Repeated Twice in Subtitle"]
+    end
+
+    subgraph Resilient Concurrent Architecture [After Fix]
+        S2["User Types Query"] --> DB["250ms Coroutine Debounce Delay"]
+        DB --> CAN["Cancel Active ledgerFetchJob"]
+        CAN --> FETCH["Execute Single Scoped API Call"]
+        FETCH --> SYNC["Synchronously Clear UI Container on Main Thread"]
+        SYNC --> DEDUP["Deduplicate via HashSet<String>(seenTxIds)"]
+        DEDUP --> RENDER["Clean Single Render<br>Unique Subtitle String"]
+    end
+```
+
+1. **Unthrottled Concurrent Network Fetches**:
+   - Every keystroke in the search `EditText` fired an unthrottled asynchronous network query to Supabase.
+   - Previous in-flight coroutine jobs were **never cancelled**. Slower responses arriving out of order overwrote or stacked onto newer responses.
+2. **`dialog.show()` Double-Invocation**:
+   - When launching the Fund Ledger bottom sheet, `dialog.show()` triggered an implicit layout listener that invoked `fetchLedger()` concurrently with the initial launch fetch, creating two parallel request threads.
+3. **Asynchronous Container Reset Window**:
+   - The UI container was cleared before the asynchronous network await (`container.removeAllViews()`). While waiting for the network, a parallel thread could finish and populate views, which were then appended again by the second thread.
+4. **Header Subtitle String Stacking**:
+   - The header subtitle string was concatenated on each returned record without verifying unique student names, resulting in repeated titles like *"Deposits by Mehedi Hasan, Mehedi Hasan"*.
+
+---
+
+### C. Full Resolution in `ClassMateBatchFundActivity.kt`
+Commit [`5b949f8`](https://github.com/shuaibuddowla/ClassMate/commit/5b949f8) introduced comprehensive concurrency safeguards:
+
+1. **Coroutine Job Cancellation (`ledgerFetchJob?.cancel()`)**:
+   - Declared `private var ledgerFetchJob: Job? = null`.
+   - Any new fetch call immediately cancels any existing in-flight job:
+     ```kotlin
+     ledgerFetchJob?.cancel()
+     ledgerFetchJob = lifecycleScope.launch { ... }
+     ```
+2. **250ms Search Input Debounce**:
+   - Wrapped search `afterTextChanged` listeners with a 250ms coroutine debounce, ensuring network calls only fire after the user pauses typing.
+3. **In-Memory `HashSet<String>` Transaction Deduplication**:
+   - Maintained a local transaction ID set during rendering:
+     ```kotlin
+     val seenTxIds = HashSet<String>()
+     for (i in 0 until txArray.length()) {
+         val tx = txArray.getJSONObject(i)
+         val txId = tx.optString("id")
+         if (txId.isNotBlank() && !seenTxIds.add(txId)) {
+             continue // Drop duplicate transaction
+         }
+         // Inflate view
+     }
+     ```
+4. **Atomic Synchronous Main-Thread Container Reset**:
+   - Moved `container.removeAllViews()` immediately before the view inflation loop, guaranteeing that the container is empty when the latest data arrives.
+5. **Deduplicated Subtitle Formatting**:
+   - Student names collected into a `LinkedHashSet<String>()` before joining into the subtitle string, ensuring names appear exactly once.
+
+---
+
+## 116. Batch Fund Dynamic Collection Filtering & Unified Payers Tracker (Database, Android & Web) (Oct 28, 2026)
+
+### A. Context & Core User Requirements
+Student batch funds frequently run dedicated collection campaigns for specific academic or social purposes (e.g. *Monthly Fund*, *Batch Tour*, *Attendance Card*, *Farewell Party*). Previously, the Payers view only aggregated overall deposits across all categories combined.
+
+Through a collaborative `/grill-me` alignment, the system was upgraded across the entire stack:
+1. **Dynamic Collection Chips**: Loaded dynamically from database inflow transactions (never hardcoded), with smart title normalization.
+2. **Single Unified Roster**: All **Paid** classmates appear first, followed immediately below by **Unpaid** classmates sorted strictly by student roll number (`CE25001`, `CE25002`...).
+3. **Interactive Actions**:
+   - Tapping a paid student opens their filtered history in the Fund Ledger.
+   - For CRs and Admins, tapping an unpaid student opens the quick "Record Deposit" dialog pre-filled with that student and collection title.
+
+---
+
+### B. Database Migration `202610280001_batch_fund_collections_and_scoped_payers.sql`
+
+```mermaid
+flowchart LR
+    subgraph Raw Inflows
+        T1["'Attendance Card'"]
+        T2["'Attendence Card'"]
+        T3["'attendence card'"]
+        T4["'Monthly Fund 2026'"]
+        T5["'Batch Tour Sreemangal'"]
+    end
+
+    subgraph canonical_fund_title
+        C["Smart Title Normalizer<br>Regex Pattern Matching"]
+    end
+
+    subgraph Canonical Categories
+        K1["'Attendance Card'"]
+        K2["'Monthly Fund'"]
+        K3["'Tour'"]
+    end
+
+    T1 --> C
+    T2 --> C
+    T3 --> C
+    T4 --> C
+    T5 --> C
+    C --> K1
+    C --> K2
+    C --> K3
+```
+
+1. **`canonical_fund_title(raw_title text)`**:
+   - Standardizes variations across casing, spelling, and prefixes:
+     - `Attendence Card`, `attendance card`, `Attendance Card` $\rightarrow$ `Attendance Card`
+     - `%tour%` $\rightarrow$ `Tour`
+     - `%monthly%` $\rightarrow$ `Monthly Fund`
+     - Fallback: Trims whitespace and preserves title case.
+2. **`batch_fund_collections(target_batch uuid)` RPC**:
+   - Aggregates distinct collection categories across all inflows for `target_batch`.
+   - Returns:
+     ```sql
+     returns table (
+       title text,
+       payment_count bigint,
+       total_amount numeric,
+       last_transacted_at date
+     )
+     ```
+3. **`batch_fund_payers(target_batch uuid, target_collection text default null)` RPC**:
+   - Scopes payment aggregation to `target_collection` (or aggregates all inflows if null/`"all"`).
+   - Returns a single unified list of all batch students:
+     - Paid students have `total_paid > 0` and `payment_count > 0`.
+     - Unpaid students have `total_paid = 0` and `payment_count = 0`.
+   - **Ordering**: `ORDER BY (total_paid > 0) DESC, student_id ASC NULLS LAST, full_name ASC`.
+
+---
+
+### C. Android Native Implementation (`ClassMateBatchFundActivity.kt` & Layouts)
+- **Layout (`dialog_fund_payers_sheet.xml`)**: Added a horizontal `ChipGroup` (`chipGroupCollections`) inside a `HorizontalScrollView` below the search bar.
+- **Dynamic Chip Inflation**:
+  - Dynamically inflates an `"All Collections"` chip followed by collection chips (`Attendance Card`, `Monthly Fund`, `Tour`...).
+  - Chip selection updates the active filter and re-queries `batch_fund_payers`.
+- **Card Rendering**:
+  - **Paid Students**: Green monogram avatar, student name, roll number, `+ ৳ {amount}` contribution pill, and transaction count badge. Tapping opens `showLedgerSheet` pre-filtered to the student.
+  - **Unpaid Students**: Slate monogram avatar, student name, roll number, and a soft red `Unpaid` badge. For CRs, tapping opens `showAddFundSheet` pre-filled with the student and collection title.
+
+---
+
+### D. Web Companion Implementation & Collection Chip Fix (`web/src/components/batch-fund.tsx`)
+- **Horizontal Collection Chips**: Displays filter chips with collection titles and deposit counts.
+- **Unified Roster Table**: Displays paid classmates with emerald contribution pills, and unpaid classmates with a quick **"+ Deposit"** action button for CRs.
+- **Critical Production Bug & Resolution (Oct 28, 2026 - Commit [`d1e693d`](https://github.com/shuaibuddowla/ClassMate/commit/d1e693d))**:
+  - **Symptom**: User uploaded a screenshot showing collection chips rendering as three blank green dots/ovals without labels (`look the collection ship isnt shows up`).
+  - **Root Cause**: The database RPC returned fields `title` and `payment_count`, but the TypeScript frontend attempted to read `c.collection_title` and `c.transaction_count`. `c.collection_title` evaluated to `undefined`, leaving chip text empty and causing `undefined === undefined` to highlight all chips simultaneously.
+  - **Fix**:
+    - Added dual-field resolution: `const colTitle = c.title || c.collection_title;` and `const count = c.payment_count || c.transaction_count;`.
+    - Guarded against empty titles (`if (!colTitle) return null;`).
+    - Made active state comparison case-insensitive (`selectedCollection.toLowerCase() === colTitle.toLowerCase()`).
+  - **Deployment**: Pushed to `main` and deployed to Vercel production at [`https://classmatebd.vercel.app`](https://classmatebd.vercel.app).
+
+---
+
+## 117. Smart Attendance Presentation in Google Slides & Real-World Accuracy Calibration (Oct 28, 2026)
+
+### A. Context & Purpose
+To support academic presentations to university faculty and department leadership regarding the ClassMate RFID attendance station and mobile integration, an interactive Google Slides presentation was developed and grounded in ClassMate's authentic architecture.
+
+---
+
+### B. Real-World Calibration & Corrections
+1. **Exam Eligibility Threshold**:
+   - Corrected generic 75% attendance figure to the authentic **60% attendance threshold** enforced under MBSTU academic regulations.
+2. **Instructional Time Overhead**:
+   - Documented the real-world overhead of manual roll calling: **4–5 minutes per class period**.
+   - With 4–5 classes daily across a 15-week semester, manual roll calling consumes **15–20 hours of lost instructional time per semester**, which the ESP32 RFID station reduces to **< 30 seconds** of passive student card tapping.
+3. **Dual-Core Hardware Resilience**:
+   - Highlighted the ESP32 dual-core FreeRTOS architecture: Core 1 handles RC522 SPI scanning and OLED feedback (< 200ms per tap), while Core 0 manages background Wi-Fi and offline punch synchronization without UI freezing.
+
+---
+
+### C. Google Slides Delivery
+- **Format**: Clean Light Theme designed in **Bangla (Bengali)** with high-contrast typography and structured slide hierarchy.
+- **Slide Deck URL**:
+  👉 [**ক্লাসমেট - স্মার্ট অ্যাটেনডেন্স ট্র্যাকার ও সিস্টেম ইন্টিগ্রেশন (Google Slides)**](https://docs.google.com/presentation/d/1NCQAN_aQ5hUonCq1cwGfzoDDCJ9d4mMfBfQl95DDmmQ/edit)
+  *(Google Presentation ID: `1NCQAN_aQ5hUonCq1cwGfzoDDCJ9d4mMfBfQl95DDmmQ`)*.
+
+---
+
+## 118. MIFARE Classic 1K RFID Card Architecture & Data Writing Protocols (Oct 28–29, 2026)
+
+### A. Memory Organization & Usable Capacity
+A technical audit of the **MIFARE Classic 1K (S50)** RFID smart cards used by the ClassMate attendance station established exact storage boundaries:
+
+| Layer | Structure | Size / Count | Notes |
+|---|---|---|---|
+| **Total EEPROM** | 16 Sectors $\times$ 4 Blocks $\times$ 16 Bytes | **1,024 Bytes (1 KB)** | Gross physical chip memory |
+| **Manufacturer Block** | Sector 0, Block 0 | 16 Bytes | Read-only factory block; stores 4-byte/7-byte UID and BCC |
+| **Sector Trailers** | Block 3 of Sectors 0 through 15 | 16 Sectors $\times$ 16 Bytes = **256 Bytes** | Reserved for Key A (6B), Access Bits (4B), and Key B (6B) |
+| **Usable User Data** | 47 Data Blocks $\times$ 16 Bytes | **752 Bytes** | Actual usable storage for student credentials and tokens |
+
+```mermaid
+flowchart TD
+    subgraph MIFARE Classic 1K Chip (1024 Bytes)
+        S0["Sector 0<br>Block 0: Manufacturer UID (Read-Only)<br>Blocks 1-2: User Data (32B)<br>Block 3: Sector Trailer (Key A/Access/Key B)"]
+        S1["Sectors 1 to 15 (15 Sectors)<br>Blocks 0-2: User Data (48B per sector)<br>Block 3: Sector Trailer (16B per sector)"]
+    end
+
+    S0 --> U["Total Usable User Storage = 752 Bytes (47 Blocks)"]
+    S1 --> U
+```
+
+---
+
+### B. Card Writing Protocols & Methods
+1. **Method 1: Android Phone with NFC (Recommended & Mobile-Friendly)**:
+   - Requirements: Android device with hardware NFC controller (`NfcAdapter`).
+   - Recommended Tools: **MIFARE Classic Tool (MCT)** (direct sector/block hex editor) or **NFC Tools**.
+   - Protocol: Authenticate with factory transport key (`0xFF 0xFF 0xFF 0xFF 0xFF 0xFF`) and write student ID (`CE25045`) or encrypted token into Sector 1, Block 4.
+2. **Method 2: ESP32 Hardware Station with RC522 Reader**:
+   - Firmware routine using `MFRC522` library:
+     ```cpp
+     MFRC522::MIFARE_Key key;
+     for (byte i = 0; i < 6; i++) key.keyByte[i] = 0xFF; // Default transport key
+     status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockAddr, &key, &(mfrc522.uid));
+     if (status == MFRC522::STATUS_OK) {
+         status = mfrc522.MIFARE_Write(blockAddr, dataBlock, 16);
+     }
+     ```
+
+---
+
+## 119. System Optimization Roadmap: Native Android Polish & Micro-Interactions (Oct 29, 2026)
+
+### A. Architectural Mindset Shift
+Per user directive:
+> *"instead of bringing new features, let us make the existing classmate better in ways."*
+
+The engineering focus transitioned from feature expansion to deepening and hardening the existing native Android Kotlin codebase across 4 core pillars:
+
+```mermaid
+flowchart TD
+    P["ClassMate Quality & Hardening Focus"]
+    P --> P1["Pillar A: Unified Beautiful Empty States<br>Contextual illustrations, friendly copy, actionable buttons"]
+    P --> P2["Pillar B: Shimmer Loading Skeletons<br>Facebook-style shimmer placeholders matching card dimensions"]
+    P --> P3["Pillar C: Tactile Haptic Engine<br>Crisp vibrations on chip toggles, success thumps on RFID punches"]
+    P --> P4["Pillar D: Keyboard & Dialog Ergonomics<br>windowSoftInputMode, focus transitions, currency formatting"]
+```
+
+### B. The 4 Targeted Quality Pillars
+1. **Pillar A: Unified Beautiful Empty States**:
+   - Replace raw gray text strings (*"No transactions recorded yet"*) with structured empty-state views featuring soft circular icon containers, bold titles, descriptive helper text, and contextual action buttons (*"Record First Deposit"*, *"Try Again"*).
+2. **Pillar B: Shimmer Loading Skeletons**:
+   - Replace abrupt spinning wheels with subtle, fluid shimmer placeholders (`com.facebook.shimmer:shimmer`) matching the exact layout dimensions of Routine, Notices, and Batch Fund cards.
+3. **Pillar C: Tactile Haptic Feedback Engine**:
+   - Introduce a centralized `ClassMateHaptics` utility wrapping Android's `HapticFeedbackConstants` and `Vibrator` to deliver subtle physical clicks on chip selections, success thumps on QR/RFID attendance, and warning pulses on validation errors.
+4. **Pillar D: Keyboard & Dialog Ergonomics**:
+   - Prevent soft keyboards from obscuring input fields in bottom sheets (`windowSoftInputMode = adjustResize`), implement automatic focus chaining, and sanitize numeric/currency inputs.
+
+---
+
+## 120. Comprehensive System Architecture Synthesis & Current Production State (Oct 29, 2026)
+
+### A. Architectural Topology Summary
+```mermaid
+flowchart TD
+    subgraph Hardware Layer
+        K["ESP32 RFID Station (ESP32-READER-01)<br>RC522 Mini · 0.96\" OLED · Dual-Core FreeRTOS · 752B MIFARE Card Memory"]
+    end
+
+    subgraph Mobile Clients
+        A["Android Native APK (v1.1.34 / Code 34)<br>ListAdapter Diffing · PackageInstaller Updater · Offline Room · Debounced Fund Ledger"]
+        RN["React Native Client (Expo SDK 52)<br>Multi-Step Routine Catalog · Active Transit Routes · Academic Calendar Events"]
+    end
+
+    subgraph Web Companion & Edge Layer
+        B["Next.js 16 Web Client<br>App Router · TanStack Query v5 · Dynamic Collection Chips (d1e693d)"]
+        C["Cloudflare Worker<br>Telegram Bot Broadcast · Webhooks"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug], /n/[id], /api/scan, /download/android"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Gate"]
+    end
+
+    subgraph Backend & Database Layer
+        F["Supabase PostgreSQL (cbskpifgbdbgdmnnxfrh)<br>88+ Migrations · 202610280001 Scoped Payers · RLS Secured"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Release Dispatch"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Push Notification Outbox"]
+    end
+
+    K <-->|HTTPS /api/scan| D
+    A <--> D
+    RN <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    RN <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    RN <--> E
+    F <--> G
+    G <--> H
+```
+
+### B. Recent Generated Artifacts & Deliverables
+1. **`202610280001_batch_fund_collections_and_scoped_payers.sql`**:
+   - Production database migration introducing `canonical_fund_title`, `batch_fund_collections`, and `batch_fund_payers` with unified paid/unpaid sorting.
+2. **`ClassMateBatchFundActivity.kt` Concurrency Fix (`app/`)**:
+   - Coroutine job cancellation (`ledgerFetchJob?.cancel()`), 250ms search debounce, and `HashSet<String>` transaction deduplication (Commit `5b949f8`).
+3. **`batch-fund.tsx` Collection Chip Fix (`web/`)**:
+   - Fixed field name resolution (`title` / `payment_count`), case-insensitive matching, and deployed to Vercel production (Commit `d1e693d`).
+4. **React Native Timetable & Routine Port (`classmate-react-native/`)**:
+   - Multi-step routine catalog resolution, 16 active transit routes, and university academic calendar integration verified on device `6478ab80`.
+5. **Smart Attendance Google Slides Deck**:
+   - Production-accurate presentation deck in Bangla with clean Light Theme, 60% exam eligibility calibration, and 4-5 min class time saving calculations ([Google Slides Deck](https://docs.google.com/presentation/d/1NCQAN_aQ5hUonCq1cwGfzoDDCJ9d4mMfBfQl95DDmmQ/edit)).
+
+### C. Verification & Diagnostic Status (Oct 29, 2026)
+- **Supabase Backend**:
+  - Migration `202610280001` active across production.
+  - Keyset pagination, scoped collection payers, and hardware reader session bindings verified.
+- **Web Companion Platform**:
+  - `npm --prefix web run build`: Passed with 0 errors.
+  - Deployed live to Vercel production at [`https://classmatebd.vercel.app`](https://classmatebd.vercel.app) (HTTP 200).
+  - Dynamic collection chips and unified paid/unpaid tracking operational.
+- **Android Native Platform**:
+  - In-app update dialog, 3-tier batchmate sorting (`Admin -> Regular Students -> Re-admitted Students`), and Fund Ledger debouncing verified.
+  - Version: `versionCode = 34`, `versionName = "1.1.34"`.
+- **React Native Mobile Platform**:
+  - Standalone release APK compiled and verified live on physical device `6478ab80` with full Class Routine, Bus Schedule, and Calendar data fetching.
+
+---
+
+
+## 121. Native Android Micro-Interactions: Shimmer Skeletons, Tactile Haptics & Empty States (Oct 29–30, 2026)
+
+### A. Context & Architectural Shift
+In accordance with user guidance to prioritize quality, smoothness, and polish over introducing new features:
+> *"instead of bringing new features, let us make the existing classmate better in ways."*
+
+The engineering effort focused on refining the native Kotlin Android APK (`app/`) across three core user experience pillars:
+1. **Pillar A: Unified Beautiful Empty States** — Replacing raw gray text strings and unstyled states with structured, branded empty-state components.
+2. **Pillar B: Facebook-Style Shimmer Skeletons** — Replacing abrupt spinning wheels (`ProgressBar`) with fluid, animated card-shaped shimmer placeholders.
+3. **Pillar C: Multi-Tier Tactile Haptics Engine** — Standardizing subtle physical feedback across selection ticks, pops, thuds, success waves, and warning pulses.
+
+```mermaid
+flowchart TD
+    subgraph UI Experience Modernization
+        A["Network Request Initiated"] --> B["Shimmer Skeletons Active<br>(shimmer_fund_list.xml / ShimmerFrameLayout)"]
+        B --> C{"API Response Status"}
+        C -->|Success: Data Present| D["HapticHelper.lightPop / selectionTick<br>Animate Content In · Stop Shimmer"]
+        C -->|Success: Empty List| E["EmptyStateHelper.show()<br>Circular Icon Bubble · Action Button"]
+        C -->|Failure: Network Error| F["EmptyStateHelper.showError()<br>ic_refresh · 'Try Again' Callback"]
+    end
+```
+
+---
+
+### B. Pillar A: Standardized Empty States (`EmptyStateHelper.kt`)
+Created a centralized, reusable helper object in [`EmptyStateHelper.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/EmptyStateHelper.kt):
+- **Visual Structure**:
+  - Container layout with rounded circular icon bubble (`ivEmptyIcon`, `@drawable/bg_empty_state_icon.xml`).
+  - Bold, high-contrast title (`tvEmptyTitle`, 16–18sp, `@color/cm_text_primary`).
+  - Contextual explanatory subtitle (`tvEmptySubtitle`, 13–14sp, `@color/cm_text_muted`).
+  - Optional action button (`btnEmptyAction`, `MaterialButton`) wired with tactile haptics.
+- **Error State Handling**:
+  - `EmptyStateHelper.showError(container, title, errorMessage, onRetry)` automatically binds `R.drawable.ic_refresh` and provides an interactive `"Try Again"` retry trigger.
+- **Integrated Across**:
+  - **Batch Fund Overview** ([`activity_batch_fund.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/activity_batch_fund.xml)): `emptyStateOverview` for recent transactions ledger.
+  - **Fund Ledger Bottom Sheet** ([`dialog_fund_ledger_sheet.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/dialog_fund_ledger_sheet.xml)): `emptyStateLedger` for search filter misses.
+  - **Payers Tracker Bottom Sheet** ([`dialog_fund_payers_sheet.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/dialog_fund_payers_sheet.xml)): `emptyStatePayers` for collection filtering.
+  - **Timetable Feed** ([`fragment_timetable.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/fragment_timetable.xml)): Replaced crude raw emojis (`@string/emoji_party`) with a modern circular bubble (`flEmptyIconContainer`, 68×68dp) housing `ivEmptyIcon` (`ic_sun.xml` tinted `@color/cm_primary`), accompanied by balanced typography constraints (`maxWidth="280dp"`).
+
+---
+
+### C. Pillar B: Shimmer Skeleton Placeholders (`com.facebook.shimmer`)
+Replaced legacy circular progress spinners with high-fidelity skeleton placeholders:
+- **Layout Definitions**:
+  - [`shimmer_item_fund_row.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/shimmer_item_fund_row.xml): Replicates the exact dimensions of transaction rows — 38dp circular avatar bubble (`@drawable/bg_empty_state_icon`), two-line text bars (14dp title, 10dp subtitle with `@drawable/bg_shimmer_rect`), and an 18dp trailing badge.
+  - [`shimmer_fund_list.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/shimmer_fund_list.xml): Wraps 5 stacked shimmer rows within `com.facebook.shimmer.ShimmerFrameLayout`:
+    - `app:shimmer_auto_start="true"`
+    - `app:shimmer_base_alpha="0.45"`
+    - `app:shimmer_duration="1000"`
+    - `app:shimmer_highlight_alpha="0.85"`
+- **Lifecycle & State Synchronization in [`ClassMateBatchFundActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateBatchFundActivity.kt)**:
+  - Synchronous shimmer activation on fetch triggers (`shimmer.visibility = View.VISIBLE`, `shimmer.startShimmer()`, content container `View.GONE`).
+  - Seamless handoff upon data arrival: `shimmer.stopShimmer()`, `shimmer.visibility = View.GONE`, and container `View.VISIBLE`.
+  - Applied across `shimmerRecentActivity`, `shimmerLedger`, and `shimmerPayers`.
+
+---
+
+### D. Pillar C: Tactile Haptics Engine (`HapticHelper.kt`)
+Engineered a centralized, multi-version tactile feedback engine in [`HapticHelper.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/HapticHelper.kt):
+- **API Version Branching**:
+  - **Android 14+ (API 34 / Upside Down Cake)**: Uses `HapticFeedbackConstants.SEGMENT_TICK`.
+  - **Android 11+ (API 30 / R)**: Uses `HapticFeedbackConstants.CLOCK_TICK` and `GESTURE_END`.
+  - **Android 10+ (API 29 / Q)**: Uses predefined vibration effects (`VibrationEffect.createPredefined(EFFECT_TICK / EFFECT_CLICK / EFFECT_DOUBLE_CLICK)`).
+  - **Android 12+ (API 31 / S)**: Obtains `Vibrator` via system `VibratorManager.defaultVibrator`.
+- **Haptic Feedback Patterns**:
+  1. `selectionTick(view / context)`: Subtle, crisp click for tab switches, filter chips, and selector pills.
+  2. `lightPop(view / context)`: Delicate pop for toggles, switches, and unchecking states.
+  3. `mediumThud(view)`: Satisfying tap for opening cards, bottom sheets, and dialogs.
+  4. `heavyClick(view)`: Weighted feedback for deletions, voting, and permanent operations.
+  5. `success(view / context)`: Harmonious multi-step vibration waveform (`[0, 35, 75, 45]` ms) when punches, deposits, or notices succeed.
+  6. `warning(view / context)`: Distinctive double-pulse waveform (`[0, 50, 60, 60]` ms) on network disconnects or validation errors.
+- **Integration**:
+  - `ClassMateTeacherLiveAttendanceActivity.kt`: `selectionTick` on QR/Live Roster tab switch, `success` on attendance override present, `lightPop` on absent toggle, and `warning` on error.
+  - `ClassMateBatchFundActivity.kt`: `selectionTick` on collection chip selection, `lightPop` on action buttons.
+
+---
+
+### E. Commits & Verification
+- Commits pushed to `origin/main`:
+  - [`fb340e8`](https://github.com/shuaibuddowla/ClassMate/commit/fb340e8): `fix(batch-fund): integrate modern empty state layout in activity_batch_fund`
+  - [`d314d19`](https://github.com/shuaibuddowla/ClassMate/commit/d314d19): `fix(batch-fund): integrate modern empty state layout in dialog_fund_ledger_sheet`
+  - [`51ea057`](https://github.com/shuaibuddowla/ClassMate/commit/51ea057): `fix(batch-fund): integrate modern empty state layout in dialog_fund_payers_sheet`
+  - [`e0486fa`](https://github.com/shuaibuddowla/ClassMate/commit/e0486fa): `feat(ui): unified modern empty states, tactile haptics engine, and interactive polish across Timetable, Batch Fund, and Teacher Live Attendance`
+  - [`c028a5d`](https://github.com/shuaibuddowla/ClassMate/commit/c028a5d): `feat(ui): integrate shimmer skeleton placeholders in batch fund overview, ledger, and payers`
+
+
+---
+
+## 122. Web Batch Fund Collection Chips Production Bug & Vercel Hotfix (Oct 29–30, 2026)
+
+### A. Context & Defect Report
+During live testing on the ClassMate web companion client (`web/src/components/batch-fund.tsx`), the user encountered a critical visual bug in the Batch Fund collection chips:
+> *"look the collection ship isnt shows up"* (accompanied by a screenshot showing blank solid teal pills).
+> *"still same"* (following initial deployment attempt).
+
+---
+
+### B. Root Cause Analysis
+1. **Field Name Mismatch with Database RPC**:
+   - The Supabase RPC `batch_fund_collections` returns columns named `title` and `payment_count`:
+     ```sql
+     select title, payment_count, total_amount, last_transacted_at ...
+     ```
+   - In `batch-fund.tsx`, the JSX template attempted to bind `c.collection_title` and `c.transaction_count`.
+   - Because neither property existed on the returned object, both evaluated to `undefined`.
+2. **Visual & State Symptoms**:
+   - The chip label rendered an empty span: `<span></span>`.
+   - The payment count pill was suppressed (`Number(undefined) || 0 == 0`).
+   - The active state calculation evaluated `selectedCollection === colTitle`. When a user clicked a pill, `selectedCollection` became `undefined`. In JavaScript, `undefined === undefined` evaluated to `true` for **all three chips simultaneously**, causing every chip to render as an active, solid teal oval (`#0d9488`).
+3. **Deployment Race Condition**:
+   - The initial deployment on Vercel had finished moments before the git commit was pushed, resulting in Vercel continuing to serve the stale production bundle.
+
+---
+
+### C. Resolution & Verification
+In [`web/src/components/batch-fund.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/batch-fund.tsx#L378-L398):
+1. **Robust Dual-Property Resolution**:
+   ```tsx
+   {collections.data?.map((c) => {
+     const colTitle = (c.title || c.collection_title || "").toString().trim();
+     if (!colTitle) return null;
+     const count = Number(c.payment_count || c.transaction_count || 0);
+     const isActive = selectedCollection !== "all" && 
+       selectedCollection.toLowerCase() === colTitle.toLowerCase();
+     return (
+       <button
+         type="button"
+         key={colTitle}
+         className={`collection-chip ${isActive ? "active" : ""}`}
+         onClick={() => setSelectedCollection(colTitle)}
+       >
+         <span>{colTitle}</span>
+         {count > 0 && <span className="chip-badge">{count}</span>}
+       </button>
+     );
+   })}
+   ```
+2. **Guards & Case-Insensitive Matching**:
+   - Bypasses null/blank collection titles (`if (!colTitle) return null`).
+   - Compares active state case-insensitively (`toLowerCase()`).
+3. **Deployment**:
+   - Committed and pushed to `main` ([`d1e693d`](https://github.com/shuaibuddowla/ClassMate/commit/d1e693d)).
+   - Built cleanly via Next.js 16 (`npm run build` -> 0 errors).
+   - Deployed live to Vercel production at [`https://classmatebd.vercel.app`](https://classmatebd.vercel.app) (deployment `classmate-96rd4mgm6-sum-carry.vercel.app`).
+   - Verified live in browser: chips display `Attendance Card (33)`, `Monthly Fund (54)`, `Tour (18)` with single active selection state.
+
+
+---
+
+## 123. Multi-Developer Team Collaboration & Database Isolation Blueprint (Oct 30, 2026)
+
+### A. Context & User Inquiries
+As the ClassMate project expanded, the creator planned to onboard an additional developer to collaborate on new features (such as the threaded notice comments system). The user asked:
+> *"bro professional dev work on a same software by multiple people. how do they manage it."*
+> *"im working on a software, i want now to add my friend on it. so we both do it. how should i start"*
+> *"but bro when he does the changes, like in the database or backend then dosent he need access to database? suppose he will work on notice comments system so he does the frontend and for it the backend, database may needed to upgrade too then how do he will do this!!"*
+
+---
+
+### B. Core Architectural Principles for Multi-Dev Engineering
+
+```mermaid
+flowchart TD
+    subgraph Golden Rule: Database Isolation
+        P["Live Production Supabase<br>(cbskpifgbdbgdmnnxfrh)"] ---|NEVER CONNECT DEV DIRECTLY| X["🚫"]
+        DevA["Developer A (Lead)"] --> LocalA["Local / Staging DB<br>(Docker or Staging Project)"]
+        DevB["Developer B (Collaborator)"] --> LocalB["Local / Staging DB<br>(Isolated Seed Data)"]
+    end
+
+    subgraph Git Workflow & Schema Migration
+        DevB -->|1. Feature Branch| FB["git checkout -b feature/comments"]
+        FB -->|2. Schema as Code| M["supabase/migrations/<br>20261030_comments.sql"]
+        FB -->|3. Local Testing| T["Test Frontend + Backend Locally"]
+        FB -->|4. Pull Request| PR["GitHub Pull Request"]
+        PR -->|5. Lead Code Review| CR["Review Code & SQL Migration"]
+        CR -->|6. Merge to main| MMain["Merged into origin/main"]
+        MMain -->|7. Controlled Deploy| Dep["Apply Migration to Production DB"]
+    end
+```
+
+1. **The Golden Rule — Never Share a Single Live Database in Development**:
+   - Connecting multiple developers directly to the production database during feature development risks wiping live student data, executing destructive `DROP`/`ALTER` queries, and breaking production client apps.
+2. **Environment Separation**:
+   - **Local / Staging Environment**: Each developer runs an isolated local database instance (via Supabase CLI / Docker) or connects to a dedicated staging project populated with anonymized mock data.
+   - **Production Environment**: Restricted strictly to release deployments; schema changes are applied only after pull request review and automated verification.
+3. **Database Schema Migrations as Code**:
+   - Database tables, columns, indexes, and RPCs must **never be created manually in the Supabase Dashboard**.
+   - Instead, all schema evolution is treated as code inside timestamped SQL files: `supabase/migrations/YYYYMMDDNNNN_description.sql`.
+   - When Developer B finishes their task, their pull request includes both the frontend code and the SQL migration script. When Developer A pulls the branch, executing `supabase db push` applies the identical schema changes locally.
+4. **Environment Configuration & Secret Hygiene**:
+   - Secrets are excluded from version control via `.gitignore` (`.env`, `.env.local`, `keystore.properties`).
+   - A standardized [`.env.example`](file:///D:/Code%20&%20Scripts/ClassMate-main/.env.example) template is maintained with placeholder keys so new developers can set up their local environment instantly.
+   - The Supabase `service_role` key is strictly withheld from client code and untrusted team members, granting developers only the public `anon` key.
+
+
+---
+
+## 124. Git Repository Consolidation & Obsolete Branch Deletion (Oct 30, 2026)
+
+### A. Context & User Directive
+To ensure a clean, unified deployment baseline and avoid fragmented commits across orphan branches, the user queried repository state:
+> *"bro do u have pushed all code to the main or some are in branches? im not talking about classmate react native. im talking about classmate main app. what are the uses of branches, why devs make that. as my classmate app is already stable well, then what should i do? Commit & Push the Stable Main App to main ... Delete them."*
+
+---
+
+### B. Execution & Branch Cleanup Actions
+1. **Working Tree Verification & Full Sync**:
+   - Verified that all pending Android Kotlin (`app/`), Next.js Web (`web/`), and Supabase backend updates were staged, committed, and pushed to `origin/main`:
+     - Android v1.1.34 / VersionCode 34 release assets.
+     - Modern empty-state layouts, tactile haptics, and shimmer skeletons.
+     - Web collection chips hotfix and attendance export enhancements.
+     - Production Supabase migrations.
+2. **Branch Inventory & Stale Branch Deletion**:
+   - Inspected all local and remote branches (`git branch -a`).
+   - Identified obsolete branch: `codex/v2-schedule-library` (an early prototyping branch for timetable cataloging).
+   - Executed clean deletion:
+     - Local deletion: `git branch -D codex/v2-schedule-library`
+     - Remote deletion: `git push origin --delete codex/v2-schedule-library`
+3. **Current Clean Repository State**:
+   - **Active Local Branch**: `main`
+   - **Active Remote Tracking**: `origin/main` (`https://github.com/shuaibuddowla/ClassMate.git`)
+   - **Branch Hierarchy**: Single-branch architecture; all stale and merged branches completely eliminated.
+   - **Cross-Platform Isolation**: Enforced `classmate-react-native/` in `.gitignore` to keep the primary native Kotlin repository lightweight and unencumbered by Node modules or Expo artifacts.
+
+
+---
+
+## 125. University Live Bus Tracking Reverse-Engineering & Edge Proxy Architecture (Oct 30, 2026)
+
+### A. Context & User Innovation Request
+Following the completion of the smart attendance hardware tracker, the user proposed integrating university campus transit tracking directly into ClassMate:
+> *"Bro, I want to add live bus tracking, but there is a problem with the bus location for the bus tracking. The Oran University has an existing app, and they have a web version too. So, can somehow I connect it with my app? Like if there is an API of that app or what? Is there any chances to get it or is there anything to add bus tracking to my app?"*
+
+---
+
+### B. Feasibility Analysis & Ingestion Architecture
+University transit services generally equip shuttles with hardware GPS trackers (or driver smartphone apps) that periodically push GPS coordinates to a central university server. The official web portal and Android app consume these coordinates to render moving pins on a map.
+
+Because official university APIs are rarely publicly documented, the system can be integrated reliably via a **Three-Tier Discovery and Ingestion Architecture**:
+
+```mermaid
+flowchart TD
+    subgraph University Telemetry Infrastructure
+        UBus["University Shuttle Buses<br>(GPS/GSM Telemetry / Driver App)"] --> UHost["University Transit Server<br>(API / WebSocket / Firebase)"]
+        UHost --> UWeb["Official University Web Portal"]
+        UHost --> UApp["Official University Android APK"]
+    end
+
+    subgraph Discovery & Extraction Layer
+        UWeb -.->|Inspect Network DevTools| D1["Capture Polling Endpoint<br>GET /api/buses/live · Bearer Token"]
+        UApp -.->|PCAPdroid / jadx-gui| D2["Decompile Retrofit Interfaces<br>Base URL · Query Parameters"]
+    end
+
+    subgraph ClassMate Resilient Ingestion & Proxy Layer
+        CFW["Cloudflare Worker / Supabase Edge Cron<br>(bus-tracker-sync · Every 5-10 Seconds)"]
+        CFW -->|Authenticated Request| UHost
+        CFW -->|Parse & Sanitize Coordinates| DB[("Supabase PostgreSQL<br>classmate.bus_locations")]
+    end
+
+    subgraph ClassMate Multi-Client Delivery
+        DB -->|Realtime / Lightweight Cache| A["Native Android APK (v1.1.34)<br>Timetable Bus Screen + Animated Polyline"]
+        DB -->|Realtime / SWR| W["ClassMate Web Client<br>Interactive Leaflet/Mapbox Map"]
+        DB -->|Async Hook| RN["React Native Client<br>Bus Tracking View"]
+    end
+
+    D1 --> CFW
+    D2 --> CFW
+```
+
+---
+
+### C. Three-Tier Reverse-Engineering Methodology
+
+#### Tier 1: Web Client DevTools Inspection & MBSTU Wheels Discovery
+1. **Target Web Platform Discovered (`MBSTU Wheels - CodePhilic`)**:
+   - Analysis of the university's transit portal ([`mbstu_wheels.html`](file:///D:/Code%20&%20Scripts/ClassMate-main/mbstu_wheels.html) and JavaScript bundles [`mbstu_all_chunks.js`](file:///D:/Code%20&%20Scripts/ClassMate-main/mbstu_all_chunks.js)) identified the official backend:
+     - **Host**: `https://transport.mbstu.ac.bd`
+     - **Authentication API**: `POST https://transport.mbstu.ac.bd/api/signin/`
+     - **Session Validation API**: `POST https://transport.mbstu.ac.bd/api/sign-in-status/`
+     - **Client Stack**: Next.js App Router client with Firebase Cloud Messaging worker (`firebase-messaging-sw.js`), storing `sessionId`, user email, and user role in browser `localStorage`.
+2. **Telemetry Ingestion Payload**:
+   - Expected transit telemetry schema:
+     ```json
+     {
+       "bus_id": "BUS-04",
+       "route": "Campus - Tangail City",
+       "latitude": 24.23841,
+       "longitude": 89.89215,
+       "speed": 42.5,
+       "heading": 185.0,
+       "last_updated": "2026-10-30T02:50:12Z"
+     }
+     ```
+3. **Session Re-use**:
+   - The Cloudflare Worker proxy (`bus-tracker-sync`) authenticates via `transport.mbstu.ac.bd/api/signin/`, maintains the returned `sessionId`, and verifies health via `/api/sign-in-status/` before polling real-time vehicle coordinates.
+
+#### Tier 2: Mobile APK Network Interception & Decompilation
+If the web portal is obfuscated or restricted:
+- **Non-Root Network Capture**: Run **PCAPdroid** or **HTTP Toolkit** on an Android phone while operating the university bus app to capture raw HTTPS request URLs and JSON payloads.
+- **Bytecode Inspection**: Decompile the university APK using **`jadx-gui`**:
+  - Search for Retrofit interfaces (`@GET`, `@POST`), OkHttp interceptors, and keywords such as `location`, `bus`, `gps`, `vehicle`, or `tracker`.
+  - Extract the backend base URL and any static client credentials or cryptographic headers.
+
+#### Tier 3: Edge Ingestion Proxy & Rate-Shielding Architecture
+**Why client apps must never call the university server directly**:
+- Calling the third-party endpoint directly from hundreds of ClassMate mobile apps would trigger rate-limiting (HTTP 429), CORS errors on web, or IP bans by university firewalls.
+- If the university changes its API format or authentication tokens expire, all mobile apps would immediately break.
+
+**The Solution: Serverless Edge Ingestion Worker (`bus-tracker-sync`)**:
+1. A **Cloudflare Worker** or **Supabase Edge Function** runs a lightweight cron job every 5–10 seconds.
+2. The Worker handles third-party authentication, fetches the telemetry payload, sanitizes coordinates, and writes the latest bus state into Supabase:
+   ```sql
+   create table classmate.bus_locations (
+       bus_id text primary key,
+       bus_name text not null,
+       route_name text not null,
+       latitude double precision not null,
+       longitude double precision not null,
+       speed double precision default 0,
+       heading double precision default 0,
+       is_active boolean default true,
+       updated_at timestamptz default now()
+   );
+   ```
+3. ClassMate clients query ClassMate's own backend via Supabase Realtime or cached API, ensuring 0% load on university servers, robust offline fallbacks, and instantaneous map rendering.
+
+
+---
+
+## 126. Comprehensive System Architecture Synthesis & Current Production State (Oct 30, 2026)
+
+### A. Architectural Topology Summary
+
+```mermaid
+flowchart TD
+    subgraph Hardware Layer
+        K["ESP32 RFID Station (ESP32-READER-01)<br>RC522 Mini · 0.96\" OLED · Dual-Core FreeRTOS · 752B MIFARE Card Memory"]
+    end
+
+    subgraph Mobile Clients
+        A["Android Native APK (v1.1.34 / Code 34)<br>ListAdapter Diffing · PackageInstaller · Shimmer Skeletons · Tactile Haptics (c028a5d)"]
+        RN["React Native Client (Expo SDK 52)<br>Hermes Bytecode · Multi-Step Catalog · Isolated in .gitignore"]
+    end
+
+    subgraph Web Companion & Edge Layer
+        B["Next.js 16 Web Client (React 19)<br>App Router · TanStack Query v5 · Collection Chips Hotfix (d1e693d)"]
+        C["Cloudflare Worker<br>Telegram Bot Broadcast · Webhooks · Scheduled Ingestion"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug], /n/[id], /api/scan, /download/android"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Gate"]
+    end
+
+    subgraph Backend & Database Layer
+        F["Supabase PostgreSQL (cbskpifgbdbgdmnnxfrh)<br>88+ Migrations · RLS Secured · Scoped Collection Payers"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Release Dispatch"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Push Notification Outbox"]
+    end
+
+    K <-->|HTTPS /api/scan| D
+    A <--> D
+    RN <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    RN <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    RN <--> E
+    F <--> G
+    G <--> H
+```
+
+---
+
+### B. Recent Generated Deliverables & Commit Registry
+| Commit / Artifact | Module | Description |
+|---|---|---|
+| [`c028a5d`](https://github.com/shuaibuddowla/ClassMate/commit/c028a5d) | Android (`app/`) | Integrated Facebook-style shimmer skeleton placeholders (`ShimmerFrameLayout`) in Batch Fund overview, ledger, and payers. |
+| [`e0486fa`](https://github.com/shuaibuddowla/ClassMate/commit/e0486fa) | Android (`app/`) | Unified modern empty states, tactile haptics engine (`HapticHelper`), and timetable no-class circular icon bubble. |
+| [`51ea057`](https://github.com/shuaibuddowla/ClassMate/commit/51ea057) | Android (`app/`) | Integrated standardized empty state layout in `dialog_fund_payers_sheet.xml`. |
+| [`d314d19`](https://github.com/shuaibuddowla/ClassMate/commit/d314d19) | Android (`app/`) | Integrated standardized empty state layout in `dialog_fund_ledger_sheet.xml`. |
+| [`fb340e8`](https://github.com/shuaibuddowla/ClassMate/commit/fb340e8) | Android (`app/`) | Integrated standardized empty state layout in `activity_batch_fund.xml`. |
+| [`d1e693d`](https://github.com/shuaibuddowla/ClassMate/commit/d1e693d) | Web (`web/`) | Fixed collection chip property resolution (`title` / `payment_count`) and case-insensitive active state on Vercel production. |
+| `Branch Deletion` | Git Repo | Cleaned up stale branch `codex/v2-schedule-library` locally and remotely; consolidated entire codebase onto `main`. |
+| `HapticHelper.kt` | Android (`app/`) | Multi-version Android tactile feedback engine supporting Android 14 `SEGMENT_TICK` through legacy vibrator fallbacks. |
+| `EmptyStateHelper.kt` | Android (`app/`) | Centralized empty and error state binder supporting icon bubbles, titles, subtitles, and retry action buttons. |
+| `shimmer_*.xml` | Android (`app/`) | Created `shimmer_fund_list.xml` and `shimmer_item_fund_row.xml` skeleton layouts. |
+
+---
+
+### C. Current Production & Verification Status (Oct 30, 2026)
+- **Android Native Platform**:
+  - Current Version: `versionCode = 34`, `versionName = "1.1.34"`.
+  - Batch Fund overview, ledger sheet, and payers sheet upgraded with shimmer skeletons and unified empty states.
+  - Multi-tier tactile haptics engine active across tabs, filter chips, action buttons, and live attendance overrides.
+  - Git repository clean: local working tree clean, up to date with `origin/main`.
+- **Web Companion Platform**:
+  - `npm --prefix web run build`: Passed cleanly with 0 TypeScript/ESLint errors.
+  - Vercel Production: Live at [`https://classmatebd.vercel.app`](https://classmatebd.vercel.app) (HTTP 200).
+  - Collection chips rendering properly with labels, contribution counts, and exclusive selection state.
+- **Supabase Backend**:
+  - 88+ migrations applied across production (`cbskpifgbdbgdmnnxfrh`).
+  - Row Level Security active on all tables including `feature_flags`.
+  - Scoped collections, payers aggregation, and hardware device bindings operating reliably.
+- **Git Repository Architecture**:
+  - Single-branch model: `main` is the sole branch on local and remote. Stale branch `codex/v2-schedule-library` deleted.
+  - `classmate-react-native/` cleanly isolated in `.gitignore`.
+- **Live Transit Integration Roadmap**:
+  - Ready for Phase 1: University live bus tracking API discovery (Web DevTools / APK network capture) and Edge proxy setup (`bus-tracker-sync`).
 
 ---

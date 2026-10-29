@@ -193,7 +193,9 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
         dialogForm.panel.addView(times); val error=dialogForm.status()
         val builder=MaterialAlertDialogBuilder(this).setTitle(if(slot==null) "Add period · ${days[day]}" else "Edit period · ${days[day]}").setView(dialogForm.scroll).setNegativeButton("Cancel",null).setPositiveButton(if(slot==null) "Add period" else "Save",null)
         if(slot!=null) builder.setNeutralButton("Delete",null)
-        val dialog=builder.create(); editor=dialog; dialog.show()
+        val dialog=builder.create(); editor=dialog
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        dialog.show()
         fun saveAction(deleting:Boolean) {
             if(busy) return
             val offering=offerings.firstOrNull { it.title==course.text.toString() }

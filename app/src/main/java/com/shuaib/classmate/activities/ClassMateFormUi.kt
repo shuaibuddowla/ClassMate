@@ -27,7 +27,7 @@ internal class ClassMateFormUi(val context: Context) {
             setTextColor(context.getColor(R.color.cm_text_primary))
             if (multiline) { minLines = 4; maxLines = 8; gravity = android.view.Gravity.TOP
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            } else { setSingleLine(true); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES }
+            } else { setSingleLine(true); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES; imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE }
         }
         box.addView(input); panel.addView(box); return input
     }

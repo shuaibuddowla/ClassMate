@@ -392,6 +392,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 val behavior = BottomSheetBehavior.from(bottomSheet)
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
                 behavior.skipCollapsed = true
+                behavior.isFitToContents = true
             }
         }
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -450,6 +451,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         if (!prefillStudentName.isNullOrBlank()) {
             actvStudent.setText(prefillStudentName, false)
             actvStudent.setSelection(prefillStudentName.length)
+            etAmount.postDelayed({ etAmount.requestFocus() }, 120)
         }
         if (!prefillTitle.isNullOrBlank()) {
             etTitle.setText(prefillTitle)
@@ -464,7 +466,37 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 actvStudent.setText(opt.fullName, false)
                 actvStudent.setSelection(opt.fullName.length)
                 tilStudent.error = null
+                etAmount.requestFocus()
             }
+        }
+
+        actvStudent.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT) {
+                etAmount.requestFocus()
+                true
+            } else false
+        }
+
+        etAmount.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                tilAmount.error = null
+                val raw = s?.toString()?.toDoubleOrNull()
+                if (raw != null && raw > 0) {
+                    val formatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(raw)
+                    tilAmount.helperText = "৳ $formatted"
+                } else {
+                    tilAmount.helperText = null
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        etAmount.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT) {
+                etTitle.requestFocus()
+                true
+            } else false
         }
 
         actvStudent.addTextChangedListener(object : android.text.TextWatcher {
@@ -586,6 +618,13 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         btnSaveAndAddAnother.setOnClickListener { performSave(keepOpen = true) }
         btnSaveManual.setOnClickListener { performSave(keepOpen = false) }
+
+        etTitle.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                performSave(keepOpen = false)
+                true
+            } else false
+        }
 
         dialog.show()
     }
@@ -1098,7 +1137,37 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             (etStudent.parent?.parent as? View)?.visibility = View.GONE
         }
 
-        MaterialAlertDialogBuilder(this)
+        val tilEditAmount = view.findViewById<TextInputLayout>(R.id.tilEditAmount)
+        etAmount.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                tilEditAmount.error = null
+                val raw = s?.toString()?.toDoubleOrNull()
+                if (raw != null && raw > 0) {
+                    val formatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(raw)
+                    tilEditAmount.helperText = "৳ $formatted"
+                } else {
+                    tilEditAmount.helperText = null
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        etAmount.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT) {
+                etTitle.requestFocus()
+                true
+            } else false
+        }
+
+        etTitle.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT && isDeposit) {
+                etStudent.requestFocus()
+                true
+            } else false
+        }
+
+        val editDialog = MaterialAlertDialogBuilder(this)
             .setTitle("Edit Transaction")
             .setView(view)
             .setPositiveButton("Save Changes") { _, _ ->
@@ -1155,7 +1224,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 }
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+        editDialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        editDialog.show()
     }
 
     private fun confirmDeleteTransaction(id: String, title: String, amount: Double) {

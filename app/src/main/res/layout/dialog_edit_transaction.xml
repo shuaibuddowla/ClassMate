@@ -7,9 +7,12 @@
     android:padding="20dp">
 
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilEditAmount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Amount (৳)"
+        android:hint="Amount *"
+        app:prefixText="৳ "
+        app:prefixTextColor="@color/cm_primary"
         app:boxBackgroundMode="outline">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -17,6 +20,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="numberDecimal"
+            android:imeOptions="actionNext"
             android:textColor="@color/cm_text_primary" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -24,14 +28,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:hint="Title / Description"
+        android:hint="Title / Description *"
         app:boxBackgroundMode="outline">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etEditTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="text"
+            android:inputType="textCapSentences"
+            android:imeOptions="actionNext"
             android:textColor="@color/cm_text_primary" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -47,6 +52,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="textPersonName"
+            android:imeOptions="actionDone"
             android:textColor="@color/cm_text_primary" />
     </com.google.android.material.textfield.TextInputLayout>
 
