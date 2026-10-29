@@ -52,6 +52,7 @@ import com.shuaib.classmate.notices.NoticeUi
 import com.shuaib.classmate.utils.NetworkMonitor
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.AppContextManager
+import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.utils.applyClickAnimation
 import com.shuaib.classmate.viewmodels.NoticeViewModel
 import kotlinx.coroutines.launch
@@ -135,7 +136,10 @@ class NoticeFragment : Fragment() {
         checkAdminAccess()
         fetchData()
 
-        binding.swipeRefresh.setOnRefreshListener { fetchData() }
+        binding.swipeRefresh.setOnRefreshListener {
+            HapticHelper.lightPop(binding.swipeRefresh)
+            fetchData()
+        }
         val context = context ?: return
         binding.swipeRefresh.setProgressBackgroundColorSchemeColor(ThemeColors.surface(context))
         binding.swipeRefresh.setColorSchemeColors(
@@ -483,6 +487,7 @@ class NoticeFragment : Fragment() {
         banner.postDelayed(dismissAction, 4000L)
 
         binding.btnDismissReminder.setOnClickListener {
+            HapticHelper.lightPop(it)
             banner.removeCallbacks(dismissAction)
             dismissReminderBanner()
         }

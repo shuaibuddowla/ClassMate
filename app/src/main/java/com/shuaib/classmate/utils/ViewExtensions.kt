@@ -32,6 +32,7 @@ fun View.applyClickAnimation(onClick: () -> Unit) {
     ) == 0f
 
     setOnClickListener {
+        HapticHelper.lightPop(this)
         onClick()
         if (!reduceMotion) {
             SpringAnimation(this, DynamicAnimation.SCALE_X, 1f).apply {
