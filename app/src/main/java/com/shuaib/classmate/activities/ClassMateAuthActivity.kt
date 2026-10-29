@@ -355,6 +355,23 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 )
             }
 
+            com.shuaib.classmate.ui.ClassMateTab.TRANSIT -> {
+                listOfNotNull(
+                    com.shuaib.classmate.ui.TabQuickAction(
+                        title = "MBSTU Bus Schedule",
+                        subtitle = "Campus transport timing, stops & routes",
+                        iconRes = R.drawable.ic_bus_filled,
+                        onClick = { startActivity(Intent(this, BusScheduleManagementActivity::class.java)) }
+                    ),
+                    com.shuaib.classmate.ui.TabQuickAction(
+                        title = "Live Bus Radar",
+                        subtitle = "Track active MBSTU buses on map",
+                        iconRes = R.drawable.ic_bus_outline,
+                        onClick = { selectHomeTab(R.id.nav_transit) }
+                    )
+                )
+            }
+
             com.shuaib.classmate.ui.ClassMateTab.SETTINGS -> {
                 if (isAdmin) {
                     listOfNotNull(
@@ -1769,9 +1786,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         }
 
-        nav.menu.findItem(R.id.nav_friends).isVisible = false
+        nav.menu.findItem(R.id.nav_friends)?.isVisible = false
 
-        nav.menu.findItem(R.id.nav_manage).isVisible = false
+        nav.menu.findItem(R.id.nav_manage)?.isVisible = false
 
         if(nav.menu.findItem(selectedTab)?.isVisible!=true) selectedTab=R.id.nav_timetable
 
@@ -1794,6 +1811,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
+                    com.shuaib.classmate.ui.ClassMateTab.TRANSIT,
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
                 )
             }
@@ -4964,6 +4982,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private fun handleDeepLinkIntent(targetIntent: Intent?) {
+        if (targetIntent?.getStringExtra("open_tab") == "transit" || targetIntent?.getStringExtra("tab") == "transit") {
+            targetIntent.removeExtra("open_tab")
+            targetIntent.removeExtra("tab")
+            selectHomeTab(R.id.nav_transit)
+            return
+        }
         val uri = targetIntent?.data ?: return
         if (uri.scheme == "https" && uri.host == "classmatebd.vercel.app") {
             val path = uri.path.orEmpty()

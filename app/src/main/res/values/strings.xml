@@ -37,6 +37,7 @@
     <string name="nav_timetable">Timetable</string>
     <string name="nav_notices">Notices</string>
     <string name="nav_library">Courses</string>
+    <string name="nav_transit">Transit</string>
     <string name="nav_batch">Batch</string>
     <string name="nav_profile">Profile</string>
     <string name="nav_settings">Settings</string>

@@ -60,6 +60,7 @@ internal class ClassMateAcademicScreens(
             R.id.nav_timetable -> R.layout.fragment_timetable
             R.id.nav_notices -> R.layout.fragment_notice
             R.id.nav_pdf -> R.layout.fragment_pdf_library
+            R.id.nav_transit -> R.layout.fragment_transit
             else -> R.layout.fragment_profile
         }
         val root = inflater.inflate(layout, host, false)
@@ -68,8 +69,23 @@ internal class ClassMateAcademicScreens(
             R.id.nav_timetable -> setupTimetable(root)
             R.id.nav_notices -> setupNotices(root)
             R.id.nav_pdf -> setupLibrary(root)
+            R.id.nav_transit -> setupTransit(root)
             else -> setupProfile(root)
         }
+    }
+
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    private fun setupTransit(root: View) {
+        val webView = root.findViewById<android.webkit.WebView>(R.id.transit_webview) ?: return
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            loadsImagesAutomatically = true
+        }
+        val bridge = com.shuaib.classmate.transit.ClassMateTransitBridge(activity)
+        webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
+        webView.loadUrl("file:///android_asset/transit/index.html")
     }
 
     private fun <T : View> View.v(id: Int): T = findViewById(id)

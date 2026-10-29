@@ -461,6 +461,12 @@ internal class ClassMateAcademicScreensSupabase(
 
                     }
 
+                    R.id.nav_transit -> {
+
+                        stopNoticePoller()
+
+                    }
+
                     else -> {
 
                         stopNoticePoller()
@@ -486,6 +492,8 @@ internal class ClassMateAcademicScreensSupabase(
             R.id.nav_notices -> R.layout.fragment_notice
 
             R.id.nav_pdf -> R.layout.fragment_pdf_library
+
+            R.id.nav_transit -> R.layout.fragment_transit
 
             else -> R.layout.classmate_profile
 
@@ -514,6 +522,8 @@ internal class ClassMateAcademicScreensSupabase(
                 R.id.nav_notices -> setupNotices(root)
 
                 R.id.nav_pdf -> setupLibrary(root)
+
+                R.id.nav_transit -> setupTransit(root)
 
                 else -> {
 
@@ -614,6 +624,12 @@ internal class ClassMateAcademicScreensSupabase(
                 R.id.nestedScrollView).setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
 
                     _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
+
+            R.id.nav_transit -> {
+
+                setNavigationShown(true)
+
+            }
 
             R.id.nav_profile -> {
 
@@ -866,6 +882,41 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
 
+
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    private fun setupTransit(root: View) {
+        val webView = root.findViewById<android.webkit.WebView>(R.id.transit_webview) ?: return
+        val loadingView = root.findViewById<View>(R.id.transit_loading_view)
+
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            setSupportZoom(false)
+            builtInZoomControls = false
+            displayZoomControls = false
+            loadsImagesAutomatically = true
+            allowFileAccess = true
+            allowContentAccess = true
+        }
+
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
+
+        val bridge = com.shuaib.classmate.transit.ClassMateTransitBridge(activity)
+        webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
+
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                loadingView?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
+                    loadingView.visibility = View.GONE
+                }?.start()
+            }
+        }
+
+        webView.loadUrl("file:///android_asset/transit/index.html")
+    }
 
     private fun setupTimetable(root: View) {
 

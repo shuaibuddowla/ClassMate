@@ -15,7 +15,7 @@ class GlassBottomNavView @JvmOverloads constructor(
         isItemActiveIndicatorEnabled = true
         itemRippleColor = null
     }
-    override fun getMaxItemCount(): Int = 6
+    override fun getMaxItemCount(): Int = 8
     // Retained for existing callers; the checked color state owns selection.
     fun updateActiveTab(tabIndex: Int, totalTabs: Int) = Unit
 }
