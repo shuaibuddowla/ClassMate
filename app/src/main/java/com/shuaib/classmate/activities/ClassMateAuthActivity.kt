@@ -511,6 +511,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
     private lateinit var academicScreens: ClassMateAcademicScreensSupabase
 
     private lateinit var friendsScreen: ClassMateFriendsScreen
+    private lateinit var transitScreen: com.shuaib.classmate.transit.ClassMateTransitScreen
 
     private var profile: JSONObject? = null
 
@@ -1763,6 +1764,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         unreadActivity?.refresh()
 
         friendsScreen=ClassMateFriendsScreen(this,lifecycleScope,{ selectedBatchId },{ phone -> callFriend(phone) },{profile?.optString("role")=="teacher"})
+        transitScreen = com.shuaib.classmate.transit.ClassMateTransitScreen(this, lifecycleScope)
 
         val nav = findViewById<GlassBottomNavView>(R.id.classmate_home_nav)
 
@@ -2085,6 +2087,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 friendsScreen.render(homeHost,selectedBatchLabel)
 
                 unreadActivity?.showUnseenRequest()
+
+                return
+
+            }
+
+            if(tab == R.id.nav_transit) {
+
+                transitScreen.render(homeHost)
 
                 return
 
