@@ -5596,3 +5596,397 @@ flowchart TD
   - Next steps: Deploying `bus-tracker-sync` Edge listener and implementing the ambient transit hero pill in the Timetable header.
 
 ---
+
+
+---
+
+## 132. Predictive Back Navigation & Modernized Activity Transitions Engine (Oct 30, 2026)
+
+### A. Problem Statement & Motivation
+Prior to this release, ClassMate relied on legacy Android navigation primitives:
+1. **Deprecated Back Callbacks**: Activities overrode `onBackPressed()` directly. On modern Android versions (Android 13/API 33 and Android 14/API 34+), this bypasses the platform `OnBackPressedDispatcher`, generating deprecation warnings and failing to trigger system Predictive Back gestures.
+2. **Deprecated Transition APIs**: Activity transitions used `overridePendingTransition(enterAnim, exitAnim)`, which is deprecated starting in Android 14 (API 34) in favor of the granular `overrideActivityTransition(...)` API.
+3. **Inconsistent Navigation Feel**: Sub-screens lacked unified opening and closing transition animations, leading to abrupt screen visual cuts.
+
+---
+
+### B. Architectural Solution & Implementation ([`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d))
+
+```mermaid
+flowchart TD
+    subgraph Platform Gesture Layer
+        G["System Back Gesture / Swipe<br>(Android 13 / 14+)"] --> PB{"Predictive Back Enabled?<br>android:enableOnBackInvokedCallback"}
+    end
+
+    subgraph Modern Back Dispatcher
+        PB -->|True| D["OnBackPressedDispatcher"]
+        D --> C["setupStandardBackTransition()<br>OnBackPressedCallback(enabled = true)"]
+    end
+
+    subgraph Version-Aware Activity Transitions (AnimUtils.kt)
+        C --> API{"Build.VERSION.SDK_INT >= API 34<br>(UPSIDE_DOWN_CAKE)?"}
+        API -->|Yes| V1["overrideActivityTransition(<br>OVERRIDE_TRANSITION_CLOSE,<br>slide_in_left, slide_out_right)"]
+        API -->|No| V2["overridePendingTransition(<br>slide_in_left, slide_out_right)"]
+    end
+```
+
+#### 1. Manifest Opt-In (`AndroidManifest.xml`)
+Declared `android:enableOnBackInvokedCallback="true"` within `<application>` in [`AndroidManifest.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/AndroidManifest.xml), enabling system predictive back animations across all application activities.
+
+#### 2. Modern Activity Transition Suite (`AnimUtils.kt`)
+Extended [`AnimUtils.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/utils/AnimUtils.kt) with standardized extension functions:
+- **`Activity.overrideOpenTransition()`**:
+  ```kotlin
+  fun Activity.overrideOpenTransition(
+      enterAnim: Int = R.anim.slide_in_right,
+      exitAnim: Int = R.anim.slide_out_left
+  ) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+          overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, enterAnim, exitAnim)
+      } else {
+          @Suppress("DEPRECATION")
+          overridePendingTransition(enterAnim, exitAnim)
+      }
+  }
+  ```
+- **`Activity.overrideCloseTransition()`**:
+  ```kotlin
+  fun Activity.overrideCloseTransition(
+      enterAnim: Int = R.anim.slide_in_left,
+      exitAnim: Int = R.anim.slide_out_right
+  ) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+          overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, enterAnim, exitAnim)
+      } else {
+          @Suppress("DEPRECATION")
+          overridePendingTransition(enterAnim, exitAnim)
+      }
+  }
+  ```
+- **`ComponentActivity.setupStandardBackTransition()`**:
+  ```kotlin
+  fun ComponentActivity.setupStandardBackTransition(
+      enterAnim: Int = R.anim.slide_in_left,
+      exitAnim: Int = R.anim.slide_out_right,
+      onBack: (() -> Unit)? = null
+  ) {
+      onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+          override fun handleOnBackPressed() {
+              if (onBack != null) {
+                  onBack()
+              } else {
+                  finish()
+                  overrideCloseTransition(enterAnim, exitAnim)
+              }
+          }
+      })
+  }
+  ```
+
+#### 3. Full Codebase Migration (14 Core Activities & Fragments)
+Refactored and replaced all legacy `onBackPressed()` and `overridePendingTransition()` usages:
+- [`AdminPanelActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/AdminPanelActivity.kt): Replaced 10+ manual transition invocations with `overrideOpenTransition()`; added `setupStandardBackTransition()`.
+- [`BatchSelectionActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/BatchSelectionActivity.kt): Replaced manual back override with `setupStandardBackTransition()`.
+- [`LoginActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/LoginActivity.kt) & [`RegisterActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/RegisterActivity.kt): Unified standard slide animations.
+- [`OnboardingActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/OnboardingActivity.kt): Modernized finish animations.
+- [`ResultUploadActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultUploadActivity.kt) & [`ResultViewerActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ResultViewerActivity.kt): Standardized forward and backward slide transitions.
+- [`SeatPlanUploadActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanUploadActivity.kt) & [`SeatPlanViewerActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/SeatPlanViewerActivity.kt): Migrated transitions.
+- [`UserDetailActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserDetailActivity.kt) & [`UserManagementActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/UserManagementActivity.kt): Cleaned back callback flows.
+- [`ProfileFragment.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/fragments/ProfileFragment.kt): Updated child intent launchers to call `requireActivity().overrideOpenTransition()`.
+
+#### 4. Automated Verification & Device Testing
+- Build verified via `./gradlew compileDebugSources --daemon` (Build Successful).
+- Unit test suite verified via `./gradlew testDebugUnitTest --daemon` (All tests passed).
+- Assembled and deployed debug APK directly to physical test device **OnePlus Nord CE4 (`CPH2621`)** via ADB; validated smooth gesture predictive back and slide transitions.
+
+
+---
+
+## 133. Information Architecture Refactoring: Relocating Batch Tab into Settings & Streamlining Directory Header (Oct 30, 2026)
+
+### A. Context & The Navigation Dilemma
+ClassMate previously hosted 5 bottom navigation tabs:
+`Timetable` | `Notices` | `Courses` | `Batch` | `Settings`
+
+When introducing the university Transit/Live Bus Radar, adding a 6th bottom tab was evaluated and rejected:
+- **Material Design 3 & HIG Violation**: Bottom navigation bars are strictly specified for 3 to 5 destinations. A 6th item compresses touch targets to ~60dp on standard displays, causing mistaps, clipped titles, and visual overcrowding.
+- **User Directive**:
+  > *"Before we proceed the bus tracking into the app, take the Batch tab into Settings and place it in a better option so our navigation bar will get space for adding bus. Make sure nothing changes of the Batch tab, just take it from the navigation bar to the Settings. Don't do this for the web version, do this for the Android only."*
+
+---
+
+### B. Architectural Solution & Implementation ([`56f05a7`](https://github.com/shuaibuddowla/ClassMate/commit/56f05a7))
+
+```mermaid
+flowchart TD
+    subgraph Bottom Navigation Realignment (Android Only)
+        A["Bottom Navigation (5 Slots)"] --> B["1. Timetable"]
+        A --> C["2. Notices"]
+        A --> D["3. Courses (Library)"]
+        A --> E["4. Transit (Live Radar) - Replaces Batch"]
+        A --> F["5. Settings (Profile)"]
+    end
+
+    subgraph Settings Screen (classmate_profile.xml)
+        F --> G["cardProfileBatch (Batch & Classmates)"]
+        G --> H["Shows Batch Name, Student Directory, Blood Donors, and Batch Fund"]
+    end
+
+    subgraph Dedicated Sub-Activity
+        G -->|Intent with EXTRA_BATCH_ID| I["ClassMateBatchActivity"]
+        I --> J["ClassMateFriendsScreen (Streamlined Clean Header + Back Arrow)"]
+    end
+```
+
+#### 1. Bottom Bar Realignment (`ClassMateAuthActivity.kt` & Menus)
+- In [`ClassMateAuthActivity.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt):
+  - Updated `visibleTabs` to exclude `ClassMateTab.BATCH`.
+  - Set `nav.menu.findItem(R.id.nav_friends).isVisible = false`.
+- In [`classmate_academic_nav_menu.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/menu/classmate_academic_nav_menu.xml):
+  - Marked `nav_friends` with `android:visible="false"`.
+
+#### 2. Settings Row Integration (`classmate_profile.xml` & `ClassMateAcademicScreensSupabase.kt`)
+- Added `cardProfileBatch` in [`classmate_profile.xml`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/res/layout/classmate_profile.xml) with:
+  - 38×38dp icon container tinted `#203B82F6` with blue `ic_batch_friends` (`#3B82F6`).
+  - Dynamic titles:
+    - **Students**: Title `"Batch & Classmates"`, Subtitle `"Classmates, contacts, and Batch Fund"`.
+    - **Faculty**: Title `"Students Directory"`, Subtitle `"Department student roster and profiles"`.
+  - Trailing chevron `ic_chevron_right`.
+- In `ClassMateAcademicScreensSupabase.kt`:
+  - Bound click listener with tactile haptic selection (`ClassMateHaptics.selection`).
+  - Launches `ClassMateBatchActivity` passing `EXTRA_BATCH_ID`, `EXTRA_BATCH_LABEL`, and `EXTRA_ROLE`.
+
+#### 3. Dedicated Activity Container (`ClassMateBatchActivity.kt`)
+- Created portrait, edge-to-edge container activity configured with `android:windowSoftInputMode="adjustResize"`.
+- Applies status bar and navigation bar insets cleanly.
+- Instantiates `ClassMateFriendsScreen` with `onBack = { finish() }`.
+
+#### 4. Header De-Cluttering & Streamlining (`ClassMateFriendsScreen.kt`)
+- **User Issue Addressed**:
+  > *"You have done things well, but in the Batch and Classmate tab, the header is confusing. The page has a header of Batch CC 22 Session 24 and 25, but you have still added a big header repeating the same thing... make the header clean, absolutely clean."*
+- **Refinement**:
+  - Completely stripped away the redundant large title block that repeated batch name and session metadata.
+  - Added a clean backward navigation arrow button (`ivBack`) in the header that triggers `onBack()`.
+  - Preserved live Batch Fund balance chip (`৳ `), blood group filters, search bar, and contact dialer.
+
+
+---
+
+## 134. Google Maps-Grade Live Campus Transit Architecture & Real-Time Engine (Oct 30, 2026)
+
+### A. Context & User Vision
+The user requested a premier, production-grade transit tracking system for university campus shuttles:
+> *"When a bus is leaving the campus, all the users should get notification of that bus is heading towards a route or whatever it is. Also, in the map, it should be configured with best possible UI/UX for betterment of the student... Research about Google Maps and try to find out and predict if the Google Map has this feature, how they will implement it, and how their UI can be looked... That thing should be a master feature or flagship feature for ClassMate, so I'm taking it seriously."*
+
+---
+
+### B. High-Level System Architecture (Branch `feature/live-bus-tracking`)
+
+```mermaid
+flowchart TD
+    subgraph MBSTU Telemetry Backend
+        MBSTU["MBSTU Wheels Server<br>wss://transport.mbstu.ac.bd/socket.io/"]
+    end
+
+    subgraph Protocol Ingestion (Engine.IO v4)
+        MBSTU -->|40 Handshake| WS["Persistent WebSocket Connection"]
+        WS -->|Ping 2 / Pong 3| HB["Heartbeat Monitor"]
+        WS -->|42flutter-bus-data| P["Payload Parser<br>busId · lat · lng · speed · heading"]
+    end
+
+    subgraph Native Android APK Engine (app/)
+        P --> WV["Hardware-Accelerated Transit WebView<br>(fragment_transit.xml + Leaflet Dark Theme)"]
+        WV -->|JavascriptInterface| BR["ClassMateTransitBridge.kt"]
+        BR --> NT["ClassMateTransitManager.kt<br>Campus Departure Geofence Alerts"]
+        BR --> VC["VibratorManager<br>Tactile Feedback"]
+        BR --> DL["Android Intent.ACTION_DIAL<br>One-Tap Driver Call"]
+    end
+
+    subgraph User Experience Layer
+        WV --> M["Google Maps-Grade Live Radar<br>Directional Puck · Heading Cone · Speed Badge"]
+        WV --> S["Interactive Bottom Sheet Drawer<br>Driver Info · Stops · ETA · Departure Alarm Toggle"]
+        NT --> N["High-Priority Push Notification<br>MBSTU Bus Departure Alerts"]
+    end
+```
+
+---
+
+### C. Reverse-Engineered Socket.IO Telemetry Protocol
+Analysis of the university's official transit backend confirmed the live data protocol:
+- **Transport Endpoint**: `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`
+- **Zero-Authentication**: Open public broadcast; no tokens or cookies required.
+- **Protocol Flow**:
+  1. Connection opens; server sends Engine.IO session packet (`0{"sid":...}`).
+  2. Client emits Socket.IO handshake packet: `40`.
+  3. Server acknowledges: `40{"sid":...}`.
+  4. Ping/Pong: Server sends `2`, client responds `3`.
+  5. Telemetry stream: Server emits `42["flutter-bus-data", {...}]`.
+- **Telemetry Schema**:
+  ```json
+  {
+    "busId": "SB0003",
+    "latitude": 24.2378,
+    "longitude": 89.8942,
+    "speed": 34,
+    "heading": 175,
+    "updatedAt": "2026-10-30T04:55:12Z"
+  }
+  ```
+- **University Campus Shuttle Fleet Catalog**:
+  | Bus Code | Bus Name | Route | Color | Primary Driver |
+  |---|---|---|---|---|
+  | **`SB0003`** | সোনারতরী (Sonartori) | Santosh Campus Stand ➔ Nirala | `#38BDF8` (Sky) | MD. Rafiqul Islam |
+  | **`SB0009`** | বনলতা (Banalata) | Nirala ➔ Santosh Campus Stand | `#F59E0B` (Amber) | MD. Kamal Hossain |
+  | **`SB0010`** | রক্তকরবী (Raktakarabi) | Santosh Campus Stand (Standby) | `#F43F5E` (Rose) | MD. Abdul Alim |
+  | **`SB0001`** | গীতাঞ্জলি (Gitanjali) | Santosh Campus Stand (Standby) | `#818CF8` (Indigo) | MD. Mizanur Rahman |
+
+---
+
+### D. Google Maps-Grade UI/UX Design (`google_maps_transit_ui_showcase.html`)
+The interactive prototype approved by the user incorporates Google Maps transit UX standards:
+1. **Floating Search Bar & Fleet Filters**:
+   - Quick-toggle filter pills: `"All Buses"`, `"En Route"`, and `"At Stand"`.
+2. **Directional Vehicle Pucks**:
+   - Directional cone rotating dynamically with `heading` angle.
+   - Dynamic badge displaying vehicle short name and live speed chip (`34 km/h`).
+   - Pulsing emerald radar ring when vehicle is in motion.
+3. **Plotted University Transit Stops**:
+   - Santosh Campus Stand (`24.2348, 89.8920`)
+   - Baby Stand (`24.2405, 89.9002`)
+   - Old Bus Stand (`24.2440, 89.9070`)
+   - Nirala City Terminal (`24.2498, 89.9165`)
+4. **Interactive Bottom Sheet Drawer**:
+   - Displays full bus identity, route line, driver phone number, live speed meter, and estimated arrival (ETA).
+   - Direct action button: **Call Driver** opens the native phone dialer.
+5. **Campus Departure Alarm**:
+   - Toggle switch allowing students to subscribe to high-priority alerts when a bus departs the campus terminal.
+
+---
+
+### E. Native Android Implementation Architecture
+1. **Navigation Integration**:
+   - Added `nav_transit` tab (`@drawable/sl_nav_transit`, `@string/nav_transit`) to `bottom_nav_menu.xml` and `classmate_academic_nav_menu.xml`.
+   - Added `ClassMateTab.TRANSIT` to [`ClassMateBottomBar.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt).
+   - Replaced `BATCH` with `TRANSIT` in `visibleTabs` within `ClassMateAuthActivity.kt`.
+2. **Transit Layout (`fragment_transit.xml`)**:
+   - Hardware-accelerated `WebView` (`#0F172A` dark background).
+   - Centered connection shimmer view (`transit_loading_view`) with indeterminate progress indicator that smoothly crossfades out once map tiles render.
+3. **Embedded Web Client (`app/src/main/assets/transit/index.html`)**:
+   - Bundled Leaflet map client with dark tile schema, bus route polylines, stops, Socket.IO live stream parser, and dead-reckoning simulation fallback.
+4. **Geofenced Campus Departure Alert Subsystem (`ClassMateTransitManager.kt`)**:
+   - Notification channel: `transit_departure_alerts` (`"MBSTU Bus Departure Alerts"`).
+   - Preference store: `classmate_transit_prefs` stores boolean subscription states per bus code.
+   - `showDepartureNotification`: Triggers a high-priority system alert with `PendingIntent` launching ClassMate directly into the Transit radar screen.
+5. **Bidirectional Native Bridge (`ClassMateTransitBridge.kt`)**:
+   - Exposed `@JavascriptInterface` methods:
+     - `dialDriver(phoneNumber: String)`: Triggers native `Intent.ACTION_DIAL`.
+     - `setAlarmForBusDeparture(busCode: String, enabled: Boolean)`: Toggles departure notification preference.
+     - `onBusDeparted(busName, busCode, destination, speed)`: Invokes departure alert.
+     - `vibrateTick()`: Produces tactile click via `VibrationEffect.EFFECT_CLICK`.
+     - `notifyBusSelected(busCode)`: Communicates selected vehicle to Android container.
+6. **Lifecycle Integration (`ClassMateAcademicScreensSupabase.kt`)**:
+   - Added `setupTransit(root: View)` configuring WebView settings (JavaScript enabled, DOM storage, hardware acceleration, native bridge attachment).
+
+
+---
+
+## 135. Automated Daily Security & Quality Audit Architecture (Oct 30, 2026)
+
+### A. Automation Overview
+To ensure enterprise-grade reliability and security across ongoing rapid iterations, an automated daily background task was established:
+- **Automation Identifier**: `classmate-daily-security-audit`
+- **Schedule**: Recurring daily at 9:00 AM Asia/Dhaka time (`03:00 UTC`).
+- **Core Scope**:
+  1. **PostgreSQL RLS Audit**: Inspects all Supabase tables for active Row Level Security and validates that no policies permit unauthenticated write access.
+  2. **Security Definer Verification**: Audits all database RPC functions to ensure `search_path = public, classmate` is explicitly pinned, preventing malicious search path injection.
+  3. **Android Client Hardening**: Scans manifest permissions, exported component security (`android:exported="false"`), and network security configurations.
+  4. **API Key & Secret Leak Detection**: Scans recent commits for exposed Service Role keys, Telegram bot tokens, or Cloudflare credentials.
+
+### B. Baseline Security Audit Findings
+- **`usesCleartextTraffic` Evaluation**: Flagged `android:usesCleartextTraffic="true"` in `AndroidManifest.xml`. Validated that it is currently required for local network proxying and ESP32 attendance debugging; scheduled for restriction strictly to TLS in release builds before production deployment.
+
+
+---
+
+## 136. Updated System Architecture Synthesis & Production State (Oct 30, 2026)
+
+### A. Architectural Topology Summary
+
+```mermaid
+flowchart TD
+    subgraph Hardware Layer
+        K["ESP32 RFID Station (ESP32-READER-01)<br>RC522 Mini · 0.96" OLED · Dual-Core FreeRTOS · 752B MIFARE Card Memory"]
+    end
+
+    subgraph Mobile Clients
+        A["Android Native APK (v1.1.34 / Code 34)<br>Room Offline Caching · Shimmer Skeletons · Universal Tactile Haptics<br>Predictive Back (1b3d37d) · Relocated Batch in Settings (56f05a7)"]
+        TR["Transit Live Radar Engine (feature/live-bus-tracking)<br>Engine.IO WebSocket · Geofenced Departure Alerts · Leaflet Dark"]
+        RN["React Native Client (Expo SDK 52)<br>Hermes Bytecode · Multi-Step Catalog · Isolated in .gitignore"]
+    end
+
+    subgraph Web Companion & Edge Layer
+        B["Next.js 16 Web Client (React 19)<br>App Router · TanStack Query v5 · Collection Chips Hotfix (d1e693d)"]
+        C["Cloudflare Worker<br>Telegram Bot Broadcast · Webhooks · Scheduled Ingestion"]
+        D["Vercel Production Edge<br>Zero-Login /r/[slug], /n/[id], /api/scan, /download/android"]
+        E["Cloudflare R2 Bucket<br>Academic Files & PDFs · 9.9 GB Quota Gate"]
+    end
+
+    subgraph Telemetry & Backend Layer
+        MB["MBSTU Wheels WebSocket<br>wss://transport.mbstu.ac.bd/socket.io/"]
+        F["Supabase PostgreSQL (cbskpifgbdbgdmnnxfrh)<br>88+ Migrations · RLS Secured · Scoped Collection Payers"]
+        G["Supabase Edge Functions<br>Signed URLs · Notifications · Release Dispatch"]
+        H["Firebase Authentication & FCM<br>Google OAuth · Push Notification Outbox"]
+    end
+
+    K <-->|HTTPS /api/scan| D
+    A <--> D
+    RN <--> D
+    B <--> D
+    D <--> F
+    A <--> F
+    RN <--> F
+    C <--> F
+    D <--> E
+    A <--> E
+    RN <--> E
+    F <--> G
+    G <--> H
+    TR <-->|Socket.IO v4| MB
+```
+
+---
+
+### B. Recent Generated Deliverables & Commit Registry
+| Commit / Artifact | Module | Description |
+|---|---|---|
+| [`feature/live-bus-tracking`](https://github.com/shuaibuddowla/ClassMate/tree/feature/live-bus-tracking) | Android (`app/`) | Google Maps-grade live campus transit radar, Socket.IO Engine.IO v4 telemetry parser, geofenced departure notifications (`ClassMateTransitManager.kt`), and JavaScript native bridge (`ClassMateTransitBridge.kt`). |
+| [`56f05a7`](https://github.com/shuaibuddowla/ClassMate/commit/56f05a7) | Android (`app/`) | Relocated Batch directory into Settings (`classmate_profile.xml`), dedicated portrait activity (`ClassMateBatchActivity.kt`), and streamlined clean header with back navigation (`ClassMateFriendsScreen.kt`). |
+| [`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d) | Android (`app/`) | Enabled system Predictive Back (`android:enableOnBackInvokedCallback="true"`), modernized activity transitions (`AnimUtils.kt`), and migrated 14 core activities and fragments. |
+| [`f7478b3`](https://github.com/shuaibuddowla/ClassMate/commit/f7478b3) | Docs | Memory documentation covering offline-first Room caching, keyboard ergonomics, notice shimmer, and bus tracking socket discovery. |
+| [`148b002`](https://github.com/shuaibuddowla/ClassMate/commit/148b002) | Android (`app/`) | Modernized notice feed shimmer skeletons (`shimmer_item_notice.xml`) to match card geometry and wired universal spring tactile haptics via `View.applyClickAnimation`. |
+| [`cb05104`](https://github.com/shuaibuddowla/ClassMate/commit/cb05104) | Android (`app/`) | Soft keyboard ergonomics, dynamic auto-resizing bottom sheets, IME navigation flows, and live `৳ ` currency formatting helper. |
+| [`49d64c5`](https://github.com/shuaibuddowla/ClassMate/commit/49d64c5) | Android (`app/`) | Implemented offline-first Room caching for full-week timetable and notices, 10-minute in-memory catalog caching, and silent background revalidation. |
+| [`c028a5d`](https://github.com/shuaibuddowla/ClassMate/commit/c028a5d) | Android (`app/`) | Integrated Facebook-style shimmer skeleton placeholders (`ShimmerFrameLayout`) in Batch Fund overview, ledger, and payers. |
+| [`e0486fa`](https://github.com/shuaibuddowla/ClassMate/commit/e0486fa) | Android (`app/`) | Unified modern empty states, tactile haptics engine (`HapticHelper`), and timetable no-class circular icon bubble. |
+| `classmate-daily-security-audit` | Automation | Standalone recurring daily security audit at 9:00 AM (Asia/Dhaka) auditing PostgreSQL RLS, RPC definers, and Android manifest configurations. |
+| `google_maps_transit_ui_showcase.html` | Artifact / Prototype | Interactive Google Maps-grade live transit tracking prototype with directional vehicle pucks, speed chips, route polylines, and driver quick dial. |
+
+---
+
+### C. Current Production & Verification Status (Oct 30, 2026)
+- **Android Native Platform**:
+  - Current Version: `versionCode = 34`, `versionName = "1.1.34"`.
+  - **Navigation Ergonomics**: Clean 5-tab bottom navigation (`Timetable`, `Notices`, `Courses`, `Transit`, `Settings`), with Batch directory accessible via Settings and streamlined back navigation.
+  - **Gesture Support**: Modern Predictive Back enabled across Android 13/14+ with version-adaptive slide transitions in `AnimUtils.kt`.
+  - **Transit Radar**: Live Socket.IO telemetry parsing, geofenced departure push notifications, and driver contact dialer operating on branch `feature/live-bus-tracking`.
+  - **Automated Verification**:
+    - `./gradlew compileDebugSources`: Build Successful.
+    - `./gradlew testDebugUnitTest`: Build Successful (all tests passed).
+    - Deployed debug APK via ADB to physical test device **OnePlus Nord CE4 (`CPH2621`)**.
+- **Web Companion Platform**:
+  - Production build live on Vercel at [`https://classmatebd.vercel.app`](https://classmatebd.vercel.app) (HTTP 200).
+  - Batch tab preserved in desktop and mobile companion web layouts.
+- **Supabase Backend**:
+  - 88+ migrations applied across production (`cbskpifgbdbgdmnnxfrh`).
+  - Row Level Security active on all tables.
+  - Automated daily security audit active at 09:00 AM Asia/Dhaka.
