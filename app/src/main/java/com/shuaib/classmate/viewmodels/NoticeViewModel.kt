@@ -30,7 +30,8 @@ class NoticeViewModel(application: Application) : AndroidViewModel(application) 
         AppContextManager.activeBatchFlow, _showOlder, _historyLimit
     ) { batch, showOlder, historyLimit -> Triple(batch, showOlder, historyLimit) }
     .flatMapLatest { (batch, showOlder, historyLimit) ->
-        if (showOlder) repository.observeNotices(batch, historyLimit) else repository.observeCurrentWeekNotices(batch)
+        val limit = if (showOlder) historyLimit else 60
+        repository.observeNotices(batch, limit)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

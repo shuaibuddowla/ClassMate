@@ -128,14 +128,12 @@ class TimetableFragment : Fragment() {
         setupHeroClassClickListeners()
         setupHeroCountdownTimer()
         setupScheduleToggle()
-        if (!timetableViewModel.isV2Configured) timetableViewModel.refreshAll()
+        timetableViewModel.refreshAll()
 
-        if (!timetableViewModel.isV2Configured) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                    com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect {
-                        timetableViewModel.refreshAll()
-                    }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.shuaib.classmate.utils.SemesterManager.activeSemesterFlow.collect {
+                    timetableViewModel.refreshAll()
                 }
             }
         }

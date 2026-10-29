@@ -79,6 +79,22 @@ class TimetableRepository private constructor(private val context: Context) {
         timetableDao.replaceDay(normalizedBatch, normalizedSem, normalizedDay, entities)
     }
 
+    suspend fun cacheSupabaseWeek(
+        batchId: String,
+        semesterId: String,
+        weekSchedule: Map<String, List<Period>>
+    ) {
+        val normalizedSem = semesterId.trim().lowercase()
+        val normalizedBatch = batchId.lowercase()
+        weekSchedule.forEach { (day, periods) ->
+            val normalizedDay = day.lowercase()
+            val entities = periods.map {
+                TimetableEntity.fromPeriod(normalizedBatch, normalizedSem, normalizedDay, it)
+            }
+            timetableDao.replaceDay(normalizedBatch, normalizedSem, normalizedDay, entities)
+        }
+    }
+
     suspend fun cacheBusSchedules(weekday: Int, schedules: List<BusSchedule>) {
         require(weekday in 0..6)
         busScheduleDao.replaceWeekday(weekday, schedules.map { BusScheduleEntity.fromBusSchedule(weekday, it) })

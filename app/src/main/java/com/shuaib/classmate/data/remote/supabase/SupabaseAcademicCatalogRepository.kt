@@ -26,48 +26,66 @@ class SupabaseAcademicCatalogRepository @Inject constructor(
     private val sessionRepository: SessionRepository
 ) : AcademicCatalogRepository {
 
+    @Volatile private var cachedCatalog: AcademicCatalog? = null
+    @Volatile private var cacheTimestamp: Long = 0L
+    private val CACHE_TTL_MILLIS = 10 * 60 * 1000L // 10 minutes
+
     override suspend fun loadAccessibleCatalog(): Result<AcademicCatalog> = runCatching {
+        val now = System.currentTimeMillis()
+        val existing = cachedCatalog
+        if (existing != null && (now - cacheTimestamp) < CACHE_TTL_MILLIS) {
+            return@runCatching existing
+        }
+
         check(clientProvider.isConfigured) { "Supabase is not configured." }
         val session = sessionRepository.session.firstOrNull()
             ?: sessionRepository.refresh().getOrThrow()
         val client = clientProvider.client
 
-        coroutineScope {
-            val departments = async {
-                client.from("departments").select().decodeList<DepartmentRow>()
-            }
-            val batches = async {
-                client.from("batches").select().decodeList<BatchRow>()
-            }
-            val sections = async {
-                client.from("sections").select().decodeList<SectionRow>()
-            }
-            val semesters = async {
-                client.from("semesters").select().decodeList<SemesterRow>()
-            }
-            val batchSemesters = async {
-                client.from("batch_semesters").select().decodeList<BatchSemesterRow>()
-            }
-            val courses = async {
-                client.from("courses").select().decodeList<CourseRow>()
-            }
-            val offerings = async {
-                client.from("course_offerings").select().decodeList<CourseOfferingRow>()
-            }
+        try {
+            coroutineScope {
+                val departments = async {
+                    client.from("departments").select().decodeList<DepartmentRow>()
+                }
+                val batches = async {
+                    client.from("batches").select().decodeList<BatchRow>()
+                }
+                val sections = async {
+                    client.from("sections").select().decodeList<SectionRow>()
+                }
+                val semesters = async {
+                    client.from("semesters").select().decodeList<SemesterRow>()
+                }
+                val batchSemesters = async {
+                    client.from("batch_semesters").select().decodeList<BatchSemesterRow>()
+                }
+                val courses = async {
+                    client.from("courses").select().decodeList<CourseRow>()
+                }
+                val offerings = async {
+                    client.from("course_offerings").select().decodeList<CourseOfferingRow>()
+                }
 
-            AcademicCatalog(
-                // Schedule and Library operations use the university ID from the
-                // authenticated Supabase profile. The university display row is
-                // not needed for these flows and can be hidden by project RLS.
-                university = UniversityInfo(session.universityId, "", "", ""),
-                departments = departments.await().map { it.toDomain() },
-                batches = batches.await().map { it.toDomain() },
-                sections = sections.await().map { it.toDomain() },
-                semesters = semesters.await().map { it.toDomain() },
-                batchSemesters = batchSemesters.await().map { it.toDomain() },
-                courses = courses.await().map { it.toDomain() },
-                courseOfferings = offerings.await().map { it.toDomain() }
-            )
+                AcademicCatalog(
+                    // Schedule and Library operations use the university ID from the
+                    // authenticated Supabase profile. The university display row is
+                    // not needed for these flows and can be hidden by project RLS.
+                    university = UniversityInfo(session.universityId, "", "", ""),
+                    departments = departments.await().map { it.toDomain() },
+                    batches = batches.await().map { it.toDomain() },
+                    sections = sections.await().map { it.toDomain() },
+                    semesters = semesters.await().map { it.toDomain() },
+                    batchSemesters = batchSemesters.await().map { it.toDomain() },
+                    courses = courses.await().map { it.toDomain() },
+                    courseOfferings = offerings.await().map { it.toDomain() }
+                ).also {
+                    cachedCatalog = it
+                    cacheTimestamp = System.currentTimeMillis()
+                }
+            }
+        } catch (e: Exception) {
+            cachedCatalog?.let { return@runCatching it }
+            throw e
         }
     }
 

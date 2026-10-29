@@ -69,15 +69,41 @@ class TimetableViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             if (sessionRepository.isConfigured) {
-                DAYS.forEach { day ->
-                    refreshFromSupabase(day, semester, batch)
-                }
+                refreshWeekFromSupabase(semester, batch)
             } else {
                 repository.enqueueNetworkSync()
                 runCatching { repository.syncAllFromFirestore(semester, batch, Source.CACHE) }
                 runCatching { repository.syncAllFromFirestore(semester, batch, Source.SERVER) }
             }
         }
+    }
+
+    private suspend fun refreshWeekFromSupabase(semester: String, batch: String): Boolean = withContext(Dispatchers.IO) {
+        if (!sessionRepository.isConfigured) return@withContext false
+        val dateMap = DAYS.associate { day ->
+            val dow = POSTGRES_WEEKDAYS[day] ?: 0
+            dow to dateForWeekDay(day).toString()
+        }
+        return@withContext scheduleRepository.loadWeek(dateMap, batch, semester, includeBusDepartures = true)
+            .mapCatching { weekMap ->
+                val periodsByDay = mutableMapOf<String, List<Period>>()
+                weekMap.forEach { (weekday, dailySchedule) ->
+                    val dayName = DAYS.firstOrNull { POSTGRES_WEEKDAYS[it] == weekday } ?: return@forEach
+                    periodsByDay[dayName] = dailySchedule.toTimetablePeriods()
+                    repository.cacheBusSchedules(weekday, dailySchedule.busDepartures.map { departure ->
+                        BusSchedule(
+                            id = departure.id,
+                            busName = departure.routeName,
+                            route = departure.notes.orEmpty(),
+                            scheduleType = if (weekday in listOf(4, 5)) "off_day" else "class_day",
+                            destination = departure.destination,
+                            weekdays = departure.weekdays,
+                            notes = departure.notes
+                        )
+                    })
+                }
+                repository.cacheSupabaseWeek("v2-$batch", semester, periodsByDay)
+            }.isSuccess
     }
 
     private suspend fun refreshFromSupabase(day: String, semester: String, batch: String): Boolean {

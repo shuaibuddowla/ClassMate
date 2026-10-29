@@ -158,7 +158,7 @@ class NoticeRepository private constructor(context: Context) {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             if (!supabaseFeed.isConfigured) return@withContext
             val normBatch = AppContextManager.normalizeBatch(batchId)
-            val notices = supabaseFeed.load(normBatch, since = currentWeekStart(), limit = 60)
+            val notices = supabaseFeed.load(normBatch, since = null, limit = 60)
             if (notices.isNotEmpty()) {
                 noticeDao.upsertAll(notices.map { NoticeEntity.fromNotice(it) })
                 WidgetUpdater.refresh(appContext, syncTodayTimetable = false)

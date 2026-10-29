@@ -267,6 +267,123 @@ class SupabaseScheduleRepository @Inject constructor(
             }
         }
 
+    override suspend fun loadWeek(
+        dateMap: Map<Int, String>,
+        batchRoute: String?,
+        semesterRoute: String?,
+        includeBusDepartures: Boolean
+    ): Result<Map<Int, DailySchedule>> =
+        runCatching {
+            check(clientProvider.isConfigured) { "Supabase is not configured." }
+            val client = clientProvider.client
+            val dates = dateMap.values.toSet()
+
+            coroutineScope {
+                val catalogRequest = async {
+                    academicCatalogRepository.loadAccessibleCatalog().getOrThrow()
+                }
+                val routineRows = async {
+                    client.from("routine_slots")
+                        .select()
+                        .decodeList<RoutineSlotRow>()
+                }
+                val changeRows = async {
+                    if (dates.isEmpty()) emptyList()
+                    else {
+                        client.from("class_changes")
+                            .select()
+                            .decodeList<ClassChangeRow>()
+                    }
+                }
+                val busRows = async {
+                    if (includeBusDepartures) client.from("bus_schedules").select().decodeList<BusScheduleRow>()
+                    else emptyList()
+                }
+
+                val catalog = catalogRequest.await()
+
+                val scopedOfferingIds = if (batchRoute.isNullOrBlank() || semesterRoute.isNullOrBlank()) {
+                    null
+                } else {
+                    val departmentCode = batchRoute.filter(Char::isLetter)
+                    val cohortCode = batchRoute.filter(Char::isDigit).trimStart('0')
+                    val department = catalog.departments.firstOrNull { it.code.equals(departmentCode, true) }
+                    val batch = catalog.batches.firstOrNull {
+                        it.departmentId == department?.id && it.cohortCode.trimStart('0') == cohortCode
+                    }
+                    val ordinal = semesterRoute.firstOrNull(Char::isDigit)?.digitToIntOrNull()
+                    val semesterIds = catalog.semesters.filter { it.ordinal == ordinal }.map { it.id }.toSet()
+                    val batchSemesterIds = catalog.batchSemesters.filter {
+                        it.batchId == batch?.id && it.semesterId in semesterIds &&
+                            it.state == com.shuaib.classmate.domain.academic.SemesterState.PUBLISHED
+                    }.map { it.id }.toSet()
+                    catalog.courseOfferings.filter { it.batchSemesterId in batchSemesterIds }.map { it.id }.toSet()
+                }
+
+                val courses = catalog.courses.associateBy { it.id }
+                val offerings = catalog.courseOfferings.associateBy { it.id }
+                val sections = catalog.sections.associateBy { it.id }
+                val visibleRoutineRows = routineRows.await().filter {
+                    scopedOfferingIds == null || it.courseOfferingId in scopedOfferingIds
+                }
+                val visibleRoutineIds = visibleRoutineRows.map { it.id }.toSet()
+                val allChanges = changeRows.await().filter { it.routineSlotId in visibleRoutineIds }.map { it.toDomain() }
+                val allBusDepartures = busRows.await().map { it.toDomain() }.sortedBy { it.departureTime }
+
+                val offeringIds = visibleRoutineRows.map { it.courseOfferingId }.distinct()
+                val teacherNames = runCatching {
+                    if (offeringIds.isEmpty()) emptyMap() else {
+                        client.postgrest.rpc(
+                            "get_schedule_teacher_names",
+                            parameters = buildJsonObject {
+                                put("target_offerings", kotlinx.serialization.json.JsonArray(offeringIds.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                            }
+                        ).decodeList<ScheduleTeacherNamesRow>().associate { it.courseOfferingId to it.teacherNames }
+                    }
+                }.getOrDefault(emptyMap())
+
+                val resultMap = mutableMapOf<Int, DailySchedule>()
+
+                for ((weekday, effectiveDate) in dateMap) {
+                    val dayChanges = allChanges.filter { it.effectiveDate == effectiveDate }
+                    val changedSlotIds = dayChanges.map { it.routineSlotId }.toSet()
+                    val applicableRows = visibleRoutineRows.filter {
+                        it.weekday == weekday || it.id in changedSlotIds
+                    }
+
+                    val routine = applicableRows.mapNotNull { row ->
+                        val offering = offerings[row.courseOfferingId] ?: return@mapNotNull null
+                        val course = courses[offering.courseId] ?: return@mapNotNull null
+                        RoutineSlot(
+                            id = row.id,
+                            courseOfferingId = row.courseOfferingId,
+                            courseCode = course.code,
+                            courseName = course.name,
+                            sectionCode = offering.sectionId?.let { sections[it]?.code },
+                            weekday = row.weekday,
+                            startsAt = row.startsAt,
+                            endsAt = row.endsAt,
+                            room = row.room,
+                            classKind = row.classKind,
+                            createdBy = row.createdBy,
+                            teacherName = teacherNames[row.courseOfferingId].orEmpty()
+                                .ifBlank { course.teacherName.orEmpty() }
+                        )
+                    }.sortedBy { it.startsAt }
+
+                    resultMap[weekday] = DailySchedule(
+                        weekday = weekday,
+                        effectiveDate = effectiveDate,
+                        routine = routine,
+                        classChanges = dayChanges,
+                        busDepartures = allBusDepartures.filter { weekday in it.weekdays }
+                    )
+                }
+
+                resultMap
+            }
+        }
+
     private fun ClassChangeRow.toDomain() = ClassChange(
         id = id,
         routineSlotId = routineSlotId,

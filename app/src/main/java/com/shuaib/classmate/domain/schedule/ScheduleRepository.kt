@@ -13,4 +13,12 @@ interface ScheduleRepository {
         semesterRoute: String? = null,
         includeBusDepartures: Boolean = true
     ): Result<DailySchedule>
+
+    /** Load full week schedule (all 7 days) in a single optimized query pass. */
+    suspend fun loadWeek(
+        dateMap: Map<Int, String>,
+        batchRoute: String? = null,
+        semesterRoute: String? = null,
+        includeBusDepartures: Boolean = true
+    ): Result<Map<Int, DailySchedule>>
 }
