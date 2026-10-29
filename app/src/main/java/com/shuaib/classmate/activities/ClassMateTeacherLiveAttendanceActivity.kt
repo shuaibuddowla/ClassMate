@@ -23,6 +23,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
+import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.databinding.ActivityTeacherLiveAttendanceBinding
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +122,7 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
     }
 
     private fun switchTab(isQr: Boolean) {
+        HapticHelper.selectionTick(if (isQr) binding.tabQrCode else binding.tabLiveRoster)
         val primaryColor = getColor(R.color.cm_primary)
         val mutedColor = getColor(R.color.cm_text_muted)
 
@@ -421,9 +423,15 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                     )
                 }
                 member.isPresent = newPresent
+                if (newPresent) {
+                    HapticHelper.success(this@ClassMateTeacherLiveAttendanceActivity)
+                } else {
+                    HapticHelper.lightPop(this@ClassMateTeacherLiveAttendanceActivity)
+                }
                 rosterAdapter.notifyDataSetChanged()
                 refreshSummary(sid)
             } catch (e: Exception) {
+                HapticHelper.warning(this@ClassMateTeacherLiveAttendanceActivity)
                 Toast.makeText(this@ClassMateTeacherLiveAttendanceActivity, "Override error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }

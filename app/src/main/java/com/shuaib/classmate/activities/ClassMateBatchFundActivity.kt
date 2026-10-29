@@ -36,6 +36,8 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.shuaib.classmate.R
+import com.shuaib.classmate.utils.EmptyStateHelper
+import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -68,7 +70,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     private lateinit var tvFundDescription: TextView
     private lateinit var ivEditDescHint: View
     private lateinit var recentActivityContainer: LinearLayout
-    private lateinit var tvEmptyActivity: TextView
+    private lateinit var emptyStateOverview: View
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
 
@@ -101,7 +103,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         tvFundDescription = findViewById(R.id.tvFundDescription)
         ivEditDescHint = findViewById(R.id.ivEditDescHint)
         recentActivityContainer = findViewById(R.id.recentActivityContainer)
-        tvEmptyActivity = findViewById(R.id.tvEmptyActivity)
+        emptyStateOverview = findViewById(R.id.emptyStateOverview)
 
         toolbar.setNavigationOnClickListener { finish() }
         toolbar.inflateMenu(R.menu.menu_batch_fund_options)
@@ -121,7 +123,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.tileAddFund).setOnClickListener {
+            HapticHelper.lightPop(it)
             if (!isCr) {
+                HapticHelper.warning(this)
                 Toast.makeText(this, "Only Class Representatives can record transactions.", Toast.LENGTH_SHORT).show()
             } else {
                 showAddFundSheet()
@@ -129,18 +133,22 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.tileViewLedger).setOnClickListener {
+            HapticHelper.lightPop(it)
             showLedgerSheet()
         }
 
         findViewById<View>(R.id.btnSeeAllActivity).setOnClickListener {
+            HapticHelper.lightPop(it)
             showLedgerSheet()
         }
 
         findViewById<View>(R.id.tilePayers).setOnClickListener {
+            HapticHelper.lightPop(it)
             showPayersSheet()
         }
 
         findViewById<View>(R.id.tileSummary).setOnClickListener {
+            HapticHelper.lightPop(it)
             showSummarySheet()
         }
 
@@ -246,17 +254,27 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             recentActivityContainer.removeAllViews()
 
             if (txArray.length() == 0) {
-                tvEmptyActivity.visibility = View.VISIBLE
+                EmptyStateHelper.show(
+                    emptyStateOverview,
+                    iconRes = R.drawable.ic_sparkle,
+                    title = "No transactions yet",
+                    subtitle = if (isCr) "Tap '+ Add Fund' above to record the first transaction." else "No transactions recorded in this batch fund yet."
+                )
             } else {
-                tvEmptyActivity.visibility = View.GONE
+                EmptyStateHelper.hide(emptyStateOverview)
                 for (i in 0 until txArray.length()) {
                     val tx = txArray.getJSONObject(i)
                     recentActivityContainer.addView(createTransactionRow(tx))
                 }
             }
         } catch (e: Exception) {
-            tvEmptyActivity.visibility = View.VISIBLE
-            tvEmptyActivity.text = "Could not load recent activity."
+            recentActivityContainer.removeAllViews()
+            EmptyStateHelper.showError(
+                emptyStateOverview,
+                title = "Could not load activity",
+                errorMessage = "Check your connection and tap below to retry.",
+                onRetry = { loadData() }
+            )
         }
     }
 
@@ -488,6 +506,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             }
 
             if (amt <= 0.0) {
+                HapticHelper.warning(this@ClassMateBatchFundActivity)
                 tilAmount.error = "Enter a valid amount"
                 etAmount.requestFocus()
                 return
@@ -495,6 +514,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             tilAmount.error = null
 
             if (title.isBlank()) {
+                HapticHelper.warning(this@ClassMateBatchFundActivity)
                 tilTitle.error = if (isDeposit) "Enter reason of collection" else "Enter expense purpose"
                 etTitle.requestFocus()
                 return
@@ -525,6 +545,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         }
                     )
 
+                    HapticHelper.success(this@ClassMateBatchFundActivity)
                     Toast.makeText(
                         this@ClassMateBatchFundActivity,
                         if (isDeposit) "Deposit recorded for $sName" else "Expense recorded",
@@ -543,6 +564,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         dialog.dismiss()
                     }
                 } catch (e: Exception) {
+                    HapticHelper.warning(this@ClassMateBatchFundActivity)
                     btnToDisable.isEnabled = true
                     Toast.makeText(this@ClassMateBatchFundActivity, "Error saving: ${e.message}", Toast.LENGTH_LONG).show()
                 }
@@ -575,7 +597,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val tabFilter = view.findViewById<TabLayout>(R.id.tabLedgerFilter)
         val etSearch = view.findViewById<TextInputEditText>(R.id.etLedgerSearch)
         val container = view.findViewById<LinearLayout>(R.id.ledgerItemsContainer)
-        val tvEmpty = view.findViewById<TextView>(R.id.tvLedgerEmpty)
+        val emptyStateLedger = view.findViewById<View>(R.id.emptyStateLedger)
         val progressBar = view.findViewById<ProgressBar>(R.id.ledgerProgressBar)
 
         var currentFilter = "all"
@@ -587,7 +609,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         fun fetchLedger() {
             ledgerJob?.cancel()
             progressBar.visibility = View.VISIBLE
-            tvEmpty.visibility = View.GONE
+            EmptyStateHelper.hide(emptyStateLedger)
 
             ledgerJob = lifecycleScope.launch {
                 try {
@@ -608,9 +630,14 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     container.removeAllViews()
 
                     if (array.length() == 0) {
-                        tvEmpty.visibility = View.VISIBLE
+                        EmptyStateHelper.show(
+                            emptyStateLedger,
+                            iconRes = R.drawable.ic_search_modern,
+                            title = if (currentQuery.isNotBlank()) "No matching transactions" else "No transactions found",
+                            subtitle = if (currentQuery.isNotBlank()) "No records match '$currentQuery'. Try searching something else." else "No transactions recorded under this filter yet."
+                        )
                     } else {
-                        tvEmpty.visibility = View.GONE
+                        EmptyStateHelper.hide(emptyStateLedger)
                         val seenIds = HashSet<String>()
                         for (i in 0 until array.length()) {
                             val tx = array.getJSONObject(i)
@@ -632,8 +659,12 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     if (e is CancellationException) return@launch
                     progressBar.visibility = View.GONE
                     container.removeAllViews()
-                    tvEmpty.visibility = View.VISIBLE
-                    tvEmpty.text = "Error loading ledger: ${e.message}"
+                    EmptyStateHelper.showError(
+                        emptyStateLedger,
+                        title = "Could not load ledger",
+                        errorMessage = e.message ?: "Failed to retrieve transactions.",
+                        onRetry = { fetchLedger() }
+                    )
                 }
             }
         }
@@ -641,6 +672,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         tabFilter.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 if (isInitializingTabs) return
+                HapticHelper.selectionTick(tabFilter)
                 val newFilter = when (tab?.position) {
                     1 -> "inflow"
                     2 -> "outflow"
@@ -701,7 +733,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val chipGroupCollections = view.findViewById<ChipGroup>(R.id.chipGroupPayersCollections)
         val etSearch = view.findViewById<TextInputEditText>(R.id.etPayersSearch)
         val container = view.findViewById<LinearLayout>(R.id.payersItemsContainer)
-        val tvEmpty = view.findViewById<TextView>(R.id.tvPayersEmpty)
+        val emptyStatePayers = view.findViewById<View>(R.id.emptyStatePayers)
         val progressBar = view.findViewById<ProgressBar>(R.id.payersProgressBar)
 
         var selectedCollection = "all"
@@ -719,10 +751,15 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             }
 
             if (filtered.isEmpty()) {
-                tvEmpty.visibility = View.VISIBLE
+                EmptyStateHelper.show(
+                    emptyStatePayers,
+                    iconRes = R.drawable.ic_users,
+                    title = if (query.isNotBlank()) "No matching classmates" else "No classmates found",
+                    subtitle = if (query.isNotBlank()) "No records matched '$query'." else "No students listed for this batch or collection."
+                )
                 return
             }
-            tvEmpty.visibility = View.GONE
+            EmptyStateHelper.hide(emptyStatePayers)
 
             // Unified list: Paid classmates first, Unpaid classmates below
             val paidList = filtered.filter { it.optDouble("total_paid", 0.0) > 0 }
@@ -844,7 +881,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         fun fetchPayers() {
             payersJob?.cancel()
             progressBar.visibility = View.VISIBLE
-            tvEmpty.visibility = View.GONE
+            EmptyStateHelper.hide(emptyStatePayers)
 
             payersJob = lifecycleScope.launch {
                 try {
@@ -870,8 +907,12 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     if (e is CancellationException) return@launch
                     progressBar.visibility = View.GONE
                     container.removeAllViews()
-                    tvEmpty.visibility = View.VISIBLE
-                    tvEmpty.text = "Error loading payers: ${e.message}"
+                    EmptyStateHelper.showError(
+                        emptyStatePayers,
+                        title = "Could not load contributors",
+                        errorMessage = e.message ?: "Failed to retrieve student records.",
+                        onRetry = { fetchPayers() }
+                    )
                 }
             }
         }
@@ -892,6 +933,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     isCheckable = true
                     isChecked = true
                     setOnClickListener {
+                        HapticHelper.selectionTick(it)
                         if (selectedCollection != "all") {
                             selectedCollection = "all"
                             fetchPayers()
@@ -911,6 +953,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         isCheckable = true
                         isChecked = false
                         setOnClickListener {
+                            HapticHelper.selectionTick(it)
                             if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
                                 selectedCollection = colTitle
                                 fetchPayers()

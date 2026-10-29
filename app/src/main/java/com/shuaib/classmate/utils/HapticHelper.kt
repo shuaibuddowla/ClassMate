@@ -23,6 +23,18 @@ object HapticHelper {
         }
     }
 
+    fun selectionTick(context: Context) {
+        try {
+            val vibrator = getVibrator(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(15)
+            }
+        } catch (_: Exception) {}
+    }
+
     /**
      * Light pop for small actions like Liking, Pinning, or Toggling switches.
      */
@@ -34,6 +46,18 @@ object HapticHelper {
                 HapticFeedbackConstants.KEYBOARD_TAP
             }
         )
+    }
+
+    fun lightPop(context: Context) {
+        try {
+            val vibrator = getVibrator(context)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(20)
+            }
+        } catch (_: Exception) {}
     }
 
     /**

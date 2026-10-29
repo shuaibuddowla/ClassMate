@@ -36,6 +36,7 @@ import com.shuaib.classmate.repositories.AcademicCalendarRepository
 import com.shuaib.classmate.utils.CountdownManager
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.AnimUtils
+import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.animateSpringScale
 import com.shuaib.classmate.utils.applyClickAnimation
@@ -290,6 +291,7 @@ class TimetableFragment : Fragment() {
 
             cardView.setOnClickListener {
                 it.animateSpringScale(0.9f)
+                HapticHelper.selectionTick(it)
                 selectDay(index)
             }
 
@@ -938,6 +940,7 @@ class TimetableFragment : Fragment() {
     private fun setupScheduleToggle() {
         binding.btnToggleRoutine.setOnClickListener {
             if (isViewingRoutine) return@setOnClickListener
+            HapticHelper.selectionTick(it)
             isViewingRoutine = true
             
             (activity as? MainActivity)?.isViewingRoutineInTimetable = true
@@ -959,6 +962,7 @@ class TimetableFragment : Fragment() {
 
         binding.btnToggleBus.setOnClickListener {
             if (!isViewingRoutine) return@setOnClickListener
+            HapticHelper.selectionTick(it)
             isViewingRoutine = false
             
             (activity as? MainActivity)?.isViewingRoutineInTimetable = false

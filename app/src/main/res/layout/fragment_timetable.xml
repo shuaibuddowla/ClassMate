@@ -660,26 +660,45 @@
                 android:id="@+id/emptyState"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="300dp"
+                android:minHeight="280dp"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:paddingTop="24dp"
-                android:paddingBottom="32dp"
+                android:paddingTop="28dp"
+                android:paddingBottom="36dp"
+                android:paddingHorizontal="24dp"
                 android:visibility="gone">
 
                 <com.airbnb.lottie.LottieAnimationView
                     android:id="@+id/lottieNoClasses"
-                    android:layout_width="170dp"
-                    android:layout_height="170dp"
+                    android:layout_width="160dp"
+                    android:layout_height="160dp"
                     android:layout_gravity="center"
                     android:visibility="gone"
                     app:lottie_autoPlay="true"
                     app:lottie_loop="true" />
 
+                <!-- Modern Circular Icon Bubble -->
+                <FrameLayout
+                    android:id="@+id/flEmptyIconContainer"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:background="@drawable/bg_empty_state_icon"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivEmptyIcon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_sun"
+                        app:tint="@color/cm_primary"
+                        android:contentDescription="No classes icon" />
+                </FrameLayout>
+
                 <TextView
                     android:id="@+id/tvEmptyEmoji"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:visibility="gone"
                     android:text="@string/emoji_party"
                     android:textSize="48sp"/>
 
@@ -689,9 +708,10 @@
                     android:layout_height="wrap_content"
                     android:text="@string/no_classes_title"
                     android:textColor="@color/cm_text_primary"
-                    android:textSize="20sp"
+                    android:textSize="19sp"
                     android:textStyle="bold"
-                    android:layout_marginTop="12dp"/>
+                    android:gravity="center"
+                    android:layout_marginTop="16dp"/>
 
                 <TextView
                     android:id="@+id/tvNoClassesSubtitle"
@@ -700,7 +720,9 @@
                     android:text="@string/enjoy_free_day"
                     android:textColor="@color/cm_text_muted"
                     android:textSize="14sp"
-                    android:layout_marginTop="4dp"/>
+                    android:gravity="center"
+                    android:layout_marginTop="6dp"
+                    android:maxWidth="280dp"/>
 
             </LinearLayout>
 
