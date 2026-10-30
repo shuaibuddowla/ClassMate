@@ -10591,3 +10591,45 @@ To maintain full architectural parity between the web companion and native Andro
 4. **Streamlined FAB Controls**:
    - Removed the useless campus reset pin button (`MapPin`).
    - Kept only clean, high-utility controls: Zoom (`+`/`-`), Active Bus Focus (`LocateFixed`), Satellite Toggle (`Layers`), and Locate Me (`Navigation` with pulsating green active indicator).
+
+
+---
+
+## 169. Mobile Web Optimization Suite for Transit (Material 3 & iOS/Android Touch Ergonomics)
+
+### 169.1 Incident Diagnosis & Problem Statement
+- **Mobile Viewport Constraints**: On mobile phones (360px - 430px wide), the transit tracker previously experienced:
+  1. **Floating Action Controls (FAB) Position Flaws**: FAB controls had a static `bottom: 255px` position designed for when a bottom sheet was visible. When no bus was selected, this left the FAB stack stranded halfway up the map.
+  2. **Header Text & Control Wrapping**: On screens $\le 380\text{px}$, the unified header pill could compress or wrap title and segmented switcher buttons.
+  3. **Bus Card Metric Line Clamping**: The status pills row on bus cards used strict `nowrap` without flexible wrapping, causing horizontal squeezing on narrow phone screens.
+  4. **Touch Ergonomics**: Lack of fast-touch response (`touch-action: manipulation`) and tactile active feedback (`:active { transform: scale(0.975); }`).
+
+### 169.2 Mobile Architecture & Design System Implemented
+1. **Adaptive Floating Action Controls (FAB) Docking**:
+   - Introduced dynamic state classes in `transit.tsx`:
+     ```tsx
+     <div className={`transit-fab-controls ${selectedBus ? (sheetExpanded ? "sheet-expanded" : "sheet-collapsed") : "no-sheet"}`}>
+     ```
+   - Responsive positioning in `transit.css`:
+     - **No Bus Selected (`.no-sheet`)**: Docks comfortably at `bottom: max(16px, env(safe-area-inset-bottom, 16px))` directly within thumb reach.
+     - **Collapsed Sheet (`.sheet-collapsed`)**: Slides up to `bottom: calc(185px + env(safe-area-inset-bottom, 0px))` floating cleanly above the peek card.
+     - **Expanded Sheet (`.sheet-expanded`)**: Glides to `bottom: calc(58vh + 14px)`.
+     - **Desktop ($\ge 769\text{px}$)**: Standard bottom-right alignment (`bottom: 24px; right: 18px`).
+2. **List View Mobile Refinement ($\le 640\text{px}$)**:
+   - Header card padding tuned to `12px 14px 10px;` with compact `border-radius: 0 0 18px 18px`.
+   - Title scaled to `16.5px` and segmented switcher button heights to `36px`.
+   - Filter chips given touch-momentum scrolling (`-webkit-overflow-scrolling: touch; scrollbar-width: none`).
+   - Metric rows in bus cards allow wrap (`flex-wrap: wrap; gap: 5px 8px; font-size: 11px`), preventing text cut-off.
+   - User distance badge and location request pills sized to `10.5px` with generous tap targets.
+3. **Map View Mobile Refinement ($\le 640\text{px}$ & $\le 380\text{px}$)**:
+   - Floating header overlay docked with `top: max(8px, env(safe-area-inset-top, 8px)); left: 8px; right: 8px`.
+   - Fleet chips horizontally scroll with momentum and `scroll-snap-align: start`.
+   - Material 3 bottom sheet pinned to `left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom, 8px)); border-radius: 20px`.
+   - Approaching stop card padded compactly (`8px 10px`) with 13px bold station names and 11.5px ETA badges.
+4. **Detail Timeline View Mobile Refinement**:
+   - Back button given 36x36px touch surface.
+   - Stoppage items given generous 44px+ tap heights with clear numbered nodes and NEXT bus badges.
+   - Bottom floating summary bar pinned at `bottom: max(8px, env(safe-area-inset-bottom, 8px))`, with timeline bottom padding increased to `120px` to guarantee 0% obstruction of final corridor stops.
+5. **Touch Feedback**:
+   - Universal `-webkit-tap-highlight-color: transparent` and `touch-action: manipulation` across all transit buttons, chips, and cards to eliminate mobile tap latency.
+   - Springy `:active { transform: scale(0.975); }` click state for native app feel.
