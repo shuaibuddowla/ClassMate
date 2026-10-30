@@ -432,17 +432,14 @@
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.transit-fab-controls.no-sheet {
+.transit-fab-controls.no-sheet,
+.transit-fab-controls.no-card {
   bottom: max(16px, env(safe-area-inset-bottom, 16px));
 }
 
-.transit-fab-controls.sheet-collapsed {
-  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
-}
-
-.transit-fab-controls.sheet-expanded {
-  bottom: calc(58vh + 14px);
-  opacity: 0.9;
+.transit-fab-controls.sheet-collapsed,
+.transit-fab-controls.has-card {
+  bottom: calc(160px + env(safe-area-inset-bottom, 0px));
 }
 
 .transit-fab-btn {
@@ -1448,7 +1445,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   A. High-Visibility Transit Bus Pin
+   A. High-Visibility Ergonomic Transit Bus Pin (Sleek 30px Proportional Size)
    -------------------------------------------------------------------------- */
 .transit-bus-pin-wrapper {
   position: relative;
@@ -1457,36 +1454,36 @@
   align-items: center;
   cursor: pointer;
   user-select: none;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.65));
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-  width: 42px;
-  height: 46px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 32px;
+  height: 36px;
 }
 
 .transit-bus-pin-wrapper:hover {
-  transform: scale(1.12);
+  transform: scale(1.08);
   z-index: 999;
 }
 
 .transit-bus-pin-wrapper.selected {
-  transform: scale(1.18);
+  transform: scale(1.1);
   z-index: 1000;
 }
 
-/* Teardrop Round Badge - Ultra Crisp, 100% Opaque & High-Contrast */
+/* Teardrop Round Badge - Refined 30px, 100% Opaque & High-Contrast */
 .transit-bus-badge {
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: #ffffff !important;
-  border: 3.5px solid var(--bus-color, #0284c7) !important;
+  border: 2.5px solid var(--bus-color, #0284c7) !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), inset 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.95);
   position: relative;
   z-index: 2;
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   opacity: 1 !important;
   filter: none !important;
 }
@@ -1498,26 +1495,26 @@
 
 .transit-bus-pin-wrapper.selected .transit-bus-badge {
   border-color: #38bdf8 !important;
-  box-shadow: 0 0 0 3px #38bdf8, 0 0 20px rgba(56, 189, 248, 0.85), 0 8px 24px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 0 2.5px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.75), 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 /* SVG Icon Inside Badge - Bold & Sharp */
 .transit-bus-icon-svg {
   display: block;
-  filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3));
 }
 
 /* Teardrop Pointer Tip */
 .transit-bus-pointer {
   width: 0;
   height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 9px solid var(--bus-color, #0284c7);
-  margin-top: -2px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--bus-color, #0284c7);
+  margin-top: -1px;
   z-index: 1;
-  transition: border-top-color 0.22s ease;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  transition: border-top-color 0.2s ease;
+  filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, 0.4));
 }
 
 .transit-bus-pin-wrapper.selected .transit-bus-pointer {
@@ -1608,12 +1605,12 @@
 /* Radar pulse wave for active driving bus */
 .transit-bus-radar-ring {
   position: absolute;
-  top: -4px;
+  top: -3px;
   left: -2px;
-  width: 46px;
-  height: 46px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 2px solid var(--bus-color, #0284c7);
+  border: 1.5px solid var(--bus-color, #0284c7);
   opacity: 0.8;
   animation: transitBusRadar 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   pointer-events: none;
@@ -3991,271 +3988,288 @@
 .transit-fab-btn, .transit-fab-group { color: var(--transit-pink); background: #fff; border-color: #eee; box-shadow: 0 4px 14px rgba(15, 15, 25, 0.18); }
 .transit-fab-btn.active-track { color: var(--transit-pink); background: #fff0f5; }
 
-/* Material 3 Bottom Sheet Card */
-.transit-bottom-sheet {
+/* ==========================================================================
+   Modern Floating Bus Peek Card (Map View: Fixed Summary, Zero Clutter)
+   ========================================================================== */
+.transit-map-bus-card {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
+  left: 12px;
+  right: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  max-width: 460px;
+  margin: 0 auto;
   z-index: 30;
-  color: #282932;
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid #e8e8ed;
-  border-radius: 24px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
-  padding: 10px 16px 14px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.16);
+  padding: 13px 15px 12px;
   display: flex;
   flex-direction: column;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 8px;
   box-sizing: border-box;
+  animation: slideUpFade 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (min-width: 769px) {
-  .transit-bottom-sheet {
-    left: 18px;
+  .transit-map-bus-card {
+    left: 20px;
     right: auto;
-    bottom: 18px;
-    width: min(480px, calc(100% - 36px));
-    padding: 12px 18px 14px;
+    bottom: 20px;
+    width: 430px;
+    padding: 14px 18px 14px;
   }
 }
 
-.transit-sheet-drag-handle {
-  width: 100%;
-  height: 14px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  margin-bottom: 4px;
+@keyframes slideUpFade {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
-.transit-sheet-handle-pill {
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: #cbd5e1;
-  transition: all 0.2s ease;
-}
-
-.transit-sheet-drag-handle:hover .transit-sheet-handle-pill {
-  background: #94a3b8;
-  width: 44px;
-}
-
-/* Header Row of Bottom Sheet */
-.transit-sheet-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.transit-sheet-top-bar {
+/* Row 1: Identity & Live Status Dock */
+.transit-mbc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  width: 100%;
 }
 
-.transit-sheet-bus-identity {
+.transit-mbc-identity {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 1;
 }
 
-.transit-sheet-route-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.transit-sheet-bus-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  font-family: monospace;
-  letter-spacing: 0.3px;
-  border: 1.5px solid currentColor;
+.transit-mbc-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
 }
 
-.transit-bus-name-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.transit-bus-name-bn {
-  font-size: 16px;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1.2;
+.transit-mbc-name {
   margin: 0;
-}
-
-.transit-bus-name-en {
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-}
-
-.transit-bus-route-name {
-  font-size: 11.5px;
-  color: #64748b;
-  margin-top: 1px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.2px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
 }
 
-.transit-sheet-header-right {
+.transit-mbc-id {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.transit-mbc-header-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
 
-.transit-speed-pill {
+.transit-mbc-status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.transit-speed-pill.active {
-  color: #16a34a;
-  background: #e9f6ef;
-}
-
-.transit-sheet-user-dist-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
+  padding: 3px 9px;
+  border-radius: 999px;
   white-space: nowrap;
 }
 
-.transit-sheet-footer-dist {
-  color: #059669;
-  font-weight: 600;
-  font-size: 11px;
+.transit-mbc-status-pill.active {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
-.transit-speed-pill.stale {
-  color: #b45309;
+.transit-mbc-status-pill.standby {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.transit-mbc-status-pill.stale {
   background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
 }
 
-.transit-sheet-close-btn {
+.transit-mbc-close-btn {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   color: #64748b;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
   padding: 0;
+  flex-shrink: 0;
 }
 
-.transit-sheet-close-btn:hover {
+.transit-mbc-close-btn:hover {
   background: #fee2e2;
   color: #ef4444;
   border-color: #fca5a5;
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
-/* Compact Approaching Stop Strip (Zero vertical bloat) */
-.transit-sheet-approaching-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #fff5f8;
-  border: 1px solid #fecdd3;
-  border-radius: 12px;
-  margin-bottom: 6px;
-  box-sizing: border-box;
-}
-
-.transit-approaching-strip-left {
+/* Row 2: Route Corridor Row (Full width, zero truncation) */
+.transit-mbc-route-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: 12px;
+  color: #4b5563;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 0 1px;
+}
+
+.transit-mbc-route-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.transit-mbc-route-text {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Row 3: Next Approaching Stop Banner */
+.transit-mbc-stop-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 13px;
+  padding: 8px 11px;
+}
+
+.transit-mbc-stop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
   flex: 1;
 }
 
-.transit-approaching-strip-right {
+.transit-mbc-stop-title-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.transit-mbc-stop-pin {
+  color: var(--transit-pink, #b71454);
   flex-shrink: 0;
 }
 
-.transit-bus-route-tag {
+.transit-mbc-stop-prefix {
+  color: #64748b;
+  font-size: 11.5px;
+}
+
+.transit-mbc-stop-name {
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.transit-mbc-telemetry-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
   color: #64748b;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
+  flex-wrap: wrap;
 }
 
-.transit-standby-p-icon {
-  font-size: 10px;
-  line-height: 1;
+.transit-mbc-sep {
+  color: #cbd5e1;
 }
 
-.transit-sheet-detail-action.full-width {
-  width: 100%;
+.transit-mbc-user-dist {
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.transit-mbc-bell-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.transit-mbc-bell-btn:hover {
+  border-color: #f472b6;
+  color: var(--transit-pink, #b71454);
+  background: #fff1f5;
+}
+
+.transit-mbc-bell-btn.armed {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+/* Row 4: Primary Action CTA */
+.transit-mbc-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 12px;
+  padding: 8px 14px;
   font-size: 12px;
   font-weight: 700;
   border-radius: 12px;
   background: #fff1f5;
   border: 1px solid #fbcfe8;
-  color: #b71454;
+  color: var(--transit-pink, #b71454);
   cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
-.transit-sheet-detail-action.full-width:hover {
-  background: #ffe4e6;
-  border-color: #f472b6;
+.transit-mbc-action-btn:hover {
+  background: var(--transit-pink, #b71454);
+  color: #ffffff;
+  border-color: var(--transit-pink, #b71454);
 }
 
 /* Approaching Stop Card */
@@ -4691,10 +4705,12 @@
   .transit-fab-group {
     display: none !important;
   }
+  .transit-fab-controls.has-card,
   .transit-fab-controls.sheet-collapsed {
-    bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(160px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;
   }
+  .transit-fab-controls.no-card,
   .transit-fab-controls.no-sheet {
     bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;

@@ -330,7 +330,6 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string>("");
   const [satelliteView, setSatelliteView] = useState<boolean>(true);
-  const [sheetExpanded, setSheetExpanded] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [clockNow, setClockNow] = useState<number>(() => Date.now());
@@ -759,6 +758,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       if (
         !target?.closest(".transit-bus-pin-wrapper") &&
         !target?.closest(".transit-lollipop-wrapper") &&
+        !target?.closest(".transit-map-bus-card") &&
         !target?.closest(".transit-bottom-sheet") &&
         !target?.closest(".transit-top-overlay")
       ) {
@@ -1011,7 +1011,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           }
           ${bus.isDriving ? `<div class="transit-bus-radar-ring" style="border-color: ${bus.color};"></div>` : ""}
           <div class="transit-bus-badge" style="border-color: ${bus.color};">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
               <path d="M4 16.5C4 17.33 4.67 18 5.5 18H6V19.5C6 20.33 6.67 21 7.5 21H8.5C9.33 21 10 20.33 10 19.5V18H14V19.5C14 20.33 14.67 21 15.5 21H16.5C17.33 21 18 20.33 18 19.5V18H18.5C19.33 18 20 17.33 20 16.5V6.5C20 3.8 17.8 3 12 3C6.2 3 4 3.8 4 6.5V16.5Z" fill="${bus.color}"/>
               <path d="M5.8 7H18.2C18.4 7 18.5 7.15 18.5 7.35V11.2C18.5 11.4 18.4 11.5 18.2 11.5H5.8C5.6 11.5 5.5 11.4 5.5 11.2V7.35C5.5 7.15 5.6 7 5.8 7Z" fill="#ffffff" fill-opacity="0.95"/>
               <rect x="8.5" y="4.5" width="7" height="1.4" rx="0.7" fill="#ffffff" fill-opacity="0.9"/>
@@ -1028,8 +1028,8 @@ export function Transit({ ctx }: { ctx?: any }) {
       const icon = L.divIcon({
         className: "transit-bus-marker-container",
         html,
-        iconSize: [44, 48],
-        iconAnchor: [22, 48]
+        iconSize: [32, 36],
+        iconAnchor: [16, 36]
       });
 
       let marker = busMarkersRef.current.get(bus.id);
@@ -2095,7 +2095,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           )}
 
           {/* Right-Side Floating Map Controls (z-20) */}
-          <div className={`transit-fab-controls ${selectedBus ? (sheetExpanded ? "sheet-expanded" : "sheet-collapsed") : "no-sheet"}`}>
+          <div className={`transit-fab-controls ${selectedBus ? "has-card" : "no-card"}`}>
             <div className="transit-fab-group">
               <button
                 onClick={() => mapRef.current?.zoomIn()}
@@ -2158,187 +2158,124 @@ export function Transit({ ctx }: { ctx?: any }) {
             </button>
           </div>
 
-          {/* C. Material 3 Bottom Sheet (Appears ONLY when a bus is tapped, disappears when clicking elsewhere) */}
+          {/* C. Modern Floating Bus Peek Card (Fixed height summary, no vertical expansion, click 'সম্পূর্ণ রুট' for timeline) */}
           {selectedBus && (
             <div
-              className={`transit-bottom-sheet ${sheetExpanded ? "expanded" : "collapsed"}`}
+              className="transit-map-bus-card"
               style={{ "--bus-accent": selectedBus.color } as any}
+              role="region"
+              aria-label={`${selectedBus.nameBn} বাস বিবরণ`}
             >
-              <div
-                className="transit-sheet-drag-handle"
-                onClick={() => setSheetExpanded((prev) => !prev)}
-                role="button"
-                tabIndex={0}
-                aria-label={sheetExpanded ? "Collapse route panel" : "Expand route panel"}
-              >
-                <div className="transit-sheet-handle-pill" />
-              </div>
+              {/* Row 1: Bus Identity (Left) + Live Status & Close Button (Right) */}
+              <div className="transit-mbc-header">
+                <div className="transit-mbc-identity">
+                  <span
+                    className="transit-mbc-dot"
+                    style={{ backgroundColor: selectedBus.color || "#b71454" }}
+                  />
+                  <h2 className="transit-mbc-name">{selectedBus.nameBn}</h2>
+                  <span
+                    className="transit-mbc-id"
+                    style={{
+                      backgroundColor: `${selectedBus.color}18`,
+                      color: selectedBus.color || "#b71454",
+                      borderColor: `${selectedBus.color}35`
+                    }}
+                  >
+                    {toBengaliDigits(formatBusShortId(selectedBus.id))}
+                  </span>
+                </div>
 
-              {/* Header Row: Identity & Telemetry */}
-              <div className="transit-sheet-header">
-                <div className="transit-sheet-top-bar">
-                  <div className="transit-sheet-bus-identity">
-                    <div
-                      className="transit-sheet-bus-badge"
+                <div className="transit-mbc-header-actions">
+                  <div className={`transit-mbc-status-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : "standby"}`}>
+                    <span
+                      className="transit-pulse-dot"
                       style={{
-                        backgroundColor: `${selectedBus.color}22`,
-                        borderColor: selectedBus.color,
-                        color: selectedBus.color
+                        background: selectedBus.isStale ? "#f97316" : selectedBus.speed > 0 ? "#10b981" : "#fbbf24"
                       }}
-                    >
-                      <Bus size={12} />
-                      <span className="transit-badge-id">{toBengaliDigits(formatBusShortId(selectedBus.id))}</span>
-                    </div>
-
-                    <div className="transit-bus-name-row">
-                      <h2 className="transit-bus-name-bn">{selectedBus.nameBn}</h2>
-                      <span className="transit-bus-route-tag">{selectedBus.routeName}</span>
-                    </div>
+                    />
+                    <span>
+                      {selectedBus.isStale
+                        ? "GPS বিলম্বিত"
+                        : selectedBus.speed > 0
+                        ? `⚡ চলন্ত (${toBengaliDigits(Math.round(selectedBus.speed))} কিমি/ঘ)`
+                        : "🅿️ ক্যাম্পাস স্ট্যান্ডবাই"}
+                    </span>
                   </div>
 
-                  <div className="transit-sheet-header-right">
-                    {userLocation && (
-                      <div className="transit-sheet-user-dist-pill" title="আপনার অবস্থান থেকে এই বাসের দূরত্ব">
-                        <MapPin size={11} color="#059669" />
-                        <span>{formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}</span>
-                      </div>
-                    )}
-                    <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
-                      {selectedBus.speed > 0 ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedBusId("");
+                    }}
+                    className="transit-mbc-close-btn"
+                    title="কার্ড বন্ধ করুন"
+                    aria-label="Close bus card"
+                    type="button"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Dedicated Full-Width Route Name (Zero Truncation) */}
+              <div className="transit-mbc-route-row">
+                <Navigation size={12} className="transit-mbc-route-icon" />
+                <span className="transit-mbc-route-text">{selectedBus.routeName}</span>
+              </div>
+
+              {/* Row 3: Next Approaching Stop Banner */}
+              {nextApproachingStopInfo && (
+                <div className="transit-mbc-stop-banner">
+                  <div className="transit-mbc-stop-info">
+                    <div className="transit-mbc-stop-title-line">
+                      <MapPin size={13} className="transit-mbc-stop-pin" />
+                      <span className="transit-mbc-stop-prefix">পরবর্তী স্টপ:</span>
+                      <strong className="transit-mbc-stop-name">{nextApproachingStopInfo.station.nameBn}</strong>
+                    </div>
+
+                    <div className="transit-mbc-telemetry-line">
+                      <span>দূরত্ব: <strong>{toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি</strong></span>
+                      <span className="transit-mbc-sep">•</span>
+                      <span>ড্রাইভ: <strong>~{toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি</strong></span>
+                      {userLocation && (
                         <>
-                          <Navigation size={11} className="spin-slow" />
-                          <span>{toBengaliDigits(Math.round(selectedBus.speed))} কিমি/ঘ</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="transit-standby-p-icon">🅿️</span>
-                          <span>স্ট্যান্ডবাই</span>
+                          <span className="transit-mbc-sep">•</span>
+                          <span className="transit-mbc-user-dist">
+                            আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}
+                          </span>
                         </>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedBusId("");
-                      }}
-                      className="transit-sheet-close-btn"
-                      title="বন্ধ করুন"
-                      aria-label="Close bottom sheet"
-                      type="button"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Compact Approaching Stop Strip (Saves 70px of vertical map viewport) */}
-              {nextApproachingStopInfo && (
-                <div className="transit-sheet-approaching-strip">
-                  <div className="transit-approaching-strip-left">
-                    <span className="transit-approaching-badge">পরবর্তী</span>
-                    <strong className="transit-approaching-name">{nextApproachingStopInfo.station.nameBn}</strong>
-                    <span className="transit-approaching-dist">• {toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি</span>
                   </div>
 
-                  <div className="transit-approaching-strip-right">
-                    <span className="transit-approaching-eta">
-                      ~{toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি {selectedBus.speed > 0 ? "" : "ড্রাইভ"}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleStopAlert(nextApproachingStopInfo.station.id);
-                      }}
-                      className={`transit-stop-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
-                      title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয়" : "অ্যালার্ট দিন"}
-                      type="button"
-                      aria-label="Toggle arrival notification"
-                    >
-                      <Bell size={13} />
-                    </button>
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleStopAlert(nextApproachingStopInfo.station.id);
+                    }}
+                    className={`transit-mbc-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
+                    title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয় — বন্ধ করতে ট্যাপ করুন" : "স্টপে পৌঁছালে অ্যালার্ট পেতে ট্যাপ করুন"}
+                    type="button"
+                    aria-label="Toggle arrival notification"
+                  >
+                    <Bell size={15} />
+                  </button>
                 </div>
               )}
 
-              {/* Footer Row */}
-              <div className="transit-sheet-footer-row">
-                <button
-                  onClick={() => {
-                    setDetailBusId(selectedBus.id);
-                    setActiveView("detail");
-                  }}
-                  className="transit-sheet-detail-action full-width"
-                  type="button"
-                >
-                  <span>সম্পূর্ণ রুট ও সময়সূচী ({toBengaliDigits(CORRIDOR_STATIONS.length)}টি স্টপেজ)</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              {sheetExpanded && (
-                <div className="transit-stepper-scroll-container">
-                  <div className="transit-stepper-header-row">
-                    <span className="transit-stepper-title">করিডোর স্টপেজসমূহ ({toBengaliDigits(CORRIDOR_STATIONS.length)})</span>
-                    <span className="transit-stepper-hint">অ্যালার্ট পেতে 🔔 ট্যাপ করুন</span>
-                  </div>
-
-                  <div className="transit-stepper-list">
-                    {CORRIDOR_STATIONS.map((st, idx) => {
-                      const isApproaching = nextApproachingStopInfo?.station.id === st.id;
-                      const isAlerted = !!alertedStops[st.id];
-                      const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
-                      const distKm = (distM / 1000).toFixed(2);
-                      const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60));
-
-                      return (
-                        <div
-                          key={st.id}
-                          onClick={() => setSelectedStoppageAction(st)}
-                          className={`transit-stepper-row ${isApproaching ? "approaching" : ""}`}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
-                          <div className="transit-stepper-node">{toBengaliDigits(st.order)}</div>
-
-                          <div className="transit-stepper-content">
-                            <div className="transit-stepper-title-row">
-                              <span className="transit-stepper-stop-name">{st.nameBn}</span>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                {isApproaching && <span className="transit-stepper-badge-next">পরবর্তী</span>}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleStopAlert(st.id);
-                                  }}
-                                  className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
-                                  type="button"
-                                  title={isAlerted ? "অ্যালার্ট বন্ধ করুন" : "অ্যালার্ট দিন"}
-                                >
-                                  <Bell size={14} />
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="transit-stepper-sub">
-                              <span>{st.name}</span>
-                              <span>•</span>
-                              <span>{toBengaliDigits(distKm)} কিমি</span>
-                              <span>•</span>
-                              <span style={{ color: isApproaching ? "#b71454" : "#94a3b8" }}>
-                                {selectedBus.isStale
-                                  ? "GPS বিলম্বিত"
-                                  : `~${toBengaliDigits(etaM)} মি ${selectedBus.speed === 0 ? "ড্রাইভ" : "প্রত্যাশিত"}`}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Row 4: Primary Action CTA */}
+              <button
+                onClick={() => {
+                  setDetailBusId(selectedBus.id);
+                  setActiveView("detail");
+                }}
+                className="transit-mbc-action-btn"
+                type="button"
+              >
+                <span>সম্পূর্ণ রুট ও সময়সূচী দেখুন ({toBengaliDigits(CORRIDOR_STATIONS.length)}টি স্টপেজ)</span>
+                <ChevronRight size={15} />
+              </button>
             </div>
           )}
         </>

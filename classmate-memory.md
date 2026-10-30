@@ -10991,3 +10991,31 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
    - Localized live counts, stepper stop numbers, distances (`০.২১ কিমি`), and ETA drive times throughout modal action sheets and expanded bottom sheet drawers.
 4. **Production Build & Verification**:
    - Verified zero TypeScript compilation errors with `npm --prefix web run build`.
+
+
+---
+
+## 176. Transit Map UI/UX Modernization: Fixed Peek Card & Ergonomic 30px Bus Pins
+
+### A. Problem Diagnostic (from User Screenshot `media_1793399870532_3c771fa6.jpg`)
+1. **Unwanted Bottom Sheet Expansion**: Clicking the drag handle or controller bar expanded the bottom sheet into a 60vh vertical stepper of all 28 corridor stoppages right over the map, covering the satellite imagery and conflicting with the dedicated "সম্পূর্ণ রুট ও সময়সূচী" screen.
+2. **Text Clipping & Two-Line Numeric Wrapping**: Inside the sheet, the next stop box cramped `• ০.১৭ কিমি` onto two lines (`• ০.১৭` / `কিমি`), and the corridor name was clipped with ellipses (`মাভাবিপ্রবি পরিব...`).
+3. **Oversized Map Bus Pins**: The bus markers on the Leaflet map were 42px wide, scaling up to nearly 50px when selected, obscuring multiple campus intersections, pathways, and stop markers.
+
+### B. Architectural & UI/UX Solutions Implemented
+1. **Deleted Bottom Sheet Expansion & Stepper**:
+   - Completely deleted `sheetExpanded` state and the in-sheet 28-stoppage stepper scroll container (`.transit-stepper-scroll-container`).
+   - Removed the clickable drag handle expander.
+   - Replaced the expanding sheet with `.transit-map-bus-card`, a compact, fixed-height, glassmorphic floating peek card.
+2. **Redesigned Floating Bus Peek Card (4 Clean Rows)**:
+   - **Row 1 (Identity & Real-Time Status)**: Bus Avatar Dot + Name (`সংশপ্তক`, 17px bold) + Bengali ID Chip (`[ ০০০৫ ]`) on left; Live Status Badge (`🅿️ ক্যাম্পাস স্ট্যান্ডবাই` or `⚡ চলন্ত ২৫ কিমি/ঘ`) + Round Dismiss Button `[ ✕ ]` on right.
+   - **Row 2 (Route Corridor)**: Full-width line (`⇄ মাভাবিপ্রবি পরিবহন করিডোর` or `ক্যাম্পাস ⇄ কাগমারী ⇄ নিরালা`). 100% visible, zero truncation.
+   - **Row 3 (Next Stop Milestone Banner)**: Dedicated styled box containing `🚏 পরবর্তী স্টপ: প্রথম গেট বাস স্টপ` and telemetry `দূরত্ব: ০.১৭ কিমি • ড্রাইভ: ~১ মি • আপনার থেকে ৫২৯ মি`, plus arrival alert bell `[ 🔔 ]`.
+   - **Row 4 (Primary CTA)**: Full-width branded pill `[ সম্পূর্ণ রুট ও সময়সূচী দেখুন (২৮টি স্টপ) → ]`, cleanly navigating to the dedicated timeline Detail View.
+3. **Ergonomic Map Bus Markers (~35% Size Reduction)**:
+   - Scaled badge from $42\text{px} \to 30\text{px}$ diameter with a 2.5px crisp border.
+   - Scaled SVG icon from $24\text{px} \to 17\text{px}$ (maintaining high-contrast vector clarity).
+   - Scaled pointer tip to 6px; Leaflet `iconSize` adjusted from $[44, 48] \to [32, 36]$ with anchor $[16, 36]$.
+   - Scaled active driving radar ring from $46\text{px} \to 34\text{px}$.
+4. **Production Build & Verification**:
+   - Verified zero TypeScript compilation errors with `npm --prefix web run build`.
