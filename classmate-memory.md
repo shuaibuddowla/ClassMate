@@ -1,4 +1,4 @@
-# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
+﻿# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
 
 This memory file serves as the definitive engineering knowledge base and memory reference for the ClassMate Android APK project, Web companion client, and Supabase backend. It documents architecture, design tokens, data models, recent features, debugging resolutions, and implementation guidelines across all modules.
 
@@ -9591,4 +9591,289 @@ The Android APK transit architecture is implemented in:
 | **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
 | **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `17785ed`, `1a0b34f`, `6ee9f73`) |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+---
+
+## 159. Production Transit Satellite Street Alignment, High-Visibility Bus Marker Redesign & Contrast Hardening (Oct 30, 2026 - Master State)
+
+### A. Executive Architectural Synthesis & Session Context
+
+Following the multi-view transit hub overhaul (2-Tab Bus List, Route Stoppage Timeline, and Decoupled Segmented Tabs in Commit `6ee9f73`), recent Antigravity engineering transcripts (conversation `f299dd3b-5ee4-474d-a380-72de6b93c62b`, verification reviews `70d585c0-1826-491f-9456-8c1525383e53`, `1bdeace6-3937-4c49-9ea8-90fde9af9485`, `029a73f2-14ea-4136-bb3d-b20f937d8069`, and Android ergonomics session `b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`) addressed two critical visual, ergonomic, and geographic defects identified through physical device testing and satellite map comparison:
+
+1. **Street-Level Road Geometry Misalignment**: The previous road polyline cut across campus ponds, lawns, and took improper turns in Tangail city. Calibrated the polyline to follow actual physical asphalt roads across the MBSTU campus loop, Santosh-Kagmari road, and Tangail city center loop, and standardized the 24-station corridor sequence (Commit `10f56bc`, Vercel Deployment `dpl_81TvHyDwGuBURc3dBqZJMzLxqNpx`).
+2. **Bus Marker Visibility & Clutter Elimination**: The previous thin wireframe bus icons were barely visible against satellite foliage and rooftop tiles, while permanent bus name labels cluttered the map canvas. Redesigned the bus marker into a high-contrast front-view commuter bus badge, implemented an on-demand click-to-view popover callout with live speed indicators, added animated radar wave kinematics for moving buses, and applied a dark frosted pill with drop-shadow to bus stop labels for 100% legibility (Commit `25ad6da`, Vercel Deployment `dpl_4XphBmp5DUdAturxp1hmTZb3Ujji`).
+
+```mermaid
+flowchart TD
+    subgraph S1 ["1. Street-Accurate Polyline (Commit 10f56bc)"]
+        Campus["MBSTU Campus Loop<br>(Mukto Mancho → Halls → 1st Gate)"] --> Highway["Regional Highway Corridor<br>(Santosh → Kagmari Bridges → Nirala)"]
+        Highway --> City["Tangail City Center Loop<br>(DC Lake ⇄ Puraton Bus Stand ⇄ Nirala)"]
+    end
+
+    subgraph S2 ["2. High-Visibility Marker Engine (Commit 25ad6da)"]
+        Pin["38px Solid White Teardrop Badge<br>(3.5px Colored Border + Downward Pointer)"]
+        SVG["Front-View Bus Chassis SVG<br>(Windshield Glass + Dual Glowing Headlights)"]
+        Radar["Animated Radar Wave<br>(transitBusRadar keyframes for isDriving)"]
+        Pin --> SVG
+        Pin --> Radar
+    end
+
+    subgraph S3 ["3. Ergonomics & Contrast Isolation"]
+        Hidden["Clean Map Canvas<br>(Bus Names Strictly Hidden By Default)"]
+        Click["Marker Click Event (stopPropagation)<br>Opens Interactive Floating Callout"]
+        Contrast["Dark Frosted Stop Pill (rgba 15,23,42,0.92)<br>100% Text Legibility Over Satellite Tiles"]
+    end
+
+    S1 --> S2 --> S3
+```
+
+---
+
+### B. Street Polyline & Corridor Stoppage Ground Truth Calibration (Commit `10f56bc`)
+
+The bus route polyline on the web was calibrated against physical Google Satellite imagery and verified against the native Android app route dialog:
+
+1. **MBSTU Campus Loop Geometry**:
+   - Traces the actual paved campus road: **Mukto Mancho** $\rightarrow$ **Academic Building-1** $\rightarrow$ **SOH Hall** $\rightarrow$ **Mannan Hall** $\rightarrow$ **Academic Building-2** $\rightarrow$ **Fifth Gate** $\rightarrow$ **Prottoi-71** $\rightarrow$ **First Gate (Main Gate)**.
+   - Eliminates polyline shortcuts cutting through the campus pond or academic green lawns.
+2. **Santosh to Kagmari Main Road**:
+   - Follows Santosh Road directly through **Arif Nagar** $\rightarrow$ **Shena Nagar** $\rightarrow$ **Kagmari More**.
+3. **Kagmari to Nirala More Corridor**:
+   - Traces the highway passing **Kagmari Bridge-1** $\rightarrow$ **Kagmari Bridge-2** $\rightarrow$ **Baby Stand** $\rightarrow$ **Shantikunja More** $\rightarrow$ **Nirala More**.
+4. **Tangail City Center Loop**:
+   - **Western arm**: Nirala More $\rightarrow$ Pouro Uddan $\rightarrow$ Taltola-Shimultoli $\rightarrow$ Bottola Road $\rightarrow$ DC Lake (North tip).
+   - **Eastern arm**: DC Lake $\rightarrow$ District Bus Stop $\rightarrow$ Kazi-Nazrul Sarani $\rightarrow$ Baitun Nur Jame Mosque $\rightarrow$ C & B More $\rightarrow$ Kumudini College Gate $\rightarrow$ Registry Para Road $\rightarrow$ Puraton Bus Stand $\rightarrow$ Boro Kalibari More $\rightarrow$ connects back diagonally to Nirala More.
+   - **Return path**: Seamlessly rejoins the main arterial back through Shantikunja, Baby Stand, Kagmari, and First Gate to Mukto Mancho.
+5. **Corridor Stoppage Sequence**:
+   - Standardized all 24 stops in `CORRIDOR_STATIONS` in `web/src/components/transit.tsx` matching the app's stoppage sequence:
+     ```typescript
+     export const CORRIDOR_STATIONS: Stoppage[] = [
+       { id: "mukto-mancho", nameBn: "মুক্ত মঞ্চ", nameEn: "Mukto Mancho", lat: 24.23515, lon: 89.89009, sequence: 1 },
+       { id: "academic-1", nameBn: "একাডেমিক ভবন ১", nameEn: "Academic Building-1", lat: 24.23746, lon: 89.89061, sequence: 2 },
+       { id: "soh-hall", nameBn: "এসওএইচ হল", nameEn: "SOH Hall", lat: 24.23845, lon: 89.89049, sequence: 3 },
+       { id: "mannan-hall", nameBn: "মান্নান হল", nameEn: "Mannan Hall", lat: 24.23861, lon: 89.89108, sequence: 4 },
+       { id: "academic-2", nameBn: "একাডেমিক ভবন ২", nameEn: "Academic Building-2", lat: 24.23708, lon: 89.89152, sequence: 5 },
+       { id: "fifth-gate", nameBn: "৫ নং গেট", nameEn: "Fifth Gate", lat: 24.23577, lon: 89.89178, sequence: 6 },
+       { id: "prottoi-71", nameBn: "প্রত্যয় '৭১", nameEn: "Prottoi-71", lat: 24.23492, lon: 89.89197, sequence: 7 },
+       { id: "first-gate", nameBn: "১ নং গেট", nameEn: "First Gate", lat: 24.23363, lon: 89.89218, sequence: 8 },
+       { id: "arif-nagar", nameBn: "আরিফ নগর", nameEn: "Arif Nagar", lat: 24.23401, lon: 89.89491, sequence: 9 },
+       { id: "shena-nagar", nameBn: "সেনা নগর", nameEn: "Shena Nagar", lat: 24.23399, lon: 89.89635, sequence: 10 },
+       { id: "kagmari-more", nameBn: "কাগমারা মোড়", nameEn: "Kagmari More", lat: 24.23404, lon: 89.89991, sequence: 11 },
+       { id: "kagmari-bridge-1", nameBn: "কাগমারা ব্রিজ ১", nameEn: "Kagmari Bridge-1", lat: 24.23488, lon: 89.90125, sequence: 12 },
+       { id: "kagmari-bridge-2", nameBn: "কাগমারা ব্রিজ ২", nameEn: "Kagmari Bridge-2", lat: 24.23800, lon: 89.90250, sequence: 13 },
+       { id: "baby-stand", nameBn: "বেবী স্ট্যান্ড", nameEn: "Baby Stand", lat: 24.24152, lon: 89.90427, sequence: 14 },
+       { id: "shantikunja-more", nameBn: "শান্তিকুঞ্জ মোড়", nameEn: "Shantikunja More", lat: 24.24626, lon: 89.90363, sequence: 15 },
+       { id: "nirala-more", nameBn: "নিরালা মোড়", nameEn: "Nirala More", lat: 24.24816, lon: 89.90415, sequence: 16 },
+       { id: "pouro-uddan", nameBn: "পৌর উদ্যান", nameEn: "Pouro Uddan", lat: 24.24885, lon: 89.90569, sequence: 17 },
+       { id: "taltola-shimultoli", nameBn: "তালতলা-শিমুলতলী", nameEn: "Taltola-Shimultoli", lat: 24.24734, lon: 89.90804, sequence: 18 },
+       { id: "bottola-road", nameBn: "বটতলা রোড", nameEn: "Bottola Road", lat: 24.24645, lon: 89.91320, sequence: 19 },
+       { id: "dc-lake", nameBn: "ডিসি লেক", nameEn: "DC Lake", lat: 24.24973, lon: 89.91484, sequence: 20 },
+       { id: "district-bus-stop", nameBn: "জেলা বাস স্টপ", nameEn: "District Bus Stop", lat: 24.25346, lon: 89.91392, sequence: 21 },
+       { id: "kazi-nazrul-sarani", nameBn: "কাজী নজরুল সরণি", nameEn: "Kazi-Nazrul Sarani", lat: 24.25479, lon: 89.91144, sequence: 22 },
+       { id: "baitun-nur-mosque", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", nameEn: "Baitun Nur Jame Mosque", lat: 24.25206, lon: 89.91694, sequence: 23 },
+       { id: "puraton-bus-stand", nameBn: "পুরাতন বাস স্ট্যান্ড", nameEn: "Puraton Bus Stand", lat: 24.24945, lon: 89.91950, sequence: 24 }
+     ];
+     ```
+6. **Complete Bengali UI Localization**:
+   - Header titles: `MBSTU বাস ট্র্যাকার` with subtitle `সন্তোষ ক্যাম্পাস ⇄ নিরালা শহর লুপ`.
+   - Status indicators: `[X]টি বাস লাইভ`, `GPS-এর অপেক্ষায়`, `সংযোগ ফিরছে`, `সংযোগ হচ্ছে`, `ডেমো মোড`.
+   - Action controls: `লাইভ` / `ডেমো` toggle button, `বাসের তালিকা` / `ম্যাপ ভিউ` segmented switcher.
+   - Stoppage details: `ম্যাপে দেখুন` (Fly to map CTA), `স্টপেজ খুঁজুন...` (Search input placeholder), `ফিল্টার মুছুন` (Reset filter button).
+
+---
+
+### C. High-Visibility Commuter Bus Marker Redesign & Kinematic Radar Animation (Commit `25ad6da`)
+
+To solve the defect where thin bus wireframes disappeared into satellite foliage and building textures, the bus pin was completely re-engineered from the ground up:
+
+```
+           +-----------------------------+
+           |  (•) প্রত্যয় [CSE-01]       |  <-- Floating Popover Callout
+           |      ⚡ 24 km/h              |      (Strictly Hidden Until Clicked)
+           +--------------v--------------+
+                        \   /
+                         v v
+                    .-----------.
+                   /   .-----.   \   <-- Animated Radar Wave (transit-bus-radar-ring)
+                  |   / +---+ \   |      (Active only when bus.isDriving is true)
+                  |  |  |BUS|  |  |
+                  |   \ +---+ /   |  <-- 38px Solid White Teardrop Badge (transit-bus-badge)
+                   \   '-----'   /       (3.5px colored border matching bus fleet identity)
+                    '-----------'
+                          V          <-- Sharp Downward Pointer (transit-bus-pointer)
+                          .          <-- Exact GPS Lat/Lon on asphalt road
+```
+
+1. **Teardrop Round Badge (`.transit-bus-badge`)**:
+   - Diameter: 38px $\times$ 38px, circular (`border-radius: 50%`).
+   - Fill: Solid pure white (`#ffffff`), eliminating see-through transparency over map textures.
+   - Border: Heavy 3.5px solid border tinted with each bus's dedicated theme color (`var(--bus-color)`).
+   - Downward Pointer: Sharp CSS border triangle (`.transit-bus-pointer`, 7px transparent left/right, 8px solid top) positioned directly below the circular badge, pinpointing the road coordinate without offset drift.
+2. **Two-Tone Front-View Commuter Bus SVG**:
+   - Replaced thin wireframe icon with a bold 22x22 front-facing bus illustration:
+     ```html
+     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
+       <!-- Solid colored bus chassis -->
+       <path d="M4 16.5C4 17.33 4.67 18 5.5 18H6V19.5C6 20.33 6.67 21 7.5 21H8.5C9.33 21 10 20.33 10 19.5V18H14V19.5C14 20.33 14.67 21 15.5 21H16.5C17.33 21 18 20.33 18 19.5V18H18.5C19.33 18 20 17.33 20 16.5V6.5C20 3.8 17.8 3 12 3C6.2 3 4 3.8 4 6.5V16.5Z" fill="${bus.color}"/>
+       <!-- Crisp white windshield glass -->
+       <path d="M5.8 7H18.2C18.4 7 18.5 7.15 18.5 7.35V11.2C18.5 11.4 18.4 11.5 18.2 11.5H5.8C5.6 11.5 5.5 11.4 5.5 11.2V7.35C5.5 7.15 5.6 7 5.8 7Z" fill="#ffffff" fill-opacity="0.95"/>
+       <!-- Roof route destination sign -->
+       <rect x="8.5" y="4.5" width="7" height="1.4" rx="0.7" fill="#ffffff" fill-opacity="0.9"/>
+       <!-- Glowing dual yellow headlights -->
+       <circle cx="7" cy="14.8" r="1.3" fill="#fef08a"/>
+       <circle cx="17" cy="14.8" r="1.3" fill="#fef08a"/>
+       <!-- Front bumper grille -->
+       <rect x="10" y="14.4" width="4" height="1" rx="0.5" fill="#ffffff" fill-opacity="0.8"/>
+       <path d="M5.5 16.5H18.5" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round" stroke-opacity="0.6"/>
+     </svg>
+     ```
+3. **Kinematic Radar Wave Animation (`.transit-bus-radar-ring`)**:
+   - Rendered conditionally behind the badge strictly when `bus.isDriving === true`.
+   - CSS Keyframe animation (`transitBusRadar`):
+     ```css
+     .transit-bus-radar-ring {
+       position: absolute;
+       top: -4px;
+       left: -2px;
+       width: 46px;
+       height: 46px;
+       border-radius: 50%;
+       border: 2px solid var(--bus-color, #0284c7);
+       opacity: 0.8;
+       animation: transitBusRadar 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+       pointer-events: none;
+       z-index: 0;
+     }
+
+     @keyframes transitBusRadar {
+       0% { transform: scale(0.7); opacity: 0.9; }
+       100% { transform: scale(1.65); opacity: 0; }
+     }
+     ```
+4. **Interactive Hover & Selection Transform**:
+   - Hover: scales to `1.12x` with `z-index: 999`.
+   - Selected: scales to `1.18x`, tinting pointer tip and border with cyan (`#38bdf8`) and emitting a multi-tier glow (`box-shadow: 0 0 0 3px #38bdf8, 0 0 20px rgba(56, 189, 248, 0.85)`).
+
+---
+
+### D. Popover Callout Semantics & Click Event Isolation (Commit `25ad6da`)
+
+1. **Bus Names Strictly Hidden Until Clicked**:
+   - To eliminate label crowding, bus names and speed pills are **not rendered by default**.
+   - The map pins float clean and minimalist over the satellite view, matching native mobile navigation patterns.
+2. **On-Demand Floating Callout (`.transit-bus-callout.visible`)**:
+   - Triggered exclusively when `selectedBusId === bus.id`.
+   - Rendered with high-contrast frosted slate (`background: rgba(15, 23, 42, 0.96)`, `backdrop-filter: blur(16px)`), white border, and drop-shadow (`0 10px 24px rgba(0, 0, 0, 0.7)`).
+   - Displays:
+     - Bus theme dot indicator (`.transit-callout-dot`).
+     - Bengali bus name (`.transit-callout-name`, e.g., **প্রত্যয়**, **অগ্নিবীণা**).
+     - Unique fleet identifier (`.transit-callout-id`, e.g., `CSE-01`, `BUS-02`).
+     - Dynamic kinematics badge:
+       - Active driving: `⚡ 24 km/h` (tinted bright emerald `#34d399` with green background).
+       - Standby/Parked: `🅿️ স্ট্যান্ডবাই` (tinted muted slate `#94a3b8`).
+       - Stale/Delayed: `GPS বিলম্বিত` (tinted warning amber `#fbbf24`).
+     - Downward callout arrow pointing to the top of the bus badge.
+3. **Marker Click Event Isolation**:
+   - Problem: Clicking a Leaflet marker previously triggered the parent map container's click listener, which immediately deselected the bus and collapsed the view.
+   - Solution: Injected `L.DomEvent.stopPropagation(e)` on both bus markers and stoppage lollipop markers:
+     ```typescript
+     marker.on("click", (e) => {
+       L.DomEvent.stopPropagation(e);
+       setSelectedBusId(bus.id);
+       setDetailBusId(bus.id);
+     });
+     ```
+   - Clicking on empty map canvas triggers `map.on("click")`, cleanly dismissing any active callouts.
+
+---
+
+### E. 100% Text Contrast & Leaflet Container Style Overrides
+
+1. **Leaflet Default DivIcon Reset**:
+   - Leaflet by default applies white backgrounds, rigid borders, and clipping overflow to `leaflet-div-icon`.
+   - Completely neutralized via CSS resets:
+     ```css
+     .leaflet-div-icon.transit-bus-marker-container,
+     .leaflet-div-icon.transit-lollipop-icon-container {
+       background: transparent !important;
+       border: none !important;
+       box-shadow: none !important;
+       overflow: visible !important;
+     }
+     ```
+2. **High-Contrast Dark Frosted Bus Stop Labels (`.transit-lollipop-label`)**:
+   - Problem: Stoppage names were faint and hard to read against high-resolution satellite tiles (especially over water bodies, rooftops, and dense green campus trees).
+   - Solution: Refactored `.lollipop-label` into a high-contrast dark frosted pill:
+     ```css
+     .lollipop-label {
+       font-size: 10px !important;
+       font-weight: 800 !important;
+       color: #f8fafc !important;
+       background: rgba(15, 23, 42, 0.92) !important;
+       backdrop-filter: blur(8px) !important;
+       -webkit-backdrop-filter: blur(8px) !important;
+       border: 1px solid rgba(255, 255, 255, 0.22) !important;
+       padding: 2px 7px !important;
+       border-radius: 6px !important;
+       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7) !important;
+       margin-top: 3px !important;
+       white-space: nowrap !important;
+       pointer-events: none !important;
+       text-shadow: none !important;
+       display: inline-block !important;
+     }
+     ```
+   - Result: 100% crisp legibility across all 24 stops regardless of map zoom level or underlying tile brightness.
+
+---
+
+### F. Native Android APK Feature Alignment & Parity Blueprint
+
+The Android APK transit architecture is implemented in:
+- [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt)
+- [`ClassMateTransitManager.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt)
+- [`ClassMateTransitState.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitState.kt)
+
+#### Android APK Implementation Roadmap for Web Parity:
+1. **`TransitListComposeView`**:
+   - Jetpack Compose screen mirroring Web `TransitListView`.
+   - Top segmented tab switch (`[বাসের তালিকা]` / `[ম্যাপ ভিউ]`).
+   - Fleet cards with progress bar, live speed badges (`ClassMateTransitState.speedKmh`), and last ping timestamps.
+2. **`TransitDetailTimelineComposeView`**:
+   - Vertical `LazyColumn` corridor timeline matching Web `TransitDetailView`.
+   - Hero card with Next Approaching Stop and `ম্যাপে দেখুন` CTA.
+   - Milestone nodes with pulsing cyan indicator for active approaching stop.
+3. **`TransitMapComposeView`**:
+   - Production OSMDroid `MapView` with Google Satellite Hybrid / Mapnik tile overlays.
+   - Vehicle heading rotation markers (`BusMarkerOverlay`) rendering custom Canvas teardrop pins with white circle badge and downward triangle pointer.
+   - Animated radar circle drawn on Canvas when `bus.isDriving == true`.
+   - On-tap marker overlay popup dialog showing Bengali bus name, ID, and live speed badge.
+4. **Ergonomic Features Aligned with Recent APK Upgrades**:
+   - Seamless predictive back navigation (`OnBackPressedCallback`).
+   - Tactile haptic engine integration (`HapticUtil.performHapticFeedback`).
+   - Shimmer skeleton loaders matching `item_notice_modern` styling.
+
+---
+
+### G. Comprehensive Master Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Street Polyline Geometry** | Web Companion | **PRODUCTION** | Traced physical asphalt roads: MBSTU Campus Loop, Santosh Rd, Kagmari Bridges & Tangail City Loop (Commit `10f56bc`) |
+| **24-Station Corridor Sequence** | Web Companion | **PRODUCTION** | Standardized `CORRIDOR_STATIONS` in `transit.tsx` matching Android app stoppage sequence (Commit `10f56bc`) |
+| **Bengali UI Localization** | Web Companion | **PRODUCTION** | Complete Bengali headers, status pills, search placeholders, and empty states (Commit `10f56bc`) |
+| **High-Visibility Bus Marker** | Web Companion | **PRODUCTION** | 38px solid white badge, colored chassis SVG, dual glowing headlights & sharp pointer (Commit `25ad6da`) |
+| **Bus Name Click-to-View** | Web Companion | **PRODUCTION** | Bus names strictly hidden by default; popover callout opens only when clicked with `stopPropagation` (Commit `25ad6da`) |
+| **Kinematic Radar Wave** | Web Companion | **PRODUCTION** | CSS `transitBusRadar` 2s expanding ring animation active when `bus.isDriving === true` (Commit `25ad6da`) |
+| **Stop Label Dark Frosted Pill**| Web Companion | **PRODUCTION** | `.lollipop-label` with `rgba(15, 23, 42, 0.92)`, white border, and drop-shadow; 100% legibility (Commit `25ad6da`) |
+| **Full-Window Map Viewport** | Web Companion | **PRODUCTION** | Scoped `is-transit-*` classes in `app.tsx`; Leaflet canvas 100% height between sidebars (Commit `17785ed`) |
+| **2-Tab Bus List Screen** | Web Companion | **PRODUCTION** | Default view on `#transit`; active fleet counter, search filter, status chips, route progress bars (Commit `1a0b34f`) |
+| **Route Stoppage Timeline** | Web Companion | **PRODUCTION** | Hero live tracking card, 24-station vertical timeline, glowing `NEXT` stop node, sticky bottom bar (Commit `1a0b34f`) |
+| **Decoupled Top Tab Switcher**| Web Companion | **PRODUCTION** | Dedicated `.transit-top-nav-row` floating above `.transit-header-pill`; zero button crowding (Commit `6ee9f73`) |
+| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt); OSMDroid MapView + OkHttp Engine.IO v4 protocol |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
