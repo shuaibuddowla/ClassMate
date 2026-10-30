@@ -3657,18 +3657,31 @@
 /* Header Row of Bottom Sheet */
 .transit-sheet-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
-.transit-sheet-header-left {
+.transit-sheet-top-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.transit-sheet-bus-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   flex: 1;
+}
+
+.transit-sheet-route-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .transit-sheet-bus-badge {
@@ -3685,17 +3698,12 @@
   flex-shrink: 0;
 }
 
-.transit-sheet-bus-titles {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .transit-bus-name-row {
   display: flex;
   align-items: baseline;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .transit-bus-name-bn {
@@ -3713,18 +3721,19 @@
 }
 
 .transit-bus-route-name {
-  font-size: 11px;
+  font-size: 11.5px;
   color: #64748b;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  width: 100%;
 }
 
 .transit-sheet-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -4146,53 +4155,93 @@
     width: 32px;
     height: 3.5px;
   }
+  /* Auto-collapse horizontal bus chips on mobile when a bus is actively selected to maximize map canvas viewport (> 55%) */
+  .transit-top-overlay.has-selected-bus .transit-chips-scroll {
+    display: none !important;
+  }
+  .transit-sheet-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+  }
+  .transit-sheet-bus-identity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+  .transit-sheet-route-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-top: 1px;
+    margin-bottom: 2px;
+  }
   .transit-sheet-bus-badge {
-    padding: 2px 6px;
+    padding: 2.5px 6px;
     font-size: 9.5px;
   }
-  .transit-sheet-bus-titles .transit-bus-name-bn {
-    font-size: 14px;
+  .transit-bus-name-row .transit-bus-name-bn {
+    font-size: 14.5px;
   }
-  .transit-sheet-bus-titles .transit-bus-route-name {
-    font-size: 10.5px;
+  .transit-bus-name-row .transit-bus-name-en {
+    font-size: 11px;
+  }
+  .transit-bus-route-name {
+    font-size: 11px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+  .transit-sheet-user-dist-pill {
+    padding: 2.5px 6px;
+    font-size: 10px;
   }
   .transit-speed-pill {
-    padding: 2px 7px;
+    padding: 2.5px 6px;
     font-size: 10px;
   }
   .transit-approaching-card {
-    padding: 8px 10px;
-    border-radius: 14px;
-    margin: 6px 0;
+    padding: 7px 9px;
+    border-radius: 12px;
+    margin: 4px 0 6px;
+    gap: 8px;
   }
   .transit-approaching-icon-box {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
   }
   .transit-approaching-name {
     font-size: 13px;
+    line-height: 1.25;
   }
   .transit-approaching-bn {
-    font-size: 10.5px;
+    font-size: 10px;
   }
   .transit-eta-badge {
-    padding: 2px 7px;
+    padding: 1px 6px;
   }
   .transit-eta-val {
-    font-size: 11.5px;
+    font-size: 12px;
   }
   .transit-eta-sub {
-    font-size: 9px;
+    font-size: 8.5px;
   }
   .transit-sheet-footer-row {
-    padding-top: 6px;
+    padding-top: 4px;
   }
   .transit-status-indicator {
-    font-size: 10.5px;
+    font-size: 10px;
   }
   .transit-sheet-detail-action {
-    font-size: 11px;
-    padding: 4px 9px;
+    font-size: 10.5px;
+    padding: 3.5px 8px;
   }
   .transit-desktop-prefix {
     display: none;
@@ -4202,14 +4251,16 @@
     display: none !important;
   }
   .transit-fab-controls.sheet-collapsed {
-    bottom: calc(200px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(185px + env(safe-area-inset-bottom, 0px)) !important;
+    right: 12px !important;
   }
   .transit-fab-controls.no-sheet {
     bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    right: 12px !important;
   }
   .transit-fab-btn {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
   }
 
   /* 3. Detail View Mobile Ergonomics */

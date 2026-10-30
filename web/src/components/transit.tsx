@@ -206,11 +206,16 @@ export function findClosestPolylineIndex(point: [number, number], polyline: [num
   return closestIndex;
 }
 
+export function toBengaliDigits(num: number | string): string {
+  const bnDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+  return String(num).replace(/[0-9]/g, (d) => bnDigits[parseInt(d, 10)] || d);
+}
+
 export function formatDistanceUser(meters: number): string {
   if (meters < 1000) {
-    return `${Math.round(meters)} মি`;
+    return `${toBengaliDigits(Math.round(meters))} মি`;
   }
-  return `${(meters / 1000).toFixed(1)} কিমি`;
+  return `${toBengaliDigits((meters / 1000).toFixed(1))} কিমি`;
 }
 
 function normalizeBusHeading(heading: unknown, fallback = 0): { heading: number; hasDirection: boolean } {
@@ -888,8 +893,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <span class="transit-next-stop-dot"></span>
                   <span>NEXT • ${
                     nextApproachingStopInfo.isStandby
-                      ? `${nextApproachingStopInfo.distanceKm} কিমি`
-                      : `~${nextApproachingStopInfo.etaMinutes} মি`
+                      ? `${toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি`
+                      : `~${toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি`
                   }</span>
                 </div>`
               : ""
@@ -1911,7 +1916,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       {activeView === "map" && (
         <>
           {/* Top Floating Overlay (z-20) */}
-          <div className="transit-top-overlay">
+          <div className={`transit-top-overlay ${selectedBus ? "has-selected-bus" : ""}`}>
             {/* Unified Sleek Floating Header Bar */}
             <div className="transit-header-pill unified-bar">
               <div className="transit-header-left">
@@ -2138,57 +2143,61 @@ export function Transit({ ctx }: { ctx?: any }) {
 
               {/* Header Row */}
               <div className="transit-sheet-header">
-                <div className="transit-sheet-header-left">
-                  <div
-                    className="transit-sheet-bus-badge"
-                    style={{
-                      backgroundColor: `${selectedBus.color}22`,
-                      borderColor: selectedBus.color,
-                      color: selectedBus.color
-                    }}
-                  >
-                    <Bus size={13} />
-                    <span className="transit-badge-id">{formatBusShortId(selectedBus.id)}</span>
-                  </div>
+                <div className="transit-sheet-top-bar">
+                  <div className="transit-sheet-bus-identity">
+                    <div
+                      className="transit-sheet-bus-badge"
+                      style={{
+                        backgroundColor: `${selectedBus.color}22`,
+                        borderColor: selectedBus.color,
+                        color: selectedBus.color
+                      }}
+                    >
+                      <Bus size={12} />
+                      <span className="transit-badge-id">{toBengaliDigits(formatBusShortId(selectedBus.id))}</span>
+                    </div>
 
-                  <div className="transit-sheet-bus-titles">
                     <div className="transit-bus-name-row">
                       <h2 className="transit-bus-name-bn">{selectedBus.nameBn}</h2>
                       <span className="transit-bus-name-en">({selectedBus.nameEn})</span>
                     </div>
-                    <span className="transit-bus-route-name">{selectedBus.routeName}</span>
+                  </div>
+
+                  <div className="transit-sheet-header-right">
+                    {userLocation && (
+                      <div className="transit-sheet-user-dist-pill" title="আপনার অবস্থান থেকে এই বাসের দূরত্ব">
+                        <MapPin size={11} color="#059669" />
+                        <span>{formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}</span>
+                      </div>
+                    )}
+                    <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
+                      <Navigation size={11} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
+                      <span>
+                        {selectedBus.isStale
+                          ? "GPS বিলম্বিত"
+                          : selectedBus.speed > 0
+                          ? `${toBengaliDigits(Math.round(selectedBus.speed))} কিমি/ঘ`
+                          : "স্ট্যান্ডবাই"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBusId("");
+                      }}
+                      className="transit-sheet-close-btn"
+                      title="বন্ধ করুন"
+                      aria-label="Close bottom sheet"
+                      type="button"
+                    >
+                      <X size={15} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="transit-sheet-header-right">
-                  {userLocation && (
-                    <div className="transit-sheet-user-dist-pill" title="আপনার অবস্থান থেকে এই বাসের দূরত্ব">
-                      <MapPin size={11} color="#059669" />
-                      <span>{formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}</span>
-                    </div>
-                  )}
-                  <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
-                    <Navigation size={12} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
-                    <span>
-                      {selectedBus.isStale
-                        ? "GPS বিলম্বিত"
-                        : selectedBus.speed > 0
-                        ? `${Math.round(selectedBus.speed)} কিমি/ঘ`
-                        : "স্ট্যান্ডবাই"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedBusId("");
-                    }}
-                    className="transit-sheet-close-btn"
-                    title="Close"
-                    aria-label="Close bottom sheet"
-                    type="button"
-                  >
-                    <X size={15} />
-                  </button>
+                {/* Route Subtitle - Full width so never truncated prematurely */}
+                <div className="transit-sheet-route-row">
+                  <span className="transit-bus-route-name">{selectedBus.routeName}</span>
                 </div>
               </div>
 
@@ -2197,13 +2206,13 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div className="transit-approaching-card">
                   <div className="transit-approaching-left">
                     <div className="transit-approaching-icon-box">
-                      <Navigation size={15} />
+                      <Navigation size={14} />
                     </div>
                     <div className="transit-approaching-text">
                       <span className="transit-approaching-eyebrow">পরবর্তী স্টপ</span>
                       <h3 className="transit-approaching-name">{nextApproachingStopInfo.station.nameBn}</h3>
                       <span className="transit-approaching-bn">
-                        {nextApproachingStopInfo.station.name} • {nextApproachingStopInfo.distanceKm} কিমি
+                        {nextApproachingStopInfo.station.name} • {toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি
                       </span>
                     </div>
                   </div>
@@ -2211,11 +2220,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <div className="transit-approaching-right">
                     <div className="transit-eta-badge">
                       <span className="transit-eta-val">
-                        {selectedBus.speed > 0 ? `~${nextApproachingStopInfo.etaMinutes} মি` : "স্ট্যান্ডবাই"}
+                        ~{toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি
                       </span>
-                      <span className="transit-eta-sub">
-                        {selectedBus.speed > 0 ? "আনুমানিক সময়" : `~${nextApproachingStopInfo.etaMinutes} মি ড্রাইভ`}
-                      </span>
+                      <span className="transit-eta-sub">ড্রাইভ সময়</span>
                     </div>
 
                     <button
@@ -2223,8 +2230,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                       className={`transit-stop-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
                       title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয়" : "অ্যালার্ট দিন"}
                       type="button"
+                      aria-label="Toggle arrival notification"
                     >
-                      <Bell size={15} />
+                      <Bell size={14} />
                     </button>
                   </div>
                 </div>
@@ -2237,12 +2245,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                     className="transit-pulse-dot"
                     style={{ background: selectedBus.speed > 0 ? "#10b981" : "#fbbf24" }}
                   />
-                  <span>{selectedBus.status}</span>
-                  {userLocation && (
-                    <span className="transit-sheet-footer-dist">
-                      • 📍 আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))} দূরে
-                    </span>
-                  )}
+                  <span>{selectedBus.speed > 0 ? `চলন্ত (${toBengaliDigits(Math.round(selectedBus.speed))} কিমি/ঘ)` : "ক্যাম্পাস স্ট্যান্ডবাই"}</span>
                 </div>
 
                 <div className="transit-sheet-actions-group">

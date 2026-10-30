@@ -10744,6 +10744,28 @@ ext build --webpack with 0 TypeScript/ESLint errors and deployed to https://clas
 
 ---
 
+## 172. Professional UI/UX & Information Architecture Overhaul (Transit Tab Mobile)
+
+### 172.1 Architectural Audits & UX Resolutions Implemented
+1. **Dynamic Viewport Reclamation (>55% Map Viewport)**:
+   - Evaluated the screen against spatial ergonomics principles: the previous layout squeezed the map between top overlays and bottom sheet into only ~28% (~220px).
+   - Applied dynamic header auto-collapse: when a bus is actively selected (`selectedBus != null`), the horizontal bus chip carousel is auto-hidden (`.transit-top-overlay.has-selected-bus .transit-chips-scroll { display: none !important; }`), instantly recovering 48px of vertical map space.
+   - Tightened bottom sheet internal vertical padding, reducing collapsed height from ~260px down to ~185px, ensuring over 55% of the mobile viewport remains dedicated to live spatial tracking.
+2. **Complete Data De-Duplication**:
+   - Eliminated redundant distance: distance is now rendered strictly once in the top header row (`📍 ৩৩৮ মি`), and removed from the footer row.
+   - Eliminated redundant status: removed repeated instances of 'স্ট্যান্ডবাই' across header, next stop card, and footer.
+   - Standardized status to a single authoritative state: `চলন্ত (২৫ কিমি/ঘ)` or `ক্যাম্পাস স্ট্যান্ডবাই`.
+3. **Full-Width Subtitle & Zero Text Clipping**:
+   - Re-architected bottom sheet header into a dual-row structure:
+     - Row 1: Bus identity (Badge + Bengali Name + English Name) on the left; Telemetry (User distance + Speed pill + Close button) on the right.
+     - Row 2: Dedicated full-width route row (`.transit-sheet-route-row`), completely eliminating premature route truncation (`Campus ⇄ Nirala (City Center)` now displays in full without `Campus ⇄ ...` ellipses).
+   - Re-balanced next approaching stop card flex distribution: trimmed right-side ETA width to 65px, giving full width to stop names (`একাডেমিক ভবন-১ বাস স্টপ` displays without ellipsis).
+4. **Universal Bengali Numeral Localization**:
+   - Implemented `toBengaliDigits` utility: maps all Arabic numerals `0-9` to authentic Bengali digits `০-৯`.
+   - Applied universally across user proximity (`৩৩৮ মি`), speed (`২৫ কিমি/ঘ`), bus identifier (`০০০২`), milestone distance (`০.২৩ কিমি`), and estimated arrival drive time (`~১ মি`).
+5. **Map FAB Docking & Collision Isolation**:
+   - Docked FAB controls (`Locate Me`, `Satellite`, `Center Bus`) dynamically at `bottom: calc(185px + safe-area)`, keeping the right margin clean and preventing road corridor occlusion.
+
 ### Master Production Verification Matrix (Updated Master State)
 
 | Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
