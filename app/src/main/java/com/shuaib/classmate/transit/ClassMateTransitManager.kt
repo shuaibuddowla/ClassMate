@@ -99,6 +99,13 @@ class ClassMateTransitBridge(
     private val onBusSelected: ((String) -> Unit)? = null
 ) {
 
+    var onBackStateChanged: ((Boolean) -> Unit)? = null
+
+    @JavascriptInterface
+    fun setCanGoBack(canGoBack: Boolean) {
+        onBackStateChanged?.invoke(canGoBack)
+    }
+
     @JavascriptInterface
     fun dialDriver(phoneNumber: String) {
         try {

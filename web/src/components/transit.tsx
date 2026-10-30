@@ -356,6 +356,81 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [locPermission, setLocPermission] = useState<"prompt" | "granted" | "denied">("prompt");
   const userMarkerRef = useRef<L.Marker | null>(null);
 
+  // Native Android Shell & Bridge Integration
+  const [isAndroidApp, setIsAndroidApp] = useState<boolean>(false);
+
+  const triggerNativeHaptic = useCallback((ms = 15) => {
+    if (typeof window !== "undefined") {
+      const bridge = (window as any).ClassMateNativeBridge;
+      if (bridge?.vibrateTick) {
+        try {
+          bridge.vibrateTick();
+          return;
+        } catch (_) {}
+      }
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate(ms);
+        } catch (_) {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isAndroid = Boolean(
+      (window as any).ClassMateNativeBridge ||
+      new URLSearchParams(window.location.search).get("app") === "android" ||
+      /classmate-android/i.test(navigator.userAgent)
+    );
+    setIsAndroidApp(isAndroid);
+    if (isAndroid) {
+      document.body.classList.add("is-android-app");
+    }
+
+    // Expose a back-navigation hook for the native Android back button
+    (window as any).__classmateTransitGoBack = () => {
+      if (selectedStoppageAction) {
+        setSelectedStoppageAction(null);
+        return;
+      }
+      if (activeView === "detail") {
+        setActiveView("list");
+        return;
+      }
+    };
+
+    return () => {
+      document.body.classList.remove("is-android-app");
+      delete (window as any).__classmateTransitGoBack;
+    };
+  }, [activeView, selectedStoppageAction]);
+
+  // Sync canGoBack state to native bridge
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const bridge = (window as any).ClassMateNativeBridge;
+    if (bridge?.setCanGoBack) {
+      try {
+        bridge.setCanGoBack(activeView === "detail" || Boolean(selectedStoppageAction));
+      } catch (_) {}
+    }
+  }, [activeView, selectedStoppageAction]);
+
+  // Notify native bridge and vibrate when bus is selected
+  useEffect(() => {
+    if (!selectedBusId) return;
+    triggerNativeHaptic(12);
+    if (typeof window !== "undefined") {
+      const bridge = (window as any).ClassMateNativeBridge;
+      if (bridge?.notifyBusSelected) {
+        try {
+          bridge.notifyBusSelected(selectedBusId);
+        } catch (_) {}
+      }
+    }
+  }, [selectedBusId, triggerNativeHaptic]);
+
   // Update clock every second for live ETA and freshness calculations
   useEffect(() => {
     const timer = setInterval(() => setClockNow(Date.now()), 1000);
@@ -722,10 +797,23 @@ export function Transit({ ctx }: { ctx?: any }) {
     setAlertedStops((prev) => ({ ...prev, [reachedStop.id]: false }));
     setArrivalNotice({ busName: selectedBus.nameBn, stopName: reachedStop.name });
     playArrivalChime();
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate([200, 100, 200]);
+    triggerNativeHaptic(200);
+
+    // Dispatch Native Android Push Notification if running in native app
+    if (typeof window !== "undefined") {
+      const bridge = (window as any).ClassMateNativeBridge;
+      if (bridge?.onBusDeparted) {
+        try {
+          bridge.onBusDeparted(
+            selectedBus.nameBn,
+            selectedBus.id,
+            reachedStop.name,
+            Math.round(selectedBus.speed)
+          );
+        } catch (_) {}
+      }
     }
-  }, [selectedBus, alertedStops]);
+  }, [selectedBus, alertedStops, triggerNativeHaptic]);
 
   // 1. Initialize Map
   useEffect(() => {

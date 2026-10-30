@@ -1,0 +1,12 @@
+node_modules
+.git
+android
+scratch
+scripts
+mbstu_chunks
+.codex-attachments
+web/node_modules
+web/.next
+test-results
+playwright-report
+tests

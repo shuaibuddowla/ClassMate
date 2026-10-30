@@ -4842,3 +4842,24 @@
     border-radius: 8px;
   }
 }
+
+/* =========================================================================
+   Native Android App Shell Overrides (Accommodate Floating Bottom Bar)
+   ========================================================================= */
+body.is-android-app .transit-map-bus-card {
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+body.is-android-app .transit-map-fab-group {
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+body.is-android-app .transit-map-fab-group.has-card {
+  bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+body.is-android-app .transit-list-container,
+body.is-android-app .transit-detail-container,
+body.is-android-app .transit-detail-screen {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+}
