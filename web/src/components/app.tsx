@@ -1239,11 +1239,9 @@ function Home({
   ] as const;
   const mobileDestinations = [
     ["timetable", "Timetable", CalendarDays],
-    ["transit", "Transit", Bus],
-    ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
+    ["transit", "Transit", Bus],
     ["library", "Courses", BookOpen],
-    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
     ["profile", "Settings", Settings],
   ] as const;
   const select = (value: string) => {
@@ -1313,7 +1311,7 @@ function Home({
               }
               onClick={() => select(value)}
             >
-              <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
+              <span className="nav-icon"><Icon size={21} />{value === "transit" && <span className="nav-transit-live-dot" />}{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
               <span>{label}</span>
             </button>
           ))}
@@ -1413,7 +1411,7 @@ function Home({
             className={navigationTab === value ? "selected" : ""}
             onClick={() => select(value)}
           >
-            <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
+            <span className="nav-icon"><Icon size={21} />{value === "transit" && <span className="nav-transit-live-dot" />}{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
             <span>{label}</span>
           </button>
         ))}
