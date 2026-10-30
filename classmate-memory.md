@@ -11087,3 +11087,35 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`, `4ce6115`, `07980fd`, `a90fd7e`, `d52659c`, `50f173f`, `3003b17`, `3751f1c`, `fdba0fd`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+---
+
+## 179. Production Transit Integration into Native ClassMate Android App
+
+### 179.1 Architectural Decision & Framework Selection
+* **Evaluated Paths**:
+  1. *React Native Embedding (Strictly Rejected)*: Would bloat APK by 30MB+, cause Gradle dependency conflicts, and introduce a second JS runtime into a mature native Kotlin codebase.
+  2. *Jetpack Compose Re-Write (High Friction)*: Re-implementing 2,500 lines of complex canvas math, Leaflet OpenStreetMap layers, 28-stop timelines, and Bengali typography in Kotlin would cause code drift and duplicate maintenance overhead.
+  3. *Native Kotlin Shell + Hardware-Accelerated WebView + Bidirectional Bridge (Chosen Standard)*:
+     - Maintains 100% native Android architecture.
+     - Delivers 1:1 pixel parity with the perfected mobile web version (`https://classmatebd.vercel.app/transit-preview?app=android`).
+     - Zero APK bloat (<0KB added).
+     - Keeps single source of truth: changes to routes, stops, or maps update web and Android simultaneously.
+
+### 179.2 Implementation Details (Commit `59e8fbc`)
+* **`app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt`**:
+  - `setupTransit`: Configured hardware acceleration (`LAYER_TYPE_HARDWARE`), geolocation permission handler in `WebChromeClient`, `cacheMode = LOAD_DEFAULT`, `mediaPlaybackRequiresUserGesture = false`, and appended `ClassMate-Android` to User-Agent.
+  - Predictive Android hardware/gesture back button handling wired via `OnBackPressedCallback`, delegating to `window.__classmateTransitGoBack()` when in timeline/detail view.
+  - Graceful offline fallback to `file:///android_asset/transit/index.html` on `onReceivedError`.
+* **`app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt`**:
+  - Added `onBackStateChanged` and `setCanGoBack(Boolean)` to `ClassMateTransitBridge`.
+* **`web/src/components/transit.tsx` & `transit.css`**:
+  - Automated `isAndroidApp` detection via bridge object and `?app=android` query parameter.
+  - Implemented `triggerNativeHaptic()` connecting bus marker selection, alert bell toggles, and arrival notices directly to Android native `Vibrator` via `bridge.vibrateTick()`.
+  - Dispatched native Android departure and milestone notifications via `bridge.onBusDeparted()`.
+  - Added `body.is-android-app` CSS overrides to elegantly offset the floating bus peek card (`bottom: 74px`), FAB buttons (`bottom: 88px`/`236px`), and stoppage lists (`padding-bottom: 96px`) cleanly above the Android native floating bottom navigation bar.
+* **Verification**:
+  - Next.js Web: `npm --prefix web run build` (0 errors).
+  - Vercel: Aliased and verified at `https://classmatebd.vercel.app` (HTTP 200).
+  - Android: `powershell .\build_check.ps1` (`compileDebugKotlin` SUCCESS).
+  - Android: `powershell .\build_apk.ps1` (`assembleDebug` SUCCESS in 41s, generating 58.4MB `app-debug.apk`).
