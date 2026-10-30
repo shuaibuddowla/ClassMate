@@ -10805,3 +10805,24 @@ ext build --webpack with 0 TypeScript/ESLint errors and deployed to https://clas
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+| **Transit Detail View Streamlining** | Web Companion | **PRODUCTION** | 80px live telemetry banner, single-line stop titles, 100% Bengali numerals (Commit pending) |
+
+---
+
+## 172. Transit Detail Timeline View Modernization (Mobile Web Ergonomics)
+
+### A. Problem Diagnostic (from User Screenshot `media_1793395749690_d3d09a5c.jpg`)
+1. **Timeline Viewport Starvation**: A massive 250px Hero card ("লাইভ লোকেশন ট্র্যাকিং") with nested boxes and a huge 44px red button pushed the actual 28-stop corridor timeline below the fold, leaving only 1.5 stops visible above the bottom navigation bar.
+2. **Data & Next Stop Redundancy**: Next stop (`একাডেমিক ভবন-১ বাস স্টপ`) and distance (`0.21 কিমি`) were repeated verbatim in both the hero card and the timeline card directly below it. The word `স্ট্যান্ডবাই` was printed 3 times on the same screen. User proximity (`📍 আপনার থেকে ৩৩৮ মি`) was completely missing from the detail page.
+3. **Awkward Text Wrapping (`বাস` / `স্টপ` Split)**: In stop 2 of the timeline, because the English `NEXT` badge was placed directly next to the stop name in a cramped flex container, `একাডেমিক ভবন-১ বাস স্টপ` was broken across 3 ragged lines with `স্টপ` stranded alone on line 3.
+4. **Section Header Collision**: `আজকের রুট ট্র্যাকিং • 28টি স্টপেজ` and `স্টপেজে ট্যাপ করে অ্যালার্ট দিন` collided on mobile, wrapping into 4 ragged lines.
+5. **Numeral Inconsistency**: English digits (`0.21`, `28`, `1`) were randomly mixed with Bengali digits (`০`, `১`) and an all-caps English badge (`NEXT`).
+
+### B. Architecture & UI/UX Solution Implemented
+1. **Compact 80px Live Telemetry Banner**: Replaced the 250px hero card with `.transit-detail-telemetry-banner` displaying next stop name, user proximity (`📍 আপনার থেকে ৩৩৮ মি`), and 4 clean metric pills (`দূরত্ব`, `গতি`, `ড্রাইভ`, `স্ট্যাটাস`). This frees **170px** of vertical space, rendering 4–5 stops of the corridor timeline immediately on load.
+2. **App Bar Map Action**: Moved the map CTA into a sleek `[ 🗺️ ম্যাপ ]` button in the top header bar (`.transit-detail-header-right`), removing the giant button inside the card.
+3. **Single-Line Stop Titles & Eyebrow Badge**: Replaced the English `NEXT` inline badge with an eyebrow badge (`পরবর্তী স্টপ`), ensuring `একাডেমিক ভবন-১ বাস স্টপ` renders completely on a single clean line without splitting.
+4. **Collapsible Single-Row Meta Bar**: Streamlined the meta bar to a single non-wrapping row: `রুট স্টপেজ (২৮টি) • 🔔 অ্যালার্ট সেট করতে ট্যাপ করুন`.
+5. **Universal Bengali Numeral Localization**: Converted all digits across the detail timeline to authentic Bengali numerals using `toBengaliDigits` (`০.২১ কিমি`, `২৮টি`, `১`, `২`, `৩`, `~১ মি`).
