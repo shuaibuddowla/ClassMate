@@ -10633,3 +10633,49 @@ To maintain full architectural parity between the web companion and native Andro
 5. **Touch Feedback**:
    - Universal `-webkit-tap-highlight-color: transparent` and `touch-action: manipulation` across all transit buttons, chips, and cards to eliminate mobile tap latency.
    - Springy `:active { transform: scale(0.975); }` click state for native app feel.
+
+
+---
+
+## 170. Zoom-Adaptive Bus Stop Decluttering, Single-Line Header Lock & 100% Bengali Localization
+
+### 170.1 Incident Diagnosis & Problem Statement (From `media_1793392457704_bc214330.jpg`)
+1. **Massive Overlapping Stoppage Clutter**:
+   - At overview/zoom-out levels (zoom 13–14), all 28 bus stop markers simultaneously rendered 120px-wide dark text badges (`.transit-lollipop-label`) and full 22px red lollipop signs (`.transit-lollipop-sign`).
+   - Because the 6.5 km corridor between MBSTU campus and Nirala city center translates to only ~150 screen pixels at zoom 13, all 28 badges stacked directly on top of each other, creating an impassable wall of overlapping blue badges and red circles that completely buried the road polyline.
+2. **Top Header Title Line Break**:
+   - On narrow mobile viewports ($360\text{px}$–$380\text{px}$), `.transit-header-title-row` had `flex-wrap: wrap;`. The title broke into two lines (`MBSTU বাস` on row 1, `ট্র্যাকার` on row 2), vertically distorting the glassmorphic pill and pushing the live status indicator out of view.
+3. **English Telemetry Artifacts**:
+   - The fleet selection chips displayed raw English status strings (`Standby`, `Delayed`, `km/h`) rather than authentic Bengali (`স্ট্যান্ডবাই`, `বিলম্বিত`, `কিমি/ঘ`).
+   - Approaching stop badges displayed `km` and `min` instead of `কিমি` and `মি`.
+
+### 170.2 Architectural Resolutions Implemented
+1. **Zoom-Adaptive Stoppage Decluttering**:
+   - Added dynamic zoom listener on the Leaflet map instance:
+     ```ts
+     const updateZoomState = () => {
+       const z = map.getZoom();
+       const container = map.getContainer();
+       if (z < 16) {
+         container.classList.add("transit-zoom-out");
+       } else {
+         container.classList.remove("transit-zoom-out");
+       }
+     };
+     map.on("zoom", updateZoomState);
+     map.on("zoomend", updateZoomState);
+     updateZoomState();
+     ```
+   - In `transit.css`, when `.transit-zoom-out` is active ($z < 16$):
+     - Stems, bases, and 120px text labels are hidden (`display: none !important`).
+     - Stoppages shrink to clean **8px red waypoint dots with white borders** positioned directly along the asphalt road polyline.
+     - The **NEXT approaching stop (`.approaching`)** maintains its prominent pulsating ring, full badge, and NEXT pill so navigation intent is never lost.
+     - When zoomed in ($z \ge 16$), full lollipop signs and readable names gracefully expand.
+     - Tapping or hovering any waypoint dot at any zoom level reveals the stop name.
+2. **Strict Single-Line Header Pill**:
+   - Set `.transit-header-title-row { flex-wrap: nowrap; }` and `.transit-header-main-title { white-space: nowrap; font-size: 13px; }`.
+   - Tuned mobile button padding so title, live status pill, switcher tabs, and demo button sit strictly on **one clean horizontal line**.
+3. **100% Bengali Telemetry Localization**:
+   - Fleet chips now strictly render `স্ট্যান্ডবাই`, `বিলম্বিত`, and `${speed} কিমি/ঘ`.
+   - Next approaching stop badges render `${dist} কিমি` and `~${eta} মি`.
+   - Socket connection fallback text translated to Bengali.
