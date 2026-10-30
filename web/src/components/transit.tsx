@@ -283,7 +283,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
-  const [selectedBusId, setSelectedBusId] = useState<string>("SB0003");
+  const [selectedBusId, setSelectedBusId] = useState<string>("");
   const [satelliteView, setSatelliteView] = useState<boolean>(true);
   const [sheetExpanded, setSheetExpanded] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
@@ -626,6 +626,13 @@ export function Transit({ ctx }: { ctx?: any }) {
     });
     mapRef.current = map;
 
+    map.on("click", (e) => {
+      const target = (e.originalEvent?.target as HTMLElement | null);
+      if (!target?.closest(".transit-bus-pin-wrapper") && !target?.closest(".transit-lollipop-wrapper")) {
+        setSelectedBusId("");
+      }
+    });
+
     setTimeout(() => map.invalidateSize(), 200);
     const ro = new ResizeObserver(() => map.invalidateSize());
     if (mapContainerRef.current) ro.observe(mapContainerRef.current);
@@ -763,14 +770,15 @@ export function Transit({ ctx }: { ctx?: any }) {
       const icon = L.divIcon({
         className: "transit-lollipop-icon-container",
         html,
-        iconSize: [80, 52],
-        iconAnchor: [40, 28]
+        iconSize: [120, 56],
+        iconAnchor: [60, 29]
       });
 
       let marker = stopMarkersRef.current.get(station.id);
       if (!marker) {
         marker = L.marker([station.lat, station.lon], { icon, zIndexOffset: 200 }).addTo(map);
-        marker.on("click", () => {
+        marker.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
           setSelectedStoppageAction(station);
         });
         stopMarkersRef.current.set(station.id, marker);
@@ -796,44 +804,54 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     displayFleet.forEach((bus) => {
       const isSelected = bus.id === selectedBusId;
-      const speedBadge = bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby";
 
       const html = `
         <div class="transit-bus-pin-wrapper ${isSelected ? "selected" : ""}" style="--bus-color: ${bus.color};">
-          <div class="transit-bus-callout ${isSelected ? "visible" : ""}">
-            <span class="transit-callout-name">${bus.nameBn}</span>
-            <span class="transit-callout-speed ${bus.isStale ? "stale" : ""}">
-              ${bus.isStale ? "GPS delayed" : speedBadge}
-            </span>
+          ${
+            isSelected
+              ? `<div class="transit-bus-callout visible">
+                  <div class="transit-callout-top">
+                    <span class="transit-callout-dot" style="background: ${bus.color};"></span>
+                    <span class="transit-callout-name">${bus.nameBn}</span>
+                    <span class="transit-callout-id">${bus.id}</span>
+                  </div>
+                  <div class="transit-callout-bottom">
+                    <span class="transit-callout-speed ${bus.isDriving ? "speed-active" : "speed-standby"}">
+                      ${bus.isStale ? "GPS বিলম্বিত" : bus.isDriving ? `⚡ ${Math.round(bus.speed)} km/h` : "🅿️ স্ট্যান্ডবাই"}
+                    </span>
+                  </div>
+                  <div class="transit-callout-arrow"></div>
+                </div>`
+              : ""
+          }
+          ${bus.isDriving ? `<div class="transit-bus-radar-ring" style="border-color: ${bus.color};"></div>` : ""}
+          <div class="transit-bus-badge ${bus.isStale ? "is-stale" : ""}" style="border-color: ${bus.color};">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 16.5C4 17.33 4.67 18 5.5 18H6V19.5C6 20.33 6.67 21 7.5 21H8.5C9.33 21 10 20.33 10 19.5V18H14V19.5C14 20.33 14.67 21 15.5 21H16.5C17.33 21 18 20.33 18 19.5V18H18.5C19.33 18 20 17.33 20 16.5V6.5C20 3.8 17.8 3 12 3C6.2 3 4 3.8 4 6.5V16.5Z" fill="${bus.color}"/>
+              <path d="M5.8 7H18.2C18.4 7 18.5 7.15 18.5 7.35V11.2C18.5 11.4 18.4 11.5 18.2 11.5H5.8C5.6 11.5 5.5 11.4 5.5 11.2V7.35C5.5 7.15 5.6 7 5.8 7Z" fill="#ffffff" fill-opacity="0.95"/>
+              <rect x="8.5" y="4.5" width="7" height="1.4" rx="0.7" fill="#ffffff" fill-opacity="0.9"/>
+              <circle cx="7" cy="14.8" r="1.3" fill="#fef08a"/>
+              <circle cx="17" cy="14.8" r="1.3" fill="#fef08a"/>
+              <rect x="10" y="14.4" width="4" height="1" rx="0.5" fill="#ffffff" fill-opacity="0.8"/>
+              <path d="M5.5 16.5H18.5" stroke="#ffffff" stroke-width="0.7" stroke-linecap="round" stroke-opacity="0.6"/>
+            </svg>
           </div>
-          <div class="transit-bus-teardrop ${bus.isStale ? "is-stale" : ""}">
-            <div class="transit-bus-icon-circle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${bus.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 6v6"/>
-                <path d="M15 6v6"/>
-                <path d="M2 12h19.6"/>
-                <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20 6.3 18.7 5 17.2 5H6.8C5.3 5 4 6.3 3.6 7.8L2.2 12.8c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3"/>
-                <circle cx="7" cy="18" r="2"/>
-                <path d="M9 18h5"/>
-                <circle cx="16" cy="18" r="2"/>
-              </svg>
-            </div>
-            <div class="transit-bus-pointer" style="border-top-color: ${bus.color};"></div>
-          </div>
+          <div class="transit-bus-pointer" style="border-top-color: ${bus.color};"></div>
         </div>
       `;
 
       const icon = L.divIcon({
         className: "transit-bus-marker-container",
         html,
-        iconSize: [40, 48],
-        iconAnchor: [20, 48]
+        iconSize: [42, 46],
+        iconAnchor: [21, 46]
       });
 
       let marker = busMarkersRef.current.get(bus.id);
       if (!marker) {
         marker = L.marker([bus.lat, bus.lon], { icon, zIndexOffset: isSelected ? 1000 : 800 }).addTo(map);
-        marker.on("click", () => {
+        marker.on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
           setSelectedBusId(bus.id);
           setDetailBusId(bus.id);
         });

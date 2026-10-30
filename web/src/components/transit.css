@@ -1425,23 +1425,231 @@
    3. Custom Map Markers
    ========================================================================== */
 
-/* Red Lollipop BUS Stop Sign Marker */
-.lollipop-stop-marker {
+/* ==========================================================================
+   3. Custom Map Markers (Bus & Stop Sign)
+   ========================================================================== */
+
+/* Overrides for Leaflet custom marker containers */
+.leaflet-div-icon.transit-bus-marker-container,
+.leaflet-div-icon.transit-lollipop-icon-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* --------------------------------------------------------------------------
+   A. High-Visibility Transit Bus Pin
+   -------------------------------------------------------------------------- */
+.transit-bus-pin-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
   user-select: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.65));
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 42px;
+  height: 46px;
 }
 
-.lollipop-head {
-  width: 20px;
-  height: 20px;
+.transit-bus-pin-wrapper:hover {
+  transform: scale(1.12);
+  z-index: 999;
+}
+
+.transit-bus-pin-wrapper.selected {
+  transform: scale(1.18);
+  z-index: 1000;
+}
+
+/* Teardrop Round Badge */
+.transit-bus-badge {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #ef4444;
+  background: #ffffff;
+  border: 3.5px solid var(--bus-color, #0284c7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 2;
+  transition: all 0.22s ease;
+}
+
+.transit-bus-badge.is-stale {
+  opacity: 0.65;
+  filter: grayscale(0.5);
+}
+
+.transit-bus-pin-wrapper.selected .transit-bus-badge {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px #38bdf8, 0 0 20px rgba(56, 189, 248, 0.85), 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+
+/* SVG Icon Inside Badge */
+.transit-bus-icon-svg {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+/* Teardrop Pointer Tip */
+.transit-bus-pointer {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid var(--bus-color, #0284c7);
+  margin-top: -2px;
+  z-index: 1;
+  transition: border-top-color 0.22s ease;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+.transit-bus-pin-wrapper.selected .transit-bus-pointer {
+  border-top-color: #38bdf8 !important;
+}
+
+/* Radar pulse wave for active driving bus */
+.transit-bus-radar-ring {
+  position: absolute;
+  top: -4px;
+  left: -2px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid var(--bus-color, #0284c7);
+  opacity: 0.8;
+  animation: transitBusRadar 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes transitBusRadar {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
+
+/* Bus Name Callout - STRICTLY HIDDEN UNLESS CLICKED/SELECTED */
+.transit-bus-callout {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #090d16;
+  border: 1.5px solid #38bdf8;
+  border-radius: 12px;
+  padding: 6px 12px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.85), 0 0 16px rgba(56, 189, 248, 0.45);
+  white-space: nowrap;
+  z-index: 30;
+  pointer-events: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: calloutPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.transit-bus-callout.visible {
+  display: flex !important;
+}
+
+@keyframes calloutPop {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.92); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.transit-callout-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transit-callout-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+  flex-shrink: 0;
+}
+
+.transit-callout-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff !important;
+  letter-spacing: -0.2px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.transit-callout-id {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.transit-callout-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transit-callout-speed {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1.5px 7px;
+  border-radius: 5px;
+}
+
+.transit-callout-speed.speed-active {
+  color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.transit-callout-speed.speed-standby {
+  color: #e2e8f0 !important;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.transit-callout-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #38bdf8;
+}
+
+/* --------------------------------------------------------------------------
+   B. Red Lollipop Bus Stop Sign & High-Contrast Labels
+   -------------------------------------------------------------------------- */
+.transit-lollipop-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  width: 120px;
+}
+
+.transit-lollipop-sign {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dc2626;
   border: 2px solid #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1449,158 +1657,117 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.lollipop-stop-marker:hover .lollipop-head,
-.lollipop-stop-marker.is-next .lollipop-head {
-  transform: scale(1.2);
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8), 0 0 16px rgba(56, 189, 248, 0.9);
+.transit-lollipop-sign.alert-armed {
+  background: #f59e0b;
+  border-color: #fef08a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.9);
+}
+
+.transit-lollipop-wrapper:hover .transit-lollipop-sign,
+.transit-lollipop-wrapper.approaching .transit-lollipop-sign {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px rgba(220, 38, 38, 0.9), 0 0 16px rgba(56, 189, 248, 0.85);
   border-color: #38bdf8;
 }
 
-.lollipop-text {
+.transit-lollipop-bus-text {
   color: #ffffff;
   font-size: 7.5px;
   font-weight: 900;
-  letter-spacing: -0.2px;
+  letter-spacing: 0.4px;
   line-height: 1;
 }
 
-.lollipop-stem {
-  width: 3px;
-  height: 6px;
-  background: linear-gradient(180deg, #d1d5db 0%, #9ca3af 100%);
+.transit-lollipop-stem {
+  width: 2.5px;
+  height: 5px;
+  background: #cbd5e1;
   margin-top: -1px;
   z-index: 4;
 }
 
-.lollipop-base {
+.transit-lollipop-base {
   width: 7px;
   height: 2px;
-  background: #6b7280;
+  background: #64748b;
   border-radius: 1px;
   z-index: 4;
 }
 
-.lollipop-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9);
+/* Stoppage Text Label - Crisp, High-Contrast, 100% Readable */
+.transit-lollipop-label {
+  display: inline-block;
   margin-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff !important;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(6px);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
   white-space: nowrap;
   pointer-events: none;
-  max-width: 90px;
+  max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
-  display: none;
+  z-index: 6;
+  transition: all 0.2s ease;
 }
 
-.lollipop-stop-marker:hover .lollipop-label,
-.lollipop-stop-marker.is-next .lollipop-label {
-  display: block;
+.transit-lollipop-wrapper:hover .transit-lollipop-label,
+.transit-lollipop-wrapper.approaching .transit-lollipop-label {
+  max-width: 170px;
+  border-color: #38bdf8;
+  color: #38bdf8 !important;
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
 }
 
-.lollipop-stop-marker.is-next .lollipop-label {
-  color: #38bdf8;
-  font-weight: 800;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(56, 189, 248, 0.8);
-}
-
-.alert-indicator-badge {
+.transit-approaching-pulse-ring {
   position: absolute;
-  top: -9px;
-  right: -6px;
-  font-size: 11px;
-  z-index: 12;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
-}
-
-/* Teardrop Bus Pins */
-.teardrop-bus-pin {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.teardrop-circle {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 3px solid #818cf8;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 8;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  border: 2px solid #38bdf8;
+  animation: transitPulse 1.6s infinite;
+  pointer-events: none;
+  z-index: 3;
 }
 
-.teardrop-bus-pin.selected .teardrop-circle {
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.8), 0 4px 16px rgba(0, 0, 0, 0.7);
-  transform: scale(1.12);
-}
-
-.teardrop-bus-pin.estimated .teardrop-circle {
-  border-style: dashed;
-}
-
-.teardrop-bus-pin.stale {
-  opacity: 0.62;
-}
-
-.bus-svg-icon {
-  display: block;
-}
-
-.teardrop-tail {
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 8px solid #818cf8;
-  margin-top: -3px;
-  z-index: 7;
-  transition: border-top-color 0.25s ease;
-}
-
-.teardrop-bus-pin.selected .teardrop-tail {
-  border-top-color: #38bdf8 !important;
-}
-
-.bus-floating-info-pill {
+.transit-next-stop-badge {
   position: absolute;
-  top: -24px;
-  background: rgba(15, 23, 42, 0.94);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0284c7;
   color: #ffffff;
-  font-size: 10.5px;
+  border: 1px solid #7dd3fc;
+  border-radius: 9999px;
+  font-size: 9px;
   font-weight: 800;
   padding: 2px 8px;
-  border-radius: 9999px;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 12px rgba(2, 132, 199, 0.7);
   display: flex;
   align-items: center;
-  gap: 5px;
-  z-index: 12;
+  gap: 4px;
+  z-index: 10;
   pointer-events: none;
 }
 
-.bus-pill-name {
-  color: #ffffff;
-}
-
-.bus-pill-speed {
-  font-size: 9.5px;
-  color: #94a3b8;
-}
-
-.bus-pill-speed.moving {
-  color: #34d399;
+.transit-next-stop-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: radarPulse 1.5s infinite;
 }
 
 /* Radar Pulse Helper */
