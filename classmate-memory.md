@@ -10733,6 +10733,15 @@ To maintain full architectural parity between the web companion and native Andro
      - Modern bottom sheet with `app:behavior_peekHeight="185dp"` and `app:behavior_hideable="true"`.
      - Outside tap or swipe down dismisses selection and resets floating FABs to default bottom anchor (`16dp`).
 
+### 171.3 Implementation & Production Verification
+1. **Stop Marker Clutter Elimination**: Non-approaching stoppage text labels (.transit-lollipop-label) default to display: none !important;, rendering as clean 18px waypoint nodes along the physical corridor. Approaching stop retains prominent NEXT • 0.21 কিমি badge and pulsing wave ring. Full labels reveal on user tap or hover.
+2. **Eliminated Callout Collision with Bottom Sheet**: On mobile (@media (max-width: 768px)), suppressed redundant black marker callout (.transit-bus-callout). Integrated user distance badge (📍 ৩১৭ মি দূরে) directly into .transit-sheet-header-right and the bottom sheet footer alongside live velocity.
+3. **Pinch-Redundant FAB Removal & Dynamic Docking**: Hidden desktop +/- zoom buttons on mobile (.transit-fab-group { display: none !important; }), freeing 81px of vertical height. Dynamic docking docks Locate Me, Satellite, and Center Bus FABs above the bottom sheet (ottom: calc(200px + env(safe-area-inset-bottom, 0px))).
+4. **Mobile Header Single-Row Lock**: Shortened title to বাস ট্র্যাকার (.transit-desktop-prefix hides MBSTU  on mobile) and tightened padding to prevent text truncation on 360px phones.
+5. **Desktop List Header Breathing Room**: Increased top padding to 30px on desktop and reset container scroll on tab switch, eliminating top border clipping.
+6. **Production Build & Verification**: Passed 
+ext build --webpack with 0 TypeScript/ESLint errors and deployed to https://classmatebd.vercel.app/#transit.
+
 ---
 
 ### Master Production Verification Matrix (Updated Master State)

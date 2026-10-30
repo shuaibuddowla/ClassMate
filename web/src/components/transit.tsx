@@ -358,6 +358,13 @@ export function Transit({ ctx }: { ctx?: any }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Reset scroll on parent containers when switching view so header is never scrolled out of view
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
+  }, [activeView]);
+
   // Request & watch user geolocation
   const requestLocation = useCallback((onSuccess?: (coords: { lat: number; lon: number }) => void, isManual = false) => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) return;
@@ -1921,7 +1928,9 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 <div className="transit-header-titles">
                   <div className="transit-header-title-row">
-                    <span className="transit-header-main-title">MBSTU বাস ট্র্যাকার</span>
+                    <span className="transit-header-main-title">
+                      <span className="transit-desktop-prefix">MBSTU </span>বাস ট্র্যাকার
+                    </span>
                     <span
                       className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
                       aria-live="polite"
@@ -2152,6 +2161,12 @@ export function Transit({ ctx }: { ctx?: any }) {
                 </div>
 
                 <div className="transit-sheet-header-right">
+                  {userLocation && (
+                    <div className="transit-sheet-user-dist-pill" title="আপনার অবস্থান থেকে এই বাসের দূরত্ব">
+                      <MapPin size={11} color="#059669" />
+                      <span>{formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}</span>
+                    </div>
+                  )}
                   <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
                     <Navigation size={12} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
                     <span>
@@ -2223,6 +2238,11 @@ export function Transit({ ctx }: { ctx?: any }) {
                     style={{ background: selectedBus.speed > 0 ? "#10b981" : "#fbbf24" }}
                   />
                   <span>{selectedBus.status}</span>
+                  {userLocation && (
+                    <span className="transit-sheet-footer-dist">
+                      • 📍 আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))} দূরে
+                    </span>
+                  )}
                 </div>
 
                 <div className="transit-sheet-actions-group">

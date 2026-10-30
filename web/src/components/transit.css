@@ -1649,6 +1649,14 @@
   display: flex !important;
 }
 
+@media (max-width: 768px) {
+  /* Suppress redundant black marker callout on mobile: the Material 3 Bottom Sheet already provides full telemetry */
+  .transit-bus-callout,
+  .transit-bus-callout.visible {
+    display: none !important;
+  }
+}
+
 .transit-callout-top {
   display: flex;
   align-items: center;
@@ -1794,8 +1802,10 @@
 }
 
 /* Stoppage Text Label - Crisp, High-Contrast, 100% Readable */
+/* Non-approaching stoppage labels are hidden by default to keep the road map clean and uncluttered.
+   They smoothly reveal on tap/click or on hover, or when the bus is actively approaching. */
 .transit-lollipop-label {
-  display: inline-block;
+  display: none;
   margin-top: 2px;
   font-size: 10px;
   font-weight: 700;
@@ -1817,8 +1827,10 @@
   transition: all 0.2s ease;
 }
 
+.transit-lollipop-wrapper.approaching .transit-lollipop-label,
 .transit-lollipop-wrapper:hover .transit-lollipop-label,
-.transit-lollipop-wrapper.approaching .transit-lollipop-label {
+.transit-lollipop-wrapper:active .transit-lollipop-label {
+  display: inline-block !important;
   max-width: 170px;
   border-color: #38bdf8;
   color: #38bdf8 !important;
@@ -3361,7 +3373,7 @@
   width: 100%;
   z-index: 30;
   margin: 0;
-  padding: 18px 20px 16px;
+  padding: 26px 20px 18px;
   border: 0;
   border-radius: 0 0 24px 24px;
   background: linear-gradient(145deg, #c2185b 0%, #a90f50 100%);
@@ -3733,6 +3745,26 @@
   background: #e9f6ef;
 }
 
+.transit-sheet-user-dist-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  white-space: nowrap;
+}
+
+.transit-sheet-footer-dist {
+  color: #059669;
+  font-weight: 600;
+  font-size: 11px;
+}
+
 .transit-speed-pill.stale {
   color: #b45309;
   background: #fef3c7;
@@ -3923,7 +3955,7 @@
 .transit-timeline-container { padding-bottom: 120px; }
 
 @media (min-width: 760px) {
-  .transit-list-header-card { padding: 20px 32px 18px; }
+  .transit-list-header-card { padding: 30px 32px 20px; }
   .transit-list-body { padding: 18px 32px 48px; }
   .transit-cards-list-container { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: 16px; }
 }
@@ -4161,6 +4193,19 @@
   .transit-sheet-detail-action {
     font-size: 11px;
     padding: 4px 9px;
+  }
+  .transit-desktop-prefix {
+    display: none;
+  }
+  /* Hide desktop zoom +/- FAB buttons on mobile: touch devices pinch-to-zoom */
+  .transit-fab-group {
+    display: none !important;
+  }
+  .transit-fab-controls.sheet-collapsed {
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .transit-fab-controls.no-sheet {
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .transit-fab-btn {
     width: 40px;
