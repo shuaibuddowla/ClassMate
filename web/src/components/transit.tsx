@@ -206,6 +206,13 @@ export function findClosestPolylineIndex(point: [number, number], polyline: [num
   return closestIndex;
 }
 
+export function formatDistanceUser(meters: number): string {
+  if (meters < 1000) {
+    return `${Math.round(meters)} মি`;
+  }
+  return `${(meters / 1000).toFixed(1)} কিমি`;
+}
+
 function normalizeBusHeading(heading: unknown, fallback = 0): { heading: number; hasDirection: boolean } {
   if (typeof heading === "number" && !Number.isNaN(heading)) {
     const norm = ((heading % 360) + 360) % 360;
@@ -352,23 +359,46 @@ export function Transit({ ctx }: { ctx?: any }) {
   }, []);
 
   // Request & watch user geolocation
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback((onSuccess?: (coords: { lat: number; lon: number }) => void) => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      const coords = {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude
+      };
+      setUserLocation(coords);
+      setLocPermission("granted");
+      if (onSuccess) onSuccess(coords);
+      if (mapRef.current && activeView === "map") {
+        mapRef.current.flyTo([coords.lat, coords.lon], 16, { animate: true, duration: 0.8 });
+      }
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude
-        });
-        setLocPermission("granted");
-        if (mapRef.current && activeView === "map") {
-          mapRef.current.flyTo([pos.coords.latitude, pos.coords.longitude], 16, { animate: true, duration: 0.8 });
+      handleSuccess,
+      (err) => {
+        // If high accuracy times out (especially common on desktop/laptop Wi-Fi), fallback to coarse accuracy
+        if (err.code === err.TIMEOUT) {
+          navigator.geolocation.getCurrentPosition(
+            handleSuccess,
+            () => setLocPermission("denied"),
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+        } else if (err.code === err.PERMISSION_DENIED) {
+          setLocPermission("denied");
         }
       },
-      () => setLocPermission("denied"),
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
   }, [activeView]);
+
+  // Request location automatically on mount so distance and map marker are populated immediately
+  useEffect(() => {
+    if (typeof window !== "undefined" && "geolocation" in navigator) {
+      requestLocation();
+    }
+  }, [requestLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) return;
@@ -390,7 +420,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           setLocPermission("denied");
         }
       },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
 
     return () => {

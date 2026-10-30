@@ -10319,10 +10319,212 @@ flowchart TD
 
 ---
 
-### C. Master Production Verification Matrix (Updated Master State)
+---
+
+## 166. Live-Only Telemetry Ingestion, Geolocation Range Calculation, Auto-Adapting Corridor Bounds & High-Contrast Bus Marker Hardening (Commit `a3af691`)
+
+### A. Architectural Intent & Elimination of Stale Mock Artifacts
+
+Prior to this update, the transit engine relied on cached fleet snapshots stored in `localStorage` (`classmate_mbstu_fleet`) to provide zero-latency initial UI rendering. However, this caused significant user confusion: stale mock positions and inactive buses were displayed on the map even when university transport was not actively operating.
+
+The user explicitly mandated a **live-only tracking policy**:
+1. **Stale Cache Elimination**: Completely purged `localStorage.removeItem("classmate_mbstu_fleet")` on component mount.
+2. **Authentic Sensor Telemetry**: The UI strictly renders vehicles for which active, authentic GPS packets are received from `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket` within valid Bangladesh coordinate bounds (20° < lat < 28°, 85° < lon < 95°).
+3. **Empty State Transparency**: When no buses are active on campus, the screen displays a dedicated status message explaining that the live telemetry socket is connected and awaiting university bus dispatch, alongside a button to toggle an interactive road demo (`toggleDemoMode`) if desired.
+
+---
+
+### B. User Geolocation Range Calculation & Map Localization
+
+The footer of the bus vehicle cards previously suffered from redundant status text (e.g. "GPS বিলম্বিত" rendered twice in separate pills). This was overhauled with real-time user-to-bus proximity measurement:
+
+```mermaid
+flowchart LR
+    A["User Device GPS<br>(navigator.geolocation)"] --> B["userLocation State<br>(lat, lon)"]
+    C["Vehicle Telemetry<br>(WebSocket Socket.IO)"] --> D["bus.lat, bus.lon"]
+    B --> E["Haversine Formula<br>(getDistanceMeters)"]
+    D --> E
+    E --> F["Card Footer Badge<br>📍 আপনার থেকে X.X কিমি"]
+    B --> G["Leaflet User Marker<br>(Royal Blue Dot + Pulse Wave)"]
+    H["Floating Action Button<br>(transit-fab-btn)"] --> I["map.flyTo(userLocation, 16)"]
+```
+
+1. **Geolocation Sensor Polling (`navigator.geolocation.watchPosition`)**:
+   - Configured with `{ enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }`.
+   - Safely updates `userLocation` state without triggering unnecessary re-renders of the tile layer.
+   - If location access is not yet permitted, the card displays an interactive pill: `📍 দূরত্ব মাপুন` (`.transit-request-loc-pill`), allowing the user to initiate the permission prompt via direct tap.
+2. **Live Map User Marker (`.transit-user-marker`)**:
+   - Custom `L.divIcon` rendered at `[userLocation.lat, userLocation.lon]` with `zIndexOffset: 1500`.
+   - **Styling**: Centered 14px solid royal blue dot (`.transit-user-marker-dot`, `#2563eb`) with a 2.5px white border and drop shadow, surrounded by an expanding animated ripple pulse (`.transit-user-marker-pulse`, `transitUserPulse` keyframe expanding to 2.2x scale with decaying opacity).
+   - Bound interactive popup: `📍 আপনার অবস্থান (You are here)`.
+3. **Locate Me FAB (`.transit-fab-btn`)**:
+   - Added a dedicated Floating Action Button alongside the MBSTU Campus reset button.
+   - Uses `Lucide` `Navigation` compass icon tinted green (`#10b981`) when `userLocation` is locked.
+   - On tap: smoothly executes `map.flyTo([userLocation.lat, userLocation.lon], 16, { animate: true, duration: 0.8 })`.
+
+---
+
+### C. Auto-Adapting Road Corridor Camera Window
+
+To maintain spatial context without jarring camera snaps or fighting manual user gestures:
+- **Throttled Panning**: The camera tracker enforces a 2.6-second throttle window (`lastCameraPanRef`) so user pinch-to-zoom and dragging interactions are not aggressively overridden.
+- **Corridor Projection & Forward Sampling**:
+  - Locates the active bus's nearest vertex on `REAL_STREET_POLYLINE` using `findClosestPolylineIndex`.
+  - Samples the forward 18-20 polyline vertices along the vehicle's heading direction.
+  - Combines these coordinates with the next approaching bus stoppage (`nextApproachingStopInfo.station`).
+  - Calls `map.fitBounds(bounds, { paddingTopLeft: [75, 30], paddingBottomRight: [50, 30], maxZoom: 17, animate: true })`.
+- **Result**: As the vehicle travels from Santosh Campus through Kagmari toward Tangail Nirala, the viewport continuously leads the bus, presenting upcoming turns and stations rather than showing passed terrain.
+
+---
+
+### D. High-Contrast Bus Marker Hardening & Rendering Engine
+
+User feedback highlighted that earlier bus markers faded into the vector tile background and appeared washed out:
+- **Enlarged Canvas**: Marker size expanded to 44x48px with a 42px diameter teardrop round badge.
+- **100% Solid Opaque Foundation**: `background: #ffffff !important` with 3.5px solid border in the vehicle's designated brand color (`var(--bus-color)`).
+- **Dual Protective Shadows**: `box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), inset 0 0 0 1.5px rgba(255, 255, 255, 0.95)`.
+- **Elimination of Stale De-saturation**: Removed `.is-stale { opacity: 0.65; filter: grayscale(0.5); }` rules. All markers maintain 100% opacity and vibrant contrast regardless of packet age.
+- **Hardware-Accelerated CSS Glide**: `.transit-bus-marker-container { transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1); }` delivers smooth marker glides along the street network as GPS coordinates stream in.
+
+---
+
+## 167. Transit Screen Permanent Header Lock Architecture, Body Scroll Isolation & Phantom Hardware IMEI Tracker Elimination (Commit `81989e9`)
+
+### A. Root Cause & Architectural Overhaul of Header Layout
+
+#### The Problem
+In the initial implementation of the transit vehicle list view, `.transit-list-screen` was configured as a single overflow container with negative horizontal margins applied to `.transit-list-header-card` (`margin: 0 -18px`). When students scrolled down through the vehicle catalog:
+1. The header card—containing the screen title, live connection status pill, simulated demo button, and the `[তালিকা] / [ম্যাপ]` segmented tabs—scrolled completely off the top of the viewport.
+2. Users were stranded mid-page without the ability to toggle back to the map or view live fleet totals without manually scrolling all the way back up.
+
+#### The Architectural Solution (`transit.css`, `transit.tsx`)
+The layout was refactored into a strict two-tier flex container architecture:
+
+```mermaid
+flowchart TD
+    subgraph ViewportContainer [".transit-list-screen (overflow: hidden; height: 100%)"]
+        subgraph PinnedTopTier [".transit-list-header-card (position: relative; flex-shrink: 0; z-index: 30)"]
+            A["Title: MBSTU বাস লাইভ ট্র্যাকার"]
+            B["Live Status Pill: Xটি বাস লাইভ"]
+            C["Demo/Live Toggle Button"]
+            D["Segmented Tabs: [তালিকা] / [ম্যাপ]"]
+        end
+
+        subgraph IndependentScrollTier [".transit-list-body (flex: 1 1 auto; overflow-y: auto)"]
+            E["Search Bar: বাস খুঁজুন..."]
+            F["Category Filter Chips: সকল | শিক্ষার্থী | শিক্ষক | কর্মকর্তা"]
+            G["Vehicle Cards Grid: 2-Column Responsive"]
+            H["Empty State & Connectivity Prompts"]
+        end
+    end
+
+    PinnedTopTier --> IndependentScrollTier
+```
+
+1. **Outer Shell (`.transit-list-screen`)**:
+   - `height: 100%; max-height: 100%; overflow: hidden; display: flex; flex-direction: column; padding: 0; gap: 0;`.
+2. **Pinned Top Header (`.transit-list-header-card`)**:
+   - `position: relative; flex-shrink: 0; width: 100%; z-index: 30; margin: 0; padding: 18px 20px 16px; border-radius: 0 0 24px 24px;`.
+   - Header is locked permanently at the top of the screen on both mobile devices and desktop viewports.
+3. **Independent Scrollable Body (`.transit-list-body`)**:
+   - `flex: 1 1 auto; min-height: 0; width: 100%; max-width: 820px; margin: 0 auto; padding: 16px 20px 48px; overflow-y: auto; overscroll-behavior: contain;`.
+   - The search bar, category chips, and vehicle cards scroll cleanly beneath the fixed header without clipping or layout jumping.
+
+---
+
+### B. Phantom Hardware IMEI Tracker Elimination
+
+#### The Telemetry Leak
+The university transport server (`wss://transport.mbstu.ac.bd`) broadcasts multiple real-time Socket.IO events. While `flutter-bus-data` delivers structured bus objects, secondary events like `student-gps-data` broadcast raw hardware GPS packets originating from device testing boards, individual student trackers, or unassigned vehicle transponders.
+
+These packets contain arbitrary 10 to 15-digit IMEI strings (e.g. `353701091171104`, `9175769656`, `7826087352`) without corresponding bus identities or route assignments. Previously, fallback logic assigned these packets default labels like `"MBSTU বাস (353701091171104)"`, cluttering the vehicle list and map with non-existent ghost vehicles.
+
+#### Strict Ingestion Gatekeeper (`transit.tsx`)
+A multi-layered whitelist filter was implemented:
+1. **Event Whitelist**: Completely dropped the raw `student-gps-data` event listener; restricted exclusively to verified `flutter-bus-data` and `studentGpsData` events.
+2. **Strict Identity Validation**:
+   ```typescript
+   const rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
+   const nameFromPacket = String(raw.busName || raw.nameBn || raw.name || "").trim();
+
+   // Resolve against recognized university fleet catalog
+   let info = rawId ? KNOWN_BUS_INFO[rawId] : undefined;
+   let resolvedId = rawId;
+
+   if (!info && nameFromPacket) {
+     const matchKey = Object.keys(KNOWN_BUS_INFO).find(
+       (k) => KNOWN_BUS_INFO[k].nameBn === nameFromPacket || nameFromPacket.includes(KNOWN_BUS_INFO[k].nameBn)
+     );
+     if (matchKey) {
+       info = KNOWN_BUS_INFO[matchKey];
+       if (!resolvedId || !resolvedId.startsWith("SB")) resolvedId = matchKey;
+     }
+   }
+
+   // STRICT GATEKEEPER:
+   // Must either begin with official "SB" identifier (SB0001-SB0010) OR match a verified Bengali bus name.
+   // Unrecognized numeric IMEIs and rogue transponders are immediately dropped!
+   if (!info && (!resolvedId || !resolvedId.startsWith("SB"))) {
+     return; // Discard phantom tracker packet!
+   }
+   ```
+3. **Fleet Catalog Expansion**:
+   - Added `SB0005`: `"সংশপ্তক"` (*Shangshaptak*, `#8b5cf6`, `"MBSTU Transport Corridor"`).
+   - Standardized `SB0007`: `"ধলেশ্বরী"` (*Dhaleshwari*, `#10b981`, `"Campus ⇄ Tangail Old Bus Stand"`).
+
+---
+
+### C. Direct Web URL Hash Routing Parity (`app.tsx`)
+
+In `web/src/components/app.tsx`, the route dispatch listener was updated to include `"transit"`:
+```typescript
+if (
+  [
+    "routine",
+    "bus",
+    "calendar",
+    "notices",
+    "batch",
+    "fund",
+    "profile",
+    "manage",
+    "ai",
+    "transit" // Added direct hash navigation support
+  ].includes(targetTab)
+) {
+  // Sets active tab to transit without defaulting back to routine
+}
+```
+This enables direct deep-linking to `https://classmatebd.vercel.app/#transit` from mobile bookmarks, Telegram channels, and Android companion web views.
+
+---
+
+### D. Native Android APK Implementation Guidelines
+
+To maintain full architectural parity between the web companion and native Android APK:
+1. **Telemetry Ingestion Gatekeeper (`TelemetryParser.kt`)**:
+   - Enforce the identical IMEI whitelist logic in Android's OkHttp `WebSocketListener`. Packets where `id` does not match the official `SB` regex (`^SB[0-9]{4}$`) or a recognized Bangla name must be discarded before dispatching to `LiveData<List<MbstuBus>>`.
+2. **User Geolocation Proximity (`ClassMateTransitScreen.kt`)**:
+   - Utilize `FusedLocationProviderClient` with `LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000).build()`.
+   - Calculate Haversine distance in Kotlin (`Location.distanceTo`) to display `"📍 আপনার থেকে X.X কিমি"` in `ItemBusCardBinding`.
+   - Render a glowing blue user circle marker on the native `osmdroid` canvas overlay.
+3. **Fixed Header & RecyclerView Scrolling**:
+   - Use `CoordinatorLayout` with a fixed, non-scrolling `MaterialCardView` for the header and a `RecyclerView` for the vehicle list, guaranteeing that the list/map tabs and status pills remain persistently accessible.
+
+---
+
+### E. Master Production Verification Matrix (Updated Master State)
 
 | Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
 | :--- | :--- | :--- | :--- |
+| **Permanent Header Lock & Body Scroll** | Web Companion | **PRODUCTION** | Fixed top header card (`z-index: 30`), independent `.transit-list-body` scroll (Commit `81989e9`) |
+| **Phantom IMEI Tracker Elimination** | Web Companion | **PRODUCTION** | Discarded raw `student-gps-data`, strict `SB` prefix & fleet whitelist filter (Commit `81989e9`) |
+| **Fleet Identity Expansion (SB0005, SB0007)** | Web Companion | **PRODUCTION** | Shangshaptak (`#8b5cf6`) and Dhaleshwari (`#10b981`) cataloged (Commit `81989e9`) |
+| **Direct Hash Route (`#transit`) Parity** | Web Companion | **PRODUCTION** | `web/src/components/app.tsx` recognizes `"transit"` hash navigation (Commit `81989e9`) |
+| **Live-Only Transit Stream & Stale Purge** | Web Companion | **PRODUCTION** | Removed `classmate_mbstu_fleet` local cache, genuine live socket only (Commit `a3af691`) |
+| **User Geolocation Distance & Live Pin** | Web Companion | **PRODUCTION** | `navigator.geolocation`, Haversine km badge, pulsating royal blue map pin (Commit `a3af691`) |
+| **Auto-Adapting Road Window Tracking** | Web Companion | **PRODUCTION** | Throttled 2.6s corridor bounding box following forward route vertices (Commit `a3af691`) |
+| **High-Contrast Marker Hardening** | Web Companion | **PRODUCTION** | 44x48px white badge, dual drop shadows, 100% opacity override (Commit `a3af691`) |
 | **Tap-to-Open & Outside-Click Dismissal** | Web Companion | **PRODUCTION** | `selectedBusId` strict isolation; outside click dismisses bottom sheet (Commit `423101f`) |
 | **Bottom Sheet Restyling & Bengali Localization** | Web Companion | **PRODUCTION** | Removed rogue `0010` text, 24px top radius, 100% Bengali labels (Commit `423101f`) |
 | **Streamlined Unified Header Bar** | Web Companion | **PRODUCTION** | Single floating capsule with title, live status count badge, and view switcher (Commit `423101f`) |
@@ -10341,5 +10543,5 @@ flowchart TD
 | **Street Polyline Geometry** | Web Companion | **PRODUCTION** | Traced physical asphalt roads: MBSTU Campus Loop, Santosh Rd, Kagmari Bridges & Tangail Loop (Commit `10f56bc`) |
 | **High-Visibility Bus Marker** | Web Companion | **PRODUCTION** | 38px solid white badge, colored chassis SVG, dual glowing headlights & sharp pointer (Commit `25ad6da`) |
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
-| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
