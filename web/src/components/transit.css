@@ -423,12 +423,20 @@
 .transit-fab-controls {
   position: absolute;
   right: 14px;
-  bottom: 255px; /* Sits cleanly above collapsed bottom sheet */
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
   z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 10px;
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transit-fab-controls.no-sheet {
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+.transit-fab-controls.sheet-collapsed {
+  bottom: calc(185px + env(safe-area-inset-bottom, 0px));
 }
 
 .transit-fab-controls.sheet-expanded {
@@ -1928,6 +1936,8 @@
   }
 
   .transit-fab-controls,
+  .transit-fab-controls.no-sheet,
+  .transit-fab-controls.sheet-collapsed,
   .transit-fab-controls.sheet-expanded {
     right: 18px;
     bottom: 24px;
@@ -3911,3 +3921,316 @@
 .transit-bottom-label { color: #777880; }
 .transit-bottom-name { color: #26272e; }
 .transit-bottom-map-btn { background: #b71454 !important; color: #fff !important; }
+
+/* ==========================================================================
+   MOBILE WEB RESPONSIVE & ERGONOMIC OPTIMIZATIONS (< 640px & < 390px)
+   ========================================================================== */
+.transit-container button,
+.transit-container [role="button"],
+.transit-bus-card,
+.transit-filter-chip,
+.transit-bus-chip {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.transit-container button:active:not(:disabled),
+.transit-container [role="button"]:active {
+  transform: scale(0.975);
+}
+
+@media (max-width: 640px) {
+  /* 1. List View Mobile Ergonomics */
+  .transit-list-header-card {
+    padding: 12px 14px 10px;
+    border-radius: 0 0 18px 18px;
+  }
+  .transit-list-header-inner {
+    gap: 8px;
+  }
+  .transit-list-main-title {
+    font-size: 16.5px;
+  }
+  .transit-list-header-card .transit-segmented-tabs {
+    border-radius: 14px;
+    padding: 2.5px;
+  }
+  .transit-container .transit-list-header-card button.transit-seg-tab {
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    border-radius: 11px !important;
+  }
+  .transit-list-search-input-box {
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 0 12px;
+  }
+  .transit-list-search-input {
+    font-size: 13px;
+  }
+  .transit-filter-chips-row {
+    min-height: 36px;
+    gap: 6px;
+    padding: 2px 2px 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .transit-filter-chip {
+    min-height: 33px;
+    height: 33px;
+    font-size: 12px;
+    padding: 0 11px;
+  }
+  .transit-filter-chip-icon {
+    min-height: 33px;
+    height: 33px;
+    width: 33px;
+  }
+  .transit-list-body {
+    padding: 10px 12px 36px;
+    gap: 10px;
+  }
+  .transit-bus-card {
+    padding: 13px 13px 11px;
+    border-radius: 18px;
+  }
+  .transit-bus-name-bn {
+    font-size: 15px;
+  }
+  .transit-bus-metric-row {
+    flex-wrap: wrap;
+    gap: 5px 8px;
+    font-size: 11px;
+  }
+  .transit-bus-card-footer {
+    gap: 6px 8px;
+    font-size: 11.5px;
+  }
+  .transit-user-distance-badge,
+  .transit-request-loc-pill {
+    font-size: 10.5px;
+    padding: 2px 7px;
+  }
+
+  /* 2. Map View Mobile Ergonomics */
+  .transit-top-overlay {
+    top: max(8px, env(safe-area-inset-top, 8px));
+    left: 8px;
+    right: 8px;
+    gap: 6px;
+  }
+  .transit-header-pill.unified-bar {
+    padding: 6px 10px;
+    gap: 6px;
+    border-radius: 16px;
+  }
+  .transit-header-icon-box {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+  .transit-header-main-title {
+    font-size: 13px;
+  }
+  .transit-status-pill {
+    font-size: 9.5px;
+    padding: 1.5px 6px;
+  }
+  .header-tabs .transit-seg-tab {
+    padding: 4px 7px;
+    font-size: 11px;
+    gap: 3px;
+  }
+  .transit-mode-toggle-btn {
+    padding: 4px 7px;
+    font-size: 10.5px;
+    gap: 3px;
+  }
+  .transit-chips-scroll {
+    min-height: 34px;
+    padding: 2px 2px 4px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .transit-bus-chip {
+    padding: 4px 9px 4px 7px;
+    border-radius: 13px;
+    gap: 5px;
+  }
+  .transit-bus-chip .transit-chip-name {
+    font-size: 11.5px !important;
+  }
+  .transit-bus-chip .transit-chip-id-badge {
+    font-size: 9px;
+    padding: 0 4px;
+  }
+  .transit-bottom-sheet {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    border-radius: 20px;
+    padding: 8px 12px 10px;
+  }
+  .transit-sheet-drag-handle {
+    height: 12px;
+    margin-bottom: 2px;
+  }
+  .transit-sheet-handle-pill {
+    width: 32px;
+    height: 3.5px;
+  }
+  .transit-sheet-bus-badge {
+    padding: 2px 6px;
+    font-size: 9.5px;
+  }
+  .transit-sheet-bus-titles .transit-bus-name-bn {
+    font-size: 14px;
+  }
+  .transit-sheet-bus-titles .transit-bus-route-name {
+    font-size: 10.5px;
+  }
+  .transit-speed-pill {
+    padding: 2px 7px;
+    font-size: 10px;
+  }
+  .transit-approaching-card {
+    padding: 8px 10px;
+    border-radius: 14px;
+    margin: 6px 0;
+  }
+  .transit-approaching-icon-box {
+    width: 28px;
+    height: 28px;
+  }
+  .transit-approaching-name {
+    font-size: 13px;
+  }
+  .transit-approaching-bn {
+    font-size: 10.5px;
+  }
+  .transit-eta-badge {
+    padding: 2px 7px;
+  }
+  .transit-eta-val {
+    font-size: 11.5px;
+  }
+  .transit-eta-sub {
+    font-size: 9px;
+  }
+  .transit-sheet-footer-row {
+    padding-top: 6px;
+  }
+  .transit-status-indicator {
+    font-size: 10.5px;
+  }
+  .transit-sheet-detail-action {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+  .transit-fab-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* 3. Detail View Mobile Ergonomics */
+  .transit-detail-screen {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  }
+  .transit-detail-header-bar {
+    padding: 10px 12px;
+    border-radius: 0 0 18px 18px;
+    gap: 10px;
+  }
+  .transit-detail-back-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .transit-detail-bus-name {
+    font-size: 16px;
+  }
+  .transit-detail-hero-card {
+    padding: 14px;
+    border-radius: 18px;
+    margin: 10px 10px 12px;
+  }
+  .transit-hero-approaching-title {
+    font-size: 17px;
+  }
+  .transit-hero-stats-row {
+    padding: 8px 10px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+  .transit-stat-label {
+    font-size: 10px;
+  }
+  .transit-stat-val {
+    font-size: 12.5px;
+  }
+  .transit-hero-map-btn {
+    min-height: 40px;
+    font-size: 13px;
+  }
+  .transit-timeline-meta-bar {
+    padding: 0 12px 6px;
+    font-size: 11px;
+  }
+  .transit-timeline-container {
+    margin: 0 10px;
+    padding: 12px 10px 120px;
+    border-radius: 18px;
+  }
+  .transit-timeline-item {
+    padding: 8px 6px;
+    gap: 10px;
+  }
+  .transit-station-main-title span {
+    font-size: 13.5px;
+  }
+  .transit-station-sub-title {
+    font-size: 10.5px;
+  }
+  .transit-station-km {
+    font-size: 11px;
+  }
+  .transit-station-eta {
+    font-size: 10px;
+  }
+  .transit-detail-bottom-bar {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    padding: 8px 12px;
+    border-radius: 16px;
+  }
+  .transit-bottom-name {
+    font-size: 12.5px;
+  }
+  .transit-bottom-dist {
+    font-size: 11px;
+  }
+  .transit-bottom-map-btn {
+    padding: 6px 12px;
+    font-size: 11.5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .transit-header-main-title {
+    font-size: 12px;
+  }
+  .transit-status-pill {
+    display: none;
+  }
+  .header-tabs .transit-seg-tab span {
+    font-size: 10px;
+  }
+  .transit-mode-toggle-btn span {
+    display: none;
+  }
+  .transit-mode-toggle-btn {
+    padding: 5px;
+    border-radius: 8px;
+  }
+}

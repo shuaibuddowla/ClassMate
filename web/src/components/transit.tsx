@@ -2032,7 +2032,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           )}
 
           {/* Right-Side Floating Map Controls (z-20) */}
-          <div className={`transit-fab-controls ${sheetExpanded ? "sheet-expanded" : ""}`}>
+          <div className={`transit-fab-controls ${selectedBus ? (sheetExpanded ? "sheet-expanded" : "sheet-collapsed") : "no-sheet"}`}>
             <div className="transit-fab-group">
               <button
                 onClick={() => mapRef.current?.zoomIn()}
