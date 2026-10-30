@@ -11119,3 +11119,18 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
   - Vercel: Aliased and verified at `https://classmatebd.vercel.app` (HTTP 200).
   - Android: `powershell .\build_check.ps1` (`compileDebugKotlin` SUCCESS).
   - Android: `powershell .\build_apk.ps1` (`assembleDebug` SUCCESS in 41s, generating 58.4MB `app-debug.apk`).
+
+---
+
+## 180. Android Tab Navigation Root Cause Resolution & Live Map Delivery
+
+### 180.1 Problem Diagnostic (User Screenshot at 5:38 AM)
+* The user reported that nothing changed and uploaded `media_1793403559741_70a48d19.jpg` showing the legacy Jetpack Compose screen from `ClassMateTransitScreen.kt` (English search bar "Search bus, route, or stoppage...", osmdroid map, mock driver "MD. Rafiqul Islam").
+* **Root Cause Found**: In `ClassMateAuthActivity.kt` (lines 2095-2101), tab switching was intercepting `if (tab == R.id.nav_transit)` and hardcoded to execute `transitScreen.render(homeHost)`, completely bypassing `academicScreens.render(tab, homeHost)` where `setupTransit` and `fragment_transit.xml` lived!
+
+### 180.2 Comprehensive Resolution (Commit `2e6db6f`)
+1. **`ClassMateAuthActivity.kt`**: Routed `R.id.nav_transit` cleanly into `academicScreens.render(tab, homeHost)` so the tab lifecycle and bottom navigation caching are unified.
+2. **`ClassMateTransitScreen.kt`**: Re-architected `ClassMateTransitScreen.render` to also instantiate and host the production WebView shell with `ClassMateNativeBridge`, preventing legacy fallback regardless of entry path.
+3. **`web/src/components/transit.tsx`**: Updated `activeView` initialization to default to `"map"` when loaded in Android app (`&view=map`).
+4. **Vercel Production**: Deployed updated bundle to `https://classmatebd.vercel.app` (HTTP 200).
+5. **Physical Device Installation**: Assembled `app-debug.apk` in 1m 51s, installed via ADB streamed install, launched on device `6478ab80`, and captured live verification screenshot confirming OpenStreetMap, frosted header pill, and live peek card rendered.
