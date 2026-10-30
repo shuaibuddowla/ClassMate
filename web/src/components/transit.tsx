@@ -65,6 +65,37 @@ export interface CorridorStation {
   isCampus: boolean;
 }
 
+export const CORRIDOR_MILESTONES_KM: number[] = [
+  0.00,  // 1: Mukto Mancho Bus Stop
+  0.23,  // 2: Academic Building-1 Bus Stop
+  0.38,  // 3: SOH Hall Bus Stop
+  0.46,  // 4: Mannan Hall Bus Stop
+  0.65,  // 5: Academic Building-2 Bus Stop
+  0.82,  // 6: Fifth Gate Bus Stop
+  0.95,  // 7: Prottoi-71 Bus Stop
+  1.10,  // 8: First Gate Bus Stop
+  1.55,  // 9: Arif Nagar Bus Stop
+  1.95,  // 10: Shena Nagar Bus Stop
+  2.15,  // 11: Kagmari More Bus Stop
+  2.55,  // 12: Kagmari Bridge-1 Bus Stop
+  2.98,  // 13: Kagmari Bridge-2 Bus Stop
+  3.32,  // 14: Baby Stand Bus Stop
+  3.68,  // 15: Shantikunja More Bus Stop
+  4.45,  // 16: Nirala More Bus Stop
+  4.80,  // 17: Boro Kalibari More Bus Stop
+  5.15,  // 18: Puraton Bus Stand Bus Stop
+  5.30,  // 19: Registry Para Road Bus Stop
+  5.75,  // 20: Kumudini College Gate Bus Stop
+  6.00,  // 21: C & B More Bus Stop
+  6.15,  // 22: Baitun Nur Jame Mosque Mor
+  6.40,  // 23: Kazi-Nazrul Sarani Bus Stop
+  6.50,  // 24: District Bus Stop
+  6.65,  // 25: DC Lake Bus Stop
+  7.15,  // 26: Bottola Road Bus Stop
+  7.75,  // 27: Taltola-Shimultoli Road Bus Stop
+  7.95   // 28: Pouro Uddan Bus Stop
+];
+
 export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
   { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
@@ -1131,23 +1162,27 @@ export function Transit({ ctx }: { ctx?: any }) {
           {filteredFleet.length > 0 ? filteredFleet.map((bus) => {
             const nextInfo = getNextStopForBus(bus);
             const progressPct = getBusProgress(bus);
-            const ageText =
-              bus.positionAgeSeconds == null
-                ? "GPS সময় অজানা"
-                : bus.isStale
-                ? `${bus.positionAgeSeconds} সে আগে · বিলম্ব`
-                : bus.isEstimated
-                ? `অনুমিত · ${bus.positionAgeSeconds} সে আগে`
-                : bus.positionAgeSeconds < 15
-                ? "এইমাত্র"
-                : `${bus.positionAgeSeconds} সে আগে`;
-            const liveStatus = bus.isStale
-              ? "GPS বিলম্বিত"
-              : bus.isEstimated
-              ? "অনুমিত অবস্থান"
-              : bus.speed > 0
-              ? `${Math.round(bus.speed)} কিমি/ঘ`
-              : "স্ট্যান্ডবাই";
+            const isBusOffline = bus.isStale || (bus.positionAgeSeconds != null && bus.positionAgeSeconds > 600);
+
+            // Clean natural Bengali time format
+            let ageText = "GPS সময় অজানা";
+            if (bus.positionAgeSeconds != null) {
+              const s = bus.positionAgeSeconds;
+              if (s < 20) {
+                ageText = "এইমাত্র";
+              } else if (s < 60) {
+                ageText = `${s} সে আগে`;
+              } else if (s < 3600) {
+                ageText = `${Math.floor(s / 60)} মি আগে`;
+              } else {
+                ageText = `${Math.floor(s / 3600)} ঘণ্টা আগে`;
+              }
+            }
+
+            // Clean non-duplicated status metrics
+            const progressLabel = bus.speed > 0 ? `${progressPct}% পথ শেষ` : (isBusOffline ? "টার্মিনাল স্ট্যান্ডবাই" : "ক্যাম্পাস স্ট্যান্ডবাই");
+            const liveLabel = isBusOffline ? "GPS বিলম্বিত" : (bus.speed > 0 ? `${Math.round(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই");
+            const liveDotColor = isBusOffline ? "#f97316" : (bus.speed > 0 ? "#10b981" : "#fbbf24");
 
             return (
               <div
@@ -1160,7 +1195,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                 className="transit-bus-card"
                 role="button"
                 tabIndex={0}
-                aria-label={`${bus.nameBn}, ${formatBusShortId(bus.id)}. ${bus.routeName}. ${bus.isStale ? "GPS বিলম্বিত" : liveStatus}`}
+                aria-label={`${bus.nameBn}, ${formatBusShortId(bus.id)}. ${bus.routeName}. ${liveLabel}`}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
@@ -1200,17 +1235,17 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 {/* Progress Metric Row */}
                 <div className="transit-bus-metric-row">
-                  <div className={`transit-progress-pill ${bus.isStale ? "stale" : ""}`}>
+                  <div className={`transit-progress-pill ${isBusOffline ? "stale" : ""}`}>
                     <span className="transit-progress-bar-icon" />
-                    <span>{bus.isStale ? "GPS বিলম্বিত" : `${progressPct}% পথ শেষ`}</span>
+                    <span>{progressLabel}</span>
                   </div>
                   <span className="transit-dot-sep">•</span>
                   <div className="transit-status-live-pill">
                     <span
                       className="transit-pulse-dot"
-                      style={{ background: bus.isStale ? "#f97316" : bus.speed > 0 ? "#10b981" : "#fbbf24" }}
+                      style={{ background: liveDotColor }}
                     />
-                    <span>{liveStatus}</span>
+                    <span>{liveLabel}</span>
                   </div>
                   <span className="transit-update-time">{ageText}</span>
                 </div>
@@ -1220,14 +1255,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <div
                     className="transit-route-progress-fill"
                     style={{
-                      width: `${progressPct}%`,
+                      width: `${bus.speed > 0 ? progressPct : 12}%`,
                       background: `linear-gradient(90deg, ${bus.color}88, ${bus.color})`
                     }}
                   />
                   <div
                     className="transit-route-progress-pin"
                     style={{
-                      left: `${progressPct}%`,
+                      left: `${bus.speed > 0 ? progressPct : 12}%`,
                       borderColor: bus.color
                     }}
                   >
@@ -1241,7 +1276,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                     পরবর্তী: <strong>{nextInfo.station.nameBn}</strong>
                   </span>
                   <span className="transit-duration-tag">
-                    {bus.isStale ? "ETA স্থগিত" : bus.speed > 0 ? `~${nextInfo.etaMinutes} মি` : "স্ট্যান্ডবাই"}
+                    {bus.speed > 0 ? `~${nextInfo.etaMinutes} মি` : (isBusOffline ? "GPS বিলম্বিত" : "স্ট্যান্ডবাই")}
                   </span>
                 </div>
               </div>
@@ -1322,8 +1357,17 @@ export function Transit({ ctx }: { ctx?: any }) {
               <span className="transit-hero-approaching-sub">{detailNextInfo.station.name}</span>
             </div>
             <div className="transit-hero-eta-box">
-              <span className="transit-hero-eta-val">~{detailNextInfo.etaMinutes}</span>
-              <span className="transit-hero-eta-unit">মিনিট</span>
+              {detailBus.speed > 0 ? (
+                <>
+                  <span className="transit-hero-eta-val">~{detailNextInfo.etaMinutes}</span>
+                  <span className="transit-hero-eta-unit">মিনিট</span>
+                </>
+              ) : (
+                <>
+                  <span className="transit-hero-eta-val" style={{ fontSize: "13px", marginTop: "2px" }}>স্ট্যান্ডবাই</span>
+                  <span className="transit-hero-eta-unit">~{detailNextInfo.etaMinutes} মি ড্রাইভ</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -1335,13 +1379,13 @@ export function Transit({ ctx }: { ctx?: any }) {
             <div className="transit-hero-stat">
               <span className="transit-stat-label">বর্তমান গতি</span>
               <strong className="transit-stat-val">
-                {detailBus.speed > 0 ? `${Math.round(detailBus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}
+                {detailBus.speed > 0 ? `${Math.round(detailBus.speed)} কিমি/ঘ` : "০ কিমি/ঘ"}
               </strong>
             </div>
             <div className="transit-hero-stat">
               <span className="transit-stat-label">স্ট্যাটাস</span>
-              <strong className="transit-stat-val" style={{ color: detailBus.speed > 0 ? "#34d399" : "#fbbf24" }}>
-                {detailBus.speed > 0 ? "চলন্ত" : "স্ট্যান্ডবাই"}
+              <strong className="transit-stat-val" style={{ color: detailBus.isStale ? "#f97316" : detailBus.speed > 0 ? "#10b981" : "#fbbf24" }}>
+                {detailBus.isStale ? "GPS বিলম্বিত" : detailBus.speed > 0 ? "চলন্ত" : "স্ট্যান্ডবাই"}
               </strong>
             </div>
           </div>
@@ -1368,23 +1412,40 @@ export function Transit({ ctx }: { ctx?: any }) {
         {/* Stoppage Corridor Vertical Timeline */}
         <div className="transit-timeline-container">
           {CORRIDOR_STATIONS.map((station, idx) => {
+            const approachingIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === detailNextInfo.station.id);
             const isApproaching = station.id === detailNextInfo.station.id;
             const isAlerted = !!alertedStops[station.id];
-            const distM = getDistanceMeters(detailBus.lat, detailBus.lon, station.lat, station.lon);
-            const distKm = (distM / 1000).toFixed(2);
-            const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(detailBus.speed, 25)) * 60));
+            const isPassed = approachingIdx > -1 && idx < approachingIdx;
+
+            // Strict sequential corridor distance calculation
+            let displayKm = "0.00";
+            let displayEta = "";
+
+            if (isPassed) {
+              displayKm = (CORRIDOR_MILESTONES_KM[idx] ?? 0).toFixed(2);
+              displayEta = "অতিক্রম করেছে";
+            } else if (isApproaching) {
+              displayKm = detailNextInfo.distanceKm;
+              displayEta = detailBus.speed > 0 ? `~${detailNextInfo.etaMinutes} মি` : `~${detailNextInfo.etaMinutes} মি ড্রাইভ`;
+            } else {
+              const baseDelta = Math.max(0.1, (CORRIDOR_MILESTONES_KM[idx] ?? 0) - (CORRIDOR_MILESTONES_KM[approachingIdx] ?? 0));
+              const totalKm = baseDelta + parseFloat(detailNextInfo.distanceKm);
+              displayKm = totalKm.toFixed(2);
+              const driveEta = Math.max(1, Math.round((totalKm / Math.max(detailBus.speed, 25)) * 60));
+              displayEta = `~${driveEta} মি`;
+            }
 
             return (
               <div
                 key={station.id}
                 onClick={() => setSelectedStoppageAction(station)}
-                className={`transit-timeline-item ${isApproaching ? "is-approaching" : ""}`}
+                className={`transit-timeline-item ${isApproaching ? "is-approaching" : ""} ${isPassed ? "is-passed" : ""}`}
               >
                 {/* Timeline connector line */}
                 {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-timeline-line" />}
 
                 {/* Node Milestone */}
-                <div className={`transit-timeline-node ${isApproaching ? "active-bus-node" : ""}`}>
+                <div className={`transit-timeline-node ${isApproaching ? "active-bus-node" : ""} ${isPassed ? "passed-node" : ""}`}>
                   {isApproaching ? (
                     <Bus size={13} color="#ffffff" />
                   ) : (
@@ -1405,9 +1466,9 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                     <div className="transit-timeline-actions">
                       <div className="transit-timeline-eta-block">
-                        <span className="transit-station-km">{distKm} কিমি</span>
-                        <span className="transit-station-eta">
-                          {detailBus.speed > 0 ? `~${etaM} মি` : "স্ট্যান্ডবাই"}
+                        <span className="transit-station-km">{displayKm} কিমি</span>
+                        <span className={`transit-station-eta ${isPassed ? "eta-passed" : ""}`}>
+                          {displayEta}
                         </span>
                       </div>
                       <button
