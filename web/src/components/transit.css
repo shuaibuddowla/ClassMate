@@ -54,6 +54,21 @@
   text-decoration: none;
 }
 
+.leaflet-tooltip.transit-stop-tooltip {
+  padding: 6px 9px;
+  border: 1px solid rgba(226, 232, 240, 0.18);
+  border-radius: 9px;
+  color: #f8fafc;
+  background: rgba(9, 15, 28, 0.94);
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.28);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.leaflet-tooltip.transit-stop-tooltip::before {
+  display: none;
+}
+
 /* Custom Scrollbar Styles for Transit Component */
 .transit-container *::-webkit-scrollbar {
   width: 5px;
@@ -233,9 +248,10 @@
   align-items: center;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 0 16px 2px 0;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 22px), transparent 100%);
 }
 
 .transit-chips-scroll::-webkit-scrollbar {
@@ -300,6 +316,11 @@
   color: #34d399;
 }
 
+.transit-chip-speed.stale {
+  background: rgba(251, 146, 60, 0.18);
+  color: #fdba74;
+}
+
 .transit-chip-waiting {
   display: flex;
   align-items: center;
@@ -361,6 +382,16 @@
   transform: scale(0.95);
 }
 
+.transit-fab-btn:focus-visible,
+.transit-mode-toggle-btn:focus-visible,
+.transit-bus-chip:focus-visible,
+.transit-expand-toggle-btn:focus-visible,
+.transit-bell-alert-btn:focus-visible,
+.transit-sheet-drag-handle:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+}
+
 .transit-fab-badge {
   position: absolute;
   top: -3px;
@@ -401,7 +432,7 @@
 }
 
 .transit-bottom-sheet.collapsed {
-  height: 240px;
+  height: 236px;
 }
 
 .transit-bottom-sheet.expanded {
@@ -412,7 +443,7 @@
 
 @media (max-width: 640px) {
   .transit-bottom-sheet.collapsed {
-    height: 235px;
+    height: 244px;
   }
   .transit-bottom-sheet.expanded {
     height: 62vh;
@@ -423,7 +454,10 @@
 /* Drag Handle Bar */
 .transit-sheet-drag-handle {
   width: 100%;
-  padding: 8px 0 4px;
+  height: 22px;
+  min-height: 22px;
+  padding: 6px 0 5px;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   cursor: pointer;
@@ -463,9 +497,7 @@
   gap: 12px;
   padding: 2px 0;
   flex-shrink: 0;
-  cursor: pointer;
   border-radius: 12px;
-  user-select: none;
 }
 
 .transit-bus-header-identity {
@@ -557,10 +589,35 @@
   border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
+.transit-speed-pill.stale {
+  background: rgba(251, 146, 60, 0.16);
+  color: #fdba74;
+  border: 1px solid rgba(251, 146, 60, 0.34);
+}
+
 .transit-gps-coords-text {
   font-size: 9.5px;
   font-family: monospace;
   color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.transit-gps-coords-text .is-live-fix {
+  color: #34d399;
+  font-family: inherit;
+}
+
+.transit-gps-coords-text .is-estimated {
+  color: #fbbf24;
+  font-family: inherit;
+}
+
+.transit-gps-coords-text .is-stale {
+  color: #fb923c;
+  font-family: inherit;
 }
 
 /* Prominent "Next Approaching Stop" Card - Guaranteed Non-Squish Height */
@@ -657,9 +714,13 @@
   font-size: 11px;
   color: #94a3b8;
   line-height: 1.2;
+  flex-wrap: wrap;
+  white-space: normal;
+}
+
+.transit-next-stop-bn,
+.transit-next-dist-pill {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .transit-dot-sep {
@@ -695,6 +756,18 @@
   background: rgba(148, 163, 184, 0.18);
   color: #cbd5e1;
   border: 1px solid rgba(148, 163, 184, 0.3);
+  white-space: nowrap;
+}
+
+.transit-next-delayed-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: rgba(251, 146, 60, 0.16);
+  color: #fdba74;
+  border: 1px solid rgba(251, 146, 60, 0.34);
   white-space: nowrap;
 }
 
@@ -771,6 +844,26 @@
   gap: 5px;
 }
 
+.transit-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.transit-status-dot.fresh {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.65);
+}
+
+.transit-status-dot.estimated {
+  background: #fbbf24;
+}
+
+.transit-status-dot.stale {
+  background: #fb923c;
+}
+
 .transit-expand-toggle-btn {
   background: transparent;
   border: none;
@@ -782,6 +875,8 @@
   align-items: center;
   gap: 4px;
   padding: 3px 6px;
+  height: 28px;
+  min-height: 28px;
   border-radius: 6px;
   transition: all 0.15s ease;
 }
@@ -828,6 +923,15 @@
   justify-content: space-between;
 }
 
+.transit-stepper-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: right;
+}
+
 .transit-stepper-list {
   display: flex;
   flex-direction: column;
@@ -849,6 +953,17 @@
 
 .transit-stepper-item:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.transit-stepper-item:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.transit-stepper-item button:focus-visible,
+.transit-arrival-toast button:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
 }
 
 .transit-stepper-item:last-child {
@@ -935,6 +1050,8 @@
   align-items: center;
   gap: 8px;
   margin-top: 1.5px;
+  flex-wrap: wrap;
+  row-gap: 3px;
 }
 
 /* Waiting / Discovery Card */
@@ -974,6 +1091,53 @@
   color: #94a3b8;
   margin-top: 2px;
   line-height: 1.4;
+}
+
+.transit-arrival-toast {
+  position: absolute;
+  top: 108px;
+  left: 50%;
+  z-index: 25;
+  transform: translateX(-50%);
+  width: min(480px, calc(100% - 28px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 14px;
+  color: #d1fae5;
+  background: rgba(6, 32, 31, 0.94);
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.35);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.transit-arrival-toast > svg {
+  flex: 0 0 auto;
+  color: #34d399;
+}
+
+.transit-arrival-toast span {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.transit-arrival-toast button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: #a7f3d0;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.transit-arrival-toast button:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ==========================================================================
@@ -1120,6 +1284,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+  display: none;
+}
+
+.lollipop-stop-marker:hover .lollipop-label,
+.lollipop-stop-marker.is-next .lollipop-label {
+  display: block;
 }
 
 .lollipop-stop-marker.is-next .lollipop-label {
@@ -1163,6 +1333,14 @@
   border-color: #38bdf8 !important;
   box-shadow: 0 0 18px rgba(56, 189, 248, 0.8), 0 4px 16px rgba(0, 0, 0, 0.7);
   transform: scale(1.12);
+}
+
+.teardrop-bus-pin.estimated .teardrop-circle {
+  border-style: dashed;
+}
+
+.teardrop-bus-pin.stale {
+  opacity: 0.62;
 }
 
 .bus-svg-icon {
@@ -1272,7 +1450,7 @@
   }
 
   .transit-bottom-sheet.collapsed {
-    height: 230px;
+    height: 236px;
   }
 
   .transit-bottom-sheet.expanded {
@@ -1285,6 +1463,43 @@
     right: 18px;
     bottom: 20px;
     opacity: 1;
+  }
+
+  .transit-arrival-toast {
+    top: 18px;
+    left: auto;
+    right: 18px;
+    transform: none;
+    width: min(420px, 42vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .transit-arrival-toast {
+    top: 148px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    transform: none;
+  }
+
+  .transit-stepper-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .transit-stepper-hint {
+    max-width: 42%;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .transit-arrival-toast {
+    top: 108px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(480px, calc(100% - 36px));
   }
 }
 

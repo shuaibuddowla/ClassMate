@@ -8176,3 +8176,211 @@ Located in `app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScree
 | **Notice Feed Shimmer** | Android APK | **VERIFIED** | `shimmer_item_notice.xml` matching `item_notice_modern.xml` with 0 CLS |
 | **Predictive Back** | Android APK | **VERIFIED** | `enableOnBackInvokedCallback="true"` and `OnBackPressedCallback` across 14 activities |
 | **Daily Security Audit**| Automation | **SCHEDULED**| `classmate-daily-security-audit` scheduled daily at 09:00 AM Asia/Dhaka |
+
+
+---
+
+## 152. Real Street Route Geometry Correction (OSRM), Kinematic Dead Reckoning & Pure Student Transit UI Polish (Oct 30, 2026 - Production Master State)
+
+### A. Executive Architectural Synthesis of Recent Antigravity Transcripts
+
+Across recent Antigravity transcripts (`f299dd3b-5ee4-474d-a380-72de6b93c62b`, `3fb77483`, `0edd370b`, `23e6ef71`), engineering efforts achieved pivotal milestones in refining the live transit tracking subsystem, correcting ground-truth street routing, implementing dead reckoning algorithms, and perfecting the student-focused UI across both the Next.js Web companion client (`https://classmatebd.vercel.app/#transit`) and the native Android APK (`ClassMateTransitScreen.kt`):
+
+1. **User Request for Pure Student Location Tracking (13:13 Asia/Dhaka)**:
+   - Enforced strict product constraints eliminating non-essential bloat:
+     - **Removed**: Seat availability counters, passenger occupancy bars, crowd-reporting popups, driver phone dialer buttons.
+     - **Focused Core Value**: Pure, high-reliability location tracking — where the bus is right now, which road it is navigating, when it will reach the student's stop, and what the next approaching stoppage is.
+   - Preserved 5-Tab Bottom Navigation: Timetable, Notices, Transit (active center tab with live green pulsing dot), Courses, Profile/Settings.
+   - Google Satellite Hybrid (`lyrs=y`) map occupying 80%+ of the viewport with floating glassmorphic pills and a sleek Material 3 peek/expand bottom sheet.
+
+2. **Kinematic Projection / Dead Reckoning Engine (`predictBusPosition`)**:
+   - Resolved GPS latency and jitter between sporadic WebSocket telemetry updates.
+   - Projects vehicle coordinates forward up to 15 seconds (`MAX_PREDICTION_SECONDS = 15`) using vehicle speed, bearing, and great-circle spherical trigonometry.
+   - Computes status indicators: `positionAgeSeconds`, `isEstimated: ageSeconds > 1`, and `isStale: ageSeconds > 15` ("GPS delayed").
+
+3. **Telemetry Timestamp Parsing & Robust DateTime Normalization (`parseTelemetryTimestamp`)**:
+   - Built a robust parser handling epoch timestamps (seconds vs ms) and varying date-time string formats (with/without timezone offsets, 12h/24h AM/PM strings).
+   - Validates timestamps against client `receivedAt + 30_000ms` sanity boundary, gracefully falling back to local receipt time to avoid clock desynchronization errors.
+
+4. **Geodesic Bearing Calculation (`getBearingDegrees`)**:
+   - Implemented spherical forward azimuth calculation between consecutive coordinate fixes to smoothly rotate directional canvas arrows and vehicle markers even when tracker hardware reports 0 or invalid heading values.
+
+5. **Ground-Truth Street Route Correction via OSRM & User Map Verification (13:40 - 13:58 Asia/Dhaka)**:
+   - Ground truth provided via 5 uploaded route map captures (`media_1793346304887_97318db8.jpg` to `ad0f6a63.jpg`).
+   - Replaced idealized straight-line waypoints with exact road geometries queried from Open Source Routing Machine (OSRM) driving API:
+     - **Campus Loop**: Mukto Mancho -> AB1 -> SOH Hall -> Mannan Hall -> AB2 -> Fifth Gate -> Prottoy-71 -> First Gate.
+     - **South Arterial Corridor**: First Gate -> Arif Nagar -> Shena Nagar -> Kagmari Mor.
+     - **Highway & Approaches**: Kagmari Bridge 1 & 2 -> Baby Stand -> Shantikunja More.
+     - **Tangail City Loop**: Nirala More -> Pouro Uddan -> Taltola -> Bottola -> DC Lake -> District Bus Stop -> Kazi Nazrul -> Baitun Nur -> C&B More -> Kumudini Gate -> Registry Para -> Puraton Bus Stand -> Boro Kalibari -> Nirala More.
+     - **Return Route**: Seamless return back along the south corridor to MBSTU campus.
+   - Exported high-density polyline (`REAL_STREET_POLYLINE`) into dedicated module `web/src/components/transit-route-data.ts`.
+
+6. **In-Page Station Arrival Alerts Subsystem**:
+   - Interactive bell icons on all corridor stoppage items in the bottom sheet stepper.
+   - Audio and visual alerts trigger when the student's selected bus approaches within proximity threshold of the alerted station while the page is active.
+
+7. **Bottom Sheet UX Polish, Stepper Accessibility & Keyboard Navigation**:
+   - Styled corridor stoppages stepper (`.transit-stepper-list`) with order badge nodes, distance in km, and dynamic ETA indicators (`~X min approximate ETA`, `Bus is at the stand`, `GPS delayed`).
+   - Accessible keyboard interactions (`role="button"`, `tabIndex={0}`, Enter/Space key triggers).
+   - Instant map re-centering via `mapRef.current.flyTo([st.lat, st.lon], 18)` on station selection.
+
+8. **Security Governance & Continuous Architecture Verification**:
+   - Automated standing daily security audit (`classmate-daily-security-audit`, `0edd370b`) running at 09:00 AM (Asia/Dhaka) auditing RLS policies, RPC security contexts, and Android network security configurations.
+
+---
+
+### B. Mathematical Specifications & Core Algorithms
+
+#### 1. Kinematic Dead Reckoning Formulation
+
+```typescript
+const MAX_PREDICTION_SECONDS = 15;
+
+export function predictBusPosition(bus: MbstuBusData, now: number): DisplayBusData {
+  if (!bus.receivedAt) {
+    return { ...bus, positionAgeSeconds: null, isEstimated: false, isStale: true };
+  }
+
+  const ageSeconds = Math.max(0, (now - bus.receivedAt) / 1000);
+  const projectedSeconds = Math.min(ageSeconds, MAX_PREDICTION_SECONDS);
+  const distanceMeters =
+    bus.isDriving && bus.speed > 0 && bus.speed <= 100 && bus.hasDirection !== false
+      ? (bus.speed * 1000 * projectedSeconds) / 3600
+      : 0;
+
+  let lat = bus.lat;
+  let lon = bus.lon;
+
+  if (distanceMeters > 0) {
+    const earthRadius = 6371000;
+    const bearing = (bus.heading * Math.PI) / 180;
+    const angularDistance = distanceMeters / earthRadius;
+    const lat1 = (bus.lat * Math.PI) / 180;
+    const lon1 = (bus.lon * Math.PI) / 180;
+
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(angularDistance) +
+        Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
+    );
+    const lon2 =
+      lon1 +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+        Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+      );
+
+    lat = (lat2 * 180) / Math.PI;
+    lon = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+  }
+
+  return {
+    ...bus,
+    lat,
+    lon,
+    positionAgeSeconds: ageSeconds,
+    isEstimated: ageSeconds > 1,
+    isStale: ageSeconds > MAX_PREDICTION_SECONDS
+  };
+}
+```
+
+#### 2. Forward Geodesic Azimuth Calculation
+
+```typescript
+export function getBearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+  return (toDegrees(Math.atan2(y, x)) + 360) % 360;
+}
+```
+
+#### 3. Telemetry Timestamp Normalization
+
+```typescript
+export function parseTelemetryTimestamp(value: unknown, receivedAt: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
+    return timestamp <= receivedAt + 30_000 ? Math.min(timestamp, receivedAt) : receivedAt;
+  }
+  if (typeof value !== "string" || !value.trim()) return receivedAt;
+
+  const raw = value.trim();
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  let timestamp = Number.NaN;
+  if (hasTimezone) {
+    timestamp = Date.parse(raw);
+  } else {
+    const parts = raw.match(
+      /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i
+    );
+    if (parts) {
+      const [, year, month, day, hour, minute, second = "0", meridiem] = parts;
+      let hourOfDay = Number(hour);
+      if (meridiem?.toUpperCase() === "PM" && hourOfDay < 12) hourOfDay += 12;
+      if (meridiem?.toUpperCase() === "AM" && hourOfDay === 12) hourOfDay = 0;
+      timestamp = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        hourOfDay,
+        Number(minute),
+        Number(second)
+      ).getTime();
+    } else {
+      timestamp = Date.parse(raw);
+    }
+  }
+  return Number.isFinite(timestamp) && timestamp <= receivedAt + 30_000
+    ? Math.min(timestamp, receivedAt)
+    : receivedAt;
+}
+```
+
+---
+
+### C. Ground-Truth Corridor Waypoints & Real Street Polyline Architecture
+
+#### 1. Corridor Station Topology (`CORRIDOR_STATIONS`)
+
+| Order | Identifier | English Name | Bengali Stoppage Name | Latitude | Longitude | Zone |
+| :---: | :--- | :--- | :--- | :---: | :---: | :---: |
+| 1 | `mukto_mancho` | Mukto Mancho Stand | মুক্ত মঞ্চ স্ট্যান্ড | 24.23512 | 89.89025 | Campus |
+| 2 | `ab1` | Academic Building-1 | একাডেমিক ভবন-১ | 24.23715 | 89.89038 | Campus |
+| 3 | `soh_hall` | SOH Hall Bus Stop | শাহী হল বাস স্টপ | 24.23835 | 89.89042 | Campus |
+| 4 | `mannan_hall` | Mannan Hall Bus Stop | মান্নান হল বাস স্টপ | 24.23855 | 89.89105 | Campus |
+| 5 | `ab2` | Academic Building-2 | একাডেমিক ভবন-২ | 24.23712 | 89.89152 | Campus |
+| 6 | `fifth_gate` | Fifth Gate Bus Stop | পঞ্চম গেট বাস স্টপ | 24.23578 | 89.89178 | Campus |
+| 7 | `prottoy_71` | Prottoy-71 Bus Stop | প্রত্যয়-৭১ বাস স্টপ | 24.23482 | 89.89195 | Campus (Standby Hub) |
+| 8 | `first_gate` | First Gate (Main Entrance) | প্রথম গেট বাস স্টপ | 24.23378 | 89.89218 | Campus |
+| 9 | `santosh_bazaar` | Santosh Bazaar / Gate | সন্তোষ বাজার / গেট | 24.23780 | 89.89420 | City Corridor |
+| 10 | `kagmari` | Kagmari More | কাগমারী মোড় | 24.23915 | 89.89815 | City Corridor |
+| 11 | `baby_stand` | Baby Stand | বেবি স্ট্যান্ড | 24.24415 | 89.90445 | City Corridor |
+| 12 | `shantikunja` | Shantikunja More | শান্তিকুঞ্জ মোড় | 24.24665 | 89.90735 | City Corridor |
+| 13 | `puraton_stand` | Old Bus Stand | পুরাতন বাস স্ট্যান্ড | 24.24845 | 89.91125 | City Corridor |
+| 14 | `nirala` | Nirala (City Center) | নিরালা মোড় (শহর কেন্দ্র) | 24.24985 | 89.91485 | City Core |
+| 15 | `pouro_uddan` | Pouro Uddan | পৌর উদ্যান | 24.25125 | 89.91445 | City Core |
+| 16 | `dc_lake` | DC Lake | ডিসি লেক | 24.26245 | 89.91545 | City Core |
+| 17 | `kumudini` | Kumudini College Gate | কুমুদিনী কলেজ গেট | 24.25715 | 89.91885 | City Core |
+
+#### 2. Open Source Routing Machine (OSRM) Polyline Extraction
+- **Module**: `web/src/components/transit-route-data.ts`.
+- **Constant**: `REAL_STREET_POLYLINE: [number, number][]` (over 450 coordinate vertices).
+- **Extraction Protocol**: Driving geometry queried from OSRM router (`http://router.project-osrm.org/route/v1/driving/...`) linking sequential waypoints along actual paved roadways, eliminating straight-line cuts through buildings and water bodies.
+
+---
+
+### D. Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform | Production State | Verification Protocol |
+| :--- | :--- | :--- | :--- |
+| **Real Street Polyline** | Web Companion | **PRODUCTION** | `REAL_STREET_POLYLINE` imported in `transit.tsx` from `transit-route-data.ts`; OSRM-fitted |
+| **Dead Reckoning Engine** | Web Companion | **PRODUCTION** | `predictBusPosition` with spherical trigonometry forward projection (≤ 15s) |
+| **In-Page Station Alerts**| Web Companion | **PRODUCTION** | Bell icon toggles in corridor stepper list with proximity threshold notifications |
+| **Pure Student Transit UI**| Web Companion | **PRODUCTION** | Google Satellite Hybrid (80%+ viewport), zero seat counters, Material 3 bottom sheet |
+| **Native Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` (805 lines); OSMDroid + OkHttp Engine.IO v4 protocol |
+| **MBSTU Telemetry Stream** | Android & Web | **VERIFIED** | Handshake `40`, ping `2`/pong `3`, events `flutter-bus-data` & `studentGpsData` |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |

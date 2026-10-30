@@ -16,7 +16,10 @@ import {
   ChevronDown,
   Navigation,
   Play,
-  Sparkles
+  Sparkles,
+  LocateFixed,
+  CheckCircle2,
+  X
 } from "lucide-react";
 
 /* ==========================================================================
@@ -31,12 +34,22 @@ export interface MbstuBusData {
   lon: number;
   speed: number;
   heading: number;
+  hasDirection?: boolean;
   routeName: string;
   status: string;
   color: string;
   isDriving: boolean;
   lastUpdated?: string;
+  receivedAt?: number;
 }
+
+type DisplayBusData = MbstuBusData & {
+  positionAgeSeconds: number | null;
+  isEstimated: boolean;
+  isStale: boolean;
+};
+
+const MAX_PREDICTION_SECONDS = 15;
 
 export interface CorridorStation {
   id: string;
@@ -57,25 +70,36 @@ const BUS_METADATA: { [id: string]: { nameEn: string; color: string; routeName: 
   SB0010: { nameEn: "Raktakarabi", color: "#e11d48", routeName: "MBSTU Campus Standby" }
 };
 
-// Verified Corridor Stoppages along the MBSTU - Tangail City Street Route
+// Verified Corridor Stoppages along the MBSTU - Tangail City Street Route (28 Stops)
 export const CORRIDOR_STATIONS: CorridorStation[] = [
-  { id: "mukto_mancho", name: "Mukto Mancho Stand", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
-  { id: "ab1", name: "Academic Building-1", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
-  { id: "soh_hall", name: "SOH Hall Bus Stop", nameBn: "শহীদ জিয়াউর রহমান হল স্টপ", lat: 24.23835, lon: 89.89042, order: 3, isCampus: true },
+  { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
+  { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
+  { id: "soh_hall", name: "Bangabandhu / SOH Hall Bus Stop", nameBn: "বঙ্গবন্ধু / এসওএইচ হল বাস স্টপ", lat: 24.23835, lon: 89.89042, order: 3, isCampus: true },
   { id: "mannan_hall", name: "Mannan Hall Bus Stop", nameBn: "মান্নান হল বাস স্টপ", lat: 24.23855, lon: 89.89105, order: 4, isCampus: true },
-  { id: "ab2", name: "Academic Building-2", nameBn: "একাডেমিক ভবন-২ বাস স্টপ", lat: 24.23712, lon: 89.89152, order: 5, isCampus: true },
+  { id: "ab2", name: "Academic Building-2 Bus Stop", nameBn: "একাডেমিক ভবন-২ বাস স্টপ", lat: 24.23712, lon: 89.89152, order: 5, isCampus: true },
   { id: "fifth_gate", name: "Fifth Gate Bus Stop", nameBn: "পঞ্চম গেট বাস স্টপ", lat: 24.23578, lon: 89.89178, order: 6, isCampus: true },
   { id: "prottoy_71", name: "Prottoy-71 Bus Stop", nameBn: "প্রত্যয়-৭১ বাস স্টপ", lat: 24.23482, lon: 89.89195, order: 7, isCampus: true },
-  { id: "first_gate", name: "First Gate (Main Entrance)", nameBn: "প্রধান ফটক বাস স্টপ", lat: 24.23378, lon: 89.89218, order: 8, isCampus: true },
-  { id: "santosh_bazaar", name: "Santosh Bazaar / Gate", nameBn: "সন্তোষ বাজার / গেট", lat: 24.2378, lon: 89.8942, order: 9, isCampus: false },
-  { id: "kagmari", name: "Kagmari More", nameBn: "কাগমারী মোড়", lat: 24.23915, lon: 89.89815, order: 10, isCampus: false },
-  { id: "baby_stand", name: "Baby Stand", nameBn: "বেবি স্ট্যান্ড", lat: 24.24415, lon: 89.90445, order: 11, isCampus: false },
-  { id: "shantikunja", name: "Shantikunja More", nameBn: "শান্তিকুঞ্জ মোড়", lat: 24.24665, lon: 89.90735, order: 12, isCampus: false },
-  { id: "puraton_stand", name: "Old Bus Stand", nameBn: "পুরাতন বাস স্ট্যান্ড", lat: 24.24845, lon: 89.91125, order: 13, isCampus: false },
-  { id: "nirala", name: "Nirala (City Center)", nameBn: "নিরালা মোড় (শহর কেন্দ্র)", lat: 24.24985, lon: 89.91485, order: 14, isCampus: false },
-  { id: "pouro_uddan", name: "Pouro Uddan", nameBn: "পৌর উদ্যান", lat: 24.25125, lon: 89.91445, order: 15, isCampus: false },
-  { id: "dc_lake", name: "DC Lake", nameBn: "ডিসি লেক", lat: 24.26245, lon: 89.91545, order: 16, isCampus: false },
-  { id: "kumudini", name: "Kumudini College Gate", nameBn: "কুমুদিনী কলেজ গেট", lat: 24.25715, lon: 89.91885, order: 17, isCampus: false }
+  { id: "first_gate", name: "First Gate (Main Gate) Bus Stop", nameBn: "প্রথম গেট (প্রধান ফটক) বাস স্টপ", lat: 24.23363, lon: 89.89218, order: 8, isCampus: true },
+  { id: "arif_nagar", name: "Arif Nagar Bus Stop", nameBn: "আরিফ নগর বাস স্টপ", lat: 24.23398, lon: 89.89635, order: 9, isCampus: false },
+  { id: "shena_nagar", name: "Shena Nagar Bus Stop", nameBn: "সেনা নগর বাস স্টপ", lat: 24.23404, lon: 89.89991, order: 10, isCampus: false },
+  { id: "kagmari_more", name: "Kagmari More Bus Stop", nameBn: "কাগমারী মোড় বাস স্টপ", lat: 24.23488, lon: 89.90125, order: 11, isCampus: false },
+  { id: "kagmari_bridge_1", name: "Kagmari Bridge-1 Bus Stop", nameBn: "কাগমারী ব্রিজ-১ বাস স্টপ", lat: 24.23800, lon: 89.90250, order: 12, isCampus: false },
+  { id: "kagmari_bridge_2", name: "Kagmari Bridge-2 Bus Stop", nameBn: "কাগমারী ব্রিজ-২ বাস স্টপ", lat: 24.24155, lon: 89.90426, order: 13, isCampus: false },
+  { id: "baby_stand", name: "Baby Stand Bus Stop", nameBn: "বেবি স্ট্যান্ড বাস স্টপ", lat: 24.24415, lon: 89.90445, order: 14, isCampus: false },
+  { id: "shantikunja", name: "Shantikunja More Bus Stop", nameBn: "শান্তিকুঞ্জ মোড় বাস স্টপ", lat: 24.24665, lon: 89.90735, order: 15, isCampus: false },
+  { id: "nirala_more", name: "Nirala More Bus Stop", nameBn: "নিরালা মোড় বাস স্টপ", lat: 24.24985, lon: 89.91485, order: 16, isCampus: false },
+  { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.25125, lon: 89.91445, order: 17, isCampus: false },
+  { id: "taltola", name: "Taltola-Shimultoli Road Bus Stop", nameBn: "তালতলা-শিমুলতলী রোড স্টপ", lat: 24.25285, lon: 89.91415, order: 18, isCampus: false },
+  { id: "bottola", name: "Bottola Road Bus Stop", nameBn: "বটতলা রোড বাস স্টপ", lat: 24.25845, lon: 89.91395, order: 19, isCampus: false },
+  { id: "dc_lake", name: "DC Lake Bus Stop", nameBn: "ডিসি লেক বাস স্টপ", lat: 24.26245, lon: 89.91545, order: 20, isCampus: false },
+  { id: "district_stop", name: "District Bus Stop", nameBn: "ডিস্ট্রিক্ট বাস স্টপ", lat: 24.26195, lon: 89.91635, order: 21, isCampus: false },
+  { id: "kazi_nazrul", name: "Kazi-Nazrul Sarani Bus Stop", nameBn: "কাজী নজরুল সরণি বাস স্টপ", lat: 24.26175, lon: 89.91695, order: 22, isCampus: false },
+  { id: "baitun_nur", name: "Baitun Nur Jame Mosque Mor", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", lat: 24.25985, lon: 89.91715, order: 23, isCampus: false },
+  { id: "cnb_more", name: "C & B More Bus Stop", nameBn: "সি অ্যান্ড বি মোড় বাস স্টপ", lat: 24.25895, lon: 89.91765, order: 24, isCampus: false },
+  { id: "kumudini_gate", name: "Kumudini College Gate Bus Stop", nameBn: "কুমুদিনী কলেজ গেট বাস স্টপ", lat: 24.25715, lon: 89.91885, order: 25, isCampus: false },
+  { id: "registry_para", name: "Registry Para Road Bus Stop", nameBn: "রেজিস্ট্রি পাড়া রোড বাস স্টপ", lat: 24.25355, lon: 89.91965, order: 26, isCampus: false },
+  { id: "puraton_stand", name: "Puraton Bus Stand Bus Stop", nameBn: "পুরাতন বাস স্ট্যান্ড স্টপ", lat: 24.25245, lon: 89.91955, order: 27, isCampus: false },
+  { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.25135, lon: 89.91665, order: 28, isCampus: false }
 ];
 
 // Haversine Distance in Meters
@@ -88,6 +112,86 @@ export function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function getBearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+  return (toDegrees(Math.atan2(y, x)) + 360) % 360;
+}
+
+function parseTelemetryTimestamp(value: unknown, receivedAt: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
+    return timestamp <= receivedAt + 30_000 ? Math.min(timestamp, receivedAt) : receivedAt;
+  }
+  if (typeof value !== "string" || !value.trim()) return receivedAt;
+
+  const raw = value.trim();
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  let timestamp = Number.NaN;
+  if (hasTimezone) {
+    timestamp = Date.parse(raw);
+  } else {
+    const parts = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (parts) {
+      const [, year, month, day, hour, minute, second = "0", meridiem] = parts;
+      let hourOfDay = Number(hour);
+      if (meridiem?.toUpperCase() === "PM" && hourOfDay < 12) hourOfDay += 12;
+      if (meridiem?.toUpperCase() === "AM" && hourOfDay === 12) hourOfDay = 0;
+      timestamp = new Date(Number(year), Number(month) - 1, Number(day), hourOfDay, Number(minute), Number(second)).getTime();
+    } else {
+      timestamp = Date.parse(raw);
+    }
+  }
+  return Number.isFinite(timestamp) && timestamp <= receivedAt + 30_000 ? Math.min(timestamp, receivedAt) : receivedAt;
+}
+
+function predictBusPosition(bus: MbstuBusData, now: number): DisplayBusData {
+  if (!bus.receivedAt) {
+    return { ...bus, positionAgeSeconds: null, isEstimated: false, isStale: true };
+  }
+
+  const ageSeconds = Math.max(0, (now - bus.receivedAt) / 1000);
+  const projectedSeconds = Math.min(ageSeconds, MAX_PREDICTION_SECONDS);
+  const distanceMeters = bus.isDriving && bus.speed > 0 && bus.speed <= 100 && bus.hasDirection !== false
+    ? (bus.speed * 1000 * projectedSeconds) / 3600
+    : 0;
+  let lat = bus.lat;
+  let lon = bus.lon;
+
+  if (distanceMeters > 0) {
+    const earthRadius = 6371000;
+    const bearing = (bus.heading * Math.PI) / 180;
+    const angularDistance = distanceMeters / earthRadius;
+    const lat1 = (bus.lat * Math.PI) / 180;
+    const lon1 = (bus.lon * Math.PI) / 180;
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(angularDistance) +
+        Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
+    );
+    const lon2 =
+      lon1 +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+        Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+      );
+    lat = (lat2 * 180) / Math.PI;
+    lon = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+  }
+
+  return {
+    ...bus,
+    lat,
+    lon,
+    positionAgeSeconds: ageSeconds,
+    isEstimated: ageSeconds > 1,
+    isStale: ageSeconds > MAX_PREDICTION_SECONDS
+  };
 }
 
 // Find closest vertex on the real street polyline
@@ -111,6 +215,10 @@ function formatBusShortId(id: string): string {
   return id;
 }
 
+function formatStopTitle(name: string): string {
+  return name.replace(/\s+Bus Stop$/i, "").replace(/\s+Bus Stand$/i, "");
+}
+
 /* ==========================================================================
    Component
    ========================================================================== */
@@ -123,16 +231,24 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [alertedStops, setAlertedStops] = useState<{ [stopId: string]: boolean }>({});
+  const [arrivalNotice, setArrivalNotice] = useState<{ busName: string; stopName: string } | null>(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const satLayerRef = useRef<L.TileLayer | null>(null);
   const streetLayerRef = useRef<L.TileLayer | null>(null);
   const busMarkersRef = useRef<{ [busId: string]: L.Marker }>({});
+  const busMarkerSignaturesRef = useRef<{ [busId: string]: string }>({});
   const stopMarkersRef = useRef<{ [stopId: string]: L.Marker }>({});
   const approachingGlowPolylineRef = useRef<L.Polyline | null>(null);
   const approachingLineRef = useRef<L.Polyline | null>(null);
   const demoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, []);
 
   // Bottom Sheet Swipe Gestures
   const touchStartY = useRef<number | null>(null);
@@ -175,10 +291,16 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
   }, [fleet]);
 
+  const displayFleet = useMemo(
+    () => fleet.map((bus) => predictBusPosition(bus, clockNow)),
+    [fleet, clockNow]
+  );
+  const freshFleetCount = displayFleet.filter((bus) => bus.positionAgeSeconds !== null && !bus.isStale).length;
+
   // Active Bus
   const selectedBus = useMemo(
-    () => fleet.find((b) => b.id === selectedBusId) || (fleet.length > 0 ? fleet[0] : null),
-    [fleet, selectedBusId]
+    () => displayFleet.find((b) => b.id === selectedBusId) || (displayFleet.length > 0 ? displayFleet[0] : null),
+    [displayFleet, selectedBusId]
   );
 
   // Map stations to polyline indices for accurate sequential corridor tracking
@@ -214,13 +336,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
 
     const nextStation = targetCandidate.station;
-    const distanceMeters = getDistanceMeters(selectedBus.lat, selectedBus.lon, nextStation.lat, nextStation.lon);
-    const distanceKm = (distanceMeters / 1000).toFixed(2);
-    const isStandby = selectedBus.speed === 0;
-    const effectiveSpeed = Math.max(selectedBus.speed, 25);
-    const etaMinutes = isStandby
-      ? Math.max(1, Math.round((distanceMeters / 1000 / 25) * 60))
-      : Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
 
     // Construct path segment along vertices from bus position into the approaching stop
     const pathSegment: [number, number][] = [[selectedBus.lat, selectedBus.lon]];
@@ -233,6 +348,15 @@ export function Transit({ ctx }: { ctx?: any }) {
       guard++;
     }
     pathSegment.push([nextStation.lat, nextStation.lon]);
+
+    const distanceMeters = pathSegment.slice(1).reduce((total, point, index) => {
+      const previous = pathSegment[index];
+      return total + getDistanceMeters(previous[0], previous[1], point[0], point[1]);
+    }, 0);
+    const distanceKm = (distanceMeters / 1000).toFixed(2);
+    const isStandby = selectedBus.speed === 0;
+    const effectiveSpeed = Math.max(selectedBus.speed, 25);
+    const etaMinutes = Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
 
     return {
       station: nextStation,
@@ -252,17 +376,23 @@ export function Transit({ ctx }: { ctx?: any }) {
     }));
   }, []);
 
-  // Cycle Active Buses
-  const cycleFleet = useCallback(() => {
-    if (fleet.length === 0) return;
-    const currIdx = fleet.findIndex((b) => b.id === selectedBusId);
-    const nextIdx = (currIdx + 1) % fleet.length;
-    const nextBus = fleet[nextIdx];
-    setSelectedBusId(nextBus.id);
-    if (mapRef.current) {
-      mapRef.current.flyTo([nextBus.lat, nextBus.lon], 17, { animate: true, duration: 1.0 });
+  useEffect(() => {
+    if (!selectedBus || selectedBus.isStale) return;
+    const reachedStop = CORRIDOR_STATIONS.find(
+      (station) =>
+        alertedStops[station.id] &&
+        getDistanceMeters(selectedBus.lat, selectedBus.lon, station.lat, station.lon) <= 200
+    );
+    if (!reachedStop) return;
+    setAlertedStops((prev) => ({ ...prev, [reachedStop.id]: false }));
+    setArrivalNotice({ busName: selectedBus.nameBn, stopName: reachedStop.name });
+  }, [selectedBus, alertedStops]);
+
+  const centerSelectedBus = useCallback(() => {
+    if (selectedBus && mapRef.current) {
+      mapRef.current.flyTo([selectedBus.lat, selectedBus.lon], 17, { animate: true, duration: 0.8 });
     }
-  }, [fleet, selectedBusId]);
+  }, [selectedBus]);
 
   // Recenter Campus
   const recenterCampus = useCallback(() => {
@@ -321,17 +451,17 @@ export function Transit({ ctx }: { ctx?: any }) {
       dashArray: "4, 6"
     }).addTo(map);
 
-    // Accurate Real Street Polyline (465 vertices following real roads)
+    // Accurate Real Street Polyline (428 vertices following real roads matching verified route)
     L.polyline(REAL_STREET_POLYLINE, {
-      color: "#1e1b4b",
+      color: "#064e3b",
       weight: 8,
-      opacity: 0.55,
+      opacity: 0.6,
       lineCap: "round",
       lineJoin: "round"
     }).addTo(map);
 
     L.polyline(REAL_STREET_POLYLINE, {
-      color: "#818cf8",
+      color: "#22c55e",
       weight: 5,
       opacity: 0.95,
       lineCap: "round",
@@ -423,10 +553,9 @@ export function Transit({ ctx }: { ctx?: any }) {
       if (stopMarkersRef.current[st.id]) {
         stopMarkersRef.current[st.id].setIcon(icon);
       } else {
-        const marker = L.marker([st.lat, st.lon], { icon, zIndexOffset: 100 }).addTo(map);
-        marker.on("click", () => {
-          toggleStopAlert(st.id);
-        });
+        const marker = L.marker([st.lat, st.lon], { icon, zIndexOffset: 100, title: st.name })
+          .bindTooltip(st.name, { direction: "top", offset: [0, -12], opacity: 0.96, className: "transit-stop-tooltip" })
+          .addTo(map);
         stopMarkersRef.current[st.id] = marker;
       }
     });
@@ -450,22 +579,23 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    const activeIds = new Set(fleet.map((b) => b.id));
+    const activeIds = new Set(displayFleet.map((b) => b.id));
     Object.keys(busMarkersRef.current).forEach((id) => {
       if (!activeIds.has(id)) {
         busMarkersRef.current[id].remove();
         delete busMarkersRef.current[id];
+        delete busMarkerSignaturesRef.current[id];
       }
     });
 
-    fleet.forEach((bus) => {
+    displayFleet.forEach((bus) => {
       const isSelected = bus.id === selectedBusId;
       const pinColor = isSelected ? "#38bdf8" : bus.color || "#818cf8";
       const size = isSelected ? 34 : 29;
       const svgSize = isSelected ? 18 : 15;
 
       const html = `
-        <div class="teardrop-bus-pin ${isSelected ? "selected" : ""}">
+        <div class="teardrop-bus-pin ${isSelected ? "selected" : ""} ${bus.isEstimated ? "estimated" : ""} ${bus.isStale ? "stale" : ""}">
           ${
             isSelected
               ? `
@@ -491,20 +621,34 @@ export function Transit({ ctx }: { ctx?: any }) {
         iconSize: [size, size + 8],
         iconAnchor: [size / 2, size + 5]
       });
+      const iconSignature = [bus.nameBn, bus.color, bus.speed, isSelected, bus.isEstimated, bus.isStale].join("|");
 
       if (busMarkersRef.current[bus.id]) {
         busMarkersRef.current[bus.id].setLatLng([bus.lat, bus.lon]);
-        busMarkersRef.current[bus.id].setIcon(icon);
+        if (busMarkerSignaturesRef.current[bus.id] !== iconSignature) {
+          busMarkersRef.current[bus.id].setIcon(icon);
+          busMarkerSignaturesRef.current[bus.id] = iconSignature;
+        }
         busMarkersRef.current[bus.id].setZIndexOffset(isSelected ? 500 : 200);
+        busMarkersRef.current[bus.id].options.title = bus.isStale
+          ? "Bus location is stale"
+          : bus.isEstimated
+          ? "Estimated from the last GPS update"
+          : "Live GPS location";
       } else {
-        const marker = L.marker([bus.lat, bus.lon], { icon, zIndexOffset: isSelected ? 500 : 200 }).addTo(map);
+        const marker = L.marker([bus.lat, bus.lon], {
+          icon,
+          zIndexOffset: isSelected ? 500 : 200,
+          title: bus.isStale ? "Bus location is stale" : bus.isEstimated ? "Estimated from the last GPS update" : "Live GPS location"
+        }).addTo(map);
         marker.on("click", () => {
           setSelectedBusId(bus.id);
         });
         busMarkersRef.current[bus.id] = marker;
+        busMarkerSignaturesRef.current[bus.id] = iconSignature;
       }
     });
-  }, [fleet, selectedBusId]);
+  }, [displayFleet, selectedBusId]);
 
   // 6. Smooth Motion Simulation Demo along Real Street Polyline
   useEffect(() => {
@@ -527,10 +671,12 @@ export function Transit({ ctx }: { ctx?: any }) {
             lon: REAL_STREET_POLYLINE[0][1],
             speed: 28,
             heading: 180,
+            hasDirection: true,
             routeName: "Campus ➔ Nirala ➔ DC Lake Loop",
             status: "Simulated Road Run",
             color: "#0284c7",
-            isDriving: true
+            isDriving: true,
+            receivedAt: Date.now()
           }
         ];
       }
@@ -558,8 +704,10 @@ export function Transit({ ctx }: { ctx?: any }) {
               lon: nextCoord[1],
               speed: 32,
               heading: headingDeg,
+              hasDirection: true,
               isDriving: true,
-              status: "En Route along Corridor"
+              status: "En Route along Corridor",
+              receivedAt: Date.now()
             };
           }
           return b;
@@ -622,9 +770,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                 const busName = payload.busName || busId;
                 const lat = Number(payload.lat);
                 const lon = Number(payload.lon || payload.long);
-                const speed = Number(payload.speed ?? 0);
-                const heading = Number(payload.heading ?? 0);
-                const isDriving = payload.isDriving ?? speed > 0;
+                const reportedSpeed = Number(payload.speed);
+                const hasReportedSpeed = payload.speed != null && Number.isFinite(reportedSpeed);
+                const speed = hasReportedSpeed ? Math.max(0, reportedSpeed) : 0;
+                const reportedHeading = Number(payload.heading);
+                const hasReportedHeading = payload.heading != null && Number.isFinite(reportedHeading);
+                const heading = hasReportedHeading ? ((reportedHeading % 360) + 360) % 360 : 0;
+                const packetReceivedAt = Date.now();
+                const receivedAt = parseTelemetryTimestamp(payload.time, packetReceivedAt);
                 const time = payload.time || new Date().toLocaleTimeString();
 
                 if (!busId || isNaN(lat) || isNaN(lon)) return;
@@ -639,18 +792,43 @@ export function Transit({ ctx }: { ctx?: any }) {
                   const existingIdx = prevFleet.findIndex((b) => b.id === busId || b.nameBn === busName);
                   if (existingIdx >= 0) {
                     const updated = [...prevFleet];
+                    const previousBus = prevFleet[existingIdx];
+                    const elapsedSeconds = previousBus.receivedAt
+                      ? (receivedAt - previousBus.receivedAt) / 1000
+                      : 0;
+                    const distanceSincePrevious = getDistanceMeters(previousBus.lat, previousBus.lon, lat, lon);
+                    const inferredSpeed =
+                      elapsedSeconds > 0.5 && elapsedSeconds <= 120
+                        ? (distanceSincePrevious / elapsedSeconds) * 3.6
+                        : previousBus.speed;
+                    const finalSpeed = hasReportedSpeed
+                      ? speed
+                      : inferredSpeed <= 100
+                      ? distanceSincePrevious < 2 && elapsedSeconds > 0.5
+                        ? 0
+                        : inferredSpeed
+                      : previousBus.speed;
+                    const finalHeading = hasReportedHeading
+                      ? heading
+                      : distanceSincePrevious > 2
+                      ? getBearingDegrees(previousBus.lat, previousBus.lon, lat, lon)
+                      : previousBus.heading;
+                    const isDriving = payload.isDriving ?? finalSpeed > 0;
                     updated[existingIdx] = {
                       ...updated[existingIdx],
                       lat,
                       lon,
-                      speed,
-                      heading,
+                      speed: finalSpeed,
+                      heading: finalHeading,
+                      hasDirection: hasReportedHeading || distanceSincePrevious > 2 || previousBus.hasDirection === true,
                       isDriving,
-                      status: speed > 0 ? "In Transit along Corridor" : "Parked at Campus Standby",
-                      lastUpdated: time
+                      status: finalSpeed > 0 ? "In Transit along Corridor" : "Parked at Campus Standby",
+                      lastUpdated: time,
+                      receivedAt
                     };
                     return updated;
                   } else {
+                    const isDriving = payload.isDriving ?? speed > 0;
                     const newBus: MbstuBusData = {
                       id: busId,
                       nameBn: busName,
@@ -659,11 +837,13 @@ export function Transit({ ctx }: { ctx?: any }) {
                       lon,
                       speed,
                       heading,
+                      hasDirection: hasReportedHeading,
                       routeName: meta.routeName,
                       status: speed > 0 ? "In Transit along Corridor" : "Parked at Campus Standby",
                       color: meta.color,
                       isDriving,
-                      lastUpdated: time
+                      lastUpdated: time,
+                      receivedAt
                     };
                     return [...prevFleet, newBus];
                   }
@@ -732,21 +912,21 @@ export function Transit({ ctx }: { ctx?: any }) {
               <div className="transit-header-title-row">
                 <span className="transit-header-main-title">MBSTU Bus Tracker</span>
                 <span
-                  className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && fleet.length > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
+                  className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
                   aria-live="polite"
                 >
                   <span
                     className="transit-pulse-dot"
                     style={{
-                      background: isDemoMode ? "#38bdf8" : wsStatus === "connected" && fleet.length > 0 ? "#34d399" : wsStatus === "disconnected" ? "#fb923c" : "#fbbf24"
+                      background: isDemoMode ? "#38bdf8" : wsStatus === "connected" && freshFleetCount > 0 ? "#34d399" : wsStatus === "disconnected" ? "#fb923c" : "#fbbf24"
                     }}
                   />
                   {isDemoMode
                     ? "Road Demo"
-                    : wsStatus === "connected" && fleet.length > 0
-                    ? `Live · ${fleet.length} ${fleet.length === 1 ? "bus" : "buses"}`
+                    : wsStatus === "connected" && freshFleetCount > 0
+                    ? `Live · ${freshFleetCount} ${freshFleetCount === 1 ? "bus" : "buses"}`
                     : wsStatus === "connected"
-                    ? "Waiting for buses"
+                    ? "Waiting for GPS"
                     : wsStatus === "disconnected"
                     ? "Reconnecting"
                     : "Connecting"}
@@ -769,9 +949,9 @@ export function Transit({ ctx }: { ctx?: any }) {
         </div>
 
         {/* Horizontal Fleet Selector Chips */}
-        <div className="transit-chips-scroll">
-          {fleet.length > 0 ? (
-            fleet.map((bus) => {
+        <div className="transit-chips-scroll" role="group" aria-label="Select a bus">
+          {displayFleet.length > 0 ? (
+            displayFleet.map((bus) => {
               const isSelected = bus.id === selectedBusId;
               return (
                 <button
@@ -784,12 +964,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                   }}
                   className={`transit-bus-chip ${isSelected ? "selected" : ""}`}
                   style={isSelected ? { borderColor: bus.color, boxShadow: `0 0 16px ${bus.color}60` } : {}}
+                  aria-pressed={isSelected}
+                  title={`${bus.nameBn} · ${bus.id}${bus.isStale ? " · GPS delayed" : bus.isEstimated ? " · estimated position" : " · live GPS"}`}
                 >
                   <span className="transit-chip-dot" style={{ backgroundColor: bus.color, color: bus.color }} />
                   <span>{bus.nameBn}</span>
                   <span style={{ fontSize: 10, opacity: 0.7, fontFamily: "monospace" }}>{bus.id}</span>
-                  <span className={`transit-chip-speed ${bus.speed > 0 ? "moving" : ""}`}>
-                    {bus.speed > 0 ? `${bus.speed}k` : "Standby"}
+                  <span className={`transit-chip-speed ${bus.isStale ? "stale" : bus.speed > 0 ? "moving" : ""}`}>
+                    {bus.isStale ? "Delayed" : bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby"}
                   </span>
                 </button>
               );
@@ -797,25 +979,40 @@ export function Transit({ ctx }: { ctx?: any }) {
           ) : (
             <div className="transit-chip-waiting">
               <span className="transit-pulse-dot" style={{ background: "#fbbf24" }} />
-              <span>Listening for live bus GPS signals on corridor...</span>
+              <span>
+                {wsStatus === "connected"
+                  ? "Connected · waiting for a bus GPS update"
+                  : wsStatus === "disconnected"
+                  ? "Connection lost · trying again"
+                  : "Connecting to the university GPS feed"}
+              </span>
             </div>
           )}
         </div>
       </div>
 
+      {arrivalNotice && (
+        <div className="transit-arrival-toast" role="status">
+          <CheckCircle2 size={18} />
+          <span><strong>{arrivalNotice.busName}</strong> is near {arrivalNotice.stopName}</span>
+          <button type="button" onClick={() => setArrivalNotice(null)} aria-label="Dismiss arrival alert">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* ===================================================================
           B. Right-Side Floating Map Controls (z-20)
           =================================================================== */}
       <div className={`transit-fab-controls ${sheetExpanded ? "sheet-expanded" : ""}`}>
-        {fleet.length > 0 && (
+        {selectedBus && (
           <button
-            onClick={cycleFleet}
+            onClick={centerSelectedBus}
             className="transit-fab-btn"
-            title="Cycle through active buses"
-          aria-label={`Cycle through ${fleet.length} active buses`}
+            title={`Center map on ${selectedBus.nameBn}`}
+            aria-label={`Center map on selected bus ${selectedBus.nameBn}`}
           >
-            <Bus size={18} color="#38bdf8" />
-            <span className="transit-fab-badge">{fleet.length}</span>
+            <LocateFixed size={18} color="#38bdf8" />
           </button>
         )}
 
@@ -860,13 +1057,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             {/* Fixed Header Portion (Never Scrolls, Never Squishes) */}
             <div className="transit-sheet-fixed-header">
               {/* Bus Identity Header Card (Clickable to toggle expand) */}
-              <div
-                className="transit-bus-header-card"
-                onClick={() => setSheetExpanded((prev) => !prev)}
-                role="button"
-                tabIndex={0}
-                aria-label={`Selected bus: ${selectedBus.nameBn} (${selectedBus.id}). Click to ${sheetExpanded ? "collapse" : "expand"} corridor stops.`}
-              >
+              <div className="transit-bus-header-card">
                 <div className="transit-bus-header-identity">
                   <div
                     className="transit-bus-avatar"
@@ -896,12 +1087,27 @@ export function Transit({ ctx }: { ctx?: any }) {
                 </div>
 
                 <div className="transit-bus-telemetry-right">
-                  <span className={`transit-speed-pill ${selectedBus.speed > 0 ? "moving" : "stopped"}`}>
+                  <span className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "moving" : "stopped"}`}>
                     <Compass size={12} />
-                    {selectedBus.speed > 0 ? `${selectedBus.speed} km/h` : "Standby"}
+                    {selectedBus.isStale
+                      ? `Last ${Math.round(selectedBus.speed)} km/h`
+                      : selectedBus.speed > 0
+                      ? `${Math.round(selectedBus.speed)} km/h`
+                      : "At stand"}
                   </span>
                   <span className="transit-gps-coords-text">
-                    {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
+                    <span title={`${selectedBus.lat.toFixed(5)}, ${selectedBus.lon.toFixed(5)}`}>
+                      {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
+                    </span>
+                    <span className={selectedBus.isStale ? "is-stale" : selectedBus.isEstimated ? "is-estimated" : "is-live-fix"}>
+                      {selectedBus.positionAgeSeconds == null
+                        ? "Saved · waiting for GPS"
+                        : selectedBus.isStale
+                        ? `Stale · ${Math.floor(selectedBus.positionAgeSeconds)}s`
+                        : selectedBus.isEstimated
+                        ? `Estimated · +${Math.floor(selectedBus.positionAgeSeconds)}s`
+                        : "GPS · live"}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -922,14 +1128,20 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <div className="transit-next-info">
                     <div className="transit-next-banner-tag">
                       <span className="transit-next-pulse-dot" />
-                      <span>NEXT APPROACHING STOP</span>
+                    <span>
+                      {selectedBus.isStale
+                        ? "LAST ESTIMATE · GPS DELAYED"
+                        : selectedBus.isEstimated
+                        ? "PREDICTED NEXT STOP"
+                        : "NEXT APPROACHING STOP"}
+                    </span>
                     </div>
-                    <div className="transit-next-stop-en">{nextApproachingStopInfo.station.name}</div>
+                    <div className="transit-next-stop-en">{formatStopTitle(nextApproachingStopInfo.station.name)}</div>
                     <div className="transit-next-sub-row">
                       <span className="transit-next-stop-bn">{nextApproachingStopInfo.station.nameBn}</span>
                       <span className="transit-dot-sep">•</span>
                       <span className="transit-next-dist-pill">
-                        {nextApproachingStopInfo.distanceKm} km ahead
+                        {nextApproachingStopInfo.distanceKm} km via route
                       </span>
                     </div>
                   </div>
@@ -937,10 +1149,15 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 <div className="transit-next-right">
                   <div className="transit-next-eta-container">
-                    {nextApproachingStopInfo.isStandby ? (
+                    {selectedBus.isStale ? (
+                      <>
+                        <span className="transit-next-delayed-badge">GPS DELAYED</span>
+                        <span className="transit-next-eta-lbl">Arrival estimate paused</span>
+                      </>
+                    ) : nextApproachingStopInfo.isStandby ? (
                       <>
                         <span className="transit-next-standby-badge">STANDBY</span>
-                        <span className="transit-next-eta-lbl">~{nextApproachingStopInfo.etaMinutes} min drive</span>
+                        <span className="transit-next-eta-lbl">~{nextApproachingStopInfo.etaMinutes} min if it departs</span>
                       </>
                     ) : (
                       <>
@@ -948,7 +1165,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                           <span className="transit-next-eta-num">~{nextApproachingStopInfo.etaMinutes}</span>
                           <span className="transit-next-eta-unit">min</span>
                         </div>
-                        <span className="transit-next-eta-lbl">Estimated Arrival</span>
+                        <span className="transit-next-eta-lbl">Approx. arrival</span>
                       </>
                     )}
                   </div>
@@ -960,8 +1177,11 @@ export function Transit({ ctx }: { ctx?: any }) {
                       toggleStopAlert(nextApproachingStopInfo.station.id);
                     }}
                     className={`transit-bell-alert-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
-                    title="Alert me when bus approaches this stop"
-                    aria-label="Toggle stop arrival notification alert"
+                    title={alertedStops[nextApproachingStopInfo.station.id] ? "Turn off in-page arrival alert" : "Alert me while this page is open"}
+                    aria-label={alertedStops[nextApproachingStopInfo.station.id]
+                      ? `Turn off alert for ${nextApproachingStopInfo.station.name}`
+                      : `Alert me when the bus is near ${nextApproachingStopInfo.station.name}`}
+                    aria-pressed={!!alertedStops[nextApproachingStopInfo.station.id]}
                   >
                     <Bell size={18} />
                   </button>
@@ -971,16 +1191,25 @@ export function Transit({ ctx }: { ctx?: any }) {
               {/* Sheet Footer Row */}
               <div className="transit-sheet-footer-row">
                 <div className="transit-sheet-status-text">
-                  <span style={{ color: "#38bdf8" }}>●</span>
-                  <span>{selectedBus.status}</span>
+                  <span className={`transit-status-dot ${selectedBus.isStale ? "stale" : selectedBus.isEstimated ? "estimated" : "fresh"}`} />
+                  <span>
+                    {selectedBus.isStale
+                      ? "GPS update delayed"
+                      : selectedBus.isEstimated
+                      ? "Position estimated between GPS updates"
+                      : selectedBus.speed > 0
+                      ? "Bus is moving"
+                      : "Bus is at the stand"}
+                  </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setSheetExpanded((prev) => !prev)}
                   className="transit-expand-toggle-btn"
+                  aria-expanded={sheetExpanded}
                 >
-                  <span>{sheetExpanded ? "Hide Corridor Stops ⌄" : "View Corridor Stops ⌃"}</span>
+                  <span>{sheetExpanded ? "Hide stops" : "Show route stops"}</span>
                   {sheetExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
               </div>
@@ -990,8 +1219,8 @@ export function Transit({ ctx }: { ctx?: any }) {
             {sheetExpanded && (
               <div className="transit-corridor-scroll-container">
                 <div className="transit-stepper-header">
-                  <span>Street Corridor Stoppages ({CORRIDOR_STATIONS.length})</span>
-                  <span style={{ fontSize: 9.5, color: "#64748b" }}>Tap 🔔 to set arrival alert</span>
+                  <span>Route stops · {CORRIDOR_STATIONS.length}</span>
+                  <span className="transit-stepper-hint">Alerts work while this page is open</span>
                 </div>
 
                 <div className="transit-stepper-list">
@@ -1010,7 +1239,19 @@ export function Transit({ ctx }: { ctx?: any }) {
                             mapRef.current.flyTo([st.lat, st.lon], 18, { animate: true, duration: 0.8 });
                           }
                         }}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            if (mapRef.current) {
+                              mapRef.current.flyTo([st.lat, st.lon], 18, { animate: true, duration: 0.8 });
+                            }
+                          }
+                        }}
                         className={`transit-stepper-item ${isApproaching ? "is-approaching" : ""} ${st.isCampus ? "is-campus" : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Show ${st.name} on map`}
                       >
                         {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
                         <div className="transit-stepper-node">{st.order}</div>
@@ -1032,7 +1273,10 @@ export function Transit({ ctx }: { ctx?: any }) {
                                   color: isAlerted ? "#38bdf8" : "#64748b",
                                   padding: 2
                                 }}
-                                title="Toggle stop arrival alert"
+                                type="button"
+                                title={isAlerted ? "Turn off in-page arrival alert" : "Alert me while this page is open"}
+                                aria-label={isAlerted ? `Turn off alert for ${st.name}` : `Alert me when the bus is near ${st.name}`}
+                                aria-pressed={isAlerted}
                               >
                                 <Bell size={14} />
                               </button>
@@ -1045,7 +1289,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                             <span>{distKm} km</span>
                             <span>•</span>
                             <span style={{ color: isApproaching ? "#38bdf8" : "#94a3b8" }}>
-                              ~{etaM} min {selectedBus.speed === 0 ? "drive" : "ETA"}
+                              {selectedBus.isStale
+                                ? "GPS delayed"
+                                : `~${etaM} min approximate ${selectedBus.speed === 0 ? "drive" : "ETA"}`}
                             </span>
                           </div>
                         </div>
@@ -1063,9 +1309,19 @@ export function Transit({ ctx }: { ctx?: any }) {
               <Radio size={22} />
             </div>
             <div>
-              <div className="transit-waiting-title">Waiting for Bus GPS Signals...</div>
+              <div className="transit-waiting-title">
+                {wsStatus === "disconnected"
+                  ? "Live feed disconnected"
+                  : wsStatus === "connected"
+                  ? "Waiting for a GPS update"
+                  : "Connecting to live tracking"}
+              </div>
               <div className="transit-waiting-desc">
-                Connected to MBSTU telemetry server. Active buses will appear automatically when their on-board trackers broadcast coordinates.
+                {wsStatus === "disconnected"
+                  ? "We’re reconnecting to the university feed. The map will resume when the connection is back."
+                  : wsStatus === "connected"
+                  ? "The feed is connected. Buses appear when an on-board tracker sends its next location."
+                  : "Connecting to the university feed. This can take a few seconds."}
               </div>
               <div style={{ marginTop: 8 }}>
                 <button
