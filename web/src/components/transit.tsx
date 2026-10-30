@@ -14,6 +14,7 @@ import {
   Bell,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Navigation,
   Play,
   Sparkles,
@@ -373,9 +374,9 @@ export function Transit({ ctx }: { ctx?: any }) {
   );
   const freshFleetCount = displayFleet.filter((bus) => bus.positionAgeSeconds !== null && !bus.isStale).length;
 
-  // Active Bus
+  // Active Bus (ONLY when explicitly selected/tapped by the user)
   const selectedBus = useMemo(
-    () => displayFleet.find((b) => b.id === selectedBusId) || (displayFleet.length > 0 ? displayFleet[0] : null),
+    () => (selectedBusId ? displayFleet.find((b) => b.id === selectedBusId) || null : null),
     [displayFleet, selectedBusId]
   );
 
@@ -659,7 +660,12 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     map.on("click", (e) => {
       const target = (e.originalEvent?.target as HTMLElement | null);
-      if (!target?.closest(".transit-bus-pin-wrapper") && !target?.closest(".transit-lollipop-wrapper")) {
+      if (
+        !target?.closest(".transit-bus-pin-wrapper") &&
+        !target?.closest(".transit-lollipop-wrapper") &&
+        !target?.closest(".transit-bottom-sheet") &&
+        !target?.closest(".transit-top-overlay")
+      ) {
         setSelectedBusId("");
       }
     });
@@ -1616,32 +1622,8 @@ export function Transit({ ctx }: { ctx?: any }) {
         <>
           {/* Top Floating Overlay (z-20) */}
           <div className="transit-top-overlay">
-            {/* Dedicated Top Floating Segmented Switcher Pill */}
-            <div className="transit-top-nav-row">
-              <div className="transit-segmented-tabs">
-                <button
-                  onClick={() => setActiveView("list")}
-                  className="transit-seg-tab"
-                  type="button"
-                  aria-selected={false}
-                >
-                  <List size={15} />
-                  <span>তালিকা</span>
-                </button>
-                <button
-                  onClick={() => switchToMap()}
-                  className="transit-seg-tab active"
-                  type="button"
-                  aria-selected={true}
-                >
-                  <MapIcon size={15} />
-                  <span>ম্যাপ</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Header Glassmorphic Bar (Zero Text Truncation) */}
-            <div className="transit-header-pill">
+            {/* Unified Sleek Floating Header Bar */}
+            <div className="transit-header-pill unified-bar">
               <div className="transit-header-left">
                 <div
                   className="transit-header-icon-box"
@@ -1651,12 +1633,12 @@ export function Transit({ ctx }: { ctx?: any }) {
                     border: "1px solid #f5c2d3"
                   }}
                 >
-                  <Bus size={20} />
+                  <Bus size={18} />
                 </div>
 
                 <div className="transit-header-titles">
                   <div className="transit-header-title-row">
-                  <span className="transit-header-main-title">MBSTU বাস ট্র্যাকার</span>
+                    <span className="transit-header-main-title">MBSTU বাস ট্র্যাকার</span>
                     <span
                       className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
                       aria-live="polite"
@@ -1668,30 +1650,52 @@ export function Transit({ ctx }: { ctx?: any }) {
                         }}
                       />
                       {isDemoMode
-                        ? "ডেমো মোড"
+                        ? "ডেমো"
                         : wsStatus === "connected" && freshFleetCount > 0
-                        ? `${freshFleetCount}টি বাস লাইভ`
+                        ? `${freshFleetCount}টি লাইভ`
                         : wsStatus === "connected"
-                        ? "GPS-এর অপেক্ষায়"
+                        ? "GPS অপেক্ষা"
                         : wsStatus === "disconnected"
                         ? "সংযোগ ফিরছে"
-                        : "সংযোগ হচ্ছে"}
+                        : "সংযুক্ত হচ্ছে"}
                     </span>
                   </div>
-                  <span className="transit-header-sub">সন্তোষ ক্যাম্পাস ⇄ নিরালা শহর লুপ</span>
                 </div>
               </div>
 
-              {/* Mode Toggle Button */}
-              <button
-                onClick={toggleDemoMode}
-                className="transit-mode-toggle-btn"
-                title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
-                aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
-              >
-                {isDemoMode ? <Radio size={14} color="#38bdf8" /> : <Play size={14} color="#34d399" />}
-                <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
-              </button>
+              {/* Segmented Switcher + Demo in Header */}
+              <div className="transit-header-actions-right">
+                <div className="transit-segmented-tabs header-tabs">
+                  <button
+                    onClick={() => setActiveView("list")}
+                    className="transit-seg-tab"
+                    type="button"
+                    aria-selected={false}
+                  >
+                    <List size={14} />
+                    <span>তালিকা</span>
+                  </button>
+                  <button
+                    onClick={() => switchToMap()}
+                    className="transit-seg-tab active"
+                    type="button"
+                    aria-selected={true}
+                  >
+                    <MapIcon size={14} />
+                    <span>ম্যাপ</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={toggleDemoMode}
+                  className="transit-mode-toggle-btn"
+                  title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
+                  aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
+                >
+                  {isDemoMode ? <Radio size={13} color="#38bdf8" /> : <Play size={13} color="#34d399" />}
+                  <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
+                </button>
+              </div>
             </div>
 
             {/* Horizontal Fleet Selector Chips */}
@@ -1812,25 +1816,34 @@ export function Transit({ ctx }: { ctx?: any }) {
             </button>
           </div>
 
-          {/* C. Material 3 Bottom Sheet (z-30) */}
-          <div
-            className={`transit-bottom-sheet ${sheetExpanded ? "expanded" : "collapsed"}`}
-            style={{ "--bus-accent": selectedBus?.color || "#0284c7" } as any}
-          >
+          {/* C. Material 3 Bottom Sheet (Appears ONLY when a bus is tapped, disappears when clicking elsewhere) */}
+          {selectedBus && (
             <div
-              className="transit-sheet-drag-handle"
-              onClick={() => setSheetExpanded((prev) => !prev)}
-              role="button"
-              tabIndex={0}
-              aria-label={sheetExpanded ? "Collapse route panel" : "Expand route panel"}
+              className={`transit-bottom-sheet ${sheetExpanded ? "expanded" : "collapsed"}`}
+              style={{ "--bus-accent": selectedBus.color } as any}
             >
-              <div className="transit-sheet-handle-pill" />
-            </div>
+              <div
+                className="transit-sheet-drag-handle"
+                onClick={() => setSheetExpanded((prev) => !prev)}
+                role="button"
+                tabIndex={0}
+                aria-label={sheetExpanded ? "Collapse route panel" : "Expand route panel"}
+              >
+                <div className="transit-sheet-handle-pill" />
+              </div>
 
-            {selectedBus ? (
-              <>
-                <div className="transit-sheet-header">
-                  <div className="transit-sheet-bus-badge">
+              {/* Header Row */}
+              <div className="transit-sheet-header">
+                <div className="transit-sheet-header-left">
+                  <div
+                    className="transit-sheet-bus-badge"
+                    style={{
+                      backgroundColor: `${selectedBus.color}22`,
+                      borderColor: selectedBus.color,
+                      color: selectedBus.color
+                    }}
+                  >
+                    <Bus size={13} />
                     <span className="transit-badge-id">{formatBusShortId(selectedBus.id)}</span>
                   </div>
 
@@ -1841,162 +1854,162 @@ export function Transit({ ctx }: { ctx?: any }) {
                     </div>
                     <span className="transit-bus-route-name">{selectedBus.routeName}</span>
                   </div>
+                </div>
 
-                  <div className="transit-sheet-speed-block">
-                    <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
-                      <Navigation size={13} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
-                      <span>{selectedBus.isStale ? "GPS delayed" : selectedBus.speed > 0 ? `${Math.round(selectedBus.speed)} km/h` : "Standby"}</span>
-                    </div>
-                    <span className="transit-gps-coords">
-                      {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
+                <div className="transit-sheet-header-right">
+                  <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
+                    <Navigation size={12} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
+                    <span>
+                      {selectedBus.isStale
+                        ? "GPS বিলম্বিত"
+                        : selectedBus.speed > 0
+                        ? `${Math.round(selectedBus.speed)} কিমি/ঘ`
+                        : "স্ট্যান্ডবাই"}
                     </span>
                   </div>
-                </div>
-
-                {nextApproachingStopInfo && (
-                  <div className="transit-approaching-card">
-                    <div className="transit-approaching-left">
-                      <div className="transit-approaching-icon-box">
-                        <Navigation size={16} />
-                      </div>
-                      <div className="transit-approaching-text">
-                        <span className="transit-approaching-eyebrow">NEXT APPROACHING STOP</span>
-                        <h3 className="transit-approaching-name">{nextApproachingStopInfo.station.name}</h3>
-                        <span className="transit-approaching-bn">
-                          {nextApproachingStopInfo.station.nameBn} • {nextApproachingStopInfo.distanceKm} km via route
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="transit-approaching-right">
-                      <div className="transit-eta-badge">
-                        {nextApproachingStopInfo.isStandby ? (
-                          <>
-                            <span className="transit-eta-val">Standby</span>
-                            <span className="transit-eta-sub">~{nextApproachingStopInfo.etaMinutes} min drive</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="transit-eta-val">~{nextApproachingStopInfo.etaMinutes} min</span>
-                            <span className="transit-eta-sub">Approx. arrival</span>
-                          </>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => toggleStopAlert(nextApproachingStopInfo.station.id)}
-                        className={`transit-stop-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
-                        title={
-                          alertedStops[nextApproachingStopInfo.station.id]
-                            ? "Stop alert armed"
-                            : "Set alert for approaching stop"
-                        }
-                        aria-label={
-                          alertedStops[nextApproachingStopInfo.station.id]
-                            ? "Turn off alert for next stop"
-                            : "Alert me when the bus reaches next stop"
-                        }
-                      >
-                        <Bell size={16} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="transit-sheet-footer-row">
-                  <div className="transit-status-indicator">
-                    <span
-                      className="transit-pulse-dot"
-                      style={{ background: selectedBus.speed > 0 ? "#10b981" : "#fbbf24" }}
-                    />
-                    <span>{selectedBus.status}</span>
-                  </div>
-
                   <button
-                    onClick={() => setSheetExpanded((prev) => !prev)}
-                    className="transit-expand-toggle-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedBusId("");
+                    }}
+                    className="transit-sheet-close-btn"
+                    title="Close"
+                    aria-label="Close bottom sheet"
+                    type="button"
                   >
-                    <span>{sheetExpanded ? "Hide route stops" : "Show route stops"}</span>
-                    {sheetExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                    <X size={15} />
                   </button>
                 </div>
+              </div>
 
-                {sheetExpanded && (
-                  <div className="transit-stepper-scroll-container">
-                    <div className="transit-stepper-header-row">
-                      <span className="transit-stepper-title">STREET CORRIDOR STOPPAGES ({CORRIDOR_STATIONS.length})</span>
-                      <span className="transit-stepper-hint">TAP 🔔 TO SET ARRIVAL ALERT</span>
+              {/* Approaching Stop Card */}
+              {nextApproachingStopInfo && (
+                <div className="transit-approaching-card">
+                  <div className="transit-approaching-left">
+                    <div className="transit-approaching-icon-box">
+                      <Navigation size={15} />
                     </div>
-
-                    <div className="transit-stepper-list">
-                      {CORRIDOR_STATIONS.map((st, idx) => {
-                        const isApproaching = nextApproachingStopInfo?.station.id === st.id;
-                        const isAlerted = !!alertedStops[st.id];
-                        const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
-                        const distKm = (distM / 1000).toFixed(2);
-                        const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60));
-
-                        return (
-                          <div
-                            key={st.id}
-                            onClick={() => setSelectedStoppageAction(st)}
-                            className={`transit-stepper-row ${isApproaching ? "approaching" : ""}`}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
-                            <div className="transit-stepper-node">{st.order}</div>
-
-                            <div className="transit-stepper-content">
-                              <div className="transit-stepper-title-row">
-                                <span className="transit-stepper-stop-name">{st.name}</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  {isApproaching && <span className="transit-stepper-badge-next">NEXT</span>}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleStopAlert(st.id);
-                                    }}
-                                    className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
-                                    type="button"
-                                    title={isAlerted ? "Turn off arrival alert" : "Alert me"}
-                                  >
-                                    <Bell size={14} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="transit-stepper-sub">
-                                <span>{st.nameBn}</span>
-                                <span>•</span>
-                                <span>{distKm} km</span>
-                                <span>•</span>
-                                <span style={{ color: isApproaching ? "#38bdf8" : "#94a3b8" }}>
-                                  {selectedBus.isStale
-                                    ? "GPS delayed"
-                                    : `~${etaM} min approximate ${selectedBus.speed === 0 ? "drive" : "ETA"}`}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="transit-approaching-text">
+                      <span className="transit-approaching-eyebrow">পরবর্তী স্টপ</span>
+                      <h3 className="transit-approaching-name">{nextApproachingStopInfo.station.nameBn}</h3>
+                      <span className="transit-approaching-bn">
+                        {nextApproachingStopInfo.station.name} • {nextApproachingStopInfo.distanceKm} কিমি
+                      </span>
                     </div>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="transit-waiting-card">
-                <div className="transit-waiting-icon-pulse">
-                  <Radio size={22} />
+
+                  <div className="transit-approaching-right">
+                    <div className="transit-eta-badge">
+                      <span className="transit-eta-val">
+                        {selectedBus.speed > 0 ? `~${nextApproachingStopInfo.etaMinutes} মি` : "স্ট্যান্ডবাই"}
+                      </span>
+                      <span className="transit-eta-sub">
+                        {selectedBus.speed > 0 ? "আনুমানিক সময়" : `~${nextApproachingStopInfo.etaMinutes} মি ড্রাইভ`}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => toggleStopAlert(nextApproachingStopInfo.station.id)}
+                      className={`transit-stop-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
+                      title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয়" : "অ্যালার্ট দিন"}
+                      type="button"
+                    >
+                      <Bell size={15} />
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <div className="transit-waiting-title">Waiting for bus GPS</div>
-                  <div className="transit-waiting-desc">Connecting to live fleet stream.</div>
+              )}
+
+              {/* Footer Row */}
+              <div className="transit-sheet-footer-row">
+                <div className="transit-status-indicator">
+                  <span
+                    className="transit-pulse-dot"
+                    style={{ background: selectedBus.speed > 0 ? "#10b981" : "#fbbf24" }}
+                  />
+                  <span>{selectedBus.status}</span>
+                </div>
+
+                <div className="transit-sheet-actions-group">
+                  <button
+                    onClick={() => {
+                      setDetailBusId(selectedBus.id);
+                      setActiveView("detail");
+                    }}
+                    className="transit-sheet-detail-action"
+                    type="button"
+                  >
+                    <span>সম্পূর্ণ রুট ও সময়সূচী</span>
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+
+              {sheetExpanded && (
+                <div className="transit-stepper-scroll-container">
+                  <div className="transit-stepper-header-row">
+                    <span className="transit-stepper-title">STREET CORRIDOR STOPPAGES ({CORRIDOR_STATIONS.length})</span>
+                    <span className="transit-stepper-hint">TAP 🔔 TO SET ARRIVAL ALERT</span>
+                  </div>
+
+                  <div className="transit-stepper-list">
+                    {CORRIDOR_STATIONS.map((st, idx) => {
+                      const isApproaching = nextApproachingStopInfo?.station.id === st.id;
+                      const isAlerted = !!alertedStops[st.id];
+                      const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
+                      const distKm = (distM / 1000).toFixed(2);
+                      const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60));
+
+                      return (
+                        <div
+                          key={st.id}
+                          onClick={() => setSelectedStoppageAction(st)}
+                          className={`transit-stepper-row ${isApproaching ? "approaching" : ""}`}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
+                          <div className="transit-stepper-node">{st.order}</div>
+
+                          <div className="transit-stepper-content">
+                            <div className="transit-stepper-title-row">
+                              <span className="transit-stepper-stop-name">{st.name}</span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {isApproaching && <span className="transit-stepper-badge-next">NEXT</span>}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleStopAlert(st.id);
+                                  }}
+                                  className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
+                                  type="button"
+                                  title={isAlerted ? "Turn off arrival alert" : "Alert me"}
+                                >
+                                  <Bell size={14} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="transit-stepper-sub">
+                              <span>{st.nameBn}</span>
+                              <span>•</span>
+                              <span>{distKm} km</span>
+                              <span>•</span>
+                              <span style={{ color: isApproaching ? "#38bdf8" : "#94a3b8" }}>
+                                {selectedBus.isStale
+                                  ? "GPS delayed"
+                                  : `~${etaM} min approximate ${selectedBus.speed === 0 ? "drive" : "ETA"}`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

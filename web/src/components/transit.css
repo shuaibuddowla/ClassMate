@@ -3334,34 +3334,432 @@
 .transit-detail-bottom-bar { background: rgba(255,255,255,.98); border-color: #eee; color: #282932; box-shadow: 0 -6px 20px rgba(20,20,30,.09); }
 .transit-bottom-bell-btn { background: #fff; border: 1px solid #e2e8f0; color: var(--transit-pink); }
 
-.transit-top-overlay { top: max(12px, env(safe-area-inset-top)); left: 14px; right: 14px; gap: 9px; }
-.transit-top-nav-row .transit-segmented-tabs {
-  padding: 4px; background: rgba(255,255,255,.96) !important; border: 1px solid #eee !important;
-  border-radius: 18px; box-shadow: 0 5px 18px rgba(22,20,26,.12) !important;
+.transit-top-overlay { top: max(12px, env(safe-area-inset-top)); left: 14px; right: 14px; gap: 8px; }
+
+/* Unified Top Floating Header Bar */
+.transit-header-pill.unified-bar {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e8e8ed;
+  border-radius: 20px;
+  box-shadow: 0 6px 20px rgba(22, 20, 26, 0.12);
+  color: #24252c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
 }
-.transit-header-pill {
-  background: rgba(255,255,255,.97); border: 1px solid #eee; border-radius: 22px;
-  box-shadow: 0 5px 18px rgba(22,20,26,.12); color: #24252c;
+.transit-header-main-title { color: #24252c; font-size: 14px; font-weight: 800; }
+.transit-header-sub { color: #777880; font-size: 11px; }
+.transit-status-pill { color: #4f5058; background: #f6f6f8; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+
+.transit-header-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
-.transit-header-main-title { color: #24252c; }
-.transit-header-sub { color: #777880; }
-.transit-status-pill { color: #4f5058; background: #f6f6f8; }
-.transit-mode-toggle-btn { color: var(--transit-pink); background: #fff2f6; border-color: #f2cad8; }
-.transit-chips-scroll { scrollbar-width: none; }
-.transit-bus-chip { color: #303139; background: rgba(255,255,255,.96); border-color: #eee !important; box-shadow: 0 3px 12px rgba(20,20,30,.1) !important; }
-.transit-chip-speed { color: #777880; }
-.transit-chip-speed.moving { color: #287449; }
-.transit-chip-speed.stale { color: #a56716; }
-.transit-chip-waiting { color: #4e4f57; background: rgba(255,255,255,.96); border: 1px solid #eee; }
-.transit-fab-btn, .transit-fab-group { color: var(--transit-pink); background: #fff; border-color: #eee; box-shadow: 0 4px 14px rgba(15,15,25,.18); }
+
+.transit-segmented-tabs.header-tabs {
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px;
+  background: #f1f2f5 !important;
+  border: 1px solid #e2e4e9 !important;
+  border-radius: 12px;
+  gap: 2px;
+}
+
+.header-tabs .transit-seg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 9px;
+  border: none !important;
+  background: transparent !important;
+  color: #64748b !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-tabs .transit-seg-tab.active {
+  background: #ffffff !important;
+  color: #b71454 !important;
+  box-shadow: 0 2px 8px rgba(183, 20, 84, 0.16) !important;
+}
+
+.transit-mode-toggle-btn { color: var(--transit-pink); background: #fff2f6; border-color: #f2cad8; border-radius: 10px; padding: 5px 9px; font-size: 11px; font-weight: 700; }
+
+/* Fleet Selector Chips: High-Contrast Light Mode */
+.transit-chips-scroll { scrollbar-width: none; min-height: 38px; }
+.transit-bus-chip {
+  color: #1e293b !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 3px 12px rgba(20, 20, 30, 0.08) !important;
+  padding: 5px 12px 5px 9px;
+}
+.transit-bus-chip .transit-chip-name {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  font-size: 12.5px;
+}
+.transit-bus-chip .transit-chip-id-badge {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  font-size: 10px;
+  font-weight: 700;
+}
+.transit-chip-speed { color: #64748b; font-size: 10px; font-weight: 700; }
+.transit-chip-speed.moving { color: #16a34a; background: #e9f6ef; }
+.transit-chip-speed.stale { color: #b45309; background: #fef3c7; }
+.transit-bus-chip.selected {
+  border-color: #b71454 !important;
+  background: #fff5f8 !important;
+  box-shadow: 0 0 14px rgba(183, 20, 84, 0.22) !important;
+}
+.transit-chip-waiting { color: #4e4f57; background: rgba(255, 255, 255, 0.96); border: 1px solid #eee; }
+
+.transit-fab-btn, .transit-fab-group { color: var(--transit-pink); background: #fff; border-color: #eee; box-shadow: 0 4px 14px rgba(15, 15, 25, 0.18); }
 .transit-fab-btn.active-track { color: var(--transit-pink); background: #fff0f5; }
-.transit-bottom-sheet { color: #282932; background: rgba(255,255,255,.98); border-color: #eee; box-shadow: 0 -8px 30px rgba(15,15,25,.13); }
-.transit-bus-route-name, .transit-bus-name-en, .transit-gps-coords { color: #777880; }
-.transit-speed-pill.active { color: #287449; background: #e9f6ef; }
-.transit-approaching-card { color: #31323a; background: #fff5f8; border-color: #f1d3de; }
-.transit-approaching-eyebrow, .transit-eta-val, .transit-eta-sub { color: var(--transit-pink); }
-.transit-approaching-name { color: #25262d; }
-.transit-approaching-bn { color: #777880; }
+
+/* Material 3 Bottom Sheet Card */
+.transit-bottom-sheet {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 30;
+  color: #282932;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e8e8ed;
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  padding: 10px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@media (min-width: 769px) {
+  .transit-bottom-sheet {
+    left: 18px;
+    right: auto;
+    bottom: 18px;
+    width: min(480px, calc(100% - 36px));
+    padding: 12px 18px 14px;
+  }
+}
+
+.transit-sheet-drag-handle {
+  width: 100%;
+  height: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  margin-bottom: 4px;
+}
+
+.transit-sheet-handle-pill {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.transit-sheet-drag-handle:hover .transit-sheet-handle-pill {
+  background: #94a3b8;
+  width: 44px;
+}
+
+/* Header Row of Bottom Sheet */
+.transit-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.transit-sheet-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.transit-sheet-bus-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: monospace;
+  letter-spacing: 0.3px;
+  border: 1.5px solid currentColor;
+  flex-shrink: 0;
+}
+
+.transit-sheet-bus-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.transit-bus-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.transit-bus-name-bn {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.transit-bus-name-en {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.transit-bus-route-name {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transit-sheet-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.transit-speed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.transit-speed-pill.active {
+  color: #16a34a;
+  background: #e9f6ef;
+}
+
+.transit-speed-pill.stale {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.transit-sheet-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.transit-sheet-close-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+  transform: scale(1.05);
+}
+
+/* Approaching Stop Card */
+.transit-approaching-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff5f8;
+  border: 1px solid #fecdd3;
+  border-radius: 14px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.transit-approaching-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.transit-approaching-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffe4e6;
+  color: #b71454;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #fecdd3;
+}
+
+.transit-approaching-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.transit-approaching-eyebrow {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #b71454;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.transit-approaching-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transit-approaching-bn {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transit-approaching-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.transit-eta-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.transit-eta-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #b71454;
+  line-height: 1.1;
+}
+
+.transit-eta-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.transit-stop-bell-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #ffffff;
+  border: 1px solid #fecdd3;
+  color: #b71454;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.transit-stop-bell-btn:hover {
+  background: #ffe4e6;
+}
+
+.transit-stop-bell-btn.armed {
+  background: #e9f6ef;
+  color: #16a34a;
+  border-color: #86efac;
+}
+
+/* Footer Row */
+.transit-sheet-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.transit-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.transit-sheet-detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: #fff0f5;
+  color: #b71454;
+  border: 1px solid #fecdd3;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transit-sheet-detail-action:hover {
+  background: #ffe4e6;
+  border-color: #fca5a5;
+}
+
+.transit-timeline-container { padding-bottom: 120px; }
 
 @media (min-width: 760px) {
   .transit-list-screen { max-width: 820px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
