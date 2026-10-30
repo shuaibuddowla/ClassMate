@@ -329,7 +329,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string>("");
-  const [satelliteView, setSatelliteView] = useState<boolean>(true);
+  const [satelliteView, setSatelliteView] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [clockNow, setClockNow] = useState<number>(() => Date.now());
@@ -788,12 +788,12 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     const tileUrl = satelliteView
       ? "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-      : "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+      : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
     const layer = L.tileLayer(tileUrl, {
-      subdomains: ["0", "1", "2", "3"],
-      maxZoom: 21,
-      maxNativeZoom: 20
+      subdomains: satelliteView ? ["0", "1", "2", "3"] : ["a", "b", "c"],
+      maxZoom: 19,
+      maxNativeZoom: satelliteView ? 20 : 19
     });
     layer.addTo(mapRef.current);
     tileLayerRef.current = layer;
@@ -2130,10 +2130,10 @@ export function Transit({ ctx }: { ctx?: any }) {
             <button
               onClick={() => setSatelliteView((prev) => !prev)}
               className="transit-fab-btn"
-              title={satelliteView ? "Switch to Street Roadmap" : "Switch to Google Satellite"}
-              aria-label={satelliteView ? "Switch to street map" : "Switch to satellite map"}
+              title={satelliteView ? "সড়ক ম্যাপে (OpenStreetMap) ফিরুন" : "গুগল স্যাটেলাইট ম্যাপ দেখুন"}
+              aria-label={satelliteView ? "Switch to OpenStreetMap" : "Switch to Google Satellite"}
             >
-              <Layers size={18} color={satelliteView ? "#38bdf8" : "#94a3b8"} />
+              <Layers size={18} color={satelliteView ? "#b71454" : "#0284c7"} />
             </button>
 
             {/* Locate Me / User Location FAB */}
