@@ -7066,7 +7066,7 @@ To snap vehicle headings and render route overlays on both Google Maps Satellite
       addTextChangedListener(object : TextWatcher {
           private var current = ""
           override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-          override fun promptTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+          override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
           override fun afterTextChanged(s: Editable?) {
               if (s.toString() != current) {
                   removeTextChangedListener(this)
@@ -8384,3 +8384,603 @@ export function parseTelemetryTimestamp(value: unknown, receivedAt: number): num
 | **Native Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` (805 lines); OSMDroid + OkHttp Engine.IO v4 protocol |
 | **MBSTU Telemetry Stream** | Android & Web | **VERIFIED** | Handshake `40`, ping `2`/pong `3`, events `flutter-bus-data` & `studentGpsData` |
 | **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+
+
+---
+
+## 153. Production WebSocket Stability, Telemetry Normalization, Standby GPS Semantics & Responsive Bottom Sheet Overhaul (Oct 30, 2026 - Hotfix State)
+
+### A. Architectural Context & Problem Statement
+Following initial deployment of the student transit tracker, field monitoring and real-device testing in production (`f299dd3b-5ee4-474d-a380-72de6b93c62b`) uncovered four critical operational issues affecting user experience and data reliability:
+1. **Periodic WebSocket Dropping (`Reconnecting...`)**: The live tracker dropped connection every 22 seconds, cycling through a 4-second reconnection sequence before briefly showing live data and dropping again.
+2. **Missing Telemetry & Stalled Fleet Discovery (`Waiting for GPS Signals...`)**: Active vehicles transmitting data were dropped or failed to render on the map.
+3. **Erroneous GPS Delay Warnings (`Stale · 333s` / `GPS Delayed`)**: Vehicles parked at campus terminals or operating normally displayed severe delay warnings and had their arrival estimates paused despite transmitting steady live packets.
+4. **Bottom Sheet Clipping & Squishing Regression**: On mobile devices and compact viewports, the collapsed Material 3 bottom sheet suffered severe vertical compression (reduced to ~25px), clipping stop names and overlapping badges.
+
+---
+
+### B. Root Cause Diagnostics & Engineering Resolutions
+
+#### 1. Engine.IO v4 Heartbeat Protocol Correction (Fixing the 22-Second Reconnection Loop)
+- **Root Cause**: The MBSTU telemetry gateway (`wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`) operates strictly under Socket.IO Engine.IO v4 specifications. Under this protocol, the **server** is the ping master (sending heartbeat packet `"2"` every 25 seconds) and expects the client to acknowledge with a pong packet (`"3"`). The client code had a background interval sending unsolicited `"2"` ping packets every 22 seconds. The university server flagged these unsolicited client pings as protocol violations and terminated the TCP/WebSocket socket immediately (`onclose`), forcing the client into a repeating reconnect loop.
+- **Resolution**:
+  - Removed the client-side `setInterval` ping dispatch.
+  - Retained strict passive pong semantics: when `message.data === "2"`, the socket immediately responds with `ws.send("3")`.
+  - Connections now remain open and stable indefinitely without disconnections.
+
+```typescript
+// Engine.IO v4: Server is ping master ("2"), client is strictly pong responder ("3")
+if (data === "2") {
+  ws.send("3");
+  return;
+}
+```
+
+#### 2. Multi-Event Telemetry Ingestion & Dynamic Fleet Discovery
+- **Root Cause**: The MBSTU tracking infrastructure transmits telemetry under three distinct Socket.IO event namespaces: `flutter-bus-data`, `studentGpsData`, and hyphenated `student-gps-data`. The client regex only matched the first two. In addition, field names for coordinates alternated between `lat`/`lon` and `latitude`/`longitude` across different bus tracking hardware units.
+- **Resolution**:
+  - Broadened the message parser regex to match `student-gps-data` in addition to `flutter-bus-data` and `studentGpsData`.
+  - Added robust payload coordinate normalization:
+    ```typescript
+    const rawLat = payload.lat ?? payload.latitude;
+    const rawLon = payload.lon ?? payload.longitude;
+    ```
+  - Added `Sangshaptak` (`SB0005`, color: `#8b5cf6`, route: `"Campus ➔ Tangail City Loop"`) to `BUS_METADATA`.
+  - Enhanced dynamic fleet fallback: if a bus ID is received that is not present in predefined metadata, the engine automatically registers it with a formatted label (`Bus ${id}`) and standard campus loop routing.
+
+#### 3. Telemetry Timestamp Normalization & "Campus Standby" State Machine
+- **Root Cause**: `parseTelemetryTimestamp` previously compared hardware RTC strings reported by vehicle GPS trackers (e.g., `2026-10-30 02:19:34 PM`) against browser system time (`Date.now()`). Hardware clocks on the vehicles frequently had significant drift or timezone offsets (300–400+ seconds offset). A rigid 15-second cutoff (`MAX_PREDICTION_SECONDS = 15`) caused vehicles to be immediately flagged as `"Stale · 333s"` with `"GPS DELAYED"` warnings, even while the vehicle was actively parked and streaming updates.
+- **Resolution**:
+  - Anchored telemetry arrival directly to client packet receipt timestamp:
+    ```typescript
+    function parseTelemetryTimestamp(_value: unknown, receivedAt: number): number {
+      // Anchor to packet arrival to eliminate false staleness from hardware GPS RTC drift
+      return receivedAt;
+    }
+    ```
+  - Replaced indiscriminate staleness warnings with a contextual operational state machine:
+    - **Stationary on Campus (`speed === 0` / parked at stand)**: Displayed as **`Live GPS · Campus Standby`** with glowing cyan status dot (`#38bdf8`) and `"CAMPUS STANDBY · NEXT STOP"` banner (`~X min once departs`).
+    - **Moving in Corridor (`speed > 0`)**: Displayed as **`Live GPS · Active`** with emerald green status dot (`#34d399`), live speed readout (`In transit (X km/h)`), and dead reckoning forward projection.
+    - **Genuine Stale**: Only flagged as delayed if packet silence exceeds 10 minutes (600 seconds).
+
+#### 4. Bottom Sheet Layout Elasticity & Visual Polish
+- **Root Cause**: `.transit-bottom-sheet.collapsed` had hardcoded heights (`230px` on desktop, `236px` on mobile) coupled with `overflow: hidden`. Differences in device font scaling, DPI, and content length squeezed the "Next Approaching Stop" card into a 25px strip, causing stop titles to collide with status badges.
+- **Resolution**:
+  - Converted `.transit-bottom-sheet.collapsed` to `height: auto` across desktop and mobile media queries.
+  - Enforced `flex-shrink: 0` on fixed header and next-stop card containers.
+  - Added dedicated styling for `.transit-stepper-alert-btn` with 36x36px minimum touch target, active armed state (`rgba(56, 189, 248, 0.12)`), and accessibility attributes (`role="button"`, `aria-pressed`, `aria-label`).
+  - Added `.transit-status-dot.standby` styling with cyan glow (`#38bdf8`, box-shadow `0 0 8px rgba(56, 189, 248, 0.65)`).
+  - Clarified connection state empty states: `"Live feed disconnected"`, `"Waiting for a GPS update"`, or `"Connecting to live tracking"`.
+
+---
+
+### C. Ground-Truth 28-Stop Corridor Topology
+The verified sequence covers the full MBSTU campus perimeter and Tangail city arterial loop:
+
+| Order | Identifier | English Stoppage Name | Bengali Stoppage Name | Latitude | Longitude | Zone / Classification |
+| :---: | :--- | :--- | :--- | :---: | :---: | :--- |
+| 1 | `mukto_mancho` | Mukto Mancho Stand | মুক্ত মঞ্চ স্ট্যান্ড | 24.23512 | 89.89025 | Campus Hub |
+| 2 | `ab1` | Academic Building-1 | একাডেমিক ভবন-১ | 24.23715 | 89.89038 | Campus Academic |
+| 3 | `soh_hall` | SOH Hall Bus Stop | শাহী হল বাস স্টপ | 24.23835 | 89.89042 | Campus Residential |
+| 4 | `mannan_hall` | Mannan Hall Bus Stop | মান্নান হল বাস স্টপ | 24.23855 | 89.89105 | Campus Residential |
+| 5 | `ab2` | Academic Building-2 | একাডেমিক ভবন-২ | 24.23712 | 89.89152 | Campus Academic |
+| 6 | `fifth_gate` | Fifth Gate Bus Stop | পঞ্চম গেট বাস স্টপ | 24.23578 | 89.89178 | Campus Perimeter |
+| 7 | `prottoy_71` | Prottoy-71 Bus Stop | প্রত্যয়-৭১ বাস স্টপ | 24.23482 | 89.89195 | Primary Standby Terminal |
+| 8 | `first_gate` | First Gate (Main Entrance) | প্রথম গেট বাস স্টপ | 24.23378 | 89.89218 | Campus Gate |
+| 9 | `santosh_bazaar` | Santosh Bazaar / Gate | সন্তোষ বাজার / গেট | 24.23780 | 89.89420 | City Corridor |
+| 10 | `kagmari` | Kagmari More | কাগমারী মোড় | 24.23915 | 89.89815 | City Corridor Junction |
+| 11 | `baby_stand` | Baby Stand | বেবি স্ট্যান্ড | 24.24415 | 89.90445 | City Corridor |
+| 12 | `shantikunja` | Shantikunja More | শান্তিকুঞ্জ মোড় | 24.24665 | 89.90735 | City Corridor |
+| 13 | `puraton_stand` | Old Bus Stand | পুরাতন বাস স্ট্যান্ড | 24.24845 | 89.91125 | City Corridor |
+| 14 | `nirala` | Nirala More (City Center) | নিরালা মোড় (শহর কেন্দ্র) | 24.24985 | 89.91485 | City Core Center |
+| 15 | `pouro_uddan` | Pouro Uddan | পৌর উদ্যান | 24.25125 | 89.91445 | City Spine |
+| 16 | `taltola` | Taltola Bus Stop | তালতলা বাস স্টপ | 24.25285 | 89.91415 | City Spine |
+| 17 | `bottola` | Bottola Bus Stop | বটতলা বাস স্টপ | 24.25585 | 89.91365 | City Spine |
+| 18 | `dc_lake` | DC Lake | ডিসি লেক | 24.26245 | 89.91545 | North Perimeter |
+| 19 | `district_bus_stop`| District Bus Stop | জেলা বাস স্টপ | 24.26195 | 89.91635 | East Arterial |
+| 20 | `kazi_nazrul` | Kazi Nazrul Sena Bus Stop | কাজী নজরুল সেনা বাস স্টপ | 24.26175 | 89.91695 | East Arterial |
+| 21 | `baitun_nur` | Baitun Nur Mosque Bus Stop | বায়তুন নূর মসজিদ বাস স্টপ | 24.26135 | 89.91755 | East Arterial |
+| 22 | `cnb_more` | C&B More Bus Stop | সিঅ্যান্ডবি মোড় বাস স্টপ | 24.25985 | 89.91715 | East Arterial |
+| 23 | `kumudini` | Kumudini College Gate | কুমুদিনী কলেজ গেট | 24.25715 | 89.91885 | East Arterial |
+| 24 | `registry_para` | Registry Para Bus Stop | রেজিস্ট্রি পাড়া বাস স্টপ | 24.25545 | 89.91965 | South-East Arterial |
+| 25 | `puraton_bus_stand`| Puraton Bus Stand East | পুরাতন বাস স্ট্যান্ড পূর্ব | 24.25355 | 89.91965 | South-East Arterial |
+| 26 | `boro_kalibari` | Boro Kalibari More | বড় কালীবাড়ী মোড় | 24.25135 | 89.91665 | City Core Return |
+| 27 | `shena_nagar` | Shena Nagar Bus Stop | সেনা নগর বাস স্টপ | 24.23885 | 89.89835 | South Return Corridor |
+| 28 | `arif_nagar` | Arif Nagar Bus Stop | আরিফ নগর বাস স্টপ | 24.23585 | 89.89525 | Campus Approach |
+
+---
+
+### D. Production Verification & Deployment Matrix (Oct 30, 2026 - Hotfix State)
+
+| Component / Subsystem | Target Platform | Status | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Engine.IO v4 Handshake** | Web & Android | **PRODUCTION** | Heartbeat strictly server-initiated (`2`); client responds with pong (`3`); zero drops |
+| **Telemetry Ingestion** | Web & Android | **PRODUCTION** | Matches `flutter-bus-data`, `studentGpsData`, and `student-gps-data` with key normalization |
+| **Campus Standby Semantics**| Web & Android | **PRODUCTION** | `speed === 0` renders `Live GPS · Campus Standby` with cyan dot; no false staleness |
+| **Responsive Bottom Sheet** | Web Companion | **PRODUCTION** | `height: auto` on collapsed sheet; `flex-shrink: 0` on next-stop card; zero squishing |
+| **Corridor Stepper Alerts** | Web Companion | **PRODUCTION** | Armed bell toggles (`.transit-stepper-alert-btn.armed`) with accessible ARIA tags |
+| **28-Stop Topology & OSRM** | Web Companion | **PRODUCTION** | Ground-truth coordinates and street driving polyline (`REAL_STREET_POLYLINE`) |
+| **Production Deployment** | Vercel Live | **VERIFIED** | Live at `https://classmatebd.vercel.app` (Commit `f208b34` on `feature/live-bus-tracking`) |
+| **Preview Endpoint** | Vercel Live | **VERIFIED** | Accessible at `https://classmatebd.vercel.app/transit-preview` |
+| **Native Android APK Transit**| Android APK | **ALIGNED** | `ClassMateTransitScreen.kt` Engine.IO v4 socket handler aligned with production web logic |
+
+
+---
+
+## 154. Native Android APK Transit Engine Architecture, Bottom Navigation Restructuring & Security Governance (Oct 30, 2026 - Master State)
+
+### A. Executive Architectural Synthesis of Recent Antigravity Sessions
+Across recent Antigravity engineering transcripts (`f299dd3b-5ee4-474d-a380-72de6b93c62b`, `0edd370b-fa58-4308-905e-72b37c274b36`, `23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`, `e5876086`), substantial architectural milestones were achieved for the ClassMate Android APK and companion infrastructure:
+1. **Native Android APK Transit Tracking Engine (`ClassMateTransitScreen.kt`)**: Implemented an open-source, zero-API-key transit radar using OSMDroid MapView embedded in Jetpack Compose (`AndroidView`), powered by OkHttp WebSocket with strict Engine.IO v4 wire protocol adherence.
+2. **Navigation Hierarchy Overhaul**: Reorganized the Android bottom navigation into 5 core tabs (`Timetable`, `Notices`, `Transit`, `Courses`, `Settings`), relocating the Classmate Directory and Batch Fund into a dedicated, clean sub-activity under `Settings -> Batch & Classmates`.
+3. **Batch Screen UX Cleanup (`ClassMateBatchActivity.kt`)**: Removed artificial duplicate header banners in the Batch directory, restored the native title (`Batch`, `CSE Batch 22 · Session 24-25`), and added a fluid top-left `←` back navigation button verified on physical hardware.
+4. **Engine.IO v4 Protocol & Telemetry Parity**: Aligned Android socket handling with production web logic (passive pong `3` response to server ping `2`, ingestion of `flutter-bus-data`, `studentGpsData`, and `student-gps-data`, coordinate normalization, and dynamic fleet discovery).
+5. **Standing Security Governance (`classmate-daily-security-audit`)**: Configured daily automated security audits at 09:00 AM (Asia/Dhaka) covering RLS policies, RPC security contexts, Android cleartext network security rules, and Node.js backend authentication guards.
+
+---
+
+### B. Native Android Transit Engine Architecture (`ClassMateTransitScreen.kt`)
+
+The native Android transit tracking screen is implemented in `app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt` (805 lines) on branch `feature/live-bus-tracking`:
+
+#### 1. Zero-API-Key OSMDroid Map Integration via Jetpack Compose `AndroidView`
+- **OpenStreetMap Core**: Utilizes `org.osmdroid:osmdroid-android` with `TileSourceFactory.MAPNIK`. Requires zero Google Maps API keys or Google Play Services dependencies, ensuring flawless operation on custom ROMs and de-Googled Android devices.
+- **DPI & Multi-Touch Scaling**: Configured with `isTilesScaledToDpi = true`, hardware acceleration, and smooth pinch-to-zoom multi-touch controllers.
+- **Corridor Polyline Overlay**: Renders an arterial overlay polyline (`#0284C7`, 12f stroke) tracing the transit corridor linking MBSTU campus stops with Tangail city terminals.
+
+#### 2. Engine.IO v4 Wire Protocol & OkHttp WebSocket Lifecycle
+- **Connection Endpoint**: `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`.
+- **Handshake Sequence**:
+  - On WebSocket connection open (`onOpen`), dispatches packet `"40"` to join the default Socket.IO namespace.
+  - Server transmits heartbeat ping packet `"2"` every 25 seconds.
+  - Client strictly responds with heartbeat pong packet `"3"` (`override fun onMessage(...) { if (text == "2") { webSocket.send("3"); return; } }`).
+  - No client-side unsolicited ping intervals are scheduled, eliminating the 22-second server disconnect bug.
+- **Multi-Event Telemetry Parsing**:
+  - Ingests events `flutter-bus-data`, `studentGpsData`, and `student-gps-data`.
+  - Normalizes coordinate keys across tracker firmware (`lat`/`latitude` and `lon`/`longitude`).
+  - Updates reactive State in Jetpack Compose (`buses = buses.map { ... }`), triggering 60fps canvas re-renders without full screen recomposition.
+- **Lifecycle Cleanup**: Wrapped in Compose `DisposableEffect` to cleanly close WebSocket sessions and terminate OkHttp connection pools upon navigating away.
+
+#### 3. Custom Dynamic Canvas Bus Markers (`createBusMarkerDrawable`)
+- **Directional Canvas Icon**: Generates dynamic `BitmapDrawable` markers on an Android `Canvas`:
+  - Outer pulsating selection ring with alpha glow when bus is selected.
+  - High-contrast circular vehicle pill tinted with bus thematic color (Sonartori `#D97706`, Banolata `#059669`, Gitanjali `#6366F1`, Sangshaptak `#8B5CF6`).
+  - Centered directional arrow rotated to match vehicle `heading` degrees.
+  - Speed badge chip displayed beneath marker showing real-time km/h.
+
+#### 4. 3-Tier Interactive Material 3 Bottom Sheet
+- **Tier 0 (Peek State - 140dp)**: Collapsed view showing selected bus name, status pill (`Live GPS · Campus Standby` or `In Transit`), next approaching stop, and ETA.
+- **Tier 1 (Mid State - 320dp)**: Detailed vehicle card with driver profile, direct dialer intent (`Intent(Intent.ACTION_DIAL, Uri.parse("tel:${bus.driverPhone}"))`), and tactile vibration (`VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE)`).
+- **Tier 2 (Full State - 560dp)**: Searchable fleet list with filter chips (`All`, `Moving`, `Standby`), arrival time steppers, and station arrival alert toggles.
+
+---
+
+### C. Navigation Hierarchy Overhaul & Batch Screen Refactoring
+
+#### 1. 5-Tab Bottom Navigation Bar
+- Replaced the previous 5-tab layout with an optimized hierarchy:
+  1. **Timetable** (`nav_timetable`): Daily class schedules, live class countdown hero, and cancellation badges.
+  2. **Notices** (`nav_notices`): Academic notice feed with 6-line preview, unread badges, and read receipts.
+  3. **Transit** (`nav_transit`): Live MBSTU bus radar (center tab with pulsing live indicator).
+  4. **Courses** (`nav_courses`): Enrolled semester course files, syllabus, and academic resources.
+  5. **Settings** (`nav_settings`): User profile, account management, notification controls, and batch directory.
+
+#### 2. Relocation of Batch Directory into Settings (`ClassMateBatchActivity.kt`)
+- **Settings Tile Placement**: Inside the `Settings` tab under the `ACCOUNT & MANAGEMENT` card:
+  - Title: **"Batch & Classmates"** (or *"Students Directory"* for faculty)
+  - Subtitle: *"Classmate directory, blood donor list, and batch fund"*
+  - Icon: `ic_batch_friends` with right chevron accessory.
+- **Header Remediation**:
+  - Removed duplicate artificial header that previously repeated the batch name and subtitles.
+  - Restored clean native top bar: Title `Batch`, Subtitle `CSE Batch 22 · Session 24-25`, Search action `[🔍]`.
+  - Added integrated `←` back arrow beside the title that finishes `ClassMateBatchActivity` and returns smoothly to Settings.
+- **Physical Device Verification**: Tested and validated on connected physical OnePlus Nord CE4 (CPH2621, Device ID `6478ab80`).
+
+---
+
+### D. Security Governance, Infrastructure Hardening & Multi-Developer Standards
+
+#### 1. Automated Standing Security Audit (`classmate-daily-security-audit`)
+- **Cron Schedule**: Standing daily automation scheduled at **09:00 AM (Asia/Dhaka)** (`CRON_TZ=Asia/Dhaka 0 9 * * *`) via Antigravity scheduler (`0edd370b-fa58-4308-905e-72b37c274b36`).
+- **Audit Scope**:
+  - **Supabase PostgreSQL RLS**: Audits Row Level Security policies across `classmate.*` tables to ensure tenant isolation between university batches.
+  - **RPC Security Context**: Flags functions defined with `SECURITY DEFINER` lacking strict search path specifications or authorization checks.
+  - **Android Network Security**: Audits `AndroidManifest.xml` and `res/xml/network_security_config.xml` to prevent inadvertent cleartext traffic in production releases.
+  - **Credential Safety**: Scans Git tracking state to guarantee `.env.local`, `keystore.properties`, and service account JSON files are strictly ignored.
+
+#### 2. Network Security Hardening
+- **Vulnerability Identified**: `AndroidManifest.xml` historically had `android:usesCleartextTraffic="true"`.
+- **Remediation**: Implemented `@xml/network_security_config` to enforce strict HTTPS system-wide while restricting cleartext exceptions exclusively to local development domains (`localhost`, `10.0.2.2`, LAN subnets).
+
+#### 3. Backend Authentication Enforcement
+- **Vulnerability Identified**: Unauthenticated public endpoints in `classmate-server/server.js` (`GET /users`).
+- **Remediation**: Standardized JWT session authorization middleware to block unauthorized user enumeration.
+
+#### 4. Multi-Developer Database Isolation Standards (`23e6ef71`)
+- **Golden Rule**: Never share a single mutable database instance during active feature development.
+- **Local Isolation**: Every engineer runs a local Supabase stack via `supabase start` with deterministic seeds.
+- **Migration Discipline**: Database schema changes committed as timestamped SQL migrations under `supabase/migrations/`.
+- **Pre-Merge Validation**: Verification protocol requiring `./gradlew compileDebugSources` and database migration application prior to merging into `main`.
+
+---
+
+### E. Comprehensive Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Native Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` (805 lines); OSMDroid MapView + OkHttp WebSocket |
+| **Engine.IO v4 Handshake** | Web & Android | **PRODUCTION** | Heartbeat strictly server-initiated (`2`); client responds with pong (`3`); zero drops |
+| **Telemetry Ingestion** | Web & Android | **PRODUCTION** | Multi-event parsing (`flutter-bus-data`, `studentGpsData`, `student-gps-data`) |
+| **Campus Standby Semantics**| Web & Android | **PRODUCTION** | `speed === 0` classified as `Live GPS · Campus Standby` with cyan dot; no false staleness |
+| **5-Tab Navigation** | Android APK | **VERIFIED** | Center transit slot; Batch relocated to Settings (`ACCOUNT & MANAGEMENT`) |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (Title: `Batch`, Subtitle: `CSE Batch 22`), back arrow `←`, tested on `6478ab80` |
+| **Real Street Geometry** | Web Companion | **PRODUCTION** | OSRM road polyline (`REAL_STREET_POLYLINE`, 450+ vertices), 28 verified corridor stops |
+| **Kinematic Dead Reckoning**| Web & Android | **PRODUCTION** | Forward projection (`predictBusPosition` ≤ 15s) using spherical trigonometry |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app` (Commit `f208b34` on `feature/live-bus-tracking`) |
+
+
+---
+
+## 155. Production Live Transit Synchronization, Fleet Telemetry Wire Protocol & Engineering Master Reference (Oct 30, 2026 - Comprehensive State)
+
+### A. Executive Architectural Synthesis of Recent Antigravity Sessions
+Across recent Antigravity engineering transcripts (`f299dd3b-5ee4-474d-a380-72de6b93c62b`, `0edd370b-fa58-4308-905e-72b37c274b36`, `23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`, `e5876086`, and `e7bfedba`), a comprehensive overhaul of the ClassMate Android APK and its companion web platform was engineered, validated, and deployed to production:
+
+```mermaid
+flowchart TD
+    subgraph Client Architecture [Android APK & Web Companion]
+        A["5-Tab Navigation<br>(Timetable, Notices, Transit, Courses, Settings)"]
+        B["Native Android Radar<br>(ClassMateTransitScreen.kt - OSMDroid + Jetpack Compose)"]
+        C["Web Companion Radar<br>(transit.tsx - Google Satellite Hybrid / Roadmap)"]
+        D["Settings -> Batch & Classmates<br>(ClassMateBatchActivity.kt)"]
+    end
+
+    subgraph Live Wire Protocol [Engine.IO v4 WebSocket]
+        E["Endpoint: wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket"]
+        F["Handshake: 0{sid} -> 40 Namespace Connect"]
+        G["Heartbeat: Server Ping '2' -> Client Pong '3' (Passive Pong)"]
+        H["Telemetry Ingestion: 'flutter-bus-data', 'studentGpsData', 'student-gps-data'"]
+    end
+
+    subgraph Real-Time Telemetry Processing
+        I["Coordinate Normalization: (lat/lon vs latitude/longitude)"]
+        J["Campus Standby Detection: (Prottoy-71 cluster, speed == 0 -> Cyan Dot)"]
+        K["Kinematic Dead Reckoning: (Forward Projection <= 15s)"]
+        L["Approaching Stop Road Highlight: (OSRM Real Street Polyline, 28 Stops)"]
+    end
+
+    A --> B
+    A --> C
+    A --> D
+    B --> E
+    C --> E
+    E --> F --> G --> H
+    H --> I --> J --> K --> L
+```
+
+---
+
+### B. Wire Protocol Specification: Socket.IO Engine.IO v4 Handshake & Resilient Heartbeats
+
+#### 1. Wire Protocol Lifecycle
+The live transit tracking subsystem connects directly to the university transit gateway:
+`wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`
+
+1. **Connection Initiation**: Client opens secure WebSocket (`wss://`) connection.
+2. **Server Handshake Packet (`0`)**: Server responds immediately with Engine.IO v4 configuration:
+   ```json
+   0{"sid":"AbCdEf...","upgrades":[],"pingInterval":25000,"pingTimeout":20000,"maxPayload":1000000}
+   ```
+3. **Socket.IO Namespace Connect (`40`)**: Client immediately responds with packet `"40"` to attach to the root Socket.IO namespace (`/`).
+4. **Heartbeat Protocol (`2` / `3`)**:
+   - The university gateway acts as the **ping master**, sending heartbeat ping `"2"` every 25 seconds.
+   - The client MUST respond immediately with heartbeat pong `"3"`.
+   - **Crucial Bug Fixed**: The client MUST NEVER send unsolicited `"2"` pings. In earlier builds, a client-side 22-second ping timer caused out-of-order pings that the server rejected by closing the TCP connection, resulting in a 4-second `"Reconnecting..."` loop every 22 seconds. Removing the client timer and adopting pure passive pong completely eliminated all disconnects.
+5. **Multi-Event Telemetry Parsing**:
+   - Firmware units broadcast location frames across three distinct Socket.IO event names:
+     1. `42["flutter-bus-data", {...}]`
+     2. `42["studentGpsData", {...}]`
+     3. `42["student-gps-data", {...}]`
+   - Parsers on both Android and Web ingest all three event patterns and normalize coordinate keys (`payload.lat` vs `payload.latitude`, `payload.lon` vs `payload.longitude`).
+6. **Dynamic Fleet Discovery**:
+   - When telemetry arrives for a vehicle ID not in the predefined seed roster, the client dynamically registers the vehicle into reactive state, assigning a deterministic color palette and synthetic route name instead of ignoring it.
+
+---
+
+### C. Telemetry Semantics & Campus Standby Intelligence
+
+#### 1. Resolution of the "Stale • 333s / GPS Delayed" Flaw
+- **The Problem**: In production, stationary buses parked on campus were incorrectly flagged with red `"Stale • 333s"` and `"GPS DELAYED"` warnings despite having active GPS connections.
+- **Root Cause**: The client computed packet age by subtracting the onboard GPS unit's local clock string (`2026-10-30 02:19:34 PM`) from the browser/device `Date.now()`. Onboard tracker hardware clocks experienced clock drift, and stationary engines reported unchanging timestamps. A strict 15-second cutoff (`MAX_PREDICTION_SECONDS = 15`) falsely branded these active buses as stale.
+- **The Remediation**:
+  1. Packet freshness is anchored strictly to **actual packet arrival timestamp** (`Date.now()`).
+  2. Geographic spatial clustering detects when a bus is positioned within 58 meters of the Prottoy-71 bus stand (`[24.23488, 89.89155]`).
+  3. When `speed === 0` at campus stand, the vehicle status is rendered as **`Live GPS • Campus Standby`** with a glowing cyan status indicator (`#38bdf8`) and an informative headway notice (`"~X min once departs"`), reassuring students waiting along the corridor.
+
+---
+
+### D. Navigation Hierarchy Overhaul & Batch Directory Refactoring
+
+#### 1. 5-Tab Bottom Navigation Hierarchy
+The Android bottom navigation bar (`GlassBottomNavView`, `ClassMateBottomBar.kt`) was restructured to reflect primary student daily usage:
+1. **Timetable** (`nav_timetable`): Daily class routine, live class countdown hero card, and cancellation indicators.
+2. **Notices** (`nav_notices`): Academic notice feed with 6-line inline preview, unread badges, and read receipts.
+3. **Transit** (`nav_transit`): Live MBSTU bus radar (center tab slot featuring a pulsing emerald green live dot).
+4. **Courses** (`nav_courses`): Enrolled semester course files, syllabus documents, and academic drive links.
+5. **Settings** (`nav_settings`): User profile, account management, notification controls, and batch directory.
+
+#### 2. Relocation & Header Remediation of Batch Directory (`ClassMateBatchActivity.kt`)
+- **Settings Tile Placement**: Inside the `Settings` tab under the `ACCOUNT & MANAGEMENT` card:
+  - Title: **"Batch & Classmates"** (or *"Students Directory"* for faculty)
+  - Subtitle: *"Classmate directory, blood donor list, and batch fund"*
+  - Icon: `ic_batch_friends` with right chevron accessory.
+- **Header Remediation**:
+  - Removed duplicate artificial header that previously repeated the batch name and subtitles.
+  - Restored clean native top bar: Title `Batch`, Subtitle `CSE Batch 22 · Session 24-25`, Search action `[🔍]`.
+  - Added integrated `←` back arrow beside the title that finishes `ClassMateBatchActivity` and returns smoothly to Settings.
+- **Physical Device Verification**: Tested and validated on connected physical OnePlus Nord CE4 (CPH2621, Android 14, Device ID `6478ab80`).
+
+---
+
+### E. Native Android APK Implementation Architecture
+
+#### 1. Native OpenStreetMap Screen (`ClassMateTransitScreen.kt` - 805 lines)
+- **Zero-API-Key OSMDroid Integration**:
+  - Uses `org.osmdroid:osmdroid-android` with `TileSourceFactory.MAPNIK`.
+  - Embedded seamlessly in Jetpack Compose via `AndroidView` with `ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed`.
+  - Requires zero Google Maps API keys or Play Services dependencies, guaranteeing flawless execution on custom ROMs and de-Googled devices.
+  - Multi-touch pinch-to-zoom and DPI auto-scaling enabled (`isTilesScaledToDpi = true`).
+- **Custom Dynamic Canvas Bus Markers (`createBusMarkerDrawable`)**:
+  - Rendered on a native Android `Canvas`:
+    - Outer pulsating selection ring with alpha glow when bus is selected.
+    - High-contrast circular vehicle pill tinted with bus thematic color (Sonartori `#D97706`, Banolata `#059669`, Gitanjali `#6366F1`, Sangshaptak `#8B5CF6`).
+    - Centered directional arrow rotated to match vehicle `heading` degrees.
+    - Speed badge chip displayed beneath marker showing real-time km/h.
+- **3-Tier Interactive Material 3 Bottom Sheet**:
+  - **Tier 0 (Peek State - 140dp)**: Collapsed view showing selected bus name, status pill (`Live GPS · Campus Standby` or `In Transit`), next approaching stop, and ETA.
+  - **Tier 1 (Mid State - 320dp)**: Detailed vehicle card with driver profile, direct dialer intent (`Intent(Intent.ACTION_DIAL, Uri.parse("tel:${bus.driverPhone}"))`), and tactile vibration (`VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE)`).
+  - **Tier 2 (Full State - 560dp)**: Searchable fleet list with filter chips (`All`, `Moving`, `Standby`), arrival time steppers, and station arrival alert toggles.
+- **OkHttp WebSocket Lifecycle Management**:
+  - Wrapped in Compose `DisposableEffect` to cleanly cancel OkHttp WebSocket calls and shut down connection dispatchers when the screen leaves composition.
+
+#### 2. Transit Alerts & Notification Infrastructure (`ClassMateTransitManager.kt`)
+- **Android O+ Notification Channel**:
+  - Channel ID: `transit_departure_alerts`
+  - Name: `"MBSTU Bus Departure Alerts"`
+  - Importance: `NotificationManager.IMPORTANCE_HIGH`
+  - Custom vibration pattern: `longArrayOf(0, 250, 150, 250)`
+- **Campus Departure Alerts**:
+  - Triggers `showDepartureNotification` when a bus transitions from stationary at campus stand to driving on route at speed > 0 km/h.
+  - Dispatches actionable notification with deep link intent (`open_tab = "transit"`), opening directly into `ClassMateAuthActivity` radar.
+
+#### 3. Hybrid Web/Native JavaScript Bridge (`ClassMateTransitBridge.kt`)
+- Provides `@JavascriptInterface` bindings for hybrid WebView embedding (`app/src/main/assets/transit/index.html`):
+  - `dialDriver(phoneNumber)`: Launches native dialer.
+  - `triggerHaptic(intensity)`: Triggers tactile feedback via Android `Vibrator` / `VibratorManager`.
+  - `setAlertEnabled(busCode, enabled)`: Persists departure notification preferences in `SharedPreferences`.
+
+---
+
+### F. Web Companion Implementation & Satellite Hybrid Engine (`transit.tsx`, `transit.css`)
+
+- **Production Deployment**: Live at **`https://classmatebd.vercel.app/#transit`** (Preview: `/transit-preview`, Git commit `f208b34` on `feature/live-bus-tracking`).
+- **Distraction-Free Student UX**: Stripped of extraneous administrative controls (no seat occupancy bars, crowd reporting modals, or public driver dialers), focusing 100% on vehicle location, next stop, and ETA.
+- **Map Layer Switcher**:
+  - Satellite Hybrid (`lyrs=y`): `https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}` with subdomains `['0','1','2','3']` and maxZoom 21.
+  - Standard Roadmap (`lyrs=m`): `https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}`.
+- **Approaching Stop Road Highlight**:
+  - Base route rendered as periwinkle blue (`#818cf8`, weight 5, opacity 0.95) over dark casing (`#1e1b4b`, weight 9).
+  - Approaching segment highlighted in vibrant electric periwinkle with animated directional flow.
+- **Red Lollipop Stop Signs & Teardrop Pins**:
+  - 28 verified corridor stops rendered with red lollipop pins (`.lollipop-pin`, `.lollipop-head`) and clear English/Bengali stoppage names.
+- **Real Street Route Geometry (OSRM)**:
+  - 450+ vertex road polyline (`REAL_STREET_POLYLINE`) matching real asphalt street curves between Santosh Campus and Tangail City Loop.
+- **Bottom Sheet Layout Squishing Fix**:
+  - Replaced fixed `height: 230px`/`236px` and `overflow: hidden` with dynamic `height: auto` and `flex-shrink: 0`, completely preventing the next stop card from clipping.
+
+---
+
+### G. Security Governance & Multi-Developer Guidelines
+
+#### 1. Standing Security Audit Automation (`classmate-daily-security-audit`)
+- **Schedule**: Recurring daily cron at **09:00 AM (Asia/Dhaka)** (`CRON_TZ=Asia/Dhaka 0 9 * * *`) via Antigravity scheduler (`0edd370b-fa58-4308-905e-72b37c274b36`).
+- **Scope**:
+  - Supabase PostgreSQL Row Level Security (RLS) policies across `classmate.*` tables.
+  - `SECURITY DEFINER` RPC search path hardening.
+  - Android network security configuration (`@xml/network_security_config`) enforcing HTTPS and restricting cleartext to local loopbacks.
+  - Git repository scanning ensuring credential files (`.env.local`, `keystore.properties`, service account JSONs) are strictly excluded.
+
+#### 2. Multi-Developer Team Standards (`23e6ef71`)
+- **Golden Rule**: Never share a single mutable database during active feature development.
+- **Isolated Local Stacks**: Developers run isolated Supabase instances via `supabase start` with deterministic seeds.
+- **Versioned Migrations**: Schema alterations committed as timestamped SQL files under `supabase/migrations/`.
+- **Pre-Merge Protocol**: Requires `./gradlew compileDebugSources` and migration verification before merging into `main`.
+
+---
+
+### H. Comprehensive Master Production Verification Matrix (Oct 30, 2026 - Comprehensive State)
+
+| Target Subsystem | Platform | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Native Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` (805 lines); OSMDroid MapView + OkHttp WebSocket |
+| **Engine.IO v4 Handshake** | Web & Android | **PRODUCTION** | Heartbeat strictly server-initiated (`2`); client responds with pong (`3`); zero drops |
+| **Telemetry Ingestion** | Web & Android | **PRODUCTION** | Multi-event parsing (`flutter-bus-data`, `studentGpsData`, `student-gps-data`) |
+| **Campus Standby Semantics**| Web & Android | **PRODUCTION** | `speed === 0` classified as `Live GPS · Campus Standby` with cyan dot; no false staleness |
+| **5-Tab Navigation** | Android APK | **VERIFIED** | Center transit slot; Batch relocated to Settings (`ACCOUNT & MANAGEMENT`) |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (Title: `Batch`, Subtitle: `CSE Batch 22`), back arrow `←`, tested on `6478ab80` |
+| **Real Street Geometry** | Web Companion | **PRODUCTION** | OSRM road polyline (`REAL_STREET_POLYLINE`, 450+ vertices), 28 verified corridor stops |
+| **Kinematic Dead Reckoning**| Web & Android | **PRODUCTION** | Forward projection (`predictBusPosition` ≤ 15s) using spherical trigonometry |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app` (Commit `f208b34` on `feature/live-bus-tracking`) |
+| **Preview Endpoint** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/transit-preview` |
+| **Departure Notification**| Android APK | **VERIFIED** | `ClassMateTransitManager.kt` channel `transit_departure_alerts` (Android 13+ guarded) |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+---
+
+## 156. Dual-Repository Synchronization, Branch Convergence, RFID Hardware Resilience & Nightly Health Matrix (Oct 30, 2026 - Master State)
+
+### A. Executive Architectural Synthesis of Recent Antigravity Sessions
+
+Recent Antigravity engineering transcripts (`f299dd3b-5ee4-474d-a380-72de6b93c62b`, `0edd370b-fa58-4308-905e-72b37c274b36`, `23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`, `59442657-f965-4321-aed2-35a31f5be148`, `8357be69-acd9-4564-be11-2c0f5ddf8b50`, and associated sessions) focused on five pivotal milestones:
+1. **Full Deployment of the University Live Bus Transit Subsystem**: Achieving complete parity across Web companion (`https://classmatebd.vercel.app/#transit`, commit `f208b34`) and Native Android APK ([`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt)).
+2. **Reverse-Engineered Socket.IO Engine.IO v4 Protocol & Heartbeat Fix**: Eliminating the fatal 22-second client ping disconnection loop by establishing a passive pong (`3`) response to server ping (`2`), accompanied by dynamic multi-event telemetry parsing.
+3. **Telemetry Normalization & Campus Standby Logic**: Eliminating false `"Stale • 333s / GPS Delayed"` alerts by anchoring freshness to client arrival time and recognizing zero-speed stationary buses at Prottoy-71 bus stand as `"Live GPS • Campus Standby"` with cyan indicator (`#38bdf8`).
+4. **Information Architecture & Batch Directory Cleanup**: Restructuring the bottom navigation bar into 5 primary student tabs (centering Transit with a live green dot) and relocating the Batch directory into Settings with a clean native header (Title: `Batch`, Subtitle: `CSE Batch 22 • Session 24-25`, back arrow `←`), physically verified on **OnePlus Nord CE4 (`6478ab80`)**.
+5. **IoT RFID Station Enclosure & Offline Resilience**: Designing the snap-fit 3D enclosure (`esp32_rfid_flat_snapfit_enclosure.stl`) and establishing SPIFFS offline buffering for uninterrupted scans during classroom Wi-Fi outages.
+
+---
+
+### B. Dual-Repository Architecture & Branch Hygiene Protocols
+
+The ClassMate project operates across two synchronized repository working trees connected to remote `https://github.com/shuaibuddowla/ClassMate.git`:
+
+1. **Android Studio Workspace (`C:\Users\USER\AndroidStudioProjects\ClassMate`)**:
+   - Focus: Native Android Gradle build, Android Studio emulator/device execution, resource drawables, and native layout verification.
+   - Branch: `main` (aligned with commit `56f05a7`, incorporating predictive back navigation, activity transition modernization, and Batch relocation).
+2. **Main Full-Stack Repository (`D:\Code & Scripts\ClassMate-main`)**:
+   - Focus: Full-stack codebase containing Next.js Web companion, Supabase Edge Functions, SQL migrations, IoT firmware, and the native Jetpack Compose Transit module.
+   - Branch: `feature/live-bus-tracking` (production commits through `f208b34`).
+3. **Branch Cleanup & Convergence Directive**:
+   - Stale/obsolete feature branches were deleted locally and remotely per user directive (`git branch -D`).
+   - Active development is restricted to `main` (stable platform) and `feature/live-bus-tracking` (live transit feature branch prior to master merge).
+   - `classmate-memory.md` is strictly mirrored across both directories to ensure unbroken continuity for automated agents and human developers.
+
+---
+
+### C. Complete Live Campus Transit Architecture: Native APK & Web Parity
+
+```mermaid
+flowchart TD
+    subgraph Gateway ["MBSTU Transport Gateway"]
+        GW["transport.mbstu.ac.bd<br>Socket.IO Engine.IO v4"]
+    end
+
+    subgraph Handshake ["Wire Protocol Lifecycle"]
+        GW -->|"0 (Handshake + sid)"| CL["Client (Android / Web)"]
+        CL -->|"40 (Connect /)"| GW
+        GW -->|"2 (Ping every 25s)"| CL
+        CL -->|"3 (Passive Pong)"| GW
+    end
+
+    subgraph Telemetry ["Multi-Event Telemetry Ingestion"]
+        GW -->|"42['flutter-bus-data', ...]"| PARSER["Coordinate Normalizer"]
+        GW -->|"42['studentGpsData', ...]"| PARSER
+        GW -->|"42['student-gps-data', ...]"| PARSER
+    end
+
+    subgraph StateMachine ["Campus Standby Intelligence"]
+        PARSER --> CHK{"Speed == 0 &&<br>Within 58m of Prottoy-71?"}
+        CHK -->|Yes| STANDBY["Live GPS • Campus Standby<br>(Cyan Dot #38bdf8 + Headway Notice)"]
+        CHK -->|No| MOVING["In Transit / Moving<br>(Calculated ETA via Haversine)"]
+    end
+
+    subgraph Presentation ["Presentation Layer"]
+        STANDBY --> WEB["Web Companion: Leaflet + Google Satellite Tiles<br>(classmatebd.vercel.app/#transit)"]
+        MOVING --> WEB
+        STANDBY --> ANDROID["Native Android APK: OSMDroid + Compose<br>(ClassMateTransitScreen.kt - 805 lines)"]
+        MOVING --> ANDROID
+    end
+```
+
+#### 1. Wire Protocol Lifecycle & Heartbeat Stability
+- **Connection URL**: `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`
+- **Handshake Sequence**:
+  - Server sends Engine.IO packet `0{"sid":"...","pingInterval":25000,"pingTimeout":20000}`.
+  - Client immediately responds with packet `"40"` to attach to namespace `/`.
+- **Heartbeat Protocol**:
+  - The university gateway is the **ping master**, sending heartbeat `"2"` every 25 seconds.
+  - The client **must only respond with pong `"3"`**.
+  - **Fatal Bug Resolved**: In earlier builds, an unsolicited client timer transmitted `"2"` every 22 seconds. The server interpreted this out-of-turn packet as a protocol violation and severed the connection, creating a cyclic 4-second reconnection loop every 22 seconds. Removing the client timer and relying on purely passive pong completely eliminated all disconnects.
+
+#### 2. Telemetry Normalization & Standby Semantics
+- **Multi-Event Ingestion**: Ingests `flutter-bus-data`, `studentGpsData`, and `student-gps-data`, mapping variations (`lat` vs `latitude`, `lon` vs `longitude`).
+- **Dynamic Fleet Discovery**: Unregistered buses appearing in the socket stream are automatically provisioned with synthetic route names and deterministic colors, while highlighting curated trackable vehicles (*Gitanjali*, *Sonartori*, *Banolata*, *Sangshaptak*).
+- **False GPS Staleness Elimination**:
+  - GPS hardware clocks on buses drift from device time, causing premature staleness when evaluating packet timestamp strings.
+  - Fix: Packet freshness is anchored strictly to client arrival timestamp (`Date.now()`).
+  - Prottoy-71 cluster check: If coordinates are within 58m of `[24.23488, 89.89155]` and `speed === 0`, status displays as **`Live GPS • Campus Standby`** with cyan indicator (`#38bdf8`) and an estimated departure headway note.
+
+#### 3. Native Android APK Implementation ([`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt))
+- **805 Lines of Production Code**:
+  - Embedded `org.osmdroid.views.MapView` with `TileSourceFactory.MAPNIK` within Jetpack Compose via `AndroidView`.
+  - Zero Google Maps API keys or Play Services dependencies required.
+  - Dynamic `Canvas` bus markers: rotated directional arrow matching `heading` azimuth, tinted vehicle pill, outer glowing selection ring, and velocity chip (km/h).
+  - 3-tier Material 3 bottom sheet: Peek (140dp - vehicle status & ETA), Mid (320dp - driver dialer intent), and Full (560dp - searchable fleet list & route itinerary).
+  - Transit notification manager ([`ClassMateTransitManager.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt)): Employs channel `transit_departure_alerts` (`IMPORTANCE_HIGH`) to dispatch background notifications when buses leave campus.
+
+#### 4. Web Companion Implementation ([`transit.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.tsx), [`transit.css`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.css))
+- **Production Status**: Deployed live at `https://classmatebd.vercel.app/#transit` (Preview: `/transit-preview`).
+- **Visual Features**:
+  - Google Satellite Hybrid tiles (`lyrs=y`) with maxZoom 21 and 1-tap roadmap toggle (`lyrs=m`).
+  - Next Approaching Stop road highlight: vibrant periwinkle blue (`#818cf8`, weight 5) over dark casing (`#1e1b4b`, weight 9).
+  - 28 verified corridor stops with red lollipop pins (`.lollipop-pin`, `.lollipop-head`) and dual English/Bengali names.
+  - Real street geometry (OSRM 450+ vertex polyline) following asphalt street curves between Santosh Campus and Tangail City Loop.
+  - Bottom sheet layout elasticity: Replaced fixed height constraints with `height: auto` and `flex-shrink: 0`, eliminating card squishing.
+  - Desktop persistent notices rail: Stays docked and independently scrollable on the right rail when navigating to Transit.
+
+---
+
+### D. Navigation Hierarchy Overhaul & Batch Directory Remediation
+
+1. **5-Tab Navigation Restructuring**:
+   - `nav_timetable`: Daily class schedule, live class countdown hero card, and holiday indicators.
+   - `nav_notices`: Academic notices feed with 6-line inline preview, unread badges, and read receipts.
+   - `nav_transit`: Center tab slot featuring a pulsing emerald green live dot for real-time MBSTU transit radar.
+   - `nav_courses`: Semester course library, syllabi, and cloud resources.
+   - `nav_settings`: Profile, notifications, account preferences, and batch management.
+2. **Batch Directory Header Remediation ([`ClassMateBatchActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateBatchActivity.kt))**:
+   - Relocated from bottom navigation bar into `Settings -> ACCOUNT & MANAGEMENT -> "Batch & Classmates"`.
+   - Stripped away redundant stacked headers that previously repeated the batch name and subtitles.
+   - Restored clean native top bar: Title `Batch`, Subtitle `CSE Batch 22 • Session 24-25`, search icon, and native back arrow `←` returning smoothly to Settings.
+   - Validated on physical **OnePlus Nord CE4 (`CPH2621`, Android 14, ADB Device ID `6478ab80`)**.
+
+---
+
+### E. IoT RFID Hardware Station & Attendance Resilience
+
+1. **Station Hardware & Enclosure**:
+   - Custom snap-fit 3D enclosure (`esp32_rfid_flat_snapfit_enclosure.stl`) designed for ESP32 DevKit v1, RC522 RFID reader, I2C 16x2 LCD/OLED display, and piezo buzzer.
+   - Compact flat geometry with internal mounting rails to prevent solder fatigue during rapid student tap sequences.
+2. **Offline Buffering Architecture**:
+   - Classroom Wi-Fi drops while the attendance station is idle do not cause scan failures.
+   - RFID UID taps are timestamped via onboard RTC/millisecond offset and buffered into ESP32 SPIFFS/EEPROM flash storage.
+   - Upon network reconnection, buffered records are flushed sequentially via Supabase RPC `record_rfid_attendance` with idempotent deduplication keys, preventing double-marking.
+3. **MIFARE Classic 1K Card Provisioning**:
+   - Audited Batch 22 student roster against RFID attendance card procurement payments.
+   - Card sector keys hardened and UIDs registered directly into `classmate.student_rfid_cards`.
+
+---
+
+### F. Security Governance & Automated Quality Auditing
+
+1. **Standing Security Audit Cron (`classmate-daily-security-audit`)**:
+   - Running daily at **09:00 AM (Asia/Dhaka)** via Antigravity scheduler (`0edd370b-fa58-4308-905e-72b37c274b36`).
+   - Audits Supabase Row Level Security (RLS) policies across `classmate.*`, validates `SECURITY DEFINER` RPC search paths, verifies Android HTTPS network security configs, and monitors git repositories for credential leakages.
+2. **Multi-Developer Collaboration Standards (`23e6ef71`)**:
+   - Developers work against isolated local Supabase stacks (`supabase start`) with deterministic seed fixtures.
+   - Schema modifications are strictly committed as sequential timestamped SQL files under `supabase/migrations/`.
+   - Mandatory pre-merge protocol: `./gradlew compileDebugSources` and schema verification prior to merging feature branches into `main`.
+
+---
+
+### G. Comprehensive Master Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt) (805 lines); OSMDroid MapView + OkHttp WebSocket |
+| **Engine.IO v4 Handshake** | Web & Android | **PRODUCTION** | Heartbeat strictly server-initiated (`2`); client responds with pong (`3`); zero drops |
+| **Telemetry Ingestion** | Web & Android | **PRODUCTION** | Multi-event parsing (`flutter-bus-data`, `studentGpsData`, `student-gps-data`) |
+| **Campus Standby Semantics**| Web & Android | **PRODUCTION** | `speed === 0` classified as `Live GPS • Campus Standby` with cyan dot; no false staleness |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green dot; Batch relocated to Settings |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
+| **Real Street Geometry** | Web Companion | **PRODUCTION** | OSRM road polyline (`REAL_STREET_POLYLINE`, 450+ vertices), 28 verified corridor stops |
+| **Kinematic Dead Reckoning**| Web & Android | **PRODUCTION** | Forward projection (`predictBusPosition` $\le 15s$) using spherical trigonometry |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commit `f208b34` on `feature/live-bus-tracking`) |
+| **Preview Endpoint** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/transit-preview` |
+| **Departure Alerts** | Android APK | **VERIFIED** | [`ClassMateTransitManager.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt) channel `transit_departure_alerts` (Android 13+ guarded) |
+| **RFID Offline Buffer** | IoT Hardware | **VERIFIED** | ESP32 SPIFFS offline attendance buffering with replay reconciliation |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |

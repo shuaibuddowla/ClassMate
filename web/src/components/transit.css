@@ -267,7 +267,7 @@
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
-  padding: 5px 12px 5px 8px;
+  padding: 5px 12px 5px 9px;
   font-size: 12px;
   font-weight: 700;
   color: #cbd5e1;
@@ -301,10 +301,27 @@
   box-shadow: 0 0 8px currentColor;
 }
 
-.transit-chip-speed {
+.transit-chip-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.transit-chip-id-badge {
   font-size: 9.5px;
+  font-family: monospace;
   font-weight: 800;
-  padding: 1.5px 5.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+}
+
+.transit-chip-speed {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6.5px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.1);
   color: #94a3b8;
@@ -380,6 +397,44 @@
 
 .transit-fab-btn:active {
   transform: scale(0.95);
+}
+
+.transit-fab-btn.active-track {
+  background: rgba(2, 132, 199, 0.28);
+  border-color: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+}
+
+/* FAB Zoom Button Group */
+.transit-fab-group {
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.transit-fab-group .transit-fab-btn {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.transit-fab-group .transit-fab-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+  transform: none;
+}
+
+.transit-fab-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  width: 70%;
+  margin: 0 auto;
 }
 
 .transit-fab-btn:focus-visible,
@@ -702,10 +757,12 @@
   font-size: 14.5px;
   font-weight: 800;
   color: #ffffff;
-  line-height: 1.25;
-  white-space: nowrap;
+  line-height: 1.28;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .transit-next-sub-row {
@@ -959,6 +1016,62 @@
   text-transform: none;
   letter-spacing: 0;
   text-align: right;
+}
+
+/* Stoppage Search Row */
+.transit-stepper-search-row {
+  position: relative;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.transit-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.transit-stepper-search-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 7px 30px 7px 32px;
+  font-size: 12px;
+  color: #f1f5f9;
+  outline: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.transit-stepper-search-input:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.22);
+}
+
+.transit-stepper-search-input::placeholder {
+  color: #64748b;
+}
+
+.transit-search-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.transit-search-clear:hover {
+  color: #ffffff;
 }
 
 .transit-stepper-list {
@@ -1463,19 +1576,23 @@
 
   .transit-chips-scroll {
     min-height: 38px;
-    padding: 2px 2px 6px;
+    padding: 2px 16px 6px 2px;
   }
 
   .transit-bottom-sheet {
     left: 18px;
     right: auto;
     bottom: 18px;
-    width: min(440px, calc(100% - 36px));
+    width: min(540px, calc(100% - 36px));
     height: auto;
     border: 1px solid rgba(226, 232, 240, 0.16);
     border-radius: 24px;
-    background: rgba(9, 15, 28, 0.92);
-    box-shadow: 0 24px 70px rgba(2, 6, 23, 0.5);
+    background: rgba(9, 15, 28, 0.94);
+    box-shadow: 0 24px 70px rgba(2, 6, 23, 0.55);
+  }
+
+  .transit-sheet-drag-handle {
+    display: none;
   }
 
   .transit-bottom-sheet.collapsed {
@@ -1490,7 +1607,7 @@
   .transit-fab-controls,
   .transit-fab-controls.sheet-expanded {
     right: 18px;
-    bottom: 20px;
+    bottom: 24px;
     opacity: 1;
   }
 
@@ -1501,6 +1618,187 @@
     transform: none;
     width: min(420px, 42vw);
   }
+
+  .transit-offscreen-pill {
+    top: 120px;
+    left: 288px;
+    transform: translateX(-50%);
+  }
+}
+
+/* Off-screen Bus Recenter Floating Pill */
+.transit-offscreen-pill {
+  position: absolute;
+  top: 114px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #f1f5f9;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 14px rgba(56, 189, 248, 0.3);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  animation: floatBounce 2.5s ease-in-out infinite;
+}
+
+@keyframes floatBounce {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -4px); }
+}
+
+.transit-offscreen-pill:hover {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: #38bdf8;
+}
+
+.transit-offscreen-spin {
+  color: #38bdf8;
+}
+
+/* Custom Interactive Stop Marker Popup */
+.transit-custom-popup .leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.96) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 18px !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65) !important;
+  padding: 0 !important;
+}
+
+.transit-custom-popup .leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.transit-custom-popup .leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+}
+
+.transit-stop-popup {
+  padding: 12px 14px;
+  min-width: 210px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transit-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.transit-popup-order {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #38bdf8;
+}
+
+.transit-popup-campus-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.transit-popup-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.25;
+}
+
+.transit-popup-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.transit-popup-dist {
+  margin: 5px 0 3px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10.5px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.transit-popup-dist strong {
+  color: #38bdf8;
+}
+
+.transit-popup-eta {
+  color: #94a3b8;
+}
+
+.dist-next-tag {
+  font-size: 8.5px;
+  font-weight: 800;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.4px;
+}
+
+.transit-popup-alert-btn {
+  margin-top: 5px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.transit-popup-alert-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+}
+
+.transit-popup-alert-btn.armed {
+  background: rgba(2, 132, 199, 0.3);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* Offset attribution on desktop so it never overlaps FAB stack */
+.leaflet-bottom.leaflet-right .leaflet-control-attribution {
+  margin-right: 74px !important;
+  margin-bottom: 8px !important;
 }
 
 @media (max-width: 640px) {

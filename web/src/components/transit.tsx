@@ -19,7 +19,10 @@ import {
   Sparkles,
   LocateFixed,
   CheckCircle2,
-  X
+  X,
+  Plus,
+  Minus,
+  Search
 } from "lucide-react";
 
 /* ==========================================================================
@@ -197,6 +200,40 @@ function formatStopTitle(name: string): string {
   return name.replace(/\s+Bus Stop$/i, "").replace(/\s+Bus Stand$/i, "");
 }
 
+// Pleasant crystal chime for stop arrival alerts (Web Audio API - zero network latency)
+function playArrivalChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(659.25, now); // E5
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.18, now + 0.04);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(987.77, now + 0.12); // B5
+    gain2.gain.setValueAtTime(0, now + 0.12);
+    gain2.gain.linearRampToValueAtTime(0.22, now + 0.16);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.55);
+  } catch (e) {}
+}
+
 /* ==========================================================================
    Component
    ========================================================================== */
@@ -211,6 +248,8 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [alertedStops, setAlertedStops] = useState<{ [stopId: string]: boolean }>({});
   const [arrivalNotice, setArrivalNotice] = useState<{ busName: string; stopName: string } | null>(null);
   const [clockNow, setClockNow] = useState(() => Date.now());
+  const [isBusOffscreen, setIsBusOffscreen] = useState<boolean>(false);
+  const [stopFilter, setStopFilter] = useState<string>("");
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -222,6 +261,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   const approachingGlowPolylineRef = useRef<L.Polyline | null>(null);
   const approachingLineRef = useRef<L.Polyline | null>(null);
   const demoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const approachingStopRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setClockNow(Date.now()), 500);
@@ -288,6 +328,17 @@ export function Transit({ ctx }: { ctx?: any }) {
       idx: findClosestPolylineIndex([st.lat, st.lon], REAL_STREET_POLYLINE)
     }));
   }, []);
+
+  const filteredStops = useMemo(() => {
+    if (!stopFilter.trim()) return CORRIDOR_STATIONS;
+    const q = stopFilter.toLowerCase().trim();
+    return CORRIDOR_STATIONS.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.nameBn.includes(q) ||
+        String(s.order) === q
+    );
+  }, [stopFilter]);
 
   // Compute Next Approaching Stop along real street route loop
   const nextApproachingStopInfo = useMemo(() => {
@@ -364,6 +415,10 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!reachedStop) return;
     setAlertedStops((prev) => ({ ...prev, [reachedStop.id]: false }));
     setArrivalNotice({ busName: selectedBus.nameBn, stopName: reachedStop.name });
+    playArrivalChime();
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
   }, [selectedBus, alertedStops]);
 
   const centerSelectedBus = useCallback(() => {
@@ -371,6 +426,39 @@ export function Transit({ ctx }: { ctx?: any }) {
       mapRef.current.flyTo([selectedBus.lat, selectedBus.lon], 17, { animate: true, duration: 0.8 });
     }
   }, [selectedBus]);
+
+  // Track if selected bus is currently visible in the map viewport
+  const checkBusInBounds = useCallback(() => {
+    if (!mapRef.current || !selectedBus) {
+      setIsBusOffscreen(false);
+      return;
+    }
+    const bounds = mapRef.current.getBounds();
+    const isIn = bounds.contains([selectedBus.lat, selectedBus.lon]);
+    setIsBusOffscreen(!isIn);
+  }, [selectedBus]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    map.on("moveend", checkBusInBounds);
+    map.on("zoomend", checkBusInBounds);
+    checkBusInBounds();
+    return () => {
+      map.off("moveend", checkBusInBounds);
+      map.off("zoomend", checkBusInBounds);
+    };
+  }, [checkBusInBounds]);
+
+  // Auto-scroll to approaching stop when bottom sheet is expanded
+  useEffect(() => {
+    if (sheetExpanded && approachingStopRef.current) {
+      const timer = setTimeout(() => {
+        approachingStopRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 180);
+      return () => clearTimeout(timer);
+    }
+  }, [sheetExpanded]);
 
   // Recenter Campus
   const recenterCampus = useCallback(() => {
@@ -416,8 +504,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     } else {
       googleStreetLayer.addTo(map);
     }
-
-    L.control.zoom({ position: "bottomright" }).addTo(map);
 
     // Campus Standby Cluster Circle around Prottoy-71
     L.circle([24.23488, 89.89155], {
@@ -506,6 +592,9 @@ export function Transit({ ctx }: { ctx?: any }) {
     CORRIDOR_STATIONS.forEach((st) => {
       const isNext = st.id === nextStopId;
       const isAlerted = !!alertedStops[st.id];
+      const distM = selectedBus ? getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon) : 0;
+      const distKm = (distM / 1000).toFixed(2);
+      const estTimeM = selectedBus ? Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60)) : 1;
 
       const html = `
         <div class="lollipop-stop-marker ${isNext ? "is-next" : ""} ${isAlerted ? "is-alerted" : ""}">
@@ -521,6 +610,29 @@ export function Transit({ ctx }: { ctx?: any }) {
         </div>
       `;
 
+      const popupHtml = `
+        <div class="transit-stop-popup">
+          <div class="transit-popup-header">
+            <span class="transit-popup-order">STOP #${st.order}</span>
+            ${st.isCampus ? '<span class="transit-popup-campus-pill">Campus</span>' : ""}
+          </div>
+          <div class="transit-popup-title">${st.name}</div>
+          <div class="transit-popup-sub">${st.nameBn}</div>
+          ${
+            selectedBus
+              ? `<div class="transit-popup-dist">
+                  <span><strong>${distKm} km</strong> from ${selectedBus.nameBn}</span>
+                  <span class="transit-popup-eta">• ~${estTimeM} min</span>
+                  ${isNext ? '<span class="dist-next-tag">NEXT</span>' : ""}
+                </div>`
+              : ""
+          }
+          <button class="transit-popup-alert-btn ${isAlerted ? "armed" : ""}" id="btn-popup-alert-${st.id}">
+            ${isAlerted ? "🔔 Alert Armed · Click to Cancel" : "🔔 Alert me when bus is near"}
+          </button>
+        </div>
+      `;
+
       const icon = L.divIcon({
         className: "lollipop-div-icon",
         html,
@@ -530,14 +642,26 @@ export function Transit({ ctx }: { ctx?: any }) {
 
       if (stopMarkersRef.current[st.id]) {
         stopMarkersRef.current[st.id].setIcon(icon);
+        stopMarkersRef.current[st.id].setPopupContent(popupHtml);
       } else {
         const marker = L.marker([st.lat, st.lon], { icon, zIndexOffset: 100, title: st.name })
-          .bindTooltip(st.name, { direction: "top", offset: [0, -12], opacity: 0.96, className: "transit-stop-tooltip" })
+          .bindPopup(popupHtml, { className: "transit-custom-popup", closeButton: false, offset: [0, -22] })
           .addTo(map);
+
+        marker.on("popupopen", () => {
+          const btn = document.getElementById(`btn-popup-alert-${st.id}`);
+          if (btn) {
+            btn.onclick = () => {
+              toggleStopAlert(st.id);
+              marker.closePopup();
+            };
+          }
+        });
+
         stopMarkersRef.current[st.id] = marker;
       }
     });
-  }, [nextApproachingStopInfo, alertedStops, toggleStopAlert]);
+  }, [nextApproachingStopInfo, alertedStops, toggleStopAlert, selectedBus]);
 
   // 4. Update Dynamic Approaching Road Highlight
   useEffect(() => {
@@ -938,8 +1062,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                   title={`${bus.nameBn} · ${bus.id}${bus.isStale ? " · GPS delayed" : bus.isEstimated ? " · estimated position" : " · live GPS"}`}
                 >
                   <span className="transit-chip-dot" style={{ backgroundColor: bus.color, color: bus.color }} />
-                  <span>{bus.nameBn}</span>
-                  <span style={{ fontSize: 10, opacity: 0.7, fontFamily: "monospace" }}>{bus.id}</span>
+                  <span className="transit-chip-name">{bus.nameBn}</span>
+                  <span className="transit-chip-id-badge">{formatBusShortId(bus.id)}</span>
                   <span className={`transit-chip-speed ${bus.isStale ? "stale" : bus.speed > 0 ? "moving" : ""}`}>
                     {bus.isStale ? "Delayed" : bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby"}
                   </span>
@@ -961,6 +1085,18 @@ export function Transit({ ctx }: { ctx?: any }) {
         </div>
       </div>
 
+      {/* Off-screen Bus Recenter Floating Pill */}
+      {isBusOffscreen && selectedBus && (
+        <button
+          onClick={centerSelectedBus}
+          className="transit-offscreen-pill"
+          aria-label={`Center map on ${selectedBus.nameBn}`}
+        >
+          <Compass size={14} className="transit-offscreen-spin" />
+          <span><strong>{selectedBus.nameBn}</strong> is off-screen · Tap to view</span>
+        </button>
+      )}
+
       {arrivalNotice && (
         <div className="transit-arrival-toast" role="status">
           <CheckCircle2 size={18} />
@@ -975,21 +1111,41 @@ export function Transit({ ctx }: { ctx?: any }) {
           B. Right-Side Floating Map Controls (z-20)
           =================================================================== */}
       <div className={`transit-fab-controls ${sheetExpanded ? "sheet-expanded" : ""}`}>
+        <div className="transit-fab-group">
+          <button
+            onClick={() => mapRef.current?.zoomIn()}
+            className="transit-fab-btn"
+            title="Zoom In"
+            aria-label="Zoom in on map"
+          >
+            <Plus size={18} />
+          </button>
+          <div className="transit-fab-divider" />
+          <button
+            onClick={() => mapRef.current?.zoomOut()}
+            className="transit-fab-btn"
+            title="Zoom Out"
+            aria-label="Zoom out on map"
+          >
+            <Minus size={18} />
+          </button>
+        </div>
+
         {selectedBus && (
           <button
             onClick={centerSelectedBus}
-            className="transit-fab-btn"
+            className={`transit-fab-btn ${!isBusOffscreen ? "active-track" : ""}`}
             title={`Center map on ${selectedBus.nameBn}`}
             aria-label={`Center map on selected bus ${selectedBus.nameBn}`}
           >
-            <LocateFixed size={18} color="#38bdf8" />
+            <LocateFixed size={18} color={!isBusOffscreen ? "#38bdf8" : "#94a3b8"} />
           </button>
         )}
 
         <button
           onClick={() => setSatelliteView((prev) => !prev)}
           className="transit-fab-btn"
-          title="Toggle Google Satellite / Street Roadmap"
+          title={satelliteView ? "Switch to Street Roadmap" : "Switch to Google Satellite"}
           aria-label={satelliteView ? "Switch to street map" : "Switch to satellite map"}
         >
           <Layers size={18} color={satelliteView ? "#38bdf8" : "#94a3b8"} />
@@ -1013,7 +1169,7 @@ export function Transit({ ctx }: { ctx?: any }) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Drag Handle Bar */}
+        {/* Drag Handle Bar (Visible on mobile, styled away on desktop) */}
         <button
           className="transit-sheet-drag-handle"
           onClick={() => setSheetExpanded((prev) => !prev)}
@@ -1027,7 +1183,14 @@ export function Transit({ ctx }: { ctx?: any }) {
             {/* Fixed Header Portion (Never Scrolls, Never Squishes) */}
             <div className="transit-sheet-fixed-header">
               {/* Bus Identity Header Card (Clickable to toggle expand) */}
-              <div className="transit-bus-header-card">
+              <div
+                className="transit-bus-header-card"
+                onClick={() => setSheetExpanded((prev) => !prev)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={sheetExpanded}
+                aria-label={`Toggle route stops for ${selectedBus.nameBn}`}
+              >
                 <div className="transit-bus-header-identity">
                   <div
                     className="transit-bus-avatar"
@@ -1178,12 +1341,34 @@ export function Transit({ ctx }: { ctx?: any }) {
             {sheetExpanded && (
               <div className="transit-corridor-scroll-container">
                 <div className="transit-stepper-header">
-                  <span>Route stops · {CORRIDOR_STATIONS.length}</span>
-                  <span className="transit-stepper-hint">Alerts work while this page is open</span>
+                  <span>Route stops · {filteredStops.length} of {CORRIDOR_STATIONS.length}</span>
+                  <span className="transit-stepper-hint">Alerts work while this tab is open</span>
+                </div>
+
+                {/* Stoppage Search Filter Bar */}
+                <div className="transit-stepper-search-row">
+                  <Search size={14} className="transit-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search 28 stops (e.g. DC Lake, Nirala)..."
+                    value={stopFilter}
+                    onChange={(e) => setStopFilter(e.target.value)}
+                    className="transit-stepper-search-input"
+                  />
+                  {stopFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setStopFilter("")}
+                      className="transit-search-clear"
+                      aria-label="Clear stop search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="transit-stepper-list">
-                  {CORRIDOR_STATIONS.map((st, idx) => {
+                  {filteredStops.map((st, idx) => {
                     const isApproaching = st.id === nextApproachingStopInfo.station.id;
                     const isAlerted = !!alertedStops[st.id];
                     const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
@@ -1193,6 +1378,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                     return (
                       <div
                         key={st.id}
+                        ref={isApproaching ? approachingStopRef : undefined}
                         onClick={() => {
                           if (mapRef.current) {
                             mapRef.current.flyTo([st.lat, st.lon], 18, { animate: true, duration: 0.8 });
@@ -1212,7 +1398,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                         tabIndex={0}
                         aria-label={`Show ${st.name} on map`}
                       >
-                        {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
+                        {idx < filteredStops.length - 1 && <div className="transit-stepper-line" />}
                         <div className="transit-stepper-node">{st.order}</div>
 
                         <div className="transit-stepper-content">
