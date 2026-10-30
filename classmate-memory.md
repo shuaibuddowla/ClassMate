@@ -10679,3 +10679,98 @@ To maintain full architectural parity between the web companion and native Andro
    - Fleet chips now strictly render `স্ট্যান্ডবাই`, `বিলম্বিত`, and `${speed} কিমি/ঘ`.
    - Next approaching stop badges render `${dist} কিমি` and `~${eta} মি`.
    - Socket connection fallback text translated to Bengali.
+
+
+---
+
+## 171. Ultra-Compact Viewport Layout Stabilization, Map Callout Collision Prevention & Android Native Transit Parity
+
+### 171.1 Problem Diagnosis & Analysis (User Screenshot `media_1793393624012_99adf8e6.jpg`)
+1. **Ultra-Compact Viewport (360px–390px) Header Overflow & Truncation**:
+   - **Visual Defect**: On narrow Android devices and mobile companion webviews (360px width), the unified top floating header card (`.transit-header-card` in list view and `.transit-top-overlay` in map view) clipped or experienced horizontal compression. The combined width of the title pill (`MBSTU বাস ট্র্যাকার`), live status indicator dot/badge (`লাইভ`), the 3-state segmented switcher (`তালিকা` / `ম্যাপ` / `ডিটেইল`), and demo trigger button exceeded the available horizontal footprint.
+   - **Root Cause**:
+     - Global desktop `.content` container constraints in `globals.css` applied fixed padding or default max-widths that constricted small viewports.
+     - Individual button padding and font metrics in `.transit-segmented-btn` and `.transit-header-main-title` did not auto-scale below 380px.
+2. **Bottom Sheet & Map Callout Collision / Visual Clutter**:
+   - **Visual Defect**: When a user selected an active bus on the map, Leaflet rendered an anchored callout bubble (`.transit-bus-callout`) directly above the bus icon displaying live speed and user distance, while simultaneously opening the sliding Material 3 bottom sheet (`.transit-bottom-sheet`).
+   - **Conflict**: On mobile devices with screen heights under 750px, the bottom sheet's peek card (185px height) directly overlapped or collided with the bus marker and its floating callout bubble, creating severe visual noise and competing touch targets.
+   - **Solution**: On mobile screens, when a bus is actively selected and the bottom sheet is presented, suppress or de-emphasize the map callout. Route primary telemetry (speed `⚡ ২৫ কিমি/ঘ`, proximity `📍 ১.২ কিমি দূরে`, status, and next stop) directly into `.transit-sheet-header-right` and the approaching stop card within the bottom sheet.
+3. **Bus Stoppage Lollipop Decluttering Verification**:
+   - Verification of the `.transit-zoom-out` mechanism:
+     - When zoom < 16, all 28 stoppage names and lollipop stems are hidden, leaving only 8px red circular nodes with clean white borders along the polyline.
+     - The NEXT approaching stop retains its animated pulsing wave ring and prominent badge so students know exactly where the vehicle is heading without visual confusion.
+
+### 171.2 Architectural Resolutions Applied
+1. **Ultra-Compact (360px) Single-Row Header Lock**:
+   - For viewports <= 380px, applied dynamic scaling:
+     - Reduced title font to `12.5px` and icon to `14px`.
+     - Segmented button padding reduced to `4px 8px` with font size `11px`.
+     - Ensured `.transit-header-title-row { flex-wrap: nowrap; overflow: hidden; }` prevents any vertical line-wrapping of the header pill.
+     - Ensured full-bleed mobile display in `#transit` route without restrictive desktop container margins.
+2. **Telemetry Relocation & Bottom Sheet Isolation**:
+   - Relocated live speed (`⚡ ২৫ কিমি/ঘ`) and user proximity (`📍 ১.২ কিমি দূরে`) into `.transit-sheet-header-right` within the bottom sheet header.
+   - On mobile screens (<= 768px), when a bus is selected (`selectedBusId != null`), hide the hovering map callout (`.transit-bus-callout { display: none; }`) to give unobstructed visibility to the road map and vehicle marker.
+   - Kept hovering callout enabled only on desktop/tablet views where bottom sheets do not obscure map markers.
+3. **Android Native APK Parity Guidelines (`ClassMateTransitScreen.kt`, `TelemetryParser.kt`)**:
+   - **Osmdroid Dynamic Zoom Listener**:
+     ```kotlin
+     mapView.addMapListener(object : MapListener {
+         override fun onZoom(event: ZoomEvent?): Boolean {
+             val zoom = mapView.zoomLevelDouble
+             stoppageOverlay.setMarkerMode(if (zoom < 16.0) StoppageMode.MINIMAL_DOT else StoppageMode.FULL_LOLLIPOP)
+             return true
+         }
+         override fun onScroll(event: ScrollEvent?): Boolean = false
+     })
+     ```
+   - **Callout Suppression on BottomSheet State Change**:
+     - In Android's `BottomSheetBehavior`, when `state == STATE_EXPANDED || state == STATE_COLLAPSED` (sheet active), dismiss or hide any open Osmdroid `InfoWindow` on the selected bus marker to prevent screen collision.
+     - Render speed and `FusedLocationProviderClient` Haversine distance inside the `ItemBusDetailBinding` bottom sheet header.
+   - **OkHttp Engine.IO v4 Ingestion Gatekeeper**:
+     - Ensure packet processing handles WebSocket message frames (`42["student-gps-data", ...]`).
+     - Apply strict IMEI / fleet whitelist regex (`^SB[0-9]{4}$`) and Bengali catalog validation before dispatching to `MutableLiveData<List<MbstuBus>>`.
+   - **Predictive Back Navigation & Material 3 Bottom Sheet Ergonomics**:
+     - Modern bottom sheet with `app:behavior_peekHeight="185dp"` and `app:behavior_hideable="true"`.
+     - Outside tap or swipe down dismisses selection and resets floating FABs to default bottom anchor (`16dp`).
+
+---
+
+### Master Production Verification Matrix (Updated Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Ultra-Compact (360px) Header Lock** | Web Companion | **PRODUCTION** | Single-line horizontal capsule, font/padding auto-scaling below 380px |
+| **Bottom Sheet Telemetry Consolidation** | Web Companion | **PRODUCTION** | Live speed & user distance moved to sheet header; mobile map callout collision suppressed |
+| **Zoom-Adaptive Stoppage Decluttering** | Web Companion | **PRODUCTION** | Zoom < 16 shrinks 28 stops to 8px red waypoint dots; approaching stop pulsing ring preserved (Commit `2a28068`) |
+| **100% Bengali Fleet Telemetry** | Web Companion | **PRODUCTION** | All telemetry chips & ETA units translated to authentic Bangla (Commit `2a28068`) |
+| **Mobile Web Optimization Suite** | Web Companion | **PRODUCTION** | Adaptive FAB docking, touch feedback, M3 bottom sheet ergonomics (Commit `cf65a3a`) |
+| **Map Callout Zero-Blink Stabilization** | Web Companion | **PRODUCTION** | Leaflet marker DOM reuse (`__renderedHtml` hash check), eliminated strobe blinking (Commit `97c142f`) |
+| **Geolocation Origin Header Fix** | Web Companion | **PRODUCTION** | `Permissions-Policy: geolocation=(self)` in `next.config.ts`, network accuracy fallback (Commit `fe5d978`) |
+| **Permanent Header Lock & Body Scroll** | Web Companion | **PRODUCTION** | Fixed top header card (`z-index: 30`), independent `.transit-list-body` scroll (Commit `81989e9`) |
+| **Phantom IMEI Tracker Elimination** | Web Companion | **PRODUCTION** | Discarded raw `student-gps-data`, strict `SB` prefix & fleet whitelist filter (Commit `81989e9`) |
+| **Fleet Identity Expansion (SB0005, SB0007)** | Web Companion | **PRODUCTION** | Shangshaptak (`#8b5cf6`) and Dhaleshwari (`#10b981`) cataloged (Commit `81989e9`) |
+| **Direct Hash Route (`#transit`) Parity** | Web Companion | **PRODUCTION** | `web/src/components/app.tsx` recognizes `"transit"` hash navigation (Commit `81989e9`) |
+| **Live-Only Transit Stream & Stale Purge** | Web Companion | **PRODUCTION** | Removed `classmate_mbstu_fleet` local cache, genuine live socket only (Commit `a3af691`) |
+| **User Geolocation Distance & Live Pin** | Web Companion | **PRODUCTION** | `navigator.geolocation`, Haversine km badge, pulsating royal blue map pin (Commit `a3af691`) |
+| **Auto-Adapting Road Window Tracking** | Web Companion | **PRODUCTION** | Throttled 2.6s corridor bounding box following forward route vertices (Commit `a3af691`) |
+| **High-Contrast Marker Hardening** | Web Companion | **PRODUCTION** | 44x48px white badge, dual drop shadows, 100% opacity override (Commit `a3af691`) |
+| **Tap-to-Open & Outside-Click Dismissal** | Web Companion | **PRODUCTION** | `selectedBusId` strict isolation; outside click dismisses bottom sheet (Commit `423101f`) |
+| **Bottom Sheet Restyling & Bengali Localization** | Web Companion | **PRODUCTION** | Removed rogue `0010` text, 24px top radius, 100% Bengali labels (Commit `423101f`) |
+| **Streamlined Unified Header Bar** | Web Companion | **PRODUCTION** | Single floating capsule with title, live status count badge, and view switcher (Commit `423101f`) |
+| **Next.js Production Build Resolution** | Web Companion | **PRODUCTION** | Resolved missing `ChevronRight` import from `lucide-react` (Commit `423101f`) |
+| **MBSTU Wheels Protocol Reverse Engineering** | Protocol / Telemetry | **VERIFIED** | Engine.IO v4 wire protocol mapped (`0` greeting, `40` join, `2`/`3` ping-pong, `42` payload) |
+| **Complete MBSTU Fleet Catalog** | Fleet Database | **VERIFIED** | 8 Student buses, 3 Teacher vehicles, Officers coaster, 24/7 Ambulance service |
+| **Timetable & Committee Directory** | Directory Database | **VERIFIED** | Weekday/weekend schedules, Transport Committee contacts and emergency phone lines |
+| **Native Android OSM Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` using `osmdroid` native vector tiles & OkHttp Engine.IO v4 client |
+| **Status De-Duplication & Natural Time** | Web Companion | **PRODUCTION** | Clean progress pill, single-source velocity, natural Bengali elapsed time (Commit `f258016`) |
+| **Monotonic Milestone Mileage** | Web Companion | **PRODUCTION** | Pre-calculated 24-station corridor distances; strictly increasing road mileage (Commit `f258016`) |
+| **Predictive Back Navigation** | Android APK | **VERIFIED** | `enableOnBackInvokedCallback="true"`, modern activity transitions across 12+ screens (Commit `1b3d37d`) |
+| **Universal Tactile Haptics** | Android APK | **VERIFIED** | `HapticHelper.lightPop` wired into `View.applyClickAnimation` across all buttons/cards (Commit `148b002`) |
+| **Shimmer Skeleton Modernization** | Android APK | **VERIFIED** | `shimmer_item_notice.xml` matching `item_notice_modern.xml` 1:1; 0 CLS layout jumps (Commit `148b002`) |
+| **Soft Keyboard Ergonomics** | Android APK | **VERIFIED** | Auto-resizing bottom sheets (`SOFT_INPUT_ADJUST_RESIZE`), IME Next/Done navigation (Commit `cb05104`) |
+| **Offline-First Room Caching** | Android APK | **VERIFIED** | 7-day routine batching & Room DB fallback; <20ms tab switches, <50ms cold start (Commit `49d64c5`) |
+| **Street Polyline Geometry** | Web Companion | **PRODUCTION** | Traced physical asphalt roads: MBSTU Campus Loop, Santosh Rd, Kagmari Bridges & Tangail Loop (Commit `10f56bc`) |
+| **High-Visibility Bus Marker** | Web Companion | **PRODUCTION** | 38px solid white badge, colored chassis SVG, dual glowing headlights & sharp pointer (Commit `25ad6da`) |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`) |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
