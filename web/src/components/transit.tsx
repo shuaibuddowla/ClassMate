@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./transit.css";
@@ -20,7 +20,8 @@ import {
   UserCheck,
   ShieldAlert,
   Crosshair,
-  Volume2
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 export interface MbstuBusData {
@@ -37,6 +38,7 @@ export interface MbstuBusData {
   capacity: string;
   isDriving: boolean;
   color: string;
+  lastUpdated?: string;
 }
 
 export interface Station {
@@ -64,21 +66,22 @@ const ROUTE_COORDS: [number, number][] = [
   [24.2498, 89.9165]  // Nirala
 ];
 
+// Initial real MBSTU fleet definitions - all defaulted to 0 speed (parked at campus)
 const INITIAL_FLEET: MbstuBusData[] = [
-  { id: "SB0001", nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", lat: 24.234833, lon: 89.892358, speed: 0, heading: 171, routeName: "MBSTU Standby", driverName: "MD. Mizanur Rahman", driverPhone: "01711234567", capacity: "42 Seater", isDriving: false, color: "#6366f1" },
-  { id: "SB0002", nameBn: "অগ্নিবীণা", nameEn: "Agnibeena", lat: 24.237800, lon: 89.894200, speed: 28, heading: 175, routeName: "Campus ➔ Nirala", driverName: "MD. Rafiqul Islam", driverPhone: "01712345678", capacity: "42 Seater", isDriving: true, color: "#0284c7" },
-  { id: "SB0003", nameBn: "সোনারতরী", nameEn: "Sonartori", lat: 24.244000, lon: 89.907000, speed: 34, heading: 355, routeName: "Nirala ➔ Campus", driverName: "MD. Kamal Hossain", driverPhone: "01713456789", capacity: "42 Seater", isDriving: true, color: "#0d9488" },
+  { id: "SB0001", nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", lat: 24.234833, lon: 89.892358, speed: 0, heading: 171, routeName: "MBSTU Campus Standby", driverName: "MD. Mizanur Rahman", driverPhone: "01711234567", capacity: "42 Seater", isDriving: false, color: "#6366f1" },
+  { id: "SB0002", nameBn: "অগ্নিবীণা", nameEn: "Agnibeena", lat: 24.235100, lon: 89.891400, speed: 0, heading: 180, routeName: "Campus ➔ Nirala", driverName: "MD. Rafiqul Islam", driverPhone: "01712345678", capacity: "42 Seater", isDriving: false, color: "#0284c7" },
+  { id: "SB0003", nameBn: "সোনারতরী", nameEn: "Sonartori", lat: 24.235010, lon: 89.891573, speed: 0, heading: 181, routeName: "Campus ➔ Tangail City", driverName: "MD. Kamal Hossain", driverPhone: "01713456789", capacity: "42 Seater", isDriving: false, color: "#0d9488" },
   { id: "SB0004", nameBn: "ধলেশ্বরী", nameEn: "Dholeshwari", lat: 24.235222, lon: 89.890800, speed: 0, heading: 101, routeName: "MBSTU Standby", driverName: "MD. Abdul Alim", driverPhone: "01714567890", capacity: "42 Seater", isDriving: false, color: "#d97706" },
   { id: "SB0005", nameBn: "যমুনা", nameEn: "Jamuna", lat: 24.235100, lon: 89.891200, speed: 0, heading: 180, routeName: "Campus ➔ New Bus Stand", driverName: "MD. Jahangir Alam", driverPhone: "01715678901", capacity: "42 Seater", isDriving: false, color: "#ea580c" },
   { id: "SB0006", nameBn: "মেঘনা", nameEn: "Meghna", lat: 24.234900, lon: 89.891900, speed: 0, heading: 0, routeName: "MBSTU Standby", driverName: "MD. Sirajul Islam", driverPhone: "01716789012", capacity: "42 Seater", isDriving: false, color: "#2563eb" },
   { id: "SB0007", nameBn: "সুরমা", nameEn: "Surma", lat: 24.235300, lon: 89.892100, speed: 0, heading: 90, routeName: "Campus ➔ Railway Station", driverName: "MD. Nazrul Islam", driverPhone: "01717890123", capacity: "42 Seater", isDriving: false, color: "#7c3aed" },
   { id: "SB0008", nameBn: "কর্ণফুলী", nameEn: "Karnafuli", lat: 24.235400, lon: 89.891500, speed: 0, heading: 180, routeName: "MBSTU Standby", driverName: "MD. Faruk Ahmed", driverPhone: "01718901234", capacity: "42 Seater", isDriving: false, color: "#db2777" },
-  { id: "SB0009", nameBn: "বনলতা", nameEn: "Banalata", lat: 24.235050, lon: 89.891750, speed: 0, heading: 270, routeName: "Campus ➔ Nirala", driverName: "MD. Habibur Rahman", driverPhone: "01719012345", capacity: "42 Seater", isDriving: false, color: "#059669" },
+  { id: "SB0009", nameBn: "বনলতা", nameEn: "Banalata", lat: 24.235258, lon: 89.890181, speed: 0, heading: 0, routeName: "Campus ➔ Nirala", driverName: "MD. Habibur Rahman", driverPhone: "01719012345", capacity: "42 Seater", isDriving: false, color: "#059669" },
   { id: "SB0010", nameBn: "রক্তকরবী", nameEn: "Raktakarabi", lat: 24.235150, lon: 89.891650, speed: 0, heading: 0, routeName: "MBSTU Standby", driverName: "MD. Anisur Rahman", driverPhone: "01720123456", capacity: "42 Seater", isDriving: false, color: "#e11d48" }
 ];
 
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3; // Earth radius in meters
+  const R = 6371e3;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -91,13 +94,14 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 
 export function Transit({ ctx }: { ctx?: any }) {
   const [fleet, setFleet] = useState<MbstuBusData[]>(INITIAL_FLEET);
-  const [selectedBusId, setSelectedBusId] = useState<string>("SB0002");
+  const [selectedBusId, setSelectedBusId] = useState<string>("SB0003");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStationId, setSelectedStationId] = useState<string>("gate");
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [isLiveWs, setIsLiveWs] = useState(false);
   const [satelliteView, setSatelliteView] = useState(true);
   const [alertEnabled, setAlertEnabled] = useState(true);
+  const [lastPacketTime, setLastPacketTime] = useState<string>("Connecting...");
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -108,16 +112,13 @@ export function Transit({ ctx }: { ctx?: any }) {
   const streetLayerRef = useRef<L.TileLayer | null>(null);
   const routePolylineRef = useRef<L.Polyline | null>(null);
 
-  // Selected bus
   const selectedBus = fleet.find((b) => b.id === selectedBusId) || fleet[0];
 
-  // Target Station or User Location
   const targetStation =
     selectedStationId === "user_gps" && userLocation
       ? { id: "user_gps", name: "Your Current Location (GPS)", lat: userLocation.lat, lon: userLocation.lon }
       : STATIONS.find((s) => s.id === selectedStationId) || STATIONS[1];
 
-  // Dynamic ETA & Distance
   const distanceToStationMeters = calculateDistanceMeters(
     selectedBus.lat,
     selectedBus.lon,
@@ -125,67 +126,81 @@ export function Transit({ ctx }: { ctx?: any }) {
     targetStation.lon
   );
 
-  const effectiveSpeedKmH = Math.max(selectedBus.speed > 0 ? selectedBus.speed : 25, 15);
-  const etaMinutes = Math.max(1, Math.round((distanceToStationMeters / 1000 / effectiveSpeedKmH) * 60));
+  // ETA Calculation: if parked at campus with 0 speed, indicate parked
+  const isParked = selectedBus.speed === 0;
+  const effectiveSpeedKmH = Math.max(selectedBus.speed, 25);
+  const etaMinutes = isParked ? 0 : Math.max(1, Math.round((distanceToStationMeters / 1000 / effectiveSpeedKmH) * 60));
 
-  // Initialize Map
+  // Initialize Map with Google Maps Satellite Hybrid
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
+    // Centered at MBSTU Campus
     const map = L.map(mapContainerRef.current, {
-      center: [24.2385, 89.8960],
-      zoom: 15,
+      center: [24.2355, 89.8916],
+      zoom: 16,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: true
     });
 
-    const satLayer = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{r}",
-      { maxZoom: 19 }
-    );
-    const strLayer = L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      { maxZoom: 19 }
+    // Official Google Maps Satellite Hybrid (lyrs=y: satellite + roads + labels)
+    const googleSatLayer = L.tileLayer(
+      "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+      {
+        subdomains: ["0", "1", "2", "3"],
+        maxZoom: 21,
+        attribution: "&copy; Google Maps"
+      }
     );
 
-    satelliteLayerRef.current = satLayer;
-    streetLayerRef.current = strLayer;
+    // Official Google Maps Roadmap (lyrs=m: standard street map)
+    const googleStreetLayer = L.tileLayer(
+      "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+      {
+        subdomains: ["0", "1", "2", "3"],
+        maxZoom: 21,
+        attribution: "&copy; Google Maps"
+      }
+    );
+
+    satelliteLayerRef.current = googleSatLayer;
+    streetLayerRef.current = googleStreetLayer;
 
     if (satelliteView) {
-      satLayer.addTo(map);
+      googleSatLayer.addTo(map);
     } else {
-      strLayer.addTo(map);
+      googleStreetLayer.addTo(map);
     }
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
-    // MBSTU Campus Geofence Circle
+    // MBSTU Campus Boundary Geofence Circle
     L.circle([24.2349, 89.8916], {
       radius: 280,
       color: "#38bdf8",
-      weight: 1.5,
+      weight: 2,
       fillColor: "#0284c7",
       fillOpacity: 0.15,
-      dashArray: "4, 6"
+      dashArray: "5, 5"
     }).addTo(map);
 
     // Route Polyline
     routePolylineRef.current = L.polyline(ROUTE_COORDS, {
       color: "#38bdf8",
       weight: 4,
-      opacity: 0.7,
+      opacity: 0.8,
       dashArray: "6, 8"
     }).addTo(map);
 
-    // Add Stoppages Markers
+    // Stoppages Markers
     STATIONS.forEach((st) => {
       const icon = L.divIcon({
         className: "station-icon",
         html: `
-          <div style="background:#0f172a;border:2px solid #38bdf8;border-radius:50%;width:12px;height:12px;box-shadow:0 0 8px rgba(56,189,248,0.8);"></div>
+          <div style="background:#0f172a;border:2.5px solid #38bdf8;border-radius:50%;width:14px;height:14px;box-shadow:0 0 10px rgba(56,189,248,0.9);"></div>
         `,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
       });
       const stMarker = L.marker([st.lat, st.lon], { icon }).addTo(map);
       stMarker.bindTooltip(st.name, {
@@ -198,7 +213,19 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     mapRef.current = map;
 
-    // Track user location
+    // Trigger size invalidation to guarantee full container rendering
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
+    // User GPS tracking
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -225,17 +252,18 @@ export function Transit({ ctx }: { ctx?: any }) {
           }
         },
         () => {},
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 6000 }
       );
     }
 
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // Toggle Map Tiles
+  // Toggle Map Tiles (Satellite Hybrid vs Google Maps Street)
   useEffect(() => {
     if (!mapRef.current || !satelliteLayerRef.current || !streetLayerRef.current) return;
     if (satelliteView) {
@@ -274,7 +302,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             <div class="custom-bus-heading" style="transform: rotate(${bus.heading}deg) translate(0, -18px);"></div>
           </div>
           <div class="custom-bus-label">
-            ${bus.nameBn} ${bus.speed > 0 ? `· ${bus.speed} km/h` : ""}
+            ${bus.nameBn} ${bus.speed > 0 ? `· ${bus.speed} km/h` : "· Parked"}
           </div>
         </div>
       `;
@@ -302,7 +330,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   // Center on Selected Bus
   const centerOnBus = (bus: MbstuBusData) => {
     if (!mapRef.current) return;
-    mapRef.current.flyTo([bus.lat, bus.lon], 16, { animate: true, duration: 1.2 });
+    mapRef.current.flyTo([bus.lat, bus.lon], 17, { animate: true, duration: 1.2 });
   };
 
   const centerOnUser = () => {
@@ -312,73 +340,138 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   const centerCampus = () => {
     if (!mapRef.current) return;
-    mapRef.current.flyTo([24.2385, 89.8960], 15, { animate: true, duration: 1.2 });
+    mapRef.current.flyTo([24.2355, 89.8916], 16, { animate: true, duration: 1.2 });
   };
 
-  // WebSocket Live Telemetry Connection
+  // REAL WebSocket Connection with Genuine Socket.IO Handshake
   useEffect(() => {
     let ws: WebSocket | null = null;
     let heartbeatTimer: NodeJS.Timeout | null = null;
+    let isDisposed = false;
 
-    try {
-      ws = new WebSocket("wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket");
+    const connectWs = () => {
+      try {
+        ws = new WebSocket("wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket");
 
-      ws.onopen = () => {
-        setIsLiveWs(true);
-        heartbeatTimer = setInterval(() => {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send("2"); // Engine.IO ping
+        ws.onopen = () => {
+          // Socket opened, waiting for Engine.IO 0 packet
+        };
+
+        ws.onmessage = (event) => {
+          if (isDisposed) return;
+          const raw = String(event.data);
+
+          // 1. Engine.IO Handshake -> Send Socket.IO 40 connect packet
+          if (raw.startsWith("0")) {
+            ws?.send("40");
+            setIsLiveWs(true);
+
+            // Engine.IO Heartbeat every 20s
+            heartbeatTimer = setInterval(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send("2"); // ping
+              }
+            }, 20000);
           }
-        }, 20000);
-      };
+          // 2. Pong response
+          else if (raw === "3") {
+            // pong received
+          }
+          // 3. Socket.IO Connected
+          else if (raw.startsWith("40")) {
+            setIsLiveWs(true);
+          }
+          // 4. Telemetry Packets
+          else if (raw.startsWith("42")) {
+            try {
+              const parsed = JSON.parse(raw.slice(2));
+              if (!Array.isArray(parsed) || parsed.length < 2) return;
+              const evt = parsed[0];
+              const payload = parsed[1];
 
-      ws.onmessage = (event) => {
-        const raw = event.data as string;
-        if (raw.startsWith("42")) {
-          try {
-            const parsed = JSON.parse(raw.slice(2));
-            if (Array.isArray(parsed) && parsed[0] === "flutter-bus-data" && parsed[1]) {
-              const data = parsed[1];
-              setFleet((prev) =>
-                prev.map((bus) => {
-                  if (bus.id === data.id || bus.nameBn === data.busName) {
-                    return {
-                      ...bus,
-                      lat: data.lat || bus.lat,
-                      lon: data.lon || bus.lon,
-                      speed: data.speed ?? bus.speed,
-                      heading: data.heading ?? bus.heading,
-                      isDriving: (data.speed ?? 0) > 0
+              if (evt === "flutter-bus-data" || evt === "studentGpsData") {
+                const busId = payload.id || payload.busId;
+                const busName = payload.busName;
+                const lat = Number(payload.lat);
+                const lon = Number(payload.lon || payload.long);
+                const speed = Number(payload.speed ?? 0);
+                const heading = Number(payload.heading ?? 0);
+                const isDriving = payload.isDriving ?? (speed > 0);
+                const time = payload.time || new Date().toLocaleTimeString();
+
+                if (!busId || isNaN(lat) || isNaN(lon)) return;
+
+                setLastPacketTime(time);
+
+                setFleet((prevFleet) => {
+                  const existingIdx = prevFleet.findIndex((b) => b.id === busId || b.nameBn === busName);
+                  if (existingIdx >= 0) {
+                    const updated = [...prevFleet];
+                    updated[existingIdx] = {
+                      ...updated[existingIdx],
+                      lat,
+                      lon,
+                      speed,
+                      heading,
+                      isDriving,
+                      lastUpdated: time
                     };
+                    return updated;
+                  } else {
+                    // New bus detected dynamically from live stream
+                    const newBus: MbstuBusData = {
+                      id: busId,
+                      nameBn: busName || busId,
+                      nameEn: busId,
+                      lat,
+                      lon,
+                      speed,
+                      heading,
+                      routeName: speed > 0 ? "In Transit" : "MBSTU Campus Standby",
+                      driverName: "Assigned Driver",
+                      driverPhone: "01700000000",
+                      capacity: "42 Seater",
+                      isDriving,
+                      color: "#0284c7",
+                      lastUpdated: time
+                    };
+                    return [...prevFleet, newBus];
                   }
-                  return bus;
-                })
-              );
+                });
+              }
+            } catch (err) {
+              // Ignore unparseable packet
             }
-          } catch (e) {
-            // ignore malformed message
           }
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        setIsLiveWs(false);
-      };
+        ws.onclose = () => {
+          if (!isDisposed) {
+            setIsLiveWs(false);
+            // Reconnect after 4s
+            setTimeout(connectWs, 4000);
+          }
+        };
 
-      ws.onerror = () => {
+        ws.onerror = () => {
+          if (!isDisposed) {
+            setIsLiveWs(false);
+          }
+        };
+      } catch (e) {
         setIsLiveWs(false);
-      };
-    } catch (e) {
-      setIsLiveWs(false);
-    }
+      }
+    };
+
+    connectWs();
 
     return () => {
+      isDisposed = true;
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (ws) ws.close();
     };
   }, []);
 
-  // Filter Fleet
   const filteredFleet = fleet.filter(
     (b) =>
       b.nameBn.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -388,7 +481,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   return (
     <div className="transit-container">
-      {/* Fullscreen Map Canvas */}
+      {/* Fullscreen Leaflet Map Canvas */}
       <div className="transit-map-wrapper">
         <div ref={mapContainerRef} className="transit-map-canvas" />
       </div>
@@ -400,32 +493,32 @@ export function Transit({ ctx }: { ctx?: any }) {
           <Search size={18} color="#94a3b8" />
           <input
             type="text"
-            placeholder="Search bus (অগ্নিবীণা, SB0002)..."
+            placeholder="Search bus (অগ্নিবীণা, সোনারতরী, SB0003)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="transit-search-input"
           />
         </div>
 
-        {/* Map Quick Action Buttons */}
+        {/* Map Actions */}
         <div className="transit-map-actions">
-          {/* Live Badge */}
+          {/* Live Telemetry Status */}
           <div className={`transit-live-badge ${isLiveWs ? "online" : "offline"}`}>
             <span className="transit-pulse-dot" style={{ background: isLiveWs ? "#34d399" : "#fbbf24" }} />
-            {isLiveWs ? "MBSTU LIVE" : "TELEMETRY"}
+            {isLiveWs ? "MBSTU LIVE" : "CONNECTING"}
           </div>
 
-          {/* Satellite Toggle */}
+          {/* Google Satellite Toggle */}
           <button
             onClick={() => setSatelliteView(!satelliteView)}
             className="transit-action-btn"
-            title="Toggle Satellite Imagery"
+            title="Toggle Google Satellite / Street"
           >
             <Layers size={16} />
-            <span>{satelliteView ? "Satellite" : "Street"}</span>
+            <span>{satelliteView ? "Google Satellite" : "Street"}</span>
           </button>
 
-          {/* User Location */}
+          {/* GPS Location */}
           <button
             onClick={centerOnUser}
             className="transit-action-btn"
@@ -439,7 +532,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           <button
             onClick={centerCampus}
             className="transit-action-btn"
-            title="Focus MBSTU Campus"
+            title="Center on MBSTU Campus"
           >
             <MapPin size={16} />
             <span>Campus</span>
@@ -450,8 +543,8 @@ export function Transit({ ctx }: { ctx?: any }) {
       {/* Floating Transit Panel (Google Maps Transit Card) */}
       <div className="transit-panel">
         <div className="transit-panel-scroll">
-          
-          {/* Bus Hero Info */}
+
+          {/* Active Bus Card */}
           <div className="transit-card">
             <div className="transit-hero">
               <div>
@@ -465,35 +558,48 @@ export function Transit({ ctx }: { ctx?: any }) {
                   className={`transit-speed-badge ${selectedBus.speed > 0 ? "moving" : "stopped"}`}
                 >
                   <Compass size={14} />
-                  {selectedBus.speed > 0 ? `${selectedBus.speed} km/h` : "Standby"}
+                  {selectedBus.speed > 0 ? `${selectedBus.speed} km/h` : "Parked at Campus"}
                 </span>
               </div>
             </div>
 
-            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#cbd5e1" }}>
-              <Navigation size={14} color="#38bdf8" />
-              <span>Route: <strong>{selectedBus.routeName}</strong></span>
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#cbd5e1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Navigation size={14} color="#38bdf8" />
+                <span>{selectedBus.routeName}</span>
+              </div>
+              {selectedBus.lastUpdated && (
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                  Updated: {selectedBus.lastUpdated}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ETA & Station Arrival Card */}
+          {/* Dynamic ETA / Distance Box */}
           <div className="transit-eta-box">
             <div className="transit-eta-header">
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#93c5fd" }}>
-                  Estimated Arrival
+                  {isParked ? "Status" : "Estimated Arrival"}
                 </div>
-                <div className="transit-eta-big">~{etaMinutes} min</div>
+                <div className="transit-eta-big">
+                  {isParked ? "Parked" : `~${etaMinutes} min`}
+                </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div className="transit-eta-dist">{(distanceToStationMeters / 1000).toFixed(1)} km away</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>at current headway</div>
+                <div className="transit-eta-dist">
+                  {(distanceToStationMeters / 1000).toFixed(2)} km
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                  {isParked ? "Standby in campus" : "to chosen stoppage"}
+                </div>
               </div>
             </div>
 
-            {/* Target Station Selector */}
+            {/* Target Stoppage Picker */}
             <div>
-              <div className="transit-station-picker-label">Target Station / Your Stop</div>
+              <div className="transit-station-picker-label">Target Station / Your Stoppage</div>
               <select
                 value={selectedStationId}
                 onChange={(e) => setSelectedStationId(e.target.value)}
@@ -508,14 +614,14 @@ export function Transit({ ctx }: { ctx?: any }) {
               </select>
             </div>
 
-            {/* Focus on Map Button */}
+            {/* Center Bus on Map */}
             <button
               onClick={() => centerOnBus(selectedBus)}
               className="transit-action-btn"
               style={{ width: "100%", justifyContent: "center", background: "#0284c7", color: "white", border: "none" }}
             >
               <Crosshair size={16} />
-              <span>Track {selectedBus.nameBn} on Map</span>
+              <span>Focus {selectedBus.nameBn} on Map</span>
             </button>
           </div>
 
@@ -546,8 +652,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                       </div>
                       <div className="transit-timeline-desc">
                         {isClosest
-                          ? "Bus currently near this stop"
-                          : `${(distToStop / 1000).toFixed(1)} km from bus`}
+                          ? "Bus currently at / near this stop"
+                          : `${(distToStop / 1000).toFixed(2)} km from bus`}
                       </div>
                     </div>
                   </div>
@@ -556,7 +662,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             </div>
           </div>
 
-          {/* Driver Contact & Capacity Card */}
+          {/* Driver Card */}
           <div className="transit-card">
             <div className="transit-driver-row">
               <div>
@@ -570,7 +676,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             </div>
           </div>
 
-          {/* Campus Departure Alert Toggle */}
+          {/* Departure Alert Switch */}
           <div className="transit-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ padding: 8, borderRadius: 10, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}>
@@ -578,7 +684,7 @@ export function Transit({ ctx }: { ctx?: any }) {
               </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Campus Departure Alert</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>Alert when this bus leaves Santosh</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>Notify when bus leaves Santosh campus</div>
               </div>
             </div>
             <input
@@ -589,10 +695,10 @@ export function Transit({ ctx }: { ctx?: any }) {
             />
           </div>
 
-          {/* Quick Fleet Vehicle Selector Grid */}
+          {/* Active Fleet Selector Grid */}
           <div>
             <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
-              MBSTU Active Fleet Vehicles ({filteredFleet.length})
+              MBSTU Fleet Vehicles ({filteredFleet.length})
             </div>
             <div className="transit-fleet-grid">
               {filteredFleet.map((bus) => (
@@ -619,7 +725,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                         color: bus.speed > 0 ? "#34d399" : "#94a3b8"
                       }}
                     >
-                      {bus.speed > 0 ? `${bus.speed}k` : "Parked"}
+                      {bus.speed > 0 ? `${bus.speed} km/h` : "Parked"}
                     </span>
                   </div>
                 </div>
