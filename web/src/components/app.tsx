@@ -35,6 +35,7 @@ import {
   Radio,
   ArrowLeft,
   ChevronRight,
+  Bus,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -56,6 +57,11 @@ const ClassMateAI = lazy(() => import("./classmate-ai"));
 const Manage = lazy(() => import("./manage"));
 const TeacherAttendance = lazy(() => import("./teacher-attendance"));
 const AdminAttendance = lazy(() => import("./admin-attendance"));
+import dynamic from "next/dynamic";
+const Transit = dynamic(() => import("./transit").then((m) => m.Transit), {
+  ssr: false,
+});
+
 export type Context = {
   user: string;
   profile: Row;
@@ -937,6 +943,12 @@ function TabDeck({
           />
         </Suspense>
       );
+    if (value === "transit")
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <Transit ctx={active} />
+        </Suspense>
+      );
     if (!ctx.batch)
       return (
         <div className="card">
@@ -991,13 +1003,14 @@ function TabDeck({
             </section>
           ))}
       </div>
-      <ResizeHandle {...resizeNotices} className="notices-resizer" />
+      {tab !== "transit" && <ResizeHandle {...resizeNotices} className="notices-resizer" />}
       <div
         ref={rail}
         className={`notice-pane ${tab === "notices" ? "mobile-active" : ""}`}
         role="complementary"
         tabIndex={desktop ? 0 : -1}
         aria-label="Batch notices"
+        style={tab === "transit" ? { display: "none" } : undefined}
       >
         {ctx.batch ? (
           <Notices
@@ -1216,6 +1229,7 @@ function Home({
   const isAdmin = profile.role === "admin" || owner.data === true;
   const desktopDestinations = [
     ["timetable", "Timetable", CalendarDays],
+    ["transit", "Transit", Bus],
     ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ...(isAdmin ? [["admin-attendance", "Manage Attendance", Radio] as const] : []),
     ["notices", "Notices", Bell],
@@ -1225,6 +1239,7 @@ function Home({
   ] as const;
   const mobileDestinations = [
     ["timetable", "Timetable", CalendarDays],
+    ["transit", "Transit", Bus],
     ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
     ["notices", "Notices", Bell],
     ["library", "Courses", BookOpen],
@@ -1242,6 +1257,8 @@ function Home({
           ? "batch"
           : value === "profile"
           ? "settings"
+          : value === "transit"
+          ? "transit"
           : value === "library"
           ? "courses"
           : value === "admin-attendance"
