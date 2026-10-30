@@ -359,7 +359,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   }, []);
 
   // Request & watch user geolocation
-  const requestLocation = useCallback((onSuccess?: (coords: { lat: number; lon: number }) => void) => {
+  const requestLocation = useCallback((onSuccess?: (coords: { lat: number; lon: number }) => void, isManual = false) => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) return;
 
     const handleSuccess = (pos: GeolocationPosition) => {
@@ -378,15 +378,25 @@ export function Transit({ ctx }: { ctx?: any }) {
     navigator.geolocation.getCurrentPosition(
       handleSuccess,
       (err) => {
-        // If high accuracy times out (especially common on desktop/laptop Wi-Fi), fallback to coarse accuracy
-        if (err.code === err.TIMEOUT) {
+        // If high accuracy times out or is unavailable (common on desktop/laptop Wi-Fi), fallback to coarse accuracy
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
           navigator.geolocation.getCurrentPosition(
             handleSuccess,
-            () => setLocPermission("denied"),
-            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+            (fallbackErr) => {
+              if (fallbackErr.code === fallbackErr.PERMISSION_DENIED) {
+                setLocPermission("denied");
+                if (isManual) {
+                  alert("আপনার ব্রাউজারে লোকেশন পারমিশন ব্লক করা আছে। বাসের দূরত্ব দেখতে ব্রাউজারের অ্যাড্রেস বারের সাইট সেটিংস/লক (🔒) আইকন থেকে লোকেশন Allow করুন।");
+                }
+              }
+            },
+            { enableHighAccuracy: false, timeout: 12000, maximumAge: 120000 }
           );
         } else if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
+          if (isManual) {
+            alert("আপনার ব্রাউজারে লোকেশন পারমিশন ব্লক করা আছে। বাসের দূরত্ব দেখতে ব্রাউজারের অ্যাড্রেস বারের সাইট সেটিংস/লক (🔒) আইকন থেকে লোকেশন Allow করুন।");
+          }
         }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
@@ -1499,14 +1509,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <div className="transit-card-user-distance-box">
                     {userLocation ? (
                       <span className="transit-user-distance-badge" title="আপনার বর্তমান অবস্থান থেকে এই বাসের দূরত্ব">
-                        📍 আপনার থেকে {((getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon)) / 1000).toFixed(1)} কিমি
+                        📍 আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon))}
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          requestLocation();
+                          requestLocation(undefined, true);
                         }}
                         className="transit-request-loc-pill"
                         title="আপনার থেকে বাসের দূরত্ব জানতে লোকেশন চালু করুন"
@@ -2045,26 +2055,21 @@ export function Transit({ ctx }: { ctx?: any }) {
               <Layers size={18} color={satelliteView ? "#38bdf8" : "#94a3b8"} />
             </button>
 
-            <button
-              onClick={recenterCampus}
-              className="transit-fab-btn"
-              title="Fly to MBSTU Santosh Campus"
-              aria-label="Recenter map on campus"
-            >
-              <MapPin size={18} color="#38bdf8" />
-            </button>
-
             {/* Locate Me / User Location FAB */}
             <button
               onClick={() => {
                 if (userLocation && mapRef.current) {
                   mapRef.current.flyTo([userLocation.lat, userLocation.lon], 16, { animate: true, duration: 0.8 });
                 } else {
-                  requestLocation();
+                  requestLocation((coords) => {
+                    if (mapRef.current) {
+                      mapRef.current.flyTo([coords.lat, coords.lon], 16, { animate: true, duration: 0.8 });
+                    }
+                  }, true);
                 }
               }}
               className={`transit-fab-btn ${userLocation ? "has-user-loc" : ""}`}
-              title={userLocation ? "আমার বর্তমান অবস্থান দেখুন" : "লোকেশন চালু করে আমার অবস্থান দেখুন"}
+              title={userLocation ? "আমার অবস্থান দেখুন" : "লোকেশন চালু করে আমার অবস্থান দেখুন"}
               aria-label="Locate me on map"
               type="button"
             >
