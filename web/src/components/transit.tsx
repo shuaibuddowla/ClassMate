@@ -132,7 +132,8 @@ const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: st
   SB0001: { nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", color: "#6366f1", defaultRoute: "Campus ⇄ Nirala (City Center)" },
   SB0002: { nameBn: "অগ্নিবীণা", nameEn: "Agnibina", color: "#f97316", defaultRoute: "Campus ⇄ Nirala (City Center)" },
   SB0003: { nameBn: "সোনারতরী", nameEn: "Sonartori", color: "#0284c7", defaultRoute: "Campus ⇄ Nirala (City Center)" },
-  SB0005: { nameBn: "ধলেশ্বরী", nameEn: "Dhaleshwari", color: "#10b981", defaultRoute: "Campus ⇄ Tangail Old Bus Stand" },
+  SB0005: { nameBn: "সংশপ্তক", nameEn: "Shangshaptak", color: "#8b5cf6", defaultRoute: "MBSTU Transport Corridor" },
+  SB0007: { nameBn: "ধলেশ্বরী", nameEn: "Dhaleshwari", color: "#10b981", defaultRoute: "Campus ⇄ Tangail Old Bus Stand" },
   SB0009: { nameBn: "বনলতা", nameEn: "Banolata", color: "#059669", defaultRoute: "Campus ⇄ Kagmari ⇄ Nirala" },
   SB0010: { nameBn: "রক্তকরবী", nameEn: "Raktakarabi", color: "#ec4899", defaultRoute: "MBSTU Transport Corridor" }
 };
@@ -1093,11 +1094,11 @@ export function Transit({ ctx }: { ctx?: any }) {
               if (!Array.isArray(payload) || payload.length < 2) return;
               const [eventName, rawData] = payload;
 
-              // Only process bus telemetry events
+              // Only process verified bus telemetry events
+              // Note: We DO NOT process raw "student-gps-data" because it emits hardware IMEI trackers without bus identities
               if (
                 eventName === "flutter-bus-data" ||
-                eventName === "studentGpsData" ||
-                eventName === "student-gps-data"
+                eventName === "studentGpsData"
               ) {
                 const list = Array.isArray(rawData) ? rawData : [rawData];
                 const valid = list.filter((b: any) => {
@@ -1113,32 +1114,47 @@ export function Transit({ ctx }: { ctx?: any }) {
                     prevFleet.forEach((b) => map.set(b.id, b));
 
                     valid.forEach((raw: any) => {
-                      const id = String(raw.id || raw.busId || raw.bus_id || raw.imei || "SB0001").toUpperCase();
-                      const lat = typeof raw.lat === "number" ? raw.lat : raw.latitude;
-                      const lon = typeof raw.lon === "number" ? raw.lon : (raw.long ?? raw.longitude);
-                      const nameFromPacket = raw.busName || raw.nameBn || raw.name;
+                      const rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
+                      const nameFromPacket = String(raw.busName || raw.nameBn || raw.name || "").trim();
 
-                      // Match known metadata or use packet info
-                      let info = KNOWN_BUS_INFO[id];
+                      // Resolve info against recognized official university fleet
+                      let info = rawId ? KNOWN_BUS_INFO[rawId] : undefined;
+                      let resolvedId = rawId;
+
                       if (!info && nameFromPacket) {
-                        const matchKey = Object.keys(KNOWN_BUS_INFO).find((k) => KNOWN_BUS_INFO[k].nameBn === nameFromPacket);
-                        if (matchKey) info = KNOWN_BUS_INFO[matchKey];
+                        const matchKey = Object.keys(KNOWN_BUS_INFO).find(
+                          (k) => KNOWN_BUS_INFO[k].nameBn === nameFromPacket || nameFromPacket.includes(KNOWN_BUS_INFO[k].nameBn)
+                        );
+                        if (matchKey) {
+                          info = KNOWN_BUS_INFO[matchKey];
+                          if (!resolvedId || !resolvedId.startsWith("SB")) resolvedId = matchKey;
+                        }
                       }
+
+                      // STRICT ENFORCEMENT:
+                      // Must either start with official SB identifier (e.g. SB0001, SB0002) OR match a recognized bus name.
+                      // NEVER accept raw IMEI hardware trackers (like 353701091171104, 9175769656, 7826087352)!
+                      if (!info && (!resolvedId || !resolvedId.startsWith("SB"))) {
+                        return; // Discard phantom tracker packet!
+                      }
+
                       if (!info) {
                         info = {
-                          nameBn: nameFromPacket || "MBSTU বাস",
-                          nameEn: raw.nameEn || id,
+                          nameBn: nameFromPacket || `বাস (${resolvedId})`,
+                          nameEn: raw.nameEn || resolvedId,
                           color: "#0284c7",
                           defaultRoute: "MBSTU Transport Corridor"
                         };
                       }
 
+                      const lat = typeof raw.lat === "number" ? raw.lat : raw.latitude;
+                      const lon = typeof raw.lon === "number" ? raw.lon : (raw.long ?? raw.longitude);
                       const speedVal = typeof raw.speed === "number" ? Math.max(0, raw.speed) : 0;
                       const { heading, hasDirection } = normalizeBusHeading(raw.heading, 0);
                       const isDriving = raw.isDriving ?? speedVal > 0;
 
-                      map.set(id, {
-                        id,
+                      map.set(resolvedId, {
+                        id: resolvedId,
                         nameBn: info.nameBn,
                         nameEn: info.nameEn,
                         lat,
@@ -1197,65 +1213,69 @@ export function Transit({ ctx }: { ctx?: any }) {
   const renderListView = () => {
     return (
       <div className="transit-list-screen">
-        {/* Top Header Card */}
-        <div className="transit-list-header-card">
-          <div className="transit-list-header-top">
-            <div className="transit-list-title-box">
-              <h1 className="transit-list-main-title">MBSTU বাস লাইভ ট্র্যাকার</h1>
-              <div className="transit-list-live-badge">
-                <span
-                  className="transit-pulse-dot"
-                  style={{ background: isDemoMode ? "#ffe0eb" : freshFleetCount > 0 ? "#86efac" : "#fcd34d" }}
-                />
-                <span>
-                  {isDemoMode
-                    ? "ডেমো মোড · সিমুলেটেড লোকেশন"
-                    : freshFleetCount > 0
-                    ? `${freshFleetCount}টি বাস লাইভ · GPS আপডেট হচ্ছে`
-                    : wsStatus === "connected"
-                    ? "লাইভ ফিড সংযুক্ত · GPS-এর অপেক্ষায়"
-                    : wsStatus === "disconnected"
-                    ? "সংযোগ ফিরিয়ে আনা হচ্ছে"
-                    : "লাইভ ফিডে সংযুক্ত হচ্ছে"}
-                </span>
+        {/* Top Header Card: Fixed at the very top of the list view */}
+        <header className="transit-list-header-card">
+          <div className="transit-list-header-inner">
+            <div className="transit-list-header-top">
+              <div className="transit-list-title-box">
+                <h1 className="transit-list-main-title">MBSTU বাস লাইভ ট্র্যাকার</h1>
+                <div className="transit-list-live-badge">
+                  <span
+                    className="transit-pulse-dot"
+                    style={{ background: isDemoMode ? "#ffe0eb" : freshFleetCount > 0 ? "#86efac" : "#fcd34d" }}
+                  />
+                  <span>
+                    {isDemoMode
+                      ? "ডেমো মোড · সিমুলেটেড লোকেশন"
+                      : freshFleetCount > 0
+                      ? `${freshFleetCount}টি বাস লাইভ · GPS আপডেট হচ্ছে`
+                      : wsStatus === "connected"
+                      ? "লাইভ ফিড সংযুক্ত · GPS-এর অপেক্ষায়"
+                      : wsStatus === "disconnected"
+                      ? "সংযোগ ফিরিয়ে আনা হচ্ছে"
+                      : "লাইভ ফিডে সংযুক্ত হচ্ছে"}
+                  </span>
+                </div>
               </div>
+
+              <button
+                onClick={toggleDemoMode}
+                className="transit-list-demo-btn"
+                title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
+                aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
+              >
+                {isDemoMode ? <Radio size={13} /> : <Play size={13} />}
+                <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
+              </button>
             </div>
 
-            <button
-              onClick={toggleDemoMode}
-              className="transit-list-demo-btn"
-              title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
-              aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
-            >
-              {isDemoMode ? <Radio size={13} /> : <Play size={13} />}
-              <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
-            </button>
+            {/* Segmented 2-Tab Switcher: [তালিকা] / [ম্যাপ] */}
+            <div className="transit-segmented-tabs">
+              <button
+                className="transit-seg-tab active"
+                type="button"
+                aria-selected="true"
+              >
+                <List size={15} />
+                <span>তালিকা</span>
+              </button>
+              <button
+                onClick={() => switchToMap()}
+                className="transit-seg-tab"
+                type="button"
+                aria-selected="false"
+              >
+                <MapIcon size={15} />
+                <span>ম্যাপ</span>
+              </button>
+            </div>
           </div>
+        </header>
 
-          {/* Segmented 2-Tab Switcher: [তালিকা] / [ম্যাপ] */}
-          <div className="transit-segmented-tabs">
-            <button
-              className="transit-seg-tab active"
-              type="button"
-              aria-selected="true"
-            >
-              <List size={15} />
-              <span>তালিকা</span>
-            </button>
-            <button
-              onClick={() => switchToMap()}
-              className="transit-seg-tab"
-              type="button"
-              aria-selected="false"
-            >
-              <MapIcon size={15} />
-              <span>ম্যাপ</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="transit-list-search-wrapper">
+        {/* Scrollable List Body Container */}
+        <div className="transit-list-body">
+          {/* Search Bar */}
+          <div className="transit-list-search-wrapper">
           <div className="transit-list-search-input-box">
             <Search size={16} className="transit-search-icon" />
             <input
@@ -1501,6 +1521,7 @@ export function Transit({ ctx }: { ctx?: any }) {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     );

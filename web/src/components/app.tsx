@@ -1156,6 +1156,7 @@ function Home({
           "profile",
           "manage",
           "ai",
+        "transit",
         ].includes(targetTab)
       ) {
         if (targetTab === "attendance" || targetTab === "admin-attendance") {
