@@ -10545,3 +10545,49 @@ To maintain full architectural parity between the web companion and native Andro
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+---
+
+## 168. Map Callout Blinking Elimination, Geolocation Origin Permission & Rich Telemetry Integration
+
+### 168.1 Incident Diagnosis & Root Cause Analysis
+1. **Map Callout Blinking / Flashing Strobe Effect**:
+   - **Trigger**: Every 1000ms, the internal `clockNow` timer in `transit.tsx` updated `displayFleet` object references.
+   - **Root Cause**: In `transit.tsx`, the bus marker update loop unconditionally executed `marker.setIcon(icon)` every single second. In Leaflet, calling `setIcon` destroys the marker's existing DOM subtree and rebuilds it from scratch.
+   - **Visual Artifact**: Because `.transit-bus-callout` had `animation: calloutPop 0.22s cubic-bezier(...)` starting at `opacity: 0`, every time the DOM element was recreated, the animation restarted from `opacity: 0`, causing the callout bubble to blink/flash every second like a strobe light.
+2. **Geolocation Permission Not Prompting**:
+   - **Root Cause**: `web/next.config.ts` was sending `Permissions-Policy: camera=(self), microphone=(), geolocation=()`. Under modern browser security specifications, specifying `geolocation=()` completely blocks the Geolocation API at the HTTP header level. Browsers threw a permissions policy violation and refused to show the permission dialog.
+3. **Map Floating Action Buttons (FAB) Bloat**:
+   - The map action stack contained 4 buttons:
+     1. `LocateFixed`: Selected bus focal tracker. (Useful)
+     2. `Layers`: Google Satellite vs Roadmap layer toggle. (Useful)
+     3. `MapPin`: Arbitrary recenter on MBSTU campus coordinates (24.2376°N, 89.8913°E). (Redundant/Useless)
+     4. `Navigation`: User live locator. (Useful)
+
+### 168.2 Architectural Resolutions Applied
+1. **Zero-Blink DOM Stabilization in Leaflet**:
+   - Stored `__renderedHtml` hash on the Leaflet marker instance:
+     ```ts
+     if ((marker as any).__renderedHtml !== html) {
+       marker.setIcon(icon);
+       (marker as any).__renderedHtml = html;
+     }
+     marker.setLatLng([bus.lat, bus.lon]);
+     marker.setZIndexOffset(isSelected ? 1000 : 800);
+     ```
+   - When a bus is parked or in standby, its HTML is identical; `marker.setIcon` is **never called**, completely preventing DOM destruction.
+   - Removed `animation: calloutPop` from `.transit-bus-callout` in `transit.css`. Transitions now render instantaneously without opacity dips or flicker.
+2. **Live Telemetry in Selected Map Callout**:
+   - Enhanced `.transit-bus-callout` to display:
+     - **Row 1**: Colored bus dot, Bengali bus name (`bus.nameBn`), and fleet code pill (`bus.id`).
+     - **Row 2**: Dynamic status metrics:
+       - Speed: `⚡ ২৫ কিমি/ঘ` (when driving) or `🅿️ স্ট্যান্ডবাই (০ কিমি/ঘ)` (when stopped) or `⚠️ GPS বিলম্বিত` (when stale).
+       - Distance from user: `📍 ১.২ কিমি দূরে` or `📍 ৪৫০ মি দূরে` dynamically calculated using Haversine formula from `userLocation`.
+3. **Permissions-Policy Header Correction & Geolocation Fallback**:
+   - Updated `web/next.config.ts` to `geolocation=(self)`.
+   - Enhanced `requestLocation` with fallback to coarse network accuracy on `TIMEOUT` or `POSITION_UNAVAILABLE` (e.g. desktop laptops/Wi-Fi or indoors).
+   - Added user feedback guiding unblocking via the browser URL bar lock icon if permission was previously blocked.
+4. **Streamlined FAB Controls**:
+   - Removed the useless campus reset pin button (`MapPin`).
+   - Kept only clean, high-utility controls: Zoom (`+`/`-`), Active Bus Focus (`LocateFixed`), Satellite Toggle (`Layers`), and Locate Me (`Navigation` with pulsating green active indicator).
