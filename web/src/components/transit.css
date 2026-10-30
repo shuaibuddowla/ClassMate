@@ -214,7 +214,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .transit-header-main-title {
@@ -223,6 +223,7 @@
   color: #ffffff;
   letter-spacing: -0.2px;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .transit-status-pill {
@@ -1866,6 +1867,39 @@
   border-radius: 50%;
   background: #ffffff;
   animation: radarPulse 1.5s infinite;
+}
+
+/* Declutter Bus Stops when Zoomed Out (< 16): Turn stops into clean road waypoints */
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) .transit-lollipop-label,
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) .transit-lollipop-stem,
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) .transit-lollipop-base {
+  display: none !important;
+}
+
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) {
+  width: 16px !important;
+  margin: 0 auto;
+  transform: translateY(18px);
+}
+
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) .transit-lollipop-sign {
+  width: 9px !important;
+  height: 9px !important;
+  border: 1.5px solid #ffffff !important;
+  background: #dc2626 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.75) !important;
+}
+
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching) .transit-lollipop-bus-text {
+  display: none !important;
+}
+
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching):hover .transit-lollipop-label,
+.transit-map-canvas.transit-zoom-out .transit-lollipop-wrapper:not(.approaching):active .transit-lollipop-label {
+  display: inline-block !important;
+  position: absolute;
+  top: 14px;
+  z-index: 25;
 }
 
 /* Radar Pulse Helper */

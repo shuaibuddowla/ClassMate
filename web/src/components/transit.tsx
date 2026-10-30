@@ -728,6 +728,20 @@ export function Transit({ ctx }: { ctx?: any }) {
     });
     mapRef.current = map;
 
+    // Declutter bus stops when zoomed out (< 16) so road corridor and active buses are completely visible
+    const updateZoomState = () => {
+      const z = map.getZoom();
+      const container = map.getContainer();
+      if (z < 16) {
+        container.classList.add("transit-zoom-out");
+      } else {
+        container.classList.remove("transit-zoom-out");
+      }
+    };
+    map.on("zoom", updateZoomState);
+    map.on("zoomend", updateZoomState);
+    updateZoomState();
+
     map.on("click", (e) => {
       const target = (e.originalEvent?.target as HTMLElement | null);
       if (
@@ -745,6 +759,8 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (mapContainerRef.current) ro.observe(mapContainerRef.current);
 
     return () => {
+      map.off("zoom", updateZoomState);
+      map.off("zoomend", updateZoomState);
       ro.disconnect();
       map.remove();
       mapRef.current = null;
@@ -865,8 +881,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <span class="transit-next-stop-dot"></span>
                   <span>NEXT • ${
                     nextApproachingStopInfo.isStandby
-                      ? `${nextApproachingStopInfo.distanceKm} km`
-                      : `${nextApproachingStopInfo.etaMinutes} min`
+                      ? `${nextApproachingStopInfo.distanceKm} কিমি`
+                      : `~${nextApproachingStopInfo.etaMinutes} মি`
                   }</span>
                 </div>`
               : ""
@@ -1989,7 +2005,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                       <span className="transit-chip-name">{bus.nameBn}</span>
                       <span className="transit-chip-id-badge">{formatBusShortId(bus.id)}</span>
                       <span className={`transit-chip-speed ${bus.isStale ? "stale" : bus.speed > 0 ? "moving" : ""}`}>
-                        {bus.isStale ? "Delayed" : bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby"}
+                        {bus.isStale ? "বিলম্বিত" : bus.speed > 0 ? `${Math.round(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}
                       </span>
                     </button>
                   );
@@ -1999,10 +2015,10 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <span className="transit-pulse-dot" style={{ background: "#fbbf24" }} />
                   <span>
                     {wsStatus === "connected"
-                      ? "Connected · waiting for a bus GPS update"
+                      ? "সংযুক্ত · বাসের GPS আপডেটের অপেক্ষা"
                       : wsStatus === "disconnected"
-                      ? "Connection lost · trying again"
-                      : "Connecting to the university GPS feed"}
+                      ? "সংযোগ বিচ্ছিন্ন · পুনঃচেষ্টা চলছে"
+                      : "বিশ্ববিদ্যালয় GPS সার্ভারে সংযুক্ত হচ্ছে..."}
                   </span>
                 </div>
               )}
