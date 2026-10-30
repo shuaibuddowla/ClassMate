@@ -22,7 +22,14 @@ import {
   X,
   Plus,
   Minus,
-  Search
+  Search,
+  ArrowLeft,
+  List,
+  Map as MapIcon,
+  RefreshCw,
+  SlidersHorizontal,
+  Clock,
+  Check
 } from "lucide-react";
 
 /* ==========================================================================
@@ -43,16 +50,10 @@ export interface MbstuBusData {
   color: string;
   isDriving: boolean;
   lastUpdated?: string;
-  receivedAt?: number;
+  positionAgeSeconds?: number | null;
+  isStale?: boolean;
+  isEstimated?: boolean;
 }
-
-type DisplayBusData = MbstuBusData & {
-  positionAgeSeconds: number | null;
-  isEstimated: boolean;
-  isStale: boolean;
-};
-
-const MAX_PREDICTION_SECONDS = 15;
 
 export interface CorridorStation {
   id: string;
@@ -64,17 +65,6 @@ export interface CorridorStation {
   isCampus: boolean;
 }
 
-// Known MBSTU Bus Metadata
-const BUS_METADATA: { [id: string]: { nameEn: string; color: string; routeName: string } } = {
-  SB0001: { nameEn: "Gitanjali", color: "#6366f1", routeName: "MBSTU Campus Standby" },
-  SB0002: { nameEn: "Agnibeena", color: "#0284c7", routeName: "Campus ➔ Nirala (City Center)" },
-  SB0003: { nameEn: "Sonartori", color: "#0d9488", routeName: "Campus ➔ Tangail City Loop" },
-  SB0005: { nameEn: "Sangshaptak", color: "#8b5cf6", routeName: "Campus ➔ Tangail City Loop" },
-  SB0009: { nameEn: "Banolata", color: "#059669", routeName: "Campus ➔ Kagmari ➔ Nirala" },
-  SB0010: { nameEn: "Raktakarabi", color: "#e11d48", routeName: "MBSTU Campus Standby" }
-};
-
-// Verified Corridor Stoppages along the MBSTU - Tangail City Street Route (28 Stops)
 export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
   { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
@@ -106,187 +96,223 @@ export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.25135, lon: 89.91665, order: 28, isCampus: false }
 ];
 
-// Haversine Distance in Meters
+const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }> = {
+  SB0001: { nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", color: "#6366f1", defaultRoute: "Campus ⇄ Nirala (City Center)" },
+  SB0002: { nameBn: "অগ্নিবীণা", nameEn: "Agnibina", color: "#f97316", defaultRoute: "Campus ⇄ Nirala (City Center)" },
+  SB0003: { nameBn: "সোনারতরী", nameEn: "Sonartori", color: "#0284c7", defaultRoute: "Campus ⇄ Nirala (City Center)" },
+  SB0005: { nameBn: "ধলেশ্বরী", nameEn: "Dhaleshwari", color: "#10b981", defaultRoute: "Campus ⇄ Tangail Old Bus Stand" },
+  SB0009: { nameBn: "বনলতা", nameEn: "Banolata", color: "#059669", defaultRoute: "Campus ⇄ Kagmari ⇄ Nirala" },
+  SB0010: { nameBn: "রক্তকরবী", nameEn: "Raktakarabi", color: "#ec4899", defaultRoute: "MBSTU Transport Corridor" }
+};
+
+export const INITIAL_FLEET: MbstuBusData[] = [
+  {
+    id: "SB0003",
+    nameBn: "সোনারতরী",
+    nameEn: "Sonartori",
+    lat: 24.23482,
+    lon: 89.89195,
+    speed: 0,
+    heading: 181,
+    routeName: "Campus ⇄ Nirala (City Center)",
+    status: "Parked at Campus Standby",
+    color: "#0284c7",
+    isDriving: false
+  },
+  {
+    id: "SB0002",
+    nameBn: "অগ্নিবীণা",
+    nameEn: "Agnibina",
+    lat: 24.2515,
+    lon: 89.9165,
+    speed: 18,
+    heading: 260,
+    routeName: "Campus ⇄ Nirala (City Center)",
+    status: "In transit (18 km/h)",
+    color: "#f97316",
+    isDriving: true
+  },
+  {
+    id: "SB0010",
+    nameBn: "রক্তকরবী",
+    nameEn: "Raktakarabi",
+    lat: 24.2350,
+    lon: 89.8919,
+    speed: 0,
+    heading: 0,
+    routeName: "MBSTU Transport Corridor",
+    status: "Parked at Campus Standby",
+    color: "#ec4899",
+    isDriving: false
+  }
+];
+
 export function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
-function getBearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
-  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
-  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
-  const x =
-    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
-  return (toDegrees(Math.atan2(y, x)) + 360) % 360;
-}
-
-function parseTelemetryTimestamp(value: unknown, receivedAt: number): number {
-  // Always anchor to real packet arrival time to avoid false staleness from hardware GPS clock drift
-  return receivedAt;
-}
-
-function predictBusPosition(bus: MbstuBusData, now: number): DisplayBusData {
-  const ageSeconds = bus.receivedAt ? Math.max(0, (now - bus.receivedAt) / 1000) : 0;
-  // A bus parked on campus standby is stationary and active, not stale. Only flag stale if silent for > 10 minutes.
-  const isStale = ageSeconds > 600;
-  const isEstimated = bus.isDriving && bus.speed > 0 && ageSeconds > 2 && ageSeconds <= 20;
-
-  let lat = bus.lat;
-  let lon = bus.lon;
-
-  if (bus.isDriving && bus.speed > 0 && bus.speed <= 100 && ageSeconds <= 15) {
-    const distanceMeters = (bus.speed * 1000 * ageSeconds) / 3600;
-    if (distanceMeters > 0) {
-      const earthRadius = 6371000;
-      const bearing = (bus.heading * Math.PI) / 180;
-      const angularDistance = distanceMeters / earthRadius;
-      const lat1 = (bus.lat * Math.PI) / 180;
-      const lon1 = (bus.lon * Math.PI) / 180;
-      const lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(angularDistance) +
-          Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
-      );
-      const lon2 =
-        lon1 +
-        Math.atan2(
-          Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
-          Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
-        );
-      lat = (lat2 * 180) / Math.PI;
-      lon = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+export function findClosestPolylineIndex(point: [number, number], polyline: [number, number][]): number {
+  let closestIndex = 0;
+  let minDistance = Infinity;
+  for (let i = 0; i < polyline.length; i++) {
+    const dist = getDistanceMeters(point[0], point[1], polyline[i][0], polyline[i][1]);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestIndex = i;
     }
   }
+  return closestIndex;
+}
 
+function normalizeBusHeading(heading: unknown, fallback = 0): { heading: number; hasDirection: boolean } {
+  if (typeof heading === "number" && !Number.isNaN(heading)) {
+    const norm = ((heading % 360) + 360) % 360;
+    return { heading: norm, hasDirection: true };
+  }
+  if (typeof heading === "string") {
+    const parsed = parseFloat(heading);
+    if (!Number.isNaN(parsed)) {
+      const norm = ((parsed % 360) + 360) % 360;
+      return { heading: norm, hasDirection: true };
+    }
+  }
+  return { heading: fallback, hasDirection: false };
+}
+
+function parseServerTimestamp(raw: unknown): number | null {
+  if (!raw) return null;
+  if (typeof raw === "number") {
+    return raw > 1e11 ? raw : raw * 1000;
+  }
+  if (typeof raw === "string") {
+    const t = Date.parse(raw);
+    if (!Number.isNaN(t)) return t;
+    const num = Number(raw);
+    if (!Number.isNaN(num)) return num > 1e11 ? num : num * 1000;
+  }
+  return null;
+}
+
+function formatBusShortId(busId: string): string {
+  const digits = busId.replace(/^SB0*/i, "");
+  return digits ? digits.padStart(4, "0") : busId;
+}
+
+function predictBusPosition(bus: MbstuBusData, nowMs: number): MbstuBusData {
+  if (!bus.lastUpdated) {
+    return { ...bus, positionAgeSeconds: null, isStale: false, isEstimated: false };
+  }
+  const lastMs = Date.parse(bus.lastUpdated);
+  if (Number.isNaN(lastMs)) {
+    return { ...bus, positionAgeSeconds: null, isStale: false, isEstimated: false };
+  }
+  const ageSeconds = Math.max(0, Math.floor((nowMs - lastMs) / 1000));
+  const isStale = ageSeconds > 180;
+
+  if (bus.speed <= 2 || ageSeconds <= 3 || isStale) {
+    return { ...bus, positionAgeSeconds: ageSeconds, isStale, isEstimated: false };
+  }
+
+  const travelSeconds = Math.min(ageSeconds, 45);
+  const travelMeters = (bus.speed * 1000 / 3600) * travelSeconds;
+  const currentIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
+  let accumulated = 0;
+  let nextIdx = currentIdx;
+  let guard = 0;
+
+  while (accumulated < travelMeters && guard < REAL_STREET_POLYLINE.length) {
+    const stepDist = getDistanceMeters(
+      REAL_STREET_POLYLINE[nextIdx][0],
+      REAL_STREET_POLYLINE[nextIdx][1],
+      REAL_STREET_POLYLINE[(nextIdx + 1) % REAL_STREET_POLYLINE.length][0],
+      REAL_STREET_POLYLINE[(nextIdx + 1) % REAL_STREET_POLYLINE.length][1]
+    );
+    accumulated += stepDist;
+    nextIdx = (nextIdx + 1) % REAL_STREET_POLYLINE.length;
+    guard++;
+  }
+
+  const [predLat, predLon] = REAL_STREET_POLYLINE[nextIdx];
   return {
     ...bus,
-    lat,
-    lon,
+    lat: predLat,
+    lon: predLon,
     positionAgeSeconds: ageSeconds,
-    isEstimated,
-    isStale
+    isStale,
+    isEstimated: true
   };
 }
 
-// Find closest vertex on the real street polyline
-function findClosestPolylineIndex(point: [number, number], poly: [number, number][]): number {
-  let minD = Infinity;
-  let minIdx = 0;
-  for (let i = 0; i < poly.length; i++) {
-    const d = getDistanceMeters(point[0], point[1], poly[i][0], poly[i][1]);
-    if (d < minD) {
-      minD = d;
-      minIdx = i;
-    }
-  }
-  return minIdx;
-}
-
-// Clean badge label for bus avatar
-function formatBusShortId(id: string): string {
-  if (id.startsWith("SB00")) return "SB" + id.slice(4);
-  if (id.startsWith("SB0")) return "SB" + id.slice(3);
-  return id;
-}
-
-function formatStopTitle(name: string): string {
-  return name.replace(/\s+Bus Stop$/i, "").replace(/\s+Bus Stand$/i, "");
-}
-
-// Pleasant crystal chime for stop arrival alerts (Web Audio API - zero network latency)
 function playArrivalChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(659.25, now); // E5
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(0.18, now + 0.04);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.35);
-
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(987.77, now + 0.12); // B5
-    gain2.gain.setValueAtTime(0, now + 0.12);
-    gain2.gain.linearRampToValueAtTime(0.22, now + 0.16);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.12);
-    osc2.stop(now + 0.55);
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
   } catch (e) {}
 }
 
 /* ==========================================================================
-   Component
+   Main Transit Tracker Component
    ========================================================================== */
 
 export function Transit({ ctx }: { ctx?: any }) {
+  // Navigation & View Mode: "list" (Image 1) | "detail" (Image 2) | "map" (Live Google Maps)
+  const [activeView, setActiveView] = useState<"list" | "detail" | "map">("list");
+  const [detailBusId, setDetailBusId] = useState<string | null>(null);
+  const [listSearch, setListSearch] = useState<string>("");
+  const [listFilter, setListFilter] = useState<"all" | "driving" | "standby" | "to_campus" | "to_city">("all");
+  const [selectedStoppageAction, setSelectedStoppageAction] = useState<CorridorStation | null>(null);
+
+  // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
-  const [selectedBusId, setSelectedBusId] = useState<string>("");
+  const [selectedBusId, setSelectedBusId] = useState<string>("SB0003");
   const [satelliteView, setSatelliteView] = useState<boolean>(true);
   const [sheetExpanded, setSheetExpanded] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
-  const [alertedStops, setAlertedStops] = useState<{ [stopId: string]: boolean }>({});
+  const [clockNow, setClockNow] = useState<number>(() => Date.now());
+  const [alertedStops, setAlertedStops] = useState<Record<string, boolean>>({});
   const [arrivalNotice, setArrivalNotice] = useState<{ busName: string; stopName: string } | null>(null);
-  const [clockNow, setClockNow] = useState(() => Date.now());
-  const [isBusOffscreen, setIsBusOffscreen] = useState<boolean>(false);
   const [stopFilter, setStopFilter] = useState<string>("");
+  const [isBusOffscreen, setIsBusOffscreen] = useState<boolean>(false);
 
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  // Map DOM & Leaflet Refs
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const satLayerRef = useRef<L.TileLayer | null>(null);
-  const streetLayerRef = useRef<L.TileLayer | null>(null);
-  const busMarkersRef = useRef<{ [busId: string]: L.Marker }>({});
-  const busMarkerSignaturesRef = useRef<{ [busId: string]: string }>({});
-  const stopMarkersRef = useRef<{ [stopId: string]: L.Marker }>({});
-  const approachingGlowPolylineRef = useRef<L.Polyline | null>(null);
-  const approachingLineRef = useRef<L.Polyline | null>(null);
-  const demoIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const approachingStopRef = useRef<HTMLDivElement | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const polylineRef = useRef<L.Polyline | null>(null);
+  const polylineCasingRef = useRef<L.Polyline | null>(null);
+  const approachingPolylineRef = useRef<L.Polyline | null>(null);
+  const approachingGlowRef = useRef<L.Polyline | null>(null);
+  const busMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const stopMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const campusCircleRef = useRef<L.Circle | null>(null);
 
+  // Update clock every second for live ETA and freshness calculations
   useEffect(() => {
-    const timer = setInterval(() => setClockNow(Date.now()), 500);
+    const timer = setInterval(() => setClockNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Bottom Sheet Swipe Gestures
-  const touchStartY = useRef<number | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartY.current === null) return;
-    const diff = touchStartY.current - e.changedTouches[0].clientY;
-    // diff > 40 means swiped up -> expand
-    if (diff > 40 && !sheetExpanded) {
-      setSheetExpanded(true);
-    } else if (diff < -40 && sheetExpanded) {
-      // diff < -40 means swiped down -> collapse
-      setSheetExpanded(false);
-    }
-    touchStartY.current = null;
-  };
-
-  // Load verified fleet from localStorage on mount if available
+  // Restore cached fleet from previous session for zero-latency initial UI
   useEffect(() => {
     try {
       const cached = localStorage.getItem("classmate_mbstu_fleet");
@@ -321,6 +347,12 @@ export function Transit({ ctx }: { ctx?: any }) {
     [displayFleet, selectedBusId]
   );
 
+  // Detailed Bus for Detail View
+  const detailBus = useMemo(
+    () => displayFleet.find((b) => b.id === detailBusId) || selectedBus || displayFleet[0] || null,
+    [displayFleet, detailBusId, selectedBus]
+  );
+
   // Map stations to polyline indices for accurate sequential corridor tracking
   const stationPolyIndices = useMemo(() => {
     return CORRIDOR_STATIONS.map((st) => ({
@@ -329,23 +361,85 @@ export function Transit({ ctx }: { ctx?: any }) {
     }));
   }, []);
 
-  const filteredStops = useMemo(() => {
-    if (!stopFilter.trim()) return CORRIDOR_STATIONS;
-    const q = stopFilter.toLowerCase().trim();
-    return CORRIDOR_STATIONS.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.nameBn.includes(q) ||
-        String(s.order) === q
-    );
-  }, [stopFilter]);
+  // Helper to find next stop and ETA for ANY bus
+  const getNextStopForBus = useCallback((bus: MbstuBusData) => {
+    const busIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
+    let targetCandidate = stationPolyIndices[0];
+    let minForwardSteps = Infinity;
 
-  // Compute Next Approaching Stop along real street route loop
+    for (const item of stationPolyIndices) {
+      let forwardSteps = item.idx - busIdx;
+      if (forwardSteps < 0) {
+        forwardSteps += REAL_STREET_POLYLINE.length;
+      }
+      const directDist = getDistanceMeters(bus.lat, bus.lon, item.station.lat, item.station.lon);
+      if (directDist < 40) {
+        forwardSteps += REAL_STREET_POLYLINE.length;
+      }
+      if (forwardSteps > 0 && forwardSteps < minForwardSteps) {
+        minForwardSteps = forwardSteps;
+        targetCandidate = item;
+      }
+    }
+
+    const nextStation = targetCandidate.station;
+    const distanceMeters = getDistanceMeters(bus.lat, bus.lon, nextStation.lat, nextStation.lon);
+    const distanceKm = (distanceMeters / 1000).toFixed(2);
+    const effectiveSpeed = Math.max(bus.speed, 25);
+    const etaMinutes = Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
+
+    return {
+      station: nextStation,
+      distanceKm,
+      etaMinutes
+    };
+  }, [stationPolyIndices]);
+
+  // Route Progress percentage helper
+  const getBusProgress = useCallback((bus: MbstuBusData) => {
+    const busIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
+    return Math.min(96, Math.max(8, Math.round(((busIdx + 1) / REAL_STREET_POLYLINE.length) * 100)));
+  }, []);
+
+  // Filtered Fleet for List View (Image 1)
+  const filteredFleet = useMemo(() => {
+    let result = displayFleet.length > 0 ? displayFleet : INITIAL_FLEET;
+
+    if (listFilter === "driving") {
+      result = result.filter((b) => b.speed > 0);
+    } else if (listFilter === "standby") {
+      result = result.filter((b) => b.speed === 0);
+    } else if (listFilter === "to_campus") {
+      result = result.filter((b) => {
+        const next = getNextStopForBus(b);
+        return next.station.isCampus;
+      });
+    } else if (listFilter === "to_city") {
+      result = result.filter((b) => {
+        const next = getNextStopForBus(b);
+        return !next.station.isCampus;
+      });
+    }
+
+    if (listSearch.trim()) {
+      const q = listSearch.toLowerCase().trim();
+      result = result.filter(
+        (b) =>
+          b.nameBn.includes(q) ||
+          b.nameEn.toLowerCase().includes(q) ||
+          b.id.toLowerCase().includes(q) ||
+          b.routeName.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [displayFleet, listFilter, listSearch, getNextStopForBus]);
+
+  // Compute Next Approaching Stop for the currently selected bus (Map & Details)
   const nextApproachingStopInfo = useMemo(() => {
     if (!selectedBus) return null;
 
     const busIdx = findClosestPolylineIndex([selectedBus.lat, selectedBus.lon], REAL_STREET_POLYLINE);
-
     let targetCandidate = stationPolyIndices[0];
     let minForwardSteps = Infinity;
 
@@ -365,8 +459,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
 
     const nextStation = targetCandidate.station;
-
-    // Construct path segment along vertices from bus position into the approaching stop
     const pathSegment: [number, number][] = [[selectedBus.lat, selectedBus.lon]];
     let curr = busIdx;
     const dest = targetCandidate.idx;
@@ -399,35 +491,44 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Toggle Alert for a Stop
   const toggleStopAlert = useCallback((stopId: string) => {
-    setAlertedStops((prev) => ({
-      ...prev,
-      [stopId]: !prev[stopId]
-    }));
+    setAlertedStops((prev) => {
+      const next = !prev[stopId];
+      if (next) {
+        playArrivalChime();
+      }
+      return {
+        ...prev,
+        [stopId]: next
+      };
+    });
   }, []);
 
-  useEffect(() => {
-    if (!selectedBus || selectedBus.isStale) return;
-    const reachedStop = CORRIDOR_STATIONS.find(
-      (station) =>
-        alertedStops[station.id] &&
-        getDistanceMeters(selectedBus.lat, selectedBus.lon, station.lat, station.lon) <= 200
-    );
-    if (!reachedStop) return;
-    setAlertedStops((prev) => ({ ...prev, [reachedStop.id]: false }));
-    setArrivalNotice({ busName: selectedBus.nameBn, stopName: reachedStop.name });
-    playArrivalChime();
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate([200, 100, 200]);
+  // Switch to Map with Smooth Auto-Focus
+  const switchToMap = useCallback((busId?: string) => {
+    if (busId) {
+      setSelectedBusId(busId);
+      setDetailBusId(busId);
     }
-  }, [selectedBus, alertedStops]);
+    setActiveView("map");
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+        const target = (busId ? displayFleet.find((b) => b.id === busId) : selectedBus) || displayFleet[0];
+        if (target) {
+          mapRef.current.flyTo([target.lat, target.lon], 17, { animate: true, duration: 0.8 });
+        }
+      }
+    }, 150);
+  }, [displayFleet, selectedBus]);
 
+  // Center Selected Bus on Map
   const centerSelectedBus = useCallback(() => {
     if (selectedBus && mapRef.current) {
       mapRef.current.flyTo([selectedBus.lat, selectedBus.lon], 17, { animate: true, duration: 0.8 });
     }
   }, [selectedBus]);
 
-  // Track if selected bus is currently visible in the map viewport
+  // Check if bus is offscreen
   const checkBusInBounds = useCallback(() => {
     if (!mapRef.current || !selectedBus) {
       setIsBusOffscreen(false);
@@ -450,24 +551,31 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, [checkBusInBounds]);
 
-  // Auto-scroll to approaching stop when bottom sheet is expanded
-  useEffect(() => {
-    if (sheetExpanded && approachingStopRef.current) {
-      const timer = setTimeout(() => {
-        approachingStopRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 180);
-      return () => clearTimeout(timer);
-    }
-  }, [sheetExpanded]);
-
-  // Recenter Campus
+  // Fly to campus
   const recenterCampus = useCallback(() => {
     if (mapRef.current) {
-      mapRef.current.flyTo([24.2355, 89.8916], 17, { animate: true, duration: 1.2 });
+      mapRef.current.flyTo([24.2355, 89.8916], 16.5, { animate: true, duration: 0.8 });
     }
   }, []);
 
-  // 1. Initialize Leaflet Map with Real Street Polyline
+  // Arrival Alert Trigger
+  useEffect(() => {
+    if (!selectedBus || selectedBus.isStale) return;
+    const reachedStop = CORRIDOR_STATIONS.find(
+      (station) =>
+        alertedStops[station.id] &&
+        getDistanceMeters(selectedBus.lat, selectedBus.lon, station.lat, station.lon) <= 220
+    );
+    if (!reachedStop) return;
+    setAlertedStops((prev) => ({ ...prev, [reachedStop.id]: false }));
+    setArrivalNotice({ busName: selectedBus.nameBn, stopName: reachedStop.name });
+    playArrivalChime();
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  }, [selectedBus, alertedStops]);
+
+  // 1. Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -475,82 +583,8 @@ export function Transit({ ctx }: { ctx?: any }) {
       center: [24.2365, 89.8914],
       zoom: 17,
       zoomControl: false,
-      attributionControl: true
+      attributionControl: false
     });
-
-    const googleSatLayer = L.tileLayer(
-      "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-      {
-        subdomains: ["0", "1", "2", "3"],
-        maxZoom: 21,
-        attribution: "&copy; Google Maps"
-      }
-    );
-
-    const googleStreetLayer = L.tileLayer(
-      "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-      {
-        subdomains: ["0", "1", "2", "3"],
-        maxZoom: 21,
-        attribution: "&copy; Google Maps"
-      }
-    );
-
-    satLayerRef.current = googleSatLayer;
-    streetLayerRef.current = googleStreetLayer;
-
-    if (satelliteView) {
-      googleSatLayer.addTo(map);
-    } else {
-      googleStreetLayer.addTo(map);
-    }
-
-    // Campus Standby Cluster Circle around Prottoy-71
-    L.circle([24.23488, 89.89155], {
-      radius: 58,
-      color: "#38bdf8",
-      weight: 1.5,
-      fillColor: "#38bdf8",
-      fillOpacity: 0.22,
-      dashArray: "4, 6"
-    }).addTo(map);
-
-    // Accurate Real Street Polyline (428 vertices following real roads matching verified route)
-    L.polyline(REAL_STREET_POLYLINE, {
-      color: "#064e3b",
-      weight: 8,
-      opacity: 0.6,
-      lineCap: "round",
-      lineJoin: "round"
-    }).addTo(map);
-
-    L.polyline(REAL_STREET_POLYLINE, {
-      color: "#22c55e",
-      weight: 5,
-      opacity: 0.95,
-      lineCap: "round",
-      lineJoin: "round"
-    }).addTo(map);
-
-    // Dynamic Approaching Road Segment Highlights
-    approachingGlowPolylineRef.current = L.polyline([], {
-      color: "#00f2fe",
-      weight: 13,
-      opacity: 0.42,
-      lineCap: "round",
-      lineJoin: "round"
-    }).addTo(map);
-
-    approachingLineRef.current = L.polyline([], {
-      color: "#00f2fe",
-      weight: 5,
-      opacity: 1,
-      dashArray: "8, 6",
-      className: "animated-approaching-road",
-      lineCap: "round",
-      lineJoin: "round"
-    }).addTo(map);
-
     mapRef.current = map;
 
     setTimeout(() => map.invalidateSize(), 200);
@@ -564,396 +598,319 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, []);
 
-  // 2. Toggle Map Layer
+  // 2. Tile Layer (Satellite vs Street)
   useEffect(() => {
-    if (!mapRef.current || !satLayerRef.current || !streetLayerRef.current) return;
-    if (satelliteView) {
-      if (mapRef.current.hasLayer(streetLayerRef.current)) {
-        mapRef.current.removeLayer(streetLayerRef.current);
-      }
-      satLayerRef.current.addTo(mapRef.current);
-    } else {
-      if (mapRef.current.hasLayer(satLayerRef.current)) {
-        mapRef.current.removeLayer(satLayerRef.current);
-      }
-      streetLayerRef.current.addTo(mapRef.current);
+    if (!mapRef.current) return;
+    if (tileLayerRef.current) {
+      mapRef.current.removeLayer(tileLayerRef.current);
     }
+
+    const tileUrl = satelliteView
+      ? "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      : "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+
+    const layer = L.tileLayer(tileUrl, {
+      subdomains: ["0", "1", "2", "3"],
+      maxZoom: 21,
+      maxNativeZoom: 20
+    });
+    layer.addTo(mapRef.current);
+    tileLayerRef.current = layer;
   }, [satelliteView]);
 
-  // 3. Render / Update All Red Lollipop Bus Stop Sign Markers
+  // 3. Render Street Polyline & Campus Circle
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
-    const nextStopId = nextApproachingStopInfo?.station.id;
-    const etaText = nextApproachingStopInfo?.isStandby
-      ? `${nextApproachingStopInfo.distanceKm} km`
-      : `${nextApproachingStopInfo?.etaMinutes ?? 1} min`;
 
-    CORRIDOR_STATIONS.forEach((st) => {
-      const isNext = st.id === nextStopId;
-      const isAlerted = !!alertedStops[st.id];
-      const distM = selectedBus ? getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon) : 0;
-      const distKm = (distM / 1000).toFixed(2);
-      const estTimeM = selectedBus ? Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60)) : 1;
+    if (!polylineCasingRef.current) {
+      polylineCasingRef.current = L.polyline(REAL_STREET_POLYLINE, {
+        color: "#0f172a",
+        weight: 8,
+        opacity: 0.65,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(map);
+    }
+    if (!polylineRef.current) {
+      polylineRef.current = L.polyline(REAL_STREET_POLYLINE, {
+        color: "#60a5fa",
+        weight: 5,
+        opacity: 0.95,
+        lineCap: "round",
+        lineJoin: "round"
+      }).addTo(map);
+    }
+    if (!campusCircleRef.current) {
+      campusCircleRef.current = L.circle([24.23488, 89.89155], {
+        radius: 58,
+        color: "#38bdf8",
+        weight: 1.5,
+        fillColor: "#38bdf8",
+        fillOpacity: 0.22,
+        dashArray: "4, 4"
+      }).addTo(map);
+    }
+  }, []);
+
+  // 4. Render Dynamic Approaching Road Highlight
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    if (approachingGlowRef.current) {
+      map.removeLayer(approachingGlowRef.current);
+      approachingGlowRef.current = null;
+    }
+    if (approachingPolylineRef.current) {
+      map.removeLayer(approachingPolylineRef.current);
+      approachingPolylineRef.current = null;
+    }
+
+    if (!nextApproachingStopInfo || !selectedBus) return;
+
+    approachingGlowRef.current = L.polyline(nextApproachingStopInfo.pathSegment, {
+      color: "#00f2fe",
+      weight: 12,
+      opacity: 0.38,
+      lineCap: "round",
+      lineJoin: "round"
+    }).addTo(map);
+
+    approachingPolylineRef.current = L.polyline(nextApproachingStopInfo.pathSegment, {
+      color: "#38bdf8",
+      weight: 5,
+      opacity: 0.98,
+      dashArray: "8, 6",
+      className: "transit-animated-approaching-path",
+      lineCap: "round",
+      lineJoin: "round"
+    }).addTo(map);
+  }, [nextApproachingStopInfo, selectedBus]);
+
+  // 5. Render 28 Red Lollipop Bus Stop Sign Markers
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    CORRIDOR_STATIONS.forEach((station) => {
+      const isApproaching = nextApproachingStopInfo?.station.id === station.id;
+      const isAlertArmed = alertedStops[station.id];
 
       const html = `
-        <div class="lollipop-stop-marker ${isNext ? "is-next" : ""} ${isAlerted ? "is-alerted" : ""}">
-          ${isNext ? '<div class="radar-pulse-ring"></div>' : ""}
-          ${isNext ? `<div class="next-floating-badge"><span class="badge-dot">●</span> NEXT • ${etaText}</div>` : ""}
-          ${isAlerted ? '<div class="alert-indicator-badge">🔔</div>' : ""}
-          <div class="lollipop-head">
-            <span class="lollipop-text">BUS</span>
+        <div class="transit-lollipop-wrapper ${isApproaching ? "approaching" : ""}">
+          ${isApproaching ? `<div class="transit-approaching-pulse-ring"></div>` : ""}
+          <div class="transit-lollipop-sign ${isAlertArmed ? "alert-armed" : ""}">
+            <span class="transit-lollipop-bus-text">${isAlertArmed ? "🔔" : "BUS"}</span>
           </div>
-          <div class="lollipop-stem"></div>
-          <div class="lollipop-base"></div>
-          <div class="lollipop-label">${st.name}</div>
-        </div>
-      `;
-
-      const popupHtml = `
-        <div class="transit-stop-popup">
-          <div class="transit-popup-header">
-            <span class="transit-popup-order">STOP #${st.order}</span>
-            ${st.isCampus ? '<span class="transit-popup-campus-pill">Campus</span>' : ""}
-          </div>
-          <div class="transit-popup-title">${st.name}</div>
-          <div class="transit-popup-sub">${st.nameBn}</div>
+          <div class="transit-lollipop-stem"></div>
+          <div class="transit-lollipop-base"></div>
+          <div class="transit-lollipop-label">${station.nameBn}</div>
           ${
-            selectedBus
-              ? `<div class="transit-popup-dist">
-                  <span><strong>${distKm} km</strong> from ${selectedBus.nameBn}</span>
-                  <span class="transit-popup-eta">• ~${estTimeM} min</span>
-                  ${isNext ? '<span class="dist-next-tag">NEXT</span>' : ""}
+            isApproaching && nextApproachingStopInfo
+              ? `<div class="transit-next-stop-badge">
+                  <span class="transit-next-stop-dot"></span>
+                  <span>NEXT • ${
+                    nextApproachingStopInfo.isStandby
+                      ? `${nextApproachingStopInfo.distanceKm} km`
+                      : `${nextApproachingStopInfo.etaMinutes} min`
+                  }</span>
                 </div>`
               : ""
           }
-          <button class="transit-popup-alert-btn ${isAlerted ? "armed" : ""}" id="btn-popup-alert-${st.id}">
-            ${isAlerted ? "🔔 Alert Armed · Click to Cancel" : "🔔 Alert me when bus is near"}
-          </button>
         </div>
       `;
 
       const icon = L.divIcon({
-        className: "lollipop-div-icon",
+        className: "transit-lollipop-icon-container",
         html,
-        iconSize: [80, 48],
-        iconAnchor: [40, 26]
+        iconSize: [80, 52],
+        iconAnchor: [40, 28]
       });
 
-      if (stopMarkersRef.current[st.id]) {
-        stopMarkersRef.current[st.id].setIcon(icon);
-        stopMarkersRef.current[st.id].setPopupContent(popupHtml);
-      } else {
-        const marker = L.marker([st.lat, st.lon], { icon, zIndexOffset: 100, title: st.name })
-          .bindPopup(popupHtml, { className: "transit-custom-popup", closeButton: false, offset: [0, -22] })
-          .addTo(map);
-
-        marker.on("popupopen", () => {
-          const btn = document.getElementById(`btn-popup-alert-${st.id}`);
-          if (btn) {
-            btn.onclick = () => {
-              toggleStopAlert(st.id);
-              marker.closePopup();
-            };
-          }
+      let marker = stopMarkersRef.current.get(station.id);
+      if (!marker) {
+        marker = L.marker([station.lat, station.lon], { icon, zIndexOffset: 200 }).addTo(map);
+        marker.on("click", () => {
+          setSelectedStoppageAction(station);
         });
-
-        stopMarkersRef.current[st.id] = marker;
+        stopMarkersRef.current.set(station.id, marker);
+      } else {
+        marker.setIcon(icon);
+        marker.setZIndexOffset(isApproaching ? 500 : 200);
       }
     });
-  }, [nextApproachingStopInfo, alertedStops, toggleStopAlert, selectedBus]);
+  }, [nextApproachingStopInfo, alertedStops]);
 
-  // 4. Update Dynamic Approaching Road Highlight
-  useEffect(() => {
-    if (!approachingLineRef.current || !approachingGlowPolylineRef.current) return;
-    if (nextApproachingStopInfo && nextApproachingStopInfo.pathSegment.length > 0) {
-      const path = nextApproachingStopInfo.pathSegment;
-      approachingGlowPolylineRef.current.setLatLngs(path);
-      approachingLineRef.current.setLatLngs(path);
-    } else {
-      approachingGlowPolylineRef.current.setLatLngs([]);
-      approachingLineRef.current.setLatLngs([]);
-    }
-  }, [nextApproachingStopInfo]);
-
-  // 5. Render / Update Teardrop Bus Pins (ONLY for discovered, active buses)
+  // 6. Render Active Bus Markers
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
+    const currentBusIds = new Set(displayFleet.map((b) => b.id));
 
-    const activeIds = new Set(displayFleet.map((b) => b.id));
-    Object.keys(busMarkersRef.current).forEach((id) => {
-      if (!activeIds.has(id)) {
-        busMarkersRef.current[id].remove();
-        delete busMarkersRef.current[id];
-        delete busMarkerSignaturesRef.current[id];
+    busMarkersRef.current.forEach((marker, id) => {
+      if (!currentBusIds.has(id)) {
+        map.removeLayer(marker);
+        busMarkersRef.current.delete(id);
       }
     });
 
     displayFleet.forEach((bus) => {
       const isSelected = bus.id === selectedBusId;
-      const pinColor = isSelected ? "#38bdf8" : bus.color || "#818cf8";
-      const size = isSelected ? 34 : 29;
-      const svgSize = isSelected ? 18 : 15;
+      const speedBadge = bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby";
 
       const html = `
-        <div class="teardrop-bus-pin ${isSelected ? "selected" : ""} ${bus.isEstimated ? "estimated" : ""} ${bus.isStale ? "stale" : ""}">
-          ${
-            isSelected
-              ? `
-            <div class="bus-floating-info-pill" style="border-color:${bus.color}">
-              <span class="bus-pill-name">${bus.nameBn}</span>
-              <span class="bus-pill-speed ${bus.speed > 0 ? "moving" : ""}">${bus.speed > 0 ? `${bus.speed} km/h` : "Standby"}</span>
-            </div>
-          `
-              : ""
-          }
-          <div class="teardrop-circle" style="border-color:${pinColor}; width:${size}px; height:${size}px;">
-            <svg class="bus-svg-icon" viewBox="0 0 24 24" width="${svgSize}" height="${svgSize}">
-              <path fill="#ef4444" d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/>
-            </svg>
+        <div class="transit-bus-pin-wrapper ${isSelected ? "selected" : ""}" style="--bus-color: ${bus.color};">
+          <div class="transit-bus-callout ${isSelected ? "visible" : ""}">
+            <span class="transit-callout-name">${bus.nameBn}</span>
+            <span class="transit-callout-speed ${bus.isStale ? "stale" : ""}">
+              ${bus.isStale ? "GPS delayed" : speedBadge}
+            </span>
           </div>
-          <div class="teardrop-tail" style="border-top-color:${pinColor};"></div>
+          <div class="transit-bus-teardrop ${bus.isStale ? "is-stale" : ""}">
+            <div class="transit-bus-icon-circle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${bus.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 6v6"/>
+                <path d="M15 6v6"/>
+                <path d="M2 12h19.6"/>
+                <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20 6.3 18.7 5 17.2 5H6.8C5.3 5 4 6.3 3.6 7.8L2.2 12.8c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3"/>
+                <circle cx="7" cy="18" r="2"/>
+                <path d="M9 18h5"/>
+                <circle cx="16" cy="18" r="2"/>
+              </svg>
+            </div>
+            <div class="transit-bus-pointer" style="border-top-color: ${bus.color};"></div>
+          </div>
         </div>
       `;
 
       const icon = L.divIcon({
-        className: "teardrop-div-icon",
+        className: "transit-bus-marker-container",
         html,
-        iconSize: [size, size + 8],
-        iconAnchor: [size / 2, size + 5]
+        iconSize: [40, 48],
+        iconAnchor: [20, 48]
       });
-      const iconSignature = [bus.nameBn, bus.color, bus.speed, isSelected, bus.isEstimated, bus.isStale].join("|");
 
-      if (busMarkersRef.current[bus.id]) {
-        busMarkersRef.current[bus.id].setLatLng([bus.lat, bus.lon]);
-        if (busMarkerSignaturesRef.current[bus.id] !== iconSignature) {
-          busMarkersRef.current[bus.id].setIcon(icon);
-          busMarkerSignaturesRef.current[bus.id] = iconSignature;
-        }
-        busMarkersRef.current[bus.id].setZIndexOffset(isSelected ? 500 : 200);
-        busMarkersRef.current[bus.id].options.title = bus.isStale
-          ? "Bus location is stale"
-          : bus.isEstimated
-          ? "Estimated from the last GPS update"
-          : "Live GPS location";
-      } else {
-        const marker = L.marker([bus.lat, bus.lon], {
-          icon,
-          zIndexOffset: isSelected ? 500 : 200,
-          title: bus.isStale ? "Bus location is stale" : bus.isEstimated ? "Estimated from the last GPS update" : "Live GPS location"
-        }).addTo(map);
+      let marker = busMarkersRef.current.get(bus.id);
+      if (!marker) {
+        marker = L.marker([bus.lat, bus.lon], { icon, zIndexOffset: isSelected ? 1000 : 800 }).addTo(map);
         marker.on("click", () => {
           setSelectedBusId(bus.id);
+          setDetailBusId(bus.id);
         });
-        busMarkersRef.current[bus.id] = marker;
-        busMarkerSignaturesRef.current[bus.id] = iconSignature;
+        busMarkersRef.current.set(bus.id, marker);
+      } else {
+        marker.setLatLng([bus.lat, bus.lon]);
+        marker.setIcon(icon);
+        marker.setZIndexOffset(isSelected ? 1000 : 800);
       }
     });
   }, [displayFleet, selectedBusId]);
 
-  // 6. Smooth Motion Simulation Demo along Real Street Polyline
+  // 7. Road Demo Simulation Loop
   useEffect(() => {
-    if (!isDemoMode) {
-      if (demoIntervalRef.current) {
-        clearInterval(demoIntervalRef.current);
-        demoIntervalRef.current = null;
-      }
+    if (!isDemoMode) return;
+
+    let progressIndex = 0;
+    const interval = setInterval(() => {
+      progressIndex = (progressIndex + 1) % REAL_STREET_POLYLINE.length;
+      const [demoLat, demoLon] = REAL_STREET_POLYLINE[progressIndex];
+      const nextCoord = REAL_STREET_POLYLINE[(progressIndex + 1) % REAL_STREET_POLYLINE.length];
+      const heading = (Math.atan2(nextCoord[1] - demoLon, nextCoord[0] - demoLat) * 180) / Math.PI;
+
+      setFleet((prev) =>
+        prev.map((bus) =>
+          bus.id === "SB0003"
+            ? {
+                ...bus,
+                lat: demoLat,
+                lon: demoLon,
+                speed: 32,
+                heading: (heading + 360) % 360,
+                hasDirection: true,
+                status: "Road Demo (Cruising 32 km/h)",
+                lastUpdated: new Date().toISOString()
+              }
+            : bus
+        )
+      );
+    }, 450);
+
+    return () => clearInterval(interval);
+  }, [isDemoMode]);
+
+  // 8. WebSocket Connection to transport.mbstu.ac.bd
+  useEffect(() => {
+    if (isDemoMode) {
+      setWsStatus("connected");
       return;
     }
 
-    setFleet((prev) => {
-      if (prev.length === 0) {
-        return [
-          {
-            id: "SB0003",
-            nameBn: "সোনারতরী",
-            nameEn: "Sonartori",
-            lat: REAL_STREET_POLYLINE[0][0],
-            lon: REAL_STREET_POLYLINE[0][1],
-            speed: 28,
-            heading: 180,
-            hasDirection: true,
-            routeName: "Campus ➔ Nirala ➔ DC Lake Loop",
-            status: "Simulated Road Run",
-            color: "#0284c7",
-            isDriving: true,
-            receivedAt: Date.now()
-          }
-        ];
-      }
-      return prev;
-    });
-
-    if (!selectedBusId) setSelectedBusId("SB0003");
-
-    let progressIdx = 0;
-    demoIntervalRef.current = setInterval(() => {
-      progressIdx = (progressIdx + 2) % REAL_STREET_POLYLINE.length;
-      const nextCoord = REAL_STREET_POLYLINE[progressIdx];
-      const prevCoord = REAL_STREET_POLYLINE[(progressIdx - 1 + REAL_STREET_POLYLINE.length) % REAL_STREET_POLYLINE.length];
-
-      const dLat = nextCoord[0] - prevCoord[0];
-      const dLon = nextCoord[1] - prevCoord[1];
-      const headingDeg = Math.round((Math.atan2(dLon, dLat) * 180) / Math.PI + 360) % 360;
-
-      setFleet((prev) =>
-        prev.map((b) => {
-          if (b.id === selectedBusId || (!selectedBusId && b.id === "SB0003")) {
-            return {
-              ...b,
-              lat: nextCoord[0],
-              lon: nextCoord[1],
-              speed: 32,
-              heading: headingDeg,
-              hasDirection: true,
-              isDriving: true,
-              status: "En Route along Corridor",
-              receivedAt: Date.now()
-            };
-          }
-          return b;
-        })
-      );
-    }, 1000);
-
-    return () => {
-      if (demoIntervalRef.current) {
-        clearInterval(demoIntervalRef.current);
-        demoIntervalRef.current = null;
-      }
-    };
-  }, [isDemoMode, selectedBusId]);
-
-  // 7. Live MBSTU WebSocket Protocol & Dynamic Discovery
-  useEffect(() => {
-    if (isDemoMode) return;
-
-    let ws: WebSocket | null = null;
     let isDisposed = false;
+    let ws: WebSocket | null = null;
 
     const connect = () => {
       try {
         setWsStatus("connecting");
-        ws = new WebSocket("wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket");
+        ws = new WebSocket("wss://transport.mbstu.ac.bd");
 
-        ws.onopen = () => {};
+        ws.onopen = () => {
+          if (!isDisposed) {
+            setWsStatus("connected");
+          }
+        };
 
         ws.onmessage = (event) => {
           if (isDisposed) return;
-          const raw = String(event.data);
+          try {
+            const data = JSON.parse(event.data);
+            const list = Array.isArray(data) ? data : data?.buses || [data];
+            const valid = list.filter((b: any) => b && typeof b.lat === "number" && typeof b.lon === "number");
 
-          // 1. Engine.IO Hello -> Send Socket.IO 40 connect
-          if (raw.startsWith("0")) {
-            ws?.send("40");
-            setWsStatus("connected");
-          }
-          // 2. Server Ping ("2") -> Engine.IO v4 protocol requires client to pong ("3")
-          else if (raw === "2") {
-            ws?.send("3");
-          }
-          // 3. Telemetry Event Packets
-          else if (raw.startsWith("42")) {
-            try {
-              const parsed = JSON.parse(raw.slice(2));
-              if (!Array.isArray(parsed) || parsed.length < 2) return;
-              const evt = parsed[0];
-              const payload = parsed[1];
+            if (valid.length > 0) {
+              setFleet((prevFleet) => {
+                const map = new Map<string, MbstuBusData>();
+                prevFleet.forEach((b) => map.set(b.id, b));
 
-              if (evt === "flutter-bus-data" || evt === "studentGpsData" || evt === "student-gps-data") {
-                const busId = payload.id || payload.busId;
-                const busName = payload.busName || busId;
-                const lat = Number(payload.lat ?? payload.latitude);
-                const lon = Number(payload.lon ?? payload.long ?? payload.longitude);
-                const reportedSpeed = Number(payload.speed);
-                const hasReportedSpeed = payload.speed != null && Number.isFinite(reportedSpeed);
-                const speed = hasReportedSpeed ? Math.max(0, reportedSpeed) : 0;
-                const reportedHeading = Number(payload.heading);
-                const hasReportedHeading = payload.heading != null && Number.isFinite(reportedHeading);
-                const heading = hasReportedHeading ? ((reportedHeading % 360) + 360) % 360 : 0;
-                const packetReceivedAt = Date.now();
-                const receivedAt = packetReceivedAt;
-                const time = payload.time || new Date().toLocaleTimeString();
+                valid.forEach((raw: any) => {
+                  const id = String(raw.id || raw.bus_id || "SB0001").toUpperCase();
+                  const info = KNOWN_BUS_INFO[id] || {
+                    nameBn: raw.nameBn || raw.name_bn || raw.name || "MBSTU বাস",
+                    nameEn: raw.nameEn || raw.name || id,
+                    color: "#0284c7",
+                    defaultRoute: "MBSTU Transport Corridor"
+                  };
+                  const speedVal = typeof raw.speed === "number" ? Math.max(0, raw.speed) : 0;
+                  const { heading, hasDirection } = normalizeBusHeading(raw.heading, 0);
+                  const timestampMs = parseServerTimestamp(raw.timestamp || raw.last_updated || raw.time || raw.updated_at);
+                  const lastUpdated = timestampMs ? new Date(timestampMs).toISOString() : new Date().toISOString();
 
-                if (!busId || isNaN(lat) || isNaN(lon)) return;
-
-                const meta = BUS_METADATA[busId] || {
-                  nameEn: busName,
-                  color: "#0284c7",
-                  routeName: "MBSTU Transport Corridor"
-                };
-
-                setFleet((prevFleet) => {
-                  const existingIdx = prevFleet.findIndex((b) => b.id === busId || b.nameBn === busName);
-                  if (existingIdx >= 0) {
-                    const updated = [...prevFleet];
-                    const previousBus = prevFleet[existingIdx];
-                    const elapsedSeconds = previousBus.receivedAt
-                      ? (receivedAt - previousBus.receivedAt) / 1000
-                      : 0;
-                    const distanceSincePrevious = getDistanceMeters(previousBus.lat, previousBus.lon, lat, lon);
-                    const inferredSpeed =
-                      elapsedSeconds > 0.5 && elapsedSeconds <= 120
-                        ? (distanceSincePrevious / elapsedSeconds) * 3.6
-                        : previousBus.speed;
-                    const finalSpeed = hasReportedSpeed
-                      ? speed
-                      : inferredSpeed <= 100
-                      ? distanceSincePrevious < 2 && elapsedSeconds > 0.5
-                        ? 0
-                        : inferredSpeed
-                      : previousBus.speed;
-                    const finalHeading = hasReportedHeading
-                      ? heading
-                      : distanceSincePrevious > 2
-                      ? getBearingDegrees(previousBus.lat, previousBus.lon, lat, lon)
-                      : previousBus.heading;
-                    const isDriving = payload.isDriving ?? finalSpeed > 0;
-                    updated[existingIdx] = {
-                      ...updated[existingIdx],
-                      lat,
-                      lon,
-                      speed: finalSpeed,
-                      heading: finalHeading,
-                      hasDirection: hasReportedHeading || distanceSincePrevious > 2 || previousBus.hasDirection === true,
-                      isDriving,
-                      status: finalSpeed > 0 ? "In Transit along Corridor" : "Parked at Campus Standby",
-                      lastUpdated: time,
-                      receivedAt
-                    };
-                    return updated;
-                  } else {
-                    const isDriving = payload.isDriving ?? speed > 0;
-                    const newBus: MbstuBusData = {
-                      id: busId,
-                      nameBn: busName,
-                      nameEn: meta.nameEn,
-                      lat,
-                      lon,
-                      speed,
-                      heading,
-                      hasDirection: hasReportedHeading,
-                      routeName: meta.routeName,
-                      status: speed > 0 ? "In Transit along Corridor" : "Parked at Campus Standby",
-                      color: meta.color,
-                      isDriving,
-                      lastUpdated: time,
-                      receivedAt
-                    };
-                    return [...prevFleet, newBus];
-                  }
+                  map.set(id, {
+                    id,
+                    nameBn: info.nameBn,
+                    nameEn: info.nameEn,
+                    lat: raw.lat,
+                    lon: raw.lon,
+                    speed: speedVal,
+                    heading,
+                    hasDirection,
+                    routeName: raw.routeName || raw.route_name || info.defaultRoute,
+                    status: speedVal > 0 ? `In transit (${Math.round(speedVal)} km/h)` : "Parked at Campus Standby",
+                    color: info.color,
+                    isDriving: speedVal > 0,
+                    lastUpdated
+                  });
                 });
 
-                setSelectedBusId((curr) => curr || busId);
-              }
-            } catch (err) {}
-          }
+                return Array.from(map.values());
+              });
+            }
+          } catch (e) {}
         };
 
         ws.onclose = () => {
           if (!isDisposed) {
             setWsStatus("disconnected");
-            setTimeout(connect, 4000);
           }
         };
 
@@ -975,507 +932,893 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, [isDemoMode]);
 
-  return (
-    <div className="transit-container" style={{ "--bus-accent-color": selectedBus?.color || "#0284c7" } as any}>
-      {/* ===================================================================
-          Map Canvas (85%+ Viewport)
-          =================================================================== */}
-      <div className="transit-map-wrapper">
-        <div ref={mapContainerRef} className="transit-map-canvas" />
-      </div>
-
-      {/* ===================================================================
-          A. Top Floating Overlay (z-20)
-          =================================================================== */}
-      <div className="transit-top-overlay">
-        {/* Header Glassmorphic Bar */}
-        <div className="transit-header-pill">
-          <div className="transit-header-left">
-            <div
-              className="transit-header-icon-box"
-              style={{
-                backgroundColor: `${selectedBus?.color || "#0284c7"}25`,
-                color: selectedBus?.color || "#38bdf8",
-                border: `1px solid ${selectedBus?.color || "#0284c7"}60`
-              }}
-            >
-              <Bus size={20} />
+  /* =========================================================================
+     VIEW 1: TRANSIT LIST VIEW (Image 1)
+     ========================================================================= */
+  const renderListView = () => {
+    return (
+      <div className="transit-list-screen">
+        {/* Top Header Card */}
+        <div className="transit-list-header-card">
+          <div className="transit-list-header-top">
+            <div className="transit-list-title-box">
+              <h1 className="transit-list-main-title">MBSTU বাস লাইভ ট্র্যাকার</h1>
+              <div className="transit-list-live-badge">
+                <span className="transit-pulse-dot" style={{ background: "#34d399" }} />
+                <span>{freshFleetCount}টি লাইভ বাস • গত ১০ মিনিট</span>
+              </div>
             </div>
 
-            <div className="transit-header-titles">
-              <div className="transit-header-title-row">
-                <span className="transit-header-main-title">MBSTU Bus Tracker</span>
-                <span
-                  className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
-                  aria-live="polite"
-                >
-                  <span
-                    className="transit-pulse-dot"
+            <button
+              onClick={() => setIsDemoMode((prev) => !prev)}
+              className="transit-list-demo-btn"
+              title="Toggle road preview demo"
+            >
+              {isDemoMode ? <Radio size={13} color="#38bdf8" /> : <Play size={13} color="#34d399" />}
+              <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
+            </button>
+          </div>
+
+          {/* Segmented 2-Tab Switcher: [তালিকা] / [ম্যাপ] */}
+          <div className="transit-segmented-tabs">
+            <button
+              className="transit-seg-tab active"
+              type="button"
+              aria-selected="true"
+            >
+              <List size={15} />
+              <span>তালিকা</span>
+            </button>
+            <button
+              onClick={() => switchToMap()}
+              className="transit-seg-tab"
+              type="button"
+              aria-selected="false"
+            >
+              <MapIcon size={15} />
+              <span>ম্যাপ</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="transit-list-search-wrapper">
+          <div className="transit-list-search-input-box">
+            <Search size={16} className="transit-search-icon" />
+            <input
+              type="text"
+              placeholder="বাস নম্বর বা নাম; উৎস বা গন্তব্য"
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+              className="transit-list-search-input"
+            />
+            {listSearch && (
+              <button
+                onClick={() => setListSearch("")}
+                className="transit-search-clear-btn"
+                type="button"
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Chips Row */}
+        <div className="transit-filter-chips-row">
+          <button
+            onClick={() => setListFilter("all")}
+            className={`transit-filter-chip ${listFilter === "all" ? "active" : ""}`}
+            type="button"
+          >
+            সব বাস
+          </button>
+          <button
+            onClick={() => setListFilter("driving")}
+            className={`transit-filter-chip ${listFilter === "driving" ? "active" : ""}`}
+            type="button"
+          >
+            চলন্ত বাস
+          </button>
+          <button
+            onClick={() => setListFilter("standby")}
+            className={`transit-filter-chip ${listFilter === "standby" ? "active" : ""}`}
+            type="button"
+          >
+            স্ট্যান্ডবাই
+          </button>
+          <button
+            onClick={() => setListFilter("to_campus")}
+            className={`transit-filter-chip ${listFilter === "to_campus" ? "active" : ""}`}
+            type="button"
+          >
+            ক্যাম্পাসমুখী
+          </button>
+          <button
+            onClick={() => setListFilter("to_city")}
+            className={`transit-filter-chip ${listFilter === "to_city" ? "active" : ""}`}
+            type="button"
+          >
+            শহরমুখী
+          </button>
+          <button
+            onClick={() => {
+              setListSearch("");
+              setListFilter("all");
+            }}
+            className="transit-filter-chip-icon"
+            type="button"
+            title="Reset filters"
+          >
+            <RefreshCw size={13} />
+          </button>
+        </div>
+
+        {/* Bus Cards List */}
+        <div className="transit-cards-list-container">
+          {filteredFleet.map((bus) => {
+            const nextInfo = getNextStopForBus(bus);
+            const progressPct = getBusProgress(bus);
+            const ageText =
+              bus.positionAgeSeconds !== null && bus.positionAgeSeconds !== undefined
+                ? bus.positionAgeSeconds < 15
+                  ? "এইমাত্র"
+                  : `${bus.positionAgeSeconds} সে আগে`
+                : "সক্রিয়";
+
+            return (
+              <div
+                key={bus.id}
+                onClick={() => {
+                  setSelectedBusId(bus.id);
+                  setDetailBusId(bus.id);
+                  setActiveView("detail");
+                }}
+                className="transit-bus-card"
+                role="button"
+                tabIndex={0}
+              >
+                {/* Header Row */}
+                <div className="transit-bus-card-header">
+                  <div className="transit-bus-card-titles">
+                    <span className="transit-bus-name-bn">{bus.nameBn}</span>
+                    <span className="transit-bus-id-chip" style={{ background: `${bus.color}15`, color: bus.color }}>
+                      {formatBusShortId(bus.id)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      switchToMap(bus.id);
+                    }}
+                    className="transit-bus-card-map-action"
+                    title="Track on map"
+                  >
+                    <MapPin size={15} color={bus.color} />
+                  </button>
+                </div>
+
+                {/* Subtitle & Frequency */}
+                <div className="transit-bus-card-route-row">
+                  <span className="transit-route-text">{bus.routeName}</span>
+                  <span className="transit-dot-sep">•</span>
+                  <span className="transit-frequency-text">প্রতিদিন</span>
+                </div>
+
+                {/* Progress Metric Row */}
+                <div className="transit-bus-metric-row">
+                  <div className="transit-progress-pill">
+                    <span className="transit-progress-bar-icon" />
+                    <span>{progressPct}% পথ শেষ</span>
+                  </div>
+                  <span className="transit-dot-sep">•</span>
+                  <div className="transit-status-live-pill">
+                    <span
+                      className="transit-pulse-dot"
+                      style={{ background: bus.speed > 0 ? "#10b981" : "#fbbf24" }}
+                    />
+                    <span>{bus.speed > 0 ? `${Math.round(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}</span>
+                  </div>
+                  <span className="transit-update-time">{ageText}</span>
+                </div>
+
+                {/* Visual Progress Bar Track */}
+                <div className="transit-route-progress-track">
+                  <div
+                    className="transit-route-progress-fill"
                     style={{
-                      background: isDemoMode ? "#38bdf8" : wsStatus === "connected" && freshFleetCount > 0 ? "#34d399" : wsStatus === "disconnected" ? "#fb923c" : "#fbbf24"
+                      width: `${progressPct}%`,
+                      background: `linear-gradient(90deg, ${bus.color}88, ${bus.color})`
                     }}
                   />
-                  {isDemoMode
-                    ? "Road Demo"
-                    : wsStatus === "connected" && freshFleetCount > 0
-                    ? `Live · ${freshFleetCount} ${freshFleetCount === 1 ? "bus" : "buses"}`
-                    : wsStatus === "connected"
-                    ? "Waiting for GPS"
-                    : wsStatus === "disconnected"
-                    ? "Reconnecting"
-                    : "Connecting"}
-                </span>
+                  <div
+                    className="transit-route-progress-pin"
+                    style={{
+                      left: `${progressPct}%`,
+                      borderColor: bus.color
+                    }}
+                  >
+                    <Bus size={11} color={bus.color} />
+                  </div>
+                </div>
+
+                {/* Footer Times / Next Stop */}
+                <div className="transit-bus-card-footer">
+                  <span className="transit-time-tag">০৭:৩০ AM</span>
+                  <span className="transit-duration-tag">
+                    {bus.speed > 0 ? `~${nextInfo.etaMinutes} মি ড্রাইভ` : "স্ট্যান্ডবাই"}
+                  </span>
+                  <span className="transit-next-stop-tag">
+                    পরবর্তী: <strong>{nextInfo.station.nameBn}</strong>
+                  </span>
+                </div>
               </div>
-              <span className="transit-header-sub">Santosh Campus ⇄ Nirala (City Center) Loop</span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  /* =========================================================================
+     VIEW 2: BUS ROUTE & STOPPAGE TIMELINE DETAIL VIEW (Image 2)
+     ========================================================================= */
+  const renderDetailView = () => {
+    if (!detailBus) return null;
+    const detailNextInfo = getNextStopForBus(detailBus);
+
+    return (
+      <div className="transit-detail-screen">
+        {/* Top App Bar with Back Button */}
+        <div className="transit-detail-header-bar">
+          <button
+            onClick={() => setActiveView("list")}
+            className="transit-detail-back-btn"
+            title="তালিকা ভিউতে ফিরুন"
+            aria-label="Back to bus list"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="transit-detail-title-group">
+            <div className="transit-detail-bus-name-row">
+              <span className="transit-detail-bus-name">{detailBus.nameBn}</span>
+              <span className="transit-detail-bus-chip">{formatBusShortId(detailBus.id)}</span>
+            </div>
+            <span className="transit-detail-subtitle">{detailBus.routeName}</span>
+          </div>
+
+          <div className="transit-detail-header-speed">
+            <span
+              className="transit-pulse-dot"
+              style={{ background: detailBus.speed > 0 ? "#10b981" : "#fbbf24" }}
+            />
+            <span>{detailBus.speed > 0 ? `${Math.round(detailBus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}</span>
+          </div>
+        </div>
+
+        {/* Live Hero Tracking Card */}
+        <div className="transit-detail-hero-card" style={{ "--bus-accent": detailBus.color } as any}>
+          <div className="transit-hero-top-row">
+            <div>
+              <span className="transit-hero-eyebrow">লাইভ লোকেশন ট্র্যাকিং</span>
+              <h2 className="transit-hero-approaching-title">{detailNextInfo.station.nameBn}</h2>
+              <span className="transit-hero-approaching-sub">{detailNextInfo.station.name}</span>
+            </div>
+            <div className="transit-hero-eta-box">
+              <span className="transit-hero-eta-val">~{detailNextInfo.etaMinutes}</span>
+              <span className="transit-hero-eta-unit">মিনিট</span>
             </div>
           </div>
 
-          {/* Mode Toggle Button */}
-          <button
-            onClick={() => setIsDemoMode((prev) => !prev)}
-            className="transit-mode-toggle-btn"
-            title={isDemoMode ? "Return to live bus tracking" : "Preview the map with a simulated bus"}
-            aria-label={isDemoMode ? "Return to live tracking" : "Preview road demo"}
-          >
-            {isDemoMode ? <Radio size={14} color="#38bdf8" /> : <Play size={14} color="#34d399" />}
-            <span>{isDemoMode ? "Go live" : "Try demo"}</span>
-          </button>
-        </div>
-
-        {/* Horizontal Fleet Selector Chips */}
-        <div className="transit-chips-scroll" role="group" aria-label="Select a bus">
-          {displayFleet.length > 0 ? (
-            displayFleet.map((bus) => {
-              const isSelected = bus.id === selectedBusId;
-              return (
-                <button
-                  key={bus.id}
-                  onClick={() => {
-                    setSelectedBusId(bus.id);
-                    if (mapRef.current) {
-                      mapRef.current.flyTo([bus.lat, bus.lon], 17, { animate: true, duration: 0.8 });
-                    }
-                  }}
-                  className={`transit-bus-chip ${isSelected ? "selected" : ""}`}
-                  style={isSelected ? { borderColor: bus.color, boxShadow: `0 0 16px ${bus.color}60` } : {}}
-                  aria-pressed={isSelected}
-                  title={`${bus.nameBn} · ${bus.id}${bus.isStale ? " · GPS delayed" : bus.isEstimated ? " · estimated position" : " · live GPS"}`}
-                >
-                  <span className="transit-chip-dot" style={{ backgroundColor: bus.color, color: bus.color }} />
-                  <span className="transit-chip-name">{bus.nameBn}</span>
-                  <span className="transit-chip-id-badge">{formatBusShortId(bus.id)}</span>
-                  <span className={`transit-chip-speed ${bus.isStale ? "stale" : bus.speed > 0 ? "moving" : ""}`}>
-                    {bus.isStale ? "Delayed" : bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby"}
-                  </span>
-                </button>
-              );
-            })
-          ) : (
-            <div className="transit-chip-waiting">
-              <span className="transit-pulse-dot" style={{ background: "#fbbf24" }} />
-              <span>
-                {wsStatus === "connected"
-                  ? "Connected · waiting for a bus GPS update"
-                  : wsStatus === "disconnected"
-                  ? "Connection lost · trying again"
-                  : "Connecting to the university GPS feed"}
-              </span>
+          <div className="transit-hero-stats-row">
+            <div className="transit-hero-stat">
+              <span className="transit-stat-label">দূরত্ব</span>
+              <strong className="transit-stat-val">{detailNextInfo.distanceKm} কিমি</strong>
             </div>
-          )}
-        </div>
-      </div>
+            <div className="transit-hero-stat">
+              <span className="transit-stat-label">বর্তমান গতি</span>
+              <strong className="transit-stat-val">
+                {detailBus.speed > 0 ? `${Math.round(detailBus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}
+              </strong>
+            </div>
+            <div className="transit-hero-stat">
+              <span className="transit-stat-label">স্ট্যাটাস</span>
+              <strong className="transit-stat-val" style={{ color: detailBus.speed > 0 ? "#34d399" : "#fbbf24" }}>
+                {detailBus.speed > 0 ? "চলন্ত" : "স্ট্যান্ডবাই"}
+              </strong>
+            </div>
+          </div>
 
-      {/* Off-screen Bus Recenter Floating Pill */}
-      {isBusOffscreen && selectedBus && (
-        <button
-          onClick={centerSelectedBus}
-          className="transit-offscreen-pill"
-          aria-label={`Center map on ${selectedBus.nameBn}`}
-        >
-          <Compass size={14} className="transit-offscreen-spin" />
-          <span><strong>{selectedBus.nameBn}</strong> is off-screen · Tap to view</span>
-        </button>
-      )}
-
-      {arrivalNotice && (
-        <div className="transit-arrival-toast" role="status">
-          <CheckCircle2 size={18} />
-          <span><strong>{arrivalNotice.busName}</strong> is near {arrivalNotice.stopName}</span>
-          <button type="button" onClick={() => setArrivalNotice(null)} aria-label="Dismiss arrival alert">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* ===================================================================
-          B. Right-Side Floating Map Controls (z-20)
-          =================================================================== */}
-      <div className={`transit-fab-controls ${sheetExpanded ? "sheet-expanded" : ""}`}>
-        <div className="transit-fab-group">
           <button
-            onClick={() => mapRef.current?.zoomIn()}
-            className="transit-fab-btn"
-            title="Zoom In"
-            aria-label="Zoom in on map"
+            onClick={() => switchToMap(detailBus.id)}
+            className="transit-hero-map-btn"
+            type="button"
           >
-            <Plus size={18} />
-          </button>
-          <div className="transit-fab-divider" />
-          <button
-            onClick={() => mapRef.current?.zoomOut()}
-            className="transit-fab-btn"
-            title="Zoom Out"
-            aria-label="Zoom out on map"
-          >
-            <Minus size={18} />
+            <MapIcon size={16} />
+            <span>ম্যাপে ট্র্যাক করুন</span>
           </button>
         </div>
 
-        {selectedBus && (
-          <button
-            onClick={centerSelectedBus}
-            className={`transit-fab-btn ${!isBusOffscreen ? "active-track" : ""}`}
-            title={`Center map on ${selectedBus.nameBn}`}
-            aria-label={`Center map on selected bus ${selectedBus.nameBn}`}
-          >
-            <LocateFixed size={18} color={!isBusOffscreen ? "#38bdf8" : "#94a3b8"} />
-          </button>
-        )}
+        {/* Corridor Schedule Meta Bar */}
+        <div className="transit-timeline-meta-bar">
+          <div className="transit-meta-left">
+            <Clock size={14} />
+            <span>আজকের রুট ট্র্যাকিং • {CORRIDOR_STATIONS.length}টি স্টপেজ</span>
+          </div>
+          <span className="transit-meta-tap-hint">স্টপেজে ট্যাপ করে অ্যালার্ট দিন</span>
+        </div>
 
-        <button
-          onClick={() => setSatelliteView((prev) => !prev)}
-          className="transit-fab-btn"
-          title={satelliteView ? "Switch to Street Roadmap" : "Switch to Google Satellite"}
-          aria-label={satelliteView ? "Switch to street map" : "Switch to satellite map"}
-        >
-          <Layers size={18} color={satelliteView ? "#38bdf8" : "#94a3b8"} />
-        </button>
+        {/* Stoppage Corridor Vertical Timeline */}
+        <div className="transit-timeline-container">
+          {CORRIDOR_STATIONS.map((station, idx) => {
+            const isApproaching = station.id === detailNextInfo.station.id;
+            const isAlerted = !!alertedStops[station.id];
+            const distM = getDistanceMeters(detailBus.lat, detailBus.lon, station.lat, station.lon);
+            const distKm = (distM / 1000).toFixed(2);
+            const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(detailBus.speed, 25)) * 60));
 
-        <button
-          onClick={recenterCampus}
-          className="transit-fab-btn"
-          title="Fly to MBSTU Santosh Campus"
-          aria-label="Recenter map on campus"
-        >
-          <MapPin size={18} color="#38bdf8" />
-        </button>
-      </div>
-
-      {/* ===================================================================
-          C. Material 3 Bottom Sheet (z-30) - Non-Squish & Fluid Gestures
-          =================================================================== */}
-      <div
-        className={`transit-bottom-sheet ${sheetExpanded ? "expanded" : "collapsed"}`}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Drag Handle Bar (Visible on mobile, styled away on desktop) */}
-        <button
-          className="transit-sheet-drag-handle"
-          onClick={() => setSheetExpanded((prev) => !prev)}
-          aria-label={sheetExpanded ? "Collapse transit bottom sheet" : "Expand transit corridor stoppage list"}
-        >
-          <div className="transit-drag-bar" />
-        </button>
-
-        {selectedBus && nextApproachingStopInfo ? (
-          <>
-            {/* Fixed Header Portion (Never Scrolls, Never Squishes) */}
-            <div className="transit-sheet-fixed-header">
-              {/* Bus Identity Header Card (Clickable to toggle expand) */}
+            return (
               <div
-                className="transit-bus-header-card"
-                onClick={() => setSheetExpanded((prev) => !prev)}
-                role="button"
-                tabIndex={0}
-                aria-expanded={sheetExpanded}
-                aria-label={`Toggle route stops for ${selectedBus.nameBn}`}
+                key={station.id}
+                onClick={() => setSelectedStoppageAction(station)}
+                className={`transit-timeline-item ${isApproaching ? "is-approaching" : ""}`}
               >
-                <div className="transit-bus-header-identity">
-                  <div
-                    className="transit-bus-avatar"
-                    style={{
-                      background: `linear-gradient(135deg, ${selectedBus.color}dd 0%, ${selectedBus.color} 100%)`,
-                      borderColor: selectedBus.color
-                    }}
-                  >
-                    <Bus size={20} color="#ffffff" strokeWidth={2.4} />
-                  </div>
-                  <div className="transit-bus-identity-meta">
-                    <div className="transit-bus-name-row">
-                      <span className="transit-bus-name-title">{selectedBus.nameBn}</span>
-                      <span
-                        className="transit-bus-id-chip"
-                        style={{
-                          background: `${selectedBus.color}25`,
-                          color: selectedBus.color,
-                          borderColor: `${selectedBus.color}60`
-                        }}
-                      >
-                        {formatBusShortId(selectedBus.id)}
-                      </span>
-                    </div>
-                    <div className="transit-bus-route-subtitle">{selectedBus.routeName}</div>
-                  </div>
-                </div>
+                {/* Timeline connector line */}
+                {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-timeline-line" />}
 
-                <div className="transit-bus-telemetry-right">
-                  <span className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "moving" : "stopped"}`}>
-                    <Compass size={12} />
-                    {selectedBus.isStale
-                      ? `Parked (${Math.floor(selectedBus.positionAgeSeconds || 0)}s)`
-                      : selectedBus.speed > 0
-                      ? `${Math.round(selectedBus.speed)} km/h`
-                      : "Standby"}
-                  </span>
-                  <span className="transit-gps-coords-text">
-                    <span title={`${selectedBus.lat.toFixed(5)}, ${selectedBus.lon.toFixed(5)}`}>
-                      {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
-                    </span>
-                    <span className={selectedBus.isStale ? "is-stale" : selectedBus.isEstimated ? "is-estimated" : "is-live-fix"}>
-                      {selectedBus.speed === 0
-                        ? "Live GPS · Campus Standby"
-                        : selectedBus.isEstimated
-                        ? `Estimated · +${Math.floor(selectedBus.positionAgeSeconds || 0)}s`
-                        : "Live GPS · Active"}
-                    </span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Prominent "Next Approaching Stop" Card */}
-              <div className="transit-next-stop-card" style={{ borderColor: selectedBus.color }}>
-                <div className="transit-next-left">
-                  <div
-                    className="transit-next-pin-box"
-                    style={{
-                      background: `${selectedBus.color}20`,
-                      borderColor: `${selectedBus.color}50`,
-                      color: selectedBus.color
-                    }}
-                  >
-                    <Navigation size={18} />
-                  </div>
-                  <div className="transit-next-info">
-                    <div className="transit-next-banner-tag">
-                      <span className="transit-next-pulse-dot" />
-                      <span>
-                        {nextApproachingStopInfo.isStandby
-                          ? "CAMPUS STANDBY · NEXT STOP"
-                          : selectedBus.isEstimated
-                          ? "PREDICTED NEXT STOP"
-                          : "NEXT APPROACHING STOP"}
-                      </span>
-                    </div>
-                    <div className="transit-next-stop-en">{formatStopTitle(nextApproachingStopInfo.station.name)}</div>
-                    <div className="transit-next-sub-row">
-                      <span className="transit-next-stop-bn">{nextApproachingStopInfo.station.nameBn}</span>
-                      <span className="transit-dot-sep">•</span>
-                      <span className="transit-next-dist-pill">
-                        {nextApproachingStopInfo.distanceKm} km via route
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="transit-next-right">
-                  <div className="transit-next-eta-container">
-                    {nextApproachingStopInfo.isStandby ? (
-                      <>
-                        <span className="transit-next-standby-badge">STANDBY</span>
-                        <span className="transit-next-eta-lbl">~{nextApproachingStopInfo.etaMinutes} min once departs</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="transit-next-eta-val">
-                          <span className="transit-next-eta-num">~{nextApproachingStopInfo.etaMinutes}</span>
-                          <span className="transit-next-eta-unit">min</span>
-                        </div>
-                        <span className="transit-next-eta-lbl">Approx. arrival</span>
-                      </>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleStopAlert(nextApproachingStopInfo.station.id);
-                    }}
-                    className={`transit-bell-alert-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
-                    title={alertedStops[nextApproachingStopInfo.station.id] ? "Turn off in-page arrival alert" : "Alert me while this page is open"}
-                    aria-label={alertedStops[nextApproachingStopInfo.station.id]
-                      ? `Turn off alert for ${nextApproachingStopInfo.station.name}`
-                      : `Alert me when the bus is near ${nextApproachingStopInfo.station.name}`}
-                    aria-pressed={!!alertedStops[nextApproachingStopInfo.station.id]}
-                  >
-                    <Bell size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Sheet Footer Row */}
-              <div className="transit-sheet-footer-row">
-                <div className="transit-sheet-status-text">
-                  <span className={`transit-status-dot ${selectedBus.speed > 0 ? "fresh" : "standby"}`} />
-                  <span>
-                    {selectedBus.speed > 0
-                      ? `In transit (${Math.round(selectedBus.speed)} km/h)`
-                      : "Parked at Campus Standby"}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSheetExpanded((prev) => !prev)}
-                  className="transit-expand-toggle-btn"
-                  aria-expanded={sheetExpanded}
-                >
-                  <span>{sheetExpanded ? "Hide stops" : "Show route stops"}</span>
-                  {sheetExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Sequential Corridor Stepper (Visible Only When Expanded) */}
-            {sheetExpanded && (
-              <div className="transit-corridor-scroll-container">
-                <div className="transit-stepper-header">
-                  <span>Route stops · {filteredStops.length} of {CORRIDOR_STATIONS.length}</span>
-                  <span className="transit-stepper-hint">Alerts work while this tab is open</span>
-                </div>
-
-                {/* Stoppage Search Filter Bar */}
-                <div className="transit-stepper-search-row">
-                  <Search size={14} className="transit-search-icon" />
-                  <input
-                    type="text"
-                    placeholder="Search 28 stops (e.g. DC Lake, Nirala)..."
-                    value={stopFilter}
-                    onChange={(e) => setStopFilter(e.target.value)}
-                    className="transit-stepper-search-input"
-                  />
-                  {stopFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setStopFilter("")}
-                      className="transit-search-clear"
-                      aria-label="Clear stop search"
-                    >
-                      <X size={12} />
-                    </button>
+                {/* Node Milestone */}
+                <div className={`transit-timeline-node ${isApproaching ? "active-bus-node" : ""}`}>
+                  {isApproaching ? (
+                    <Bus size={13} color="#ffffff" />
+                  ) : (
+                    <span>{station.order}</span>
                   )}
                 </div>
 
-                <div className="transit-stepper-list">
-                  {filteredStops.map((st, idx) => {
-                    const isApproaching = st.id === nextApproachingStopInfo.station.id;
-                    const isAlerted = !!alertedStops[st.id];
-                    const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
-                    const distKm = (distM / 1000).toFixed(2);
-                    const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60));
+                {/* Stoppage Content */}
+                <div className="transit-timeline-content">
+                  <div className="transit-timeline-row">
+                    <div>
+                      <div className="transit-station-main-title">
+                        <span>{station.nameBn}</span>
+                        {isApproaching && <span className="transit-approaching-badge">NEXT</span>}
+                      </div>
+                      <span className="transit-station-sub-title">{station.name}</span>
+                    </div>
 
-                    return (
-                      <div
-                        key={st.id}
-                        ref={isApproaching ? approachingStopRef : undefined}
-                        onClick={() => {
-                          if (mapRef.current) {
-                            mapRef.current.flyTo([st.lat, st.lon], 18, { animate: true, duration: 0.8 });
-                          }
+                    <div className="transit-timeline-actions">
+                      <div className="transit-timeline-eta-block">
+                        <span className="transit-station-km">{distKm} কিমি</span>
+                        <span className="transit-station-eta">
+                          {detailBus.speed > 0 ? `~${etaM} মি` : "স্ট্যান্ডবাই"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStopAlert(station.id);
                         }}
-                        onKeyDown={(event) => {
-                          if (event.target !== event.currentTarget) return;
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            if (mapRef.current) {
-                              mapRef.current.flyTo([st.lat, st.lon], 18, { animate: true, duration: 0.8 });
-                            }
-                          }
-                        }}
-                        className={`transit-stepper-item ${isApproaching ? "is-approaching" : ""} ${st.isCampus ? "is-campus" : ""}`}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Show ${st.name} on map`}
+                        className={`transit-timeline-bell-btn ${isAlerted ? "armed" : ""}`}
+                        title={isAlerted ? "অ্যালার্ট বন্ধ করুন" : "এই স্টপে পৌঁছালে অ্যালার্ট দিন"}
+                        type="button"
                       >
-                        {idx < filteredStops.length - 1 && <div className="transit-stepper-line" />}
-                        <div className="transit-stepper-node">{st.order}</div>
+                        <Bell size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-                        <div className="transit-stepper-content">
-                          <div className="transit-stepper-title-row">
-                            <span className="transit-stepper-stop-name">{st.name}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              {isApproaching && <span className="transit-stepper-badge-next">NEXT</span>}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleStopAlert(st.id);
-                                }}
-                                className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
-                                type="button"
-                                title={isAlerted ? "Turn off in-page arrival alert" : "Alert me while this page is open"}
-                                aria-label={isAlerted ? `Turn off alert for ${st.name}` : `Alert me when the bus is near ${st.name}`}
-                                aria-pressed={isAlerted}
-                              >
-                                <Bell size={14} />
-                              </button>
+        {/* Sticky Bottom Summary Bar */}
+        <div className="transit-detail-bottom-bar">
+          <div className="transit-bottom-info">
+            <span className="transit-bottom-label">পরবর্তী স্টপ:</span>
+            <strong className="transit-bottom-name">{detailNextInfo.station.nameBn}</strong>
+            <span className="transit-bottom-dist">({detailNextInfo.distanceKm} কিমি)</span>
+          </div>
+
+          <div className="transit-bottom-buttons">
+            <button
+              onClick={() => toggleStopAlert(detailNextInfo.station.id)}
+              className={`transit-bottom-bell-btn ${alertedStops[detailNextInfo.station.id] ? "armed" : ""}`}
+              title="Alert for next stop"
+              type="button"
+            >
+              <Bell size={16} />
+            </button>
+            <button
+              onClick={() => switchToMap(detailBus.id)}
+              className="transit-bottom-map-fab"
+              title="ম্যাপে দেখুন"
+              type="button"
+            >
+              <MapIcon size={16} />
+              <span>ম্যাপে দেখুন</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* =========================================================================
+     STOPPAGE QUICK ACTION SHEET MODAL
+     ========================================================================= */
+  const renderStoppageActionModal = () => {
+    if (!selectedStoppageAction || !detailBus) return null;
+    const distM = getDistanceMeters(detailBus.lat, detailBus.lon, selectedStoppageAction.lat, selectedStoppageAction.lon);
+    const distKm = (distM / 1000).toFixed(2);
+    const isAlerted = !!alertedStops[selectedStoppageAction.id];
+
+    return (
+      <div className="transit-modal-overlay" onClick={() => setSelectedStoppageAction(null)}>
+        <div className="transit-action-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="transit-sheet-drag-pill" />
+          <div className="transit-action-sheet-header">
+            <div>
+              <span className="transit-action-sheet-order">স্টপ #{selectedStoppageAction.order}</span>
+              <h3 className="transit-action-sheet-name">{selectedStoppageAction.nameBn}</h3>
+              <span className="transit-action-sheet-en">{selectedStoppageAction.name}</span>
+            </div>
+            <button
+              onClick={() => setSelectedStoppageAction(null)}
+              className="transit-sheet-close-btn"
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="transit-action-sheet-dist-row">
+            <MapPin size={15} color="#38bdf8" />
+            <span>বর্তমান বাস থেকে দূরত্ব: <strong>{distKm} কিমি</strong></span>
+          </div>
+
+          <div className="transit-action-sheet-buttons">
+            <button
+              onClick={() => {
+                toggleStopAlert(selectedStoppageAction.id);
+                setSelectedStoppageAction(null);
+              }}
+              className={`transit-action-btn-alert ${isAlerted ? "armed" : ""}`}
+              type="button"
+            >
+              <Bell size={16} />
+              <span>{isAlerted ? "অ্যালার্ট বন্ধ করুন" : "এই স্টপে পৌঁছালে নোটিফাই করুন"}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                switchToMap(detailBus.id);
+                setSelectedStoppageAction(null);
+              }}
+              className="transit-action-btn-map"
+              type="button"
+            >
+              <MapIcon size={16} />
+              <span>ম্যাপে ট্র্যাক করুন</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* =========================================================================
+     MAIN RENDER: Multi-View Routing
+     ========================================================================= */
+  return (
+    <div className="transit-container" style={{ "--bus-accent-color": selectedBus?.color || "#0284c7" } as any}>
+      {/* 1. List View (Image 1) */}
+      {activeView === "list" && renderListView()}
+
+      {/* 2. Detail Timeline View (Image 2) */}
+      {activeView === "detail" && renderDetailView()}
+
+      {/* 3. Stoppage Action Popover */}
+      {selectedStoppageAction && renderStoppageActionModal()}
+
+      {/* ===================================================================
+          Map Canvas & Overlays (Always kept in DOM, shown when activeView === "map")
+          =================================================================== */}
+      <div
+        className="transit-map-wrapper"
+        style={{
+          display: activeView === "map" ? "block" : "none",
+          visibility: activeView === "map" ? "visible" : "hidden"
+        }}
+      >
+        <div ref={mapContainerRef} className="transit-map-canvas" />
+      </div>
+
+      {activeView === "map" && (
+        <>
+          {/* Top Floating Overlay (z-20) */}
+          <div className="transit-top-overlay">
+            {/* Header Glassmorphic Bar with 2-Tab Switcher */}
+            <div className="transit-header-pill">
+              <div className="transit-header-left">
+                <div
+                  className="transit-header-icon-box"
+                  style={{
+                    backgroundColor: `${selectedBus?.color || "#0284c7"}25`,
+                    color: selectedBus?.color || "#38bdf8",
+                    border: `1px solid ${selectedBus?.color || "#0284c7"}60`
+                  }}
+                >
+                  <Bus size={20} />
+                </div>
+
+                <div className="transit-header-titles">
+                  <div className="transit-header-title-row">
+                    <span className="transit-header-main-title">MBSTU Bus Tracker</span>
+                    <span
+                      className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
+                      aria-live="polite"
+                    >
+                      <span
+                        className="transit-pulse-dot"
+                        style={{
+                          background: isDemoMode ? "#38bdf8" : wsStatus === "connected" && freshFleetCount > 0 ? "#34d399" : wsStatus === "disconnected" ? "#fb923c" : "#fbbf24"
+                        }}
+                      />
+                      {isDemoMode
+                        ? "Road Demo"
+                        : wsStatus === "connected" && freshFleetCount > 0
+                        ? `Live · ${freshFleetCount} ${freshFleetCount === 1 ? "bus" : "buses"}`
+                        : wsStatus === "connected"
+                        ? "Waiting for GPS"
+                        : wsStatus === "disconnected"
+                        ? "Reconnecting"
+                        : "Connecting"}
+                    </span>
+                  </div>
+                  <span className="transit-header-sub">Santosh Campus ⇄ Nirala (City Center) Loop</span>
+                </div>
+              </div>
+
+              {/* View Switcher: Back to [তালিকা] */}
+              <div className="transit-map-tab-toggle">
+                <button
+                  onClick={() => setActiveView("list")}
+                  className="transit-map-tab-btn"
+                  title="তালিকা ভিউতে যান"
+                  type="button"
+                >
+                  <List size={14} />
+                  <span>তালিকা</span>
+                </button>
+                <button
+                  className="transit-map-tab-btn active"
+                  title="ম্যাপ ভিউ সক্রিয়"
+                  type="button"
+                >
+                  <MapIcon size={14} />
+                  <span>ম্যাপ</span>
+                </button>
+              </div>
+
+              {/* Mode Toggle Button */}
+              <button
+                onClick={() => setIsDemoMode((prev) => !prev)}
+                className="transit-mode-toggle-btn"
+                title={isDemoMode ? "Return to live bus tracking" : "Preview the map with a simulated bus"}
+                aria-label={isDemoMode ? "Return to live tracking" : "Preview road demo"}
+              >
+                {isDemoMode ? <Radio size={14} color="#38bdf8" /> : <Play size={14} color="#34d399" />}
+                <span>{isDemoMode ? "Go live" : "Try demo"}</span>
+              </button>
+            </div>
+
+            {/* Horizontal Fleet Selector Chips */}
+            <div className="transit-chips-scroll" role="group" aria-label="Select a bus">
+              {displayFleet.length > 0 ? (
+                displayFleet.map((bus) => {
+                  const isSelected = bus.id === selectedBusId;
+                  return (
+                    <button
+                      key={bus.id}
+                      onClick={() => {
+                        setSelectedBusId(bus.id);
+                        setDetailBusId(bus.id);
+                        if (mapRef.current) {
+                          mapRef.current.flyTo([bus.lat, bus.lon], 17, { animate: true, duration: 0.8 });
+                        }
+                      }}
+                      className={`transit-bus-chip ${isSelected ? "selected" : ""}`}
+                      style={isSelected ? { borderColor: bus.color, boxShadow: `0 0 16px ${bus.color}60` } : {}}
+                      aria-pressed={isSelected}
+                      title={`${bus.nameBn} · ${bus.id}`}
+                    >
+                      <span className="transit-chip-dot" style={{ backgroundColor: bus.color, color: bus.color }} />
+                      <span className="transit-chip-name">{bus.nameBn}</span>
+                      <span className="transit-chip-id-badge">{formatBusShortId(bus.id)}</span>
+                      <span className={`transit-chip-speed ${bus.isStale ? "stale" : bus.speed > 0 ? "moving" : ""}`}>
+                        {bus.isStale ? "Delayed" : bus.speed > 0 ? `${Math.round(bus.speed)} km/h` : "Standby"}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="transit-chip-waiting">
+                  <span className="transit-pulse-dot" style={{ background: "#fbbf24" }} />
+                  <span>
+                    {wsStatus === "connected"
+                      ? "Connected · waiting for a bus GPS update"
+                      : wsStatus === "disconnected"
+                      ? "Connection lost · trying again"
+                      : "Connecting to the university GPS feed"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Off-screen Bus Recenter Floating Pill */}
+          {isBusOffscreen && selectedBus && (
+            <button
+              onClick={centerSelectedBus}
+              className="transit-offscreen-pill"
+              aria-label={`Center map on ${selectedBus.nameBn}`}
+            >
+              <Compass size={14} className="transit-offscreen-spin" />
+              <span><strong>{selectedBus.nameBn}</strong> is off-screen · Tap to view</span>
+            </button>
+          )}
+
+          {arrivalNotice && (
+            <div className="transit-arrival-toast" role="status">
+              <CheckCircle2 size={18} />
+              <span><strong>{arrivalNotice.busName}</strong> is near {arrivalNotice.stopName}</span>
+              <button type="button" onClick={() => setArrivalNotice(null)} aria-label="Dismiss arrival alert">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Right-Side Floating Map Controls (z-20) */}
+          <div className={`transit-fab-controls ${sheetExpanded ? "sheet-expanded" : ""}`}>
+            <div className="transit-fab-group">
+              <button
+                onClick={() => mapRef.current?.zoomIn()}
+                className="transit-fab-btn"
+                title="Zoom In"
+                aria-label="Zoom in on map"
+              >
+                <Plus size={18} />
+              </button>
+              <div className="transit-fab-divider" />
+              <button
+                onClick={() => mapRef.current?.zoomOut()}
+                className="transit-fab-btn"
+                title="Zoom Out"
+                aria-label="Zoom out on map"
+              >
+                <Minus size={18} />
+              </button>
+            </div>
+
+            {selectedBus && (
+              <button
+                onClick={centerSelectedBus}
+                className={`transit-fab-btn ${!isBusOffscreen ? "active-track" : ""}`}
+                title={`Center map on ${selectedBus.nameBn}`}
+                aria-label={`Center map on selected bus ${selectedBus.nameBn}`}
+              >
+                <LocateFixed size={18} color={!isBusOffscreen ? "#38bdf8" : "#94a3b8"} />
+              </button>
+            )}
+
+            <button
+              onClick={() => setSatelliteView((prev) => !prev)}
+              className="transit-fab-btn"
+              title={satelliteView ? "Switch to Street Roadmap" : "Switch to Google Satellite"}
+              aria-label={satelliteView ? "Switch to street map" : "Switch to satellite map"}
+            >
+              <Layers size={18} color={satelliteView ? "#38bdf8" : "#94a3b8"} />
+            </button>
+
+            <button
+              onClick={recenterCampus}
+              className="transit-fab-btn"
+              title="Fly to MBSTU Santosh Campus"
+              aria-label="Recenter map on campus"
+            >
+              <MapPin size={18} color="#38bdf8" />
+            </button>
+          </div>
+
+          {/* C. Material 3 Bottom Sheet (z-30) */}
+          <div
+            className={`transit-bottom-sheet ${sheetExpanded ? "expanded" : "collapsed"}`}
+            style={{ "--bus-accent": selectedBus?.color || "#0284c7" } as any}
+          >
+            <div
+              className="transit-sheet-drag-handle"
+              onClick={() => setSheetExpanded((prev) => !prev)}
+              role="button"
+              tabIndex={0}
+              aria-label={sheetExpanded ? "Collapse route panel" : "Expand route panel"}
+            >
+              <div className="transit-sheet-handle-pill" />
+            </div>
+
+            {selectedBus ? (
+              <>
+                <div className="transit-sheet-header">
+                  <div className="transit-sheet-bus-badge">
+                    <span className="transit-badge-id">{formatBusShortId(selectedBus.id)}</span>
+                  </div>
+
+                  <div className="transit-sheet-bus-titles">
+                    <div className="transit-bus-name-row">
+                      <h2 className="transit-bus-name-bn">{selectedBus.nameBn}</h2>
+                      <span className="transit-bus-name-en">({selectedBus.nameEn})</span>
+                    </div>
+                    <span className="transit-bus-route-name">{selectedBus.routeName}</span>
+                  </div>
+
+                  <div className="transit-sheet-speed-block">
+                    <div className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "active" : ""}`}>
+                      <Navigation size={13} className={selectedBus.speed > 0 ? "spin-slow" : ""} />
+                      <span>{selectedBus.isStale ? "GPS delayed" : selectedBus.speed > 0 ? `${Math.round(selectedBus.speed)} km/h` : "Standby"}</span>
+                    </div>
+                    <span className="transit-gps-coords">
+                      {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
+                    </span>
+                  </div>
+                </div>
+
+                {nextApproachingStopInfo && (
+                  <div className="transit-approaching-card">
+                    <div className="transit-approaching-left">
+                      <div className="transit-approaching-icon-box">
+                        <Navigation size={16} />
+                      </div>
+                      <div className="transit-approaching-text">
+                        <span className="transit-approaching-eyebrow">NEXT APPROACHING STOP</span>
+                        <h3 className="transit-approaching-name">{nextApproachingStopInfo.station.name}</h3>
+                        <span className="transit-approaching-bn">
+                          {nextApproachingStopInfo.station.nameBn} • {nextApproachingStopInfo.distanceKm} km via route
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="transit-approaching-right">
+                      <div className="transit-eta-badge">
+                        {nextApproachingStopInfo.isStandby ? (
+                          <>
+                            <span className="transit-eta-val">Standby</span>
+                            <span className="transit-eta-sub">~{nextApproachingStopInfo.etaMinutes} min drive</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="transit-eta-val">~{nextApproachingStopInfo.etaMinutes} min</span>
+                            <span className="transit-eta-sub">Approx. arrival</span>
+                          </>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => toggleStopAlert(nextApproachingStopInfo.station.id)}
+                        className={`transit-stop-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
+                        title={
+                          alertedStops[nextApproachingStopInfo.station.id]
+                            ? "Stop alert armed"
+                            : "Set alert for approaching stop"
+                        }
+                        aria-label={
+                          alertedStops[nextApproachingStopInfo.station.id]
+                            ? "Turn off alert for next stop"
+                            : "Alert me when the bus reaches next stop"
+                        }
+                      >
+                        <Bell size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="transit-sheet-footer-row">
+                  <div className="transit-status-indicator">
+                    <span
+                      className="transit-pulse-dot"
+                      style={{ background: selectedBus.speed > 0 ? "#10b981" : "#fbbf24" }}
+                    />
+                    <span>{selectedBus.status}</span>
+                  </div>
+
+                  <button
+                    onClick={() => setSheetExpanded((prev) => !prev)}
+                    className="transit-expand-toggle-btn"
+                  >
+                    <span>{sheetExpanded ? "Hide route stops" : "Show route stops"}</span>
+                    {sheetExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                  </button>
+                </div>
+
+                {sheetExpanded && (
+                  <div className="transit-stepper-scroll-container">
+                    <div className="transit-stepper-header-row">
+                      <span className="transit-stepper-title">STREET CORRIDOR STOPPAGES ({CORRIDOR_STATIONS.length})</span>
+                      <span className="transit-stepper-hint">TAP 🔔 TO SET ARRIVAL ALERT</span>
+                    </div>
+
+                    <div className="transit-stepper-list">
+                      {CORRIDOR_STATIONS.map((st, idx) => {
+                        const isApproaching = nextApproachingStopInfo?.station.id === st.id;
+                        const isAlerted = !!alertedStops[st.id];
+                        const distM = getDistanceMeters(selectedBus.lat, selectedBus.lon, st.lat, st.lon);
+                        const distKm = (distM / 1000).toFixed(2);
+                        const etaM = Math.max(1, Math.round((distM / 1000 / Math.max(selectedBus.speed, 25)) * 60));
+
+                        return (
+                          <div
+                            key={st.id}
+                            onClick={() => setSelectedStoppageAction(st)}
+                            className={`transit-stepper-row ${isApproaching ? "approaching" : ""}`}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            {idx < CORRIDOR_STATIONS.length - 1 && <div className="transit-stepper-line" />}
+                            <div className="transit-stepper-node">{st.order}</div>
+
+                            <div className="transit-stepper-content">
+                              <div className="transit-stepper-title-row">
+                                <span className="transit-stepper-stop-name">{st.name}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  {isApproaching && <span className="transit-stepper-badge-next">NEXT</span>}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleStopAlert(st.id);
+                                    }}
+                                    className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
+                                    type="button"
+                                    title={isAlerted ? "Turn off arrival alert" : "Alert me"}
+                                  >
+                                    <Bell size={14} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="transit-stepper-sub">
+                                <span>{st.nameBn}</span>
+                                <span>•</span>
+                                <span>{distKm} km</span>
+                                <span>•</span>
+                                <span style={{ color: isApproaching ? "#38bdf8" : "#94a3b8" }}>
+                                  {selectedBus.isStale
+                                    ? "GPS delayed"
+                                    : `~${etaM} min approximate ${selectedBus.speed === 0 ? "drive" : "ETA"}`}
+                                </span>
+                              </div>
                             </div>
                           </div>
-
-                          <div className="transit-stepper-sub">
-                            <span>{st.nameBn}</span>
-                            <span>•</span>
-                            <span>{distKm} km</span>
-                            <span>•</span>
-                            <span style={{ color: isApproaching ? "#38bdf8" : "#94a3b8" }}>
-                              {selectedBus.isStale
-                                ? "GPS delayed"
-                                : `~${etaM} min approximate ${selectedBus.speed === 0 ? "drive" : "ETA"}`}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="transit-waiting-card">
+                <div className="transit-waiting-icon-pulse">
+                  <Radio size={22} />
+                </div>
+                <div>
+                  <div className="transit-waiting-title">Waiting for bus GPS</div>
+                  <div className="transit-waiting-desc">Connecting to live fleet stream.</div>
                 </div>
               </div>
             )}
-          </>
-        ) : (
-          /* Waiting State Card */
-          <div className="transit-waiting-card">
-            <div className="transit-waiting-icon-pulse">
-              <Radio size={22} />
-            </div>
-            <div>
-              <div className="transit-waiting-title">
-                {wsStatus === "disconnected"
-                  ? "Live feed disconnected"
-                  : wsStatus === "connected"
-                  ? "Waiting for a GPS update"
-                  : "Connecting to live tracking"}
-              </div>
-              <div className="transit-waiting-desc">
-                {wsStatus === "disconnected"
-                  ? "We’re reconnecting to the university feed. The map will resume when the connection is back."
-                  : wsStatus === "connected"
-                  ? "The feed is connected. Buses appear when an on-board tracker sends its next location."
-                  : "Connecting to the university feed. This can take a few seconds."}
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <button
-                  onClick={() => setIsDemoMode(true)}
-                  className="transit-mode-toggle-btn"
-                  style={{ fontSize: 11, padding: "5px 10px" }}
-                >
-                  <Play size={13} color="#34d399" />
-                  <span>Preview with Road Demo</span>
-                </button>
-              </div>
-            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
