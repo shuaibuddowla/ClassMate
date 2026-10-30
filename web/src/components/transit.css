@@ -437,7 +437,7 @@
 }
 
 .transit-fab-controls.sheet-collapsed {
-  bottom: calc(185px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
 }
 
 .transit-fab-controls.sheet-expanded {
@@ -1751,12 +1751,12 @@
 }
 
 .transit-lollipop-sign {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #dc2626;
-  border: 2px solid #ffffff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.7);
+  background: #e11d48;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1779,9 +1779,9 @@
 
 .transit-lollipop-bus-text {
   color: #ffffff;
-  font-size: 7.5px;
+  font-size: 6.5px;
   font-weight: 900;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   line-height: 1;
 }
 
@@ -3949,6 +3949,72 @@
   transform: scale(1.05);
 }
 
+/* Compact Approaching Stop Strip (Zero vertical bloat) */
+.transit-sheet-approaching-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff5f8;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+}
+
+.transit-approaching-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.transit-approaching-strip-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.transit-bus-route-tag {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.transit-standby-p-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.transit-sheet-detail-action.full-width {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 12px;
+  background: #fff1f5;
+  border: 1px solid #fbcfe8;
+  color: #b71454;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transit-sheet-detail-action.full-width:hover {
+  background: #ffe4e6;
+  border-color: #f472b6;
+}
+
 /* Approaching Stop Card */
 .transit-approaching-card {
   display: flex;
@@ -4399,7 +4465,7 @@
     display: none !important;
   }
   .transit-fab-controls.sheet-collapsed {
-    bottom: calc(185px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
     right: 12px !important;
   }
   .transit-fab-controls.no-sheet {
