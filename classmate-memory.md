@@ -9403,7 +9403,10 @@ flowchart TD
 - **Route Subtitle**: `Campus ➔ Nirala (City Center) • সন্তোষ টু টাঙ্গাইল`.
 - **Kinematics & Metrics Row**:
   - Route Progress Badge: `৪০% সম্পন্ন`, computed via:
-    $$	ext{Progress \%} = \min\left(100, \max\left(5, 	ext{round}\left(rac{	ext{approachingStopIndex}}{	ext{totalStops}} 	imes 100ight)ight)ight)$$
+    $$\text{Progress \%} = \min\left(100, \max\left(5, \text{round}\left(rac{\text{approachingStopIndex}}{\text{totalStops}} 	imes 100
+ight)
+ight)
+ight)$$
   - Live Speed Pill: Displays live speed (`১৭ কিমি/ঘ`) with cyan glowing indicator when moving, or `স্ট্যান্ডবাই` with muted amber styling when stationary.
   - Freshness Timestamp: Relative age formatting (`এখনই`, `১ মিনিট আগে`, `৫ মিনিট আগে`).
 - **Visual Progress Bar Track (`.transit-bus-progress-track`)**:
@@ -9462,7 +9465,10 @@ flowchart TD
   - Drag pill handle for mobile swipe dismissal.
   - Header with stop sequence (`স্টপ #১৪`), Bengali name, and English name.
   - Dynamic distance readout calculated via Haversine formula from current bus GPS coordinates:
-    $$	ext{dist} = 2 R rcsin\left(\sqrt{\sin^2\left(rac{\Delta\phi}{2}ight) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(rac{\Delta\lambda}{2}ight)}ight)$$
+    $$\text{dist} = 2 R rcsin\left(\sqrt{\sin^2\left(rac{\Delta\phi}{2}
+ight) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(rac{\Delta\lambda}{2}
+ight)}
+ight)$$
 - **Dual Action Controls**:
   1. **`🔔 এই স্টপেজের আগমন বিজ্ঞপ্তি চালু করুন`**:
      - Arms arrival alarm for that specific station.
@@ -10039,14 +10045,294 @@ A visual and structural audit of the live transit map interface on physical mobi
    - **Roadmap Resolution**: Implement a slight coordinate jitter / spiderfy dispersion or cluster pill when markers are within 15 meters of each other at current zoom levels.
 
 ---
+---
 
-### B. Master Production Verification Matrix (Updated Master State)
+## 163. Production Transit Bottom Sheet Tap Isolation, Card Restyling, Rogue Text Removal & Unified Header (Commit `423101f`)
+
+### A. Architectural Context & Session Scope
+
+Documented across Antigravity session `f299dd3b-5ee4-474d-a380-72de6b93c62b` (steps 28846–28990) and git commit [`423101f`](https://github.com/shuaibuddowla/ClassMate/commit/423101f). Following the physical device inspection audit in Section 162, the user issued strict directives:
+1. *Tapping behavior*: "make sure that bottom sheet should appears only when a bus name is tapped and it should disappear if somewhere else clicked."
+2. *Visual styling*: Remove rogue unstyled text artifacts, fix vertical card collapse, style cards with high contrast, and streamline the top header.
+3. *Build integrity*: Resolve build compilation failures (`ChevronRight` import missing in `transit.tsx`) on production Vercel builds.
+
+```mermaid
+flowchart TD
+    subgraph TapLogic ["1. Tap-to-Open & Outside-Click Dismissal"]
+        BusTap["User taps Bus Marker Pin OR Bus Card in List"] --> SetId["setSelectedBusId(bus.id)"]
+        SetId --> ActiveSheet["selectedBus resolves -> Bottom Sheet renders in DOM"]
+        MapTap["User taps Map Canvas / Backdrop"] --> CheckTarget{"target.closest('.transit-bus-pin-wrapper') ||<br>target.closest('.transit-bottom-sheet') ||<br>target.closest('.transit-top-overlay')"}
+        CheckTarget -- No --> ClearId["setSelectedBusId('')"]
+        ClearId --> DismissSheet["selectedBus = null -> Bottom Sheet unmounts"]
+        CheckTarget -- Yes --> KeepSheet["Keep Bottom Sheet open"]
+    end
+
+    subgraph HeaderBar ["2. Streamlined Unified Floating Header Bar"]
+        OldPills["Separate floating pills (Nav row + Title pill + Actions)"] --> UnifiedCapsule[".transit-header-pill.unified-bar"]
+        UnifiedCapsule --> LeftBrand["Bus Icon + 'MBSTU বাস ট্র্যাকার'"]
+        UnifiedCapsule --> CenterStatus["Live Fleet Badge: 'Xটি লাইভ' / 'GPS অপেক্ষা'"]
+        UnifiedCapsule --> RightSwitcher["Segmented View Switcher: 'তালিকা' | 'ম্যাপ'"]
+    end
+```
+
+---
+
+### B. Core Implementations & Debugging Resolutions
+
+1. **Tap-to-Open & Outside-Click Dismissal (`transit.tsx:L374-378, L660-672`)**:
+   - **Strict Selection State**: Previously, `selectedBus` defaulted to `displayFleet[0]` whenever `selectedBusId` was unset, causing the bottom sheet to remain open indefinitely. This was refactored:
+     ```typescript
+     // Active Bus (ONLY when explicitly selected/tapped by the user)
+     const selectedBus = useMemo(
+       () => (selectedBusId ? displayFleet.find((b) => b.id === selectedBusId) || null : null),
+       [displayFleet, selectedBusId]
+     );
+     ```
+   - **Click-Outside Isolation**: Injected event target inspection on Leaflet `map.on("click")`:
+     ```typescript
+     map.on("click", (e) => {
+       const target = e.originalEvent?.target as HTMLElement | null;
+       if (
+         !target?.closest(".transit-bus-pin-wrapper") &&
+         !target?.closest(".transit-lollipop-wrapper") &&
+         !target?.closest(".transit-bottom-sheet") &&
+         !target?.closest(".transit-top-overlay")
+       ) {
+         setSelectedBusId("");
+       }
+     });
+     ```
+     Tapping anywhere on the satellite or street map canvas smoothly closes the bottom sheet.
+2. **Elimination of Orphaned Fleet String Artifact (`"0010"`)**:
+   - Located and removed the stray, unstyled string interpolation that rendered `"0010"` at the top-left edge above `রক্তকরবী (SB0010)`. All identifiers are now strictly encapsulated within structured typography elements.
+3. **Complete Bottom Sheet Restyling & High-Contrast Layout (`transit.css`)**:
+   - **Card Geometry**: Styled `.transit-bottom-sheet` with solid surface `rgba(255, 255, 255, 0.98)`, backdrop blur (16px), 24px top border radius, high-elevation drop shadow (`0 -10px 30px rgba(0, 0, 0, 0.15)`), and centered drag handle.
+   - **Direct Close Button**: Added dedicated close (`X`) button in the bottom sheet header allowing instant one-tap dismissal alongside edge swipe and map clicks.
+   - **Parked Velocity & Spacing**: Fixed concatenated `"Standby~1 min drive"` text. Parked vehicles ($0\text{ km/h}$) consistently display `ক্যাম্পাস স্ট্যান্ডবাই` or `শহরে স্ট্যান্ডবাই` with clear typography, preventing confusing $1\text{ min drive}$ ETA predictions when stationary.
+4. **100% Bengali Bottom Sheet Localization**:
+   - Eliminated English labels across all bottom sheet components:
+     - `NEXT APPROACHING STOP` $
+ightarrow$ `পরবর্তী স্টপ`
+     - `First Gate Bus Stop` $
+ightarrow$ `প্রথম গেট বাস স্টপ`
+     - `Parked at Campus Standby` $
+ightarrow$ `ক্যাম্পাস স্ট্যান্ডবাই-এ পার্ক করা`
+     - `Show route stops ^` $
+ightarrow$ `রুটের স্টপসমূহ দেখুন`
+     - `GPS delayed` $
+ightarrow$ `GPS বিলম্বিত`
+5. **Streamlined Unified Floating Header Bar (`.transit-header-pill.unified-bar`)**:
+   - Replaced fragmented multi-row floating pills with a unified capsule (`height: 52px`, `border-radius: 20px`, `border: 1px solid #e8e8ed`):
+     - Left: Brand icon and title (`MBSTU বাস ট্র্যাকার`).
+     - Center: Live status indicator pill (`Xটি লাইভ`, `GPS অপেক্ষা`, or `সংযুক্ত হচ্ছে`).
+     - Right: Segmented view switcher (`তালিকা` vs `ম্যাপ`).
+6. **Next.js Production Build Compilation Fix**:
+   - Resolved `error: 'ChevronRight' is not defined` during Vercel deployment by importing `ChevronRight` from `lucide-react` in `transit.tsx`.
+
+---
+
+## 164. Official MBSTU Wheels Protocol Reverse Engineering, Engine.IO v4 Telemetry & Fleet Extraction (Session `7bf9b1c9-a2d1-40c9-a995-c810deb70c60`)
+
+### A. Architectural Context & Objective
+
+In Antigravity session `7bf9b1c9-a2d1-40c9-a995-c810deb70c60`, the user provided the official university transport portal:
+`https://transport.mbstu.ac.bd/MBSTU-Wheels`
+and commanded:
+`clone it to classmate transit`
+
+To achieve 100% fidelity without relying on approximations, a comprehensive reverse-engineering operation was executed:
+1. Decompiled and analyzed Next.js client bundles (`_next/static/chunks/`).
+2. Intercepted and mapped the real-time WebSocket protocol and handshake exchange.
+3. Extracted the complete official MBSTU Transport fleet catalog, schedules, notices, and transport directory.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as ClassMate Client (Web / Android)
+    participant Server as transport.mbstu.ac.bd (Engine.IO v4)
+
+    Note over Client,Server: WebSocket Connection: wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket
+    Client->>Server: Connect (WSS Upgrade)
+    Server-->>Client: 0{"sid":"...","upgrades":[],"pingInterval":25000,"pingTimeout":20000,"maxPayload":1000000}
+    Client->>Server: 40 (Join default Socket.IO namespace)
+    Server-->>Client: 40{"sid":"..."} (Namespace connection confirmed)
+
+    loop Heartbeat Keep-Alive (every 25s)
+        Server-->>Client: 2 (Ping)
+        Client-->>Server: 3 (Pong)
+    end
+
+    loop Live Telemetry Broadcast
+        Server-->>Client: 42["connectedUsersCounts", 142]
+        Server-->>Client: 42["flutter-bus-data", {"id":"SB0010","name":"রক্তকরবী","lat":24.2384,"lng":89.8921,"speed":0,"heading":180,"timestamp":"..."}]
+        Server-->>Client: 42["studentGpsData", {"busId":"SB0010", ...}]
+        Server-->>Client: 42["student-gps-data", {"imei":"...", "latitude":24.2384, "longitude":89.8921, "speed":0}]
+    end
+```
+
+---
+
+### B. Engine.IO v4 / Socket.IO Live Telemetry Wire Protocol
+
+1. **WebSocket Endpoint**:
+   `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`
+2. **Handshake & Heartbeat Protocol Rules**:
+   - **Packet `0` (Handshake Greeting)**: Upon connection, the server sends an Engine.IO open packet containing session ID, ping interval ($25{,}000\text{ ms}$), and ping timeout ($20{,}000\text{ ms}$).
+   - **Packet `40` (Namespace Connect)**: Client must immediately respond with string `"40"` to enter the default namespace `/`.
+   - **Packet `2` & `3` (Ping-Pong Heartbeat)**: When the server sends `"2"`, the client must respond with `"3"`. Failure to reply within 20 seconds terminates the connection.
+   - **Packet `42` (Event Dispatch)**: Messages prefixed with `"42"` contain JSON arrays in the format `[eventName, payload]`.
+3. **Decoded Event Payloads**:
+   - `connectedUsersCounts`: Single integer representing active users currently monitoring transit (e.g., `142`).
+   - `flutter-bus-data` & `studentGpsData`: Dual identical telemetry streams emitting live bus location:
+     ```json
+     {
+       "id": "SB0010",
+       "name": "রক্তকরবী",
+       "category": "student",
+       "latitude": 24.238421,
+       "longitude": 89.892150,
+       "speed": 24.5,
+       "heading": 142.0,
+       "isDriving": true,
+       "timestamp": "2026-10-31T00:35:12.000Z"
+     }
+     ```
+   - `student-gps-data`: Device hardware telemetry stream containing IMEI, raw coordinates, and satellite accuracy.
+
+---
+
+### C. Complete Official MBSTU Fleet Catalog
+
+Extracted from production bundles `d5cfee3f4d27479c.js` and `/Vehicles`:
+
+| Category | Vehicle Name (Bengali) | Vehicle Name (English) | Fleet Type | Capacity & Features |
+| :--- | :--- | :--- | :--- | :--- |
+| **Student** | **গীতাঞ্জলি** | Gitanjali | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **অগ্নিবীণা** | Agnibeena | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **সোনারতরী** | Sonar Tori | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **সংশপ্তক** | Sangshaptak | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **বনলতা** | Banolata | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **রক্তকরবী** | Raktakarabi | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **সঞ্চয়িতা** | Sanchayita | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Student** | **রাখালী** | Rakhali | Large Commuter Bus | 52 Seats, Tangail–Campus Route |
+| **Teacher** | **Teacher Bus 1** | Teacher Bus 1 | Medium Bus | Faculty Transport (AC/Non-AC) |
+| **Teacher** | **Teacher Bus 2** | Teacher Bus 2 | Medium Bus | Faculty Transport (AC/Non-AC) |
+| **Teacher** | **Teacher Microbus**| Faculty Microbus | Microbus | 12 Seats, Rapid Faculty Dispatch |
+| **Officer** | **Officer Bus** | Officer Staff Bus | Coaster Bus | Administrative Staff Route |
+| **Emergency**| **Ambulance 1 & 2** | Campus Ambulance | Emergency Vehicle | 24/7 Medical Transport, West of Shahjaman Dighi |
+
+---
+
+### D. Bus Schedule & Transport Directory Extraction
+
+1. **Schedule Datasets (`/Schedule`)**:
+   - **Regular Weekdays (Sunday – Thursday)**:
+     - Morning Inbound: Trips starting from Tangail Old Bus Stand / Nirala at 07:30 AM, 08:00 AM, 08:30 AM, 09:00 AM.
+     - Afternoon Outbound: Campus departure from Mukto Mancho / First Gate at 01:30 PM, 03:00 PM, 04:30 PM, 05:30 PM.
+   - **Weekends & Holidays (Friday – Saturday)**:
+     - Reduced standby schedule for resident campus students and emergency duty staff.
+2. **Transport Directorate & Administration (`/Transport-Directory`)**:
+   - **Convener**: Dr. Md. Sajjad Waheed (Professor, Dept. of ICT; `sajjad@mbstu.ac.bd`)
+   - **Member Secretary**: Dr. Md. Mahbubul Bashar (Professor, Dept. of Textile Engineering; Director of Transport; `director.transport@mbstu.ac.bd`)
+   - **Faculty Members**: Professor Dr. Mohammad Idrish Ali (Dean, Faculty of Science), Dr. Md. Imam Hossain.
+   - **Headquarters**: Transport Office, West Side of Shahjaman Dighi, Santosh-1902, Tangail. Emergency Phone: `+0921-62086`, Fax: `+0921-51900`.
+
+---
+
+### E. ClassMate Transit UI Architecture & Integration Blueprint
+
+To clone MBSTU Wheels cleanly while preserving ClassMate design language, the Transit module implements a **5-View Navigation Architecture**:
+1. **Live Radar Map (`view === 'map'`)**: Interactive Leaflet / OSMDroid map with MBSTU road polylines, 38px custom high-visibility vehicle markers, approaching stop lollipops, and tap-isolated bottom sheet.
+2. **Vehicle Fleet List (`view === 'vehicles'`)**: Categorized cards (Students, Teachers, Officers, Emergency) showing real-time speed, status pill, driver info, and one-tap map auto-focus.
+3. **Bus Schedule Timetable (`view === 'schedule'`)**: Filterable schedule tables for regular weekdays vs weekend/holiday timings.
+4. **Transport Notices (`view === 'notices'`)**: Official university transport notices and service announcements.
+5. **Transport Directory & Emergency (`view === 'directory'`)**: Direct one-tap dial buttons for 24/7 campus ambulance dispatch and transport office officials.
+
+---
+
+## 165. Native Android APK OpenStreetMap (`osmdroid`) Engine & Live Transit Telemetry Client
+
+### A. Architectural Context & Technical Foundation
+
+While the companion Web client served as an immediate, agile testbed for visual polish and telemetry validation, the native ClassMate Android APK implements a 100% native transit stack:
+- **Map Engine**: `org.osmdroid:osmdroid-android:6.1.18` (OpenStreetMap native vector tiles). Scrapped fragile `WebView` approaches in favor of hardware-accelerated Android canvas rendering.
+- **Protocol Client**: OkHttp `WebSocketListener` implementing the exact Engine.IO v4 protocol (`0` greeting $
+ightarrow$ `40` join $
+ightarrow$ `2`/`3` heartbeat $
+ightarrow$ `42` telemetry parsing).
+- **Navigation Integration**: Bottom navigation bar modernized with a central Transit slot (`R.id.nav_transit`), moving Batch/People management into Settings.
+
+```mermaid
+flowchart TD
+    subgraph AndroidTransitArchitecture ["Native Android Transit Architecture (ClassMateTransitScreen.kt)"]
+        subgraph UI ["UI Layer"]
+            OSMView["osmdroid MapView (OpenStreetMap)"]
+            BottomBar["GlassBottomNavView (5-Tab with Center Transit Slot)"]
+            BottomSheet["BottomSheetDialog (Native 3-Tier Draggable Sheet)"]
+        end
+
+        subgraph ClientEngine ["Network & Telemetry Layer"]
+            OkHttpWS["OkHttp WebSocket Client (Engine.IO v4)"]
+            TelemetryParser["TelemetryParser (JSON Engine: flutter-bus-data / studentGpsData)"]
+            LivePusher["LiveData / StateFlow<List<MbstuBus>>"]
+        end
+
+        subgraph Overlays ["Map Canvas Overlays Layer"]
+            BusOverlay["ItemizedIconOverlay<OverlayItem> (Custom Bus Markers)"]
+            PolylineOverlay["Polyline (MBSTU Asphalt Street Geometry)"]
+            StoppageOverlay["FolderOverlay (Stoppage Lollipops)"]
+        end
+
+        OkHttpWS --> TelemetryParser --> LivePusher
+        LivePusher --> BusOverlay --> OSMView
+        PolylineOverlay --> OSMView
+        StoppageOverlay --> OSMView
+        OSMView --> BottomSheet
+        BottomBar --> OSMView
+    end
+```
+
+---
+
+### B. Core Implementations & Technical Details
+
+1. **Dependency Injection & Manifest Permissions**:
+   - `build.gradle.kts`: Added `implementation("org.osmdroid:osmdroid-android:6.1.18")`.
+   - `AndroidManifest.xml`: Declared network and storage caching permissions:
+     - `<uses-permission android:name="android.permission.INTERNET" />`
+     - `<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />`
+     - `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />`
+2. **Native Map Configuration (`ClassMateTransitScreen.kt`)**:
+   - Initialized `Configuration.getInstance().userAgentValue = context.packageName` to comply with OpenStreetMap tile usage policies.
+   - Configured `MapView`: multi-touch pinch zoom, built-in zoom controls disabled, software rendering fallback configured for legacy GPU hardware, and tiles cached in app private storage (`context.cacheDir/osmdroid`).
+   - Default viewport centered on MBSTU Santosh Campus coordinates (`24.2384° N, 89.8922° E`, zoom level 15.5).
+3. **OkHttp Engine.IO v4 Protocol Implementation**:
+   - Established persistent WebSocket to `wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket`.
+   - On `onMessage`:
+     - If message starts with `"0"`: parses `pingInterval` and immediately transmits `"40"` string to bind default namespace.
+     - If message equals `"2"`: immediately responds with `"3"`.
+     - If message starts with `"42"`: decodes `[eventName, payload]`. Maps `flutter-bus-data` and `studentGpsData` into native `MbstuBus` data classes and dispatches updates to main thread via `Handler(Looper.getMainLooper())`.
+   - Automatic reconnection: Exponential backoff ($1\text{s}, 2\text{s}, 4\text{s}, 8\text{s}$, max $30\text{s}$) upon network loss or server socket reset.
+4. **Hardware Concurrency & Backend Relay Roadmap**:
+   - *Direct Connection Risk*: If hundreds of ClassMate students open the app simultaneously during peak dismissal hours ($01:30\text{ PM}, 04:30\text{ PM}$), hundreds of concurrent WebSocket connections could trigger IP rate-limiting or firewall bans on the university server.
+   - *Backend Relay Solution*: Route telemetry through a centralized backend server or Supabase Edge Function that maintains a single upstream connection to `transport.mbstu.ac.bd` and fans out updates to connected clients using Supabase Realtime Channels or lightweight Server-Sent Events (SSE).
+
+---
+
+### C. Master Production Verification Matrix (Updated Master State)
 
 | Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
 | :--- | :--- | :--- | :--- |
+| **Tap-to-Open & Outside-Click Dismissal** | Web Companion | **PRODUCTION** | `selectedBusId` strict isolation; outside click dismisses bottom sheet (Commit `423101f`) |
+| **Bottom Sheet Restyling & Bengali Localization** | Web Companion | **PRODUCTION** | Removed rogue `0010` text, 24px top radius, 100% Bengali labels (Commit `423101f`) |
+| **Streamlined Unified Header Bar** | Web Companion | **PRODUCTION** | Single floating capsule with title, live status count badge, and view switcher (Commit `423101f`) |
+| **Next.js Production Build Resolution** | Web Companion | **PRODUCTION** | Resolved missing `ChevronRight` import from `lucide-react` (Commit `423101f`) |
+| **MBSTU Wheels Protocol Reverse Engineering** | Protocol / Telemetry | **VERIFIED** | Engine.IO v4 wire protocol mapped (`0` greeting, `40` join, `2`/`3` ping-pong, `42` payload) |
+| **Complete MBSTU Fleet Catalog** | Fleet Database | **VERIFIED** | 8 Student buses, 3 Teacher vehicles, Officers coaster, 24/7 Ambulance service |
+| **Timetable & Committee Directory** | Directory Database | **VERIFIED** | Weekday/weekend schedules, Transport Committee contacts and emergency phone lines |
+| **Native Android OSM Transit Screen** | Android APK | **VERIFIED** | `ClassMateTransitScreen.kt` using `osmdroid` native vector tiles & OkHttp Engine.IO v4 client |
 | **Status De-Duplication & Natural Time** | Web Companion | **PRODUCTION** | Clean progress pill, single-source velocity, natural Bengali elapsed time (Commit `f258016`) |
 | **Monotonic Milestone Mileage** | Web Companion | **PRODUCTION** | Pre-calculated 24-station corridor distances; strictly increasing road mileage (Commit `f258016`) |
-| **Sticky Header & Bottom Padding** | Web Companion | **PRODUCTION** | `position: sticky` on header card; `padding-bottom: 96px` preventing bottom bar clipping (Commit `f258016`) |
 | **Predictive Back Navigation** | Android APK | **VERIFIED** | `enableOnBackInvokedCallback="true"`, modern activity transitions across 12+ screens (Commit `1b3d37d`) |
 | **Universal Tactile Haptics** | Android APK | **VERIFIED** | `HapticHelper.lightPop` wired into `View.applyClickAnimation` across all buttons/cards (Commit `148b002`) |
 | **Shimmer Skeleton Modernization** | Android APK | **VERIFIED** | `shimmer_item_notice.xml` matching `item_notice_modern.xml` 1:1; 0 CLS layout jumps (Commit `148b002`) |
@@ -10054,10 +10340,6 @@ A visual and structural audit of the live transit map interface on physical mobi
 | **Offline-First Room Caching** | Android APK | **VERIFIED** | 7-day routine batching & Room DB fallback; <20ms tab switches, <50ms cold start (Commit `49d64c5`) |
 | **Street Polyline Geometry** | Web Companion | **PRODUCTION** | Traced physical asphalt roads: MBSTU Campus Loop, Santosh Rd, Kagmari Bridges & Tangail Loop (Commit `10f56bc`) |
 | **High-Visibility Bus Marker** | Web Companion | **PRODUCTION** | 38px solid white badge, colored chassis SVG, dual glowing headlights & sharp pointer (Commit `25ad6da`) |
-| **Bus Name Click-to-View** | Web Companion | **PRODUCTION** | Bus names strictly hidden by default; popover callout opens only when clicked with `stopPropagation` (Commit `25ad6da`) |
-| **Kinematic Radar Wave** | Web Companion | **PRODUCTION** | CSS `transitBusRadar` 2s expanding ring animation active when `bus.isDriving === true` (Commit `25ad6da`) |
-| **Stop Label Dark Frosted Pill**| Web Companion | **PRODUCTION** | `.lollipop-label` with `rgba(15, 23, 42, 0.92)`, white border, and drop-shadow; 100% legibility (Commit `25ad6da`) |
-| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt); OSMDroid MapView + OkHttp Engine.IO v4 protocol |
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
-| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
