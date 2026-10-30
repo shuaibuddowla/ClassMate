@@ -10958,3 +10958,36 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
    - Added right-side scroll padding (`padding-right: 28px`) ensuring `শহরমুখী` is never clipped.
 6. **Sleek Map Shortcut**:
    - Converted the ambiguous circular pin button into a branded pill: `[ 🗺️ ম্যাপ ]`.
+
+
+---
+
+## 175. Transit UI/UX Architectural Redesign: Unified Header & Zero-Collision Card Feed
+
+### A. Problem Diagnostic (from User Screenshot `media_1793398514163_a67b3570.jpg`)
+1. **Severe Text & Button Collision in Bus Cards**: In Row 1 of every card, the inline corridor route string (`• ক্যাম্পাস ⇄ কাগমারী ⇄ নিরালা`) ran directly underneath and collided with the `[ 🗺️ ম্যাপ ]` button, making route titles unreadable on 360px–412px mobile viewports.
+2. **Next Stop Station Name Truncation (`...`)**: Because the Next Stop title shared a horizontal row with the wide user proximity badge (`📍 আপনার থেকে ৩১৫ মি`), long station names were clipped with ellipses (e.g. `একাডেমিক ভ...`, `প্রথম গেট বাস ...`, `মুক্তমঞ্চ বাস ...`), withholding critical arrival info from students.
+3. **Overbearing 140px Crimson Header Billboard & Glitch Artifact**: The list header (`.transit-list-header-card`) consumed ~145px of screen height with a giant title and tab bar. Furthermore, `.transit-list-header-card::after` drew a rotated dashed arc that looked like a broken display glitch.
+4. **Header Layout Shift Between Views**: Switching between Map View and List View caused a jarring visual jump from a 50px sleek floating pill to a 140px crimson block.
+
+### B. Architectural & UI/UX Solutions Implemented
+1. **Unified Sleek Floating Header (~50px Height, 100% View Consistency)**:
+   - Replaced the 140px crimson billboard with `.transit-list-top-bar` housing `.transit-header-pill.unified-bar`:
+     - **Left**: Rose-tinted bus avatar icon + `MBSTU বাস ট্র্যাকার` + Live fleet badge `[ 🟢 ৬টি লাইভ ]` with pulsing emerald dot.
+     - **Right**: Integrated segmented switcher `[ 📋 তালিকা | 🗺️ ম্যাপ ]`.
+   - Switching between `[তালিকা]` and `[ম্যাপ]` now maintains zero layout shift, saves ~90px of vertical space, and completely removes the glitchy rotated dashed pseudo-element.
+2. **Zero-Collision 4-Row Card Architecture**:
+   - **Row 1 (Identity & Live Status)**:
+     - Left: Bus color dot + Bus Name (`বনলতা`, 16px bold) + Short Bengali ID Chip (`[ ০০০৯ ]`).
+     - Right: Live status badge (`🅿️ ক্যাম্পাস স্ট্যান্ডবাই` or `⚡ চলন্ত ২৫ কিমি/ঘ`) docked on the right. Zero collision.
+   - **Row 2 (Dedicated Route Corridor)**:
+     - Full-width line: `⇄ ক্যাম্পাস ⇄ কাগমারী ⇄ নিরালা`. Zero overlap with any buttons.
+   - **Row 3 (Unclipped Next Stop Milestone)**:
+     - Dedicated milestone box: `🚏 পরবর্তী স্টপ: একাডেমিক ভবন-১ বাস স্টপ (০.২১ কিমি)`. Station names render 100% in full without truncation.
+   - **Row 4 (Telemetry & Quick Action)**:
+     - Left: `📍 আপনার থেকে ৩১৫ মি • ৫২ সে আগে` (User distance + GPS timestamp).
+     - Right: Sleek `[ 🗺️ ম্যাপ ]` pill button. Clicking it navigates to the bus on the map; clicking anywhere else on the card opens the full itinerary.
+3. **100% Bengali Numerals & String Standardization**:
+   - Localized live counts, stepper stop numbers, distances (`০.২১ কিমি`), and ETA drive times throughout modal action sheets and expanded bottom sheet drawers.
+4. **Production Build & Verification**:
+   - Verified zero TypeScript compilation errors with `npm --prefix web run build`.
