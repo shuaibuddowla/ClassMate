@@ -912,6 +912,18 @@ export function Transit({ ctx }: { ctx?: any }) {
     displayFleet.forEach((bus) => {
       const isSelected = bus.id === selectedBusId;
 
+      // Distance from user to this bus
+      const distFromUser = userLocation
+        ? getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon)
+        : null;
+      const userDistStr = distFromUser !== null ? `📍 ${formatDistanceUser(distFromUser)} দূরে` : "";
+
+      const speedLabel = bus.isStale
+        ? "GPS বিলম্বিত"
+        : bus.speed > 0
+        ? `⚡ ${Math.round(bus.speed)} কিমি/ঘ`
+        : "🅿️ স্ট্যান্ডবাই (০ কিমি/ঘ)";
+
       const html = `
         <div class="transit-bus-pin-wrapper ${isSelected ? "selected" : ""}" style="--bus-color: ${bus.color};">
           ${
@@ -923,9 +935,10 @@ export function Transit({ ctx }: { ctx?: any }) {
                     <span class="transit-callout-id">${bus.id}</span>
                   </div>
                   <div class="transit-callout-bottom">
-                    <span class="transit-callout-speed ${bus.isDriving ? "speed-active" : "speed-standby"}">
-                      ${bus.isStale ? "GPS বিলম্বিত" : bus.isDriving ? `⚡ ${Math.round(bus.speed)} km/h` : "🅿️ স্ট্যান্ডবাই"}
+                    <span class="transit-callout-speed ${bus.isDriving && bus.speed > 0 ? "speed-active" : "speed-standby"}">
+                      ${speedLabel}
                     </span>
+                    ${userDistStr ? `<span class="transit-callout-user-dist">${userDistStr}</span>` : ""}
                   </div>
                   <div class="transit-callout-arrow"></div>
                 </div>`
@@ -957,6 +970,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       let marker = busMarkersRef.current.get(bus.id);
       if (!marker) {
         marker = L.marker([bus.lat, bus.lon], { icon, zIndexOffset: isSelected ? 1000 : 800 }).addTo(map);
+        (marker as any).__renderedHtml = html;
         marker.on("click", (e) => {
           L.DomEvent.stopPropagation(e);
           setSelectedBusId(bus.id);
@@ -964,12 +978,16 @@ export function Transit({ ctx }: { ctx?: any }) {
         });
         busMarkersRef.current.set(bus.id, marker);
       } else {
+        // Only update icon if HTML actually changed - avoids DOM destruction and callout blinking
+        if ((marker as any).__renderedHtml !== html) {
+          marker.setIcon(icon);
+          (marker as any).__renderedHtml = html;
+        }
         marker.setLatLng([bus.lat, bus.lon]);
-        marker.setIcon(icon);
         marker.setZIndexOffset(isSelected ? 1000 : 800);
       }
     });
-  }, [displayFleet, selectedBusId]);
+  }, [displayFleet, selectedBusId, userLocation]);
 
   // 6.1 Render Live User Geolocation Marker on Map
   useEffect(() => {
