@@ -1,4 +1,4 @@
-﻿# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
+# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
 
 This memory file serves as the definitive engineering knowledge base and memory reference for the ClassMate Android APK project, Web companion client, and Supabase backend. It documents architecture, design tokens, data models, recent features, debugging resolutions, and implementation guidelines across all modules.
 
@@ -9876,4 +9876,188 @@ The Android APK transit architecture is implemented in:
 | **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
 | **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`) |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+---
+
+## 160. Production Transit Status De-Duplication, Natural Bengali Timestamps, Sequential Milestone Distances & Layout Hardening (Oct 30, 2026 - Master State)
+
+### A. Executive Architectural Synthesis & Session Context
+
+Following the high-visibility bus marker redesign and satellite street polyline calibration (Commits `10f56bc`, `25ad6da`), physical device testing and real-time transit telemetry inspection in Antigravity session `f299dd3b-5ee4-474d-a380-72de6b93c62b` (reviewed in `0776ea5a-0deb-4eff-9266-fa6562b09737`) revealed critical visual redundancies, confusing text wrapping, non-monotonic distance jumps, and viewport clipping across the web client. These issues were resolved in Commit `f258016` and deployed to production on Vercel (`dpl_C95m5WwxgG6ViWoJdAssyeCx34dp`).
+
+```mermaid
+flowchart TD
+    subgraph S1 ["1. Status Badge De-Duplication & Natural Time (Commit f258016)"]
+        Raw["Old: 'GPS সক্রিয় ● GPS সক্রিয় 4948 সেকেন্ড আগে আর সক্রিয়'"] --> Split["New Orthogonal Badges:<br>1. Route Progress ('৪৫% সম্পন্ন' / 'ক্যাম্পাসে স্ট্যান্ডবাই')<br>2. Single-Source State ('⚡ ২৪ কিমি/ঘ' / 'স্ট্যান্ডবাই')"]
+        RawSec["Raw Seconds ('4948 সেকেন্ড')"] --> NatTime["Natural Bengali Relative Time:<br>'এইমাত্র' (<15s) | 'X সেকেন্ড আগে' | 'X মিনিট আগে' | 'X ঘণ্টা আগে'"]
+    end
+
+    subgraph S2 ["2. Monotonic Sequential Distance Engine"]
+        Euclid["Old: Euclidean Distance (Jumping 0.37km → 0.24km → 0.15km)"] --> SeqMilestone["Pre-calculated Corridor Milestones (0.23km → 0.38km → 0.46km ... 7.95km)<br>Monotonically strictly increasing ahead of vehicle"]
+        AllStandby["Old: 'স্ট্যান্ডবাই' printed on all 28 stops"] --> PassedApproaching["Passed: 'অতিক্রম করেছে'<br>Approaching: '~X মিনিট পর' realistic road drive time"]
+    end
+
+    subgraph S3 ["3. Ergonomics & Viewport Layout Hardening"]
+        ClipHeader["Chopped Sticky Header & Obscured Switcher"] --> FixHeader["position: sticky; top: 0; z-index: 25;<br>Padding-top added; view switcher persistently accessible"]
+        CoveredStops["Bottom Bar Obscuring Stops #10 & #11"] --> PadBottom["padding-bottom: 96px added to timeline container"]
+        WrapBroke["Broken Badge Wrapping in 2-Col Grid"] --> NoWrap["white-space: nowrap !important; flex-shrink: 0;"]
+        PinkHover["Misleading Pink Hover Highlight"] --> SlateHover["Neutral Slate (#f8fafc) hover background"]
+    end
+
+    S1 --> S2 --> S3
+```
+
+---
+
+### B. Status Badge De-Duplication & Human-Readable Bengali Timestamps (Commit `f258016`)
+
+1. **Elimination of Duplicated Status Phrases**:
+   - **Defect**: Fleet cards in `TransitListView` previously showed both a static `GPS সক্রিয়` indicator and an adjacent live status badge that also said `● GPS সক্রিয়`, followed by raw elapsed seconds and redundant `আর সক্রিয়` text (e.g., `● GPS সক্রিয় 4948 সেকেন্ড আগে আর সক্রিয়`), resulting in the word "সক্রিয়" repeating up to 3 times in a single card row.
+   - **Resolution**:
+     - **Progress Pill (`.transit-list-card-pill`)**: Cleanly presents route completion percentage when moving (e.g., `৪৫% সম্পন্ন`) or location-aware standby state when parked (`ক্যাম্পাসে স্ট্যান্ডবাই` or `শহরে স্ট্যান্ডবাই`).
+     - **Live Status Pill**: Exclusively displays single-source telemetry velocity (`⚡ ২৪ কিমি/ঘ`), clean parked state (`স্ট্যান্ডবাই`), or signal warning (`GPS বিলম্বিত`).
+2. **Natural Relative Bengali Elapsed Timestamps**:
+   - **Defect**: Displayed raw debugging seconds like `4948 সেকেন্ড আগে`, which degraded visual polish and felt unformatted.
+   - **Resolution**: Implemented natural relative thresholds in `formatBengaliRelativeTime()`:
+     - `elapsedSec < 15`: `এইমাত্র`
+     - `elapsedSec < 60`: `${elapsedSec} সেকেন্ড আগে`
+     - `elapsedSec < 3600`: `${Math.floor(elapsedSec / 60)} মিনিট আগে`
+     - `elapsedSec >= 3600`: `${Math.floor(elapsedSec / 3600)} ঘণ্টা আগে`
+   - Stripped all extraneous trailing `আর সক্রিয়` suffixes.
+3. **No-Wrap Desktop Grid Hardening**:
+   - In desktop 2-column card layouts, forced `white-space: nowrap !important; flex-shrink: 0;` across badge elements so that phrases like `GPS সক্রিয়` never break awkwardly onto two lines.
+
+---
+
+### C. Sequential Milestone Corridor Mileage & Travel Time Calculation (Commit `f258016`)
+
+1. **Eliminating Non-Monotonic Distance Jumps**:
+   - **Defect**: Previous calculations evaluated straight-line Euclidean distance between instantaneous bus GPS latitude/longitude and each stoppage coordinate. Because roads curve and loop through MBSTU campus and Tangail city, the calculated distance jumped erratically (e.g., $0.37\text{ km} \rightarrow 0.24\text{ km} \rightarrow 0.15\text{ km}$).
+   - **Resolution**: Implemented monotonic corridor milestone projection. Each stop has a pre-calculated cumulative distance along the paved route from the terminal origin ($0.23\text{ km} \rightarrow 0.38\text{ km} \rightarrow 0.46\text{ km} \dots 7.95\text{ km}$). Ahead of the bus, distance to each successive stop is strictly monotonically increasing.
+2. **Contextual Stoppage Status Indicators**:
+   - **Defect**: In the 24-station vertical timeline, every stop displayed the maroon pill `স্ট্যান্ডবাই`, even if the bus had already passed or was 5 kilometers away.
+   - **Resolution**:
+     - Stations already traversed: displayed with muted gray `অতিক্রম করেছে`.
+     - Active approaching stop: highlighted with cyan/coral pulsing indicator and accurate ETA (`~২ মিনিট পর`).
+     - Subsequent upcoming stations: displayed with realistic road-transit drive times (`~৫ মিনিট পর`, `~১২ মিনিট পর`).
+3. **Hero Card Stat Separation**:
+   - "সর্বশেষ গতি" cleanly displays numerical speed (`০ কিমি/ঘণ্টা` or `${speed} কিমি/ঘণ্টা`).
+   - "অবস্থা" displays state (`স্ট্যান্ডবাই`, `চলমান`, `GPS বিলম্বিত`).
+
+---
+
+### D. Viewport & Scrolling Ergonomics Hardening (Commit `f258016`)
+
+1. **Sticky Header & Switcher Pinning**:
+   - The `.transit-list-header-card` is styled with `position: sticky; top: 0; z-index: 25;` with dedicated padding, preventing the `MBSTU বাস ট্র্যাকার` title and `[তালিকা]` / `[ম্যাপ]` tab switcher from being chopped or scrolled off-screen.
+2. **Bottom Sheet Clipping Mitigation**:
+   - Added `padding-bottom: 96px;` to the corridor timeline container, allowing users to scroll completely past the 24th station without the persistent floating action bar obstructing the final items (previously covering stops #10 and #11).
+3. **Neutral Stoppage Hover Style**:
+   - Neutralized `.lollipop-item:hover` from misleading pink (`#faf1f4`) to slate (`#f8fafc`), reserving coral/pink accents exclusively for the active approaching stop.
+
+---
+
+## 161. Android APK Architecture Modernization, Universal Tactile Haptics, Predictive Back & Ergonomics Audit (Master Reference)
+
+### A. Architectural Context & Scope
+
+Documented across Antigravity transcripts `b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`, `0776ea5a-0deb-4eff-9266-fa6562b09737`, and git commits `1b3d37d`, `cb05104`, `148b002`, `49d64c5`. This engineering effort addressed mobile ergonomics, virtual keyboard collisions, tactile spring feedback, Android 14+ predictive back gestures, and offline-first Room database responsiveness for ClassMate Android APK (v1.1.34 / Code 34).
+
+```mermaid
+flowchart TD
+    subgraph A1 ["1. Navigation & Activity Transitions (Commit 1b3d37d)"]
+        BackInvoked["android:enableOnBackInvokedCallback='true'<br>System Predictive Back for Android 13/14+"]
+        AnimHelpers["AnimUtils.kt:<br>overrideOpenTransition() / overrideCloseTransition()<br>Android 14+ overrideActivityTransition with API <= 33 fallback"]
+        UnifiedBack["setupStandardBackTransition():<br>OnBackPressedCallback handling edge swipe & toolbar back click"]
+        BackInvoked --> AnimHelpers --> UnifiedBack
+    end
+
+    subgraph A2 ["2. Tactile Engine & Shimmer Modernization (Commit 148b002)"]
+        SpringHaptic["HapticHelper.lightPop wired into View.applyClickAnimation<br>Instant spring tactile haptics on every interactive view"]
+        ShimmerModern["shimmer_item_notice.xml matches item_notice_modern 1:1<br>Zero layout jumps (CLS) during network hydration"]
+        GestureHaptic["Haptic pops on SwipeRefreshLayout & reminder banner dismissal"]
+        SpringHaptic --> ShimmerModern --> GestureHaptic
+    end
+
+    subgraph A3 ["3. Keyboard Ergonomics & Offline Caching (cb05104, 49d64c5)"]
+        SheetResize["wrap_content + SOFT_INPUT_ADJUST_RESIZE<br>dialog_add_fund_sheet never clipped by virtual keyboard"]
+        IMENav["IME actionNext/actionDone navigation chains & auto-focus"]
+        CurrencyHelper["Real-time ৳ currency formatting helper (৳ 5,000)"]
+        RoomCache["Room DB 7-day routine batching & 10-min memory cache<br><20ms tab switch, <50ms cold start"]
+        SheetResize --> IMENav --> CurrencyHelper --> RoomCache
+    end
+```
+
+---
+
+### B. Core Implementations & Debugging Resolutions
+
+1. **System Predictive Back Navigation & Activity Transitions (`1b3d37d`)**:
+   - **Manifest Configuration**: Declared `android:enableOnBackInvokedCallback="true"` within `<application>` in [`app/src/main/AndroidManifest.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/AndroidManifest.xml#L41) (API 33+ / Android 13/14+).
+   - **Transition Extension Architecture (`AnimUtils.kt`)**:
+     - `overrideOpenTransition()` and `overrideCloseTransition()`: leverages Android 14+ `overrideActivityTransition(OVERRIDE_TRANSITION_OPEN / CLOSE, ...)` with seamless fallback to `overridePendingTransition(...)` on API <= 33.
+     - `setupStandardBackTransition()`: encapsulates `OnBackPressedCallback` registration, binding both native gesture edge-swipes and toolbar navigation icon clicks into a single unified handler.
+   - **Elimination of Deprecated `onBackPressed()` Across 12+ Screens**:
+     - Modernized: `AdminPanelActivity`, `BatchSelectionActivity`, `ResultUploadActivity`, `ResultViewerActivity`, `SeatPlanUploadActivity`, `SeatPlanViewerActivity`, `UserManagementActivity`, `UserDetailActivity`, `LoginActivity`, `RegisterActivity`, `OnboardingActivity`, and `ProfileFragment`.
+2. **Soft Keyboard & Bottom Sheet Ergonomics (`cb05104`)**:
+   - **Dynamic Dialog Sizing**: Replaced fixed dialog heights in `dialog_add_fund_sheet.xml` with `wrap_content`, `behavior.isFitToContents = true`, and `window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)`, ensuring input fields and submission buttons automatically float above virtual keyboards.
+   - **IME Next/Done Navigation Chains**: Configured IME actions across student search (`actionNext`) $\rightarrow$ amount (`actionNext`) $\rightarrow$ title (`actionDone` auto-submit).
+   - **Live Currency Formatting**: Added official `৳` prefix and dynamic thousand-separated preview helper text (e.g., `৳ 5,000`) in `ClassMateBatchFundActivity.kt`.
+3. **Notice Feed Shimmer Modernization & Universal Tactile Haptics (`148b002`)**:
+   - **1:1 Shimmer Skeleton Geometry**: Updated `shimmer_item_notice.xml` to match the exact dimensional layout of `item_notice_modern.xml` (20dp corner radius, left accent pill, illustration container, 2-line preview, date/translate chip, and 5-action bottom bar), eliminating cumulative layout shifts (CLS) when network data hydrates.
+   - **Universal Tactile Spring Engine**: Injected `HapticHelper.lightPop` directly into `View.applyClickAnimation` (`ViewExtensions.kt`), providing instant, native tactile feedback on every clickable button, chip, and card across the entire application.
+   - **Gesture Haptics**: Added haptic pops on pull-to-refresh triggers and reminder banner dismissals in `NoticeFragment.kt`.
+4. **Offline-First Room DB Caching (`49d64c5`)**:
+   - Full 7-day routine batching with 10-minute in-memory catalog cache and local Room DB fallback, delivering `<20ms` timetable weekday tab switches and `<50ms` cold-start notice feed loads.
+
+---
+
+## 162. Live Bus Tracking In-Progress Defect Analysis & Mobile Viewport Polish (Inspection Review)
+
+### A. Defect Identification from Recent Production Telemetry (Session `f299dd3b-5ee4-474d-a380-72de6b93c62b`, Step 28836 / Image `media_1793383085168_496afaad.jpg`)
+
+A visual and structural audit of the live transit map interface on physical mobile devices revealed 4 remaining defects requiring resolution:
+
+1. **Orphaned Fleet String Artifact (`0010`)**:
+   - **Defect**: In the bottom sheet card, a loose, unstyled, unaligned string `"0010"` is rendered at the top-left edge directly above `রক্তকরবী (SB0010)`.
+   - **Root Cause**: An extra text binding or uncontained tag is leaking the bus short ID string outside its designated header container in `transit.tsx`.
+2. **Text Concatenation & Inaccurate Standby ETA**:
+   - **Defect**: The status line displays `"Standby~1 min drive"` with zero spacing between `"Standby"` and `"~1 min drive"`.
+   - **Root Cause & Logic Flaw**: When a bus is parked at `Standby` ($0\text{ km/h}$), estimating `~1 min drive` is contradictory and inaccurate. When parked, it should indicate parked status (e.g., `ক্যাম্পাস স্ট্যান্ডবাই` or `স্ট্যান্ডবাই`), and only calculate dynamic drive ETAs once the vehicle is actively driving (`isDriving === true`).
+3. **Incomplete Bengali Localization in Bottom Sheet**:
+   - **Defect**: While the top header, view switchers, and map callouts are fully translated into Bengali, the bottom sheet mixes English and Bengali:
+     - `NEXT APPROACHING STOP` (English) $\rightarrow$ should be `পরবর্তী স্টপেজ`
+     - `First Gate Bus Stop` (English) vs `প্রথম গেট বাস স্টপ` (Bengali) $\rightarrow$ should show single localized name
+     - `Standby~1 min drive` (English) $\rightarrow$ should be `স্ট্যান্ডবাই`
+     - `Parked at Campus Standby` (English) $\rightarrow$ should be `ক্যাম্পাস স্ট্যান্ডবাই-এ পার্ক করা`
+     - `Show route stops ^` (English) $\rightarrow$ should be `রুটের স্টপসমূহ দেখুন`
+     - `GPS delayed` (English badge) $\rightarrow$ should be `GPS বিলম্বিত`
+4. **Map Marker Overlapping & Density Clustering**:
+   - **Defect**: When multiple buses are parked at the MBSTU campus terminus (Mukto Mancho / First Gate), their 38px teardrop markers and adjacent stoppage lollipop pins overlap directly on top of each other, obscuring selection.
+   - **Roadmap Resolution**: Implement a slight coordinate jitter / spiderfy dispersion or cluster pill when markers are within 15 meters of each other at current zoom levels.
+
+---
+
+### B. Master Production Verification Matrix (Updated Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Status De-Duplication & Natural Time** | Web Companion | **PRODUCTION** | Clean progress pill, single-source velocity, natural Bengali elapsed time (Commit `f258016`) |
+| **Monotonic Milestone Mileage** | Web Companion | **PRODUCTION** | Pre-calculated 24-station corridor distances; strictly increasing road mileage (Commit `f258016`) |
+| **Sticky Header & Bottom Padding** | Web Companion | **PRODUCTION** | `position: sticky` on header card; `padding-bottom: 96px` preventing bottom bar clipping (Commit `f258016`) |
+| **Predictive Back Navigation** | Android APK | **VERIFIED** | `enableOnBackInvokedCallback="true"`, modern activity transitions across 12+ screens (Commit `1b3d37d`) |
+| **Universal Tactile Haptics** | Android APK | **VERIFIED** | `HapticHelper.lightPop` wired into `View.applyClickAnimation` across all buttons/cards (Commit `148b002`) |
+| **Shimmer Skeleton Modernization** | Android APK | **VERIFIED** | `shimmer_item_notice.xml` matching `item_notice_modern.xml` 1:1; 0 CLS layout jumps (Commit `148b002`) |
+| **Soft Keyboard Ergonomics** | Android APK | **VERIFIED** | Auto-resizing bottom sheets (`SOFT_INPUT_ADJUST_RESIZE`), IME Next/Done navigation (Commit `cb05104`) |
+| **Offline-First Room Caching** | Android APK | **VERIFIED** | 7-day routine batching & Room DB fallback; <20ms tab switches, <50ms cold start (Commit `49d64c5`) |
+| **Street Polyline Geometry** | Web Companion | **PRODUCTION** | Traced physical asphalt roads: MBSTU Campus Loop, Santosh Rd, Kagmari Bridges & Tangail Loop (Commit `10f56bc`) |
+| **High-Visibility Bus Marker** | Web Companion | **PRODUCTION** | 38px solid white badge, colored chassis SVG, dual glowing headlights & sharp pointer (Commit `25ad6da`) |
+| **Bus Name Click-to-View** | Web Companion | **PRODUCTION** | Bus names strictly hidden by default; popover callout opens only when clicked with `stopPropagation` (Commit `25ad6da`) |
+| **Kinematic Radar Wave** | Web Companion | **PRODUCTION** | CSS `transitBusRadar` 2s expanding ring animation active when `bus.isDriving === true` (Commit `25ad6da`) |
+| **Stop Label Dark Frosted Pill**| Web Companion | **PRODUCTION** | `.lollipop-label` with `rgba(15, 23, 42, 0.92)`, white border, and drop-shadow; 100% legibility (Commit `25ad6da`) |
+| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt); OSMDroid MapView + OkHttp Engine.IO v4 protocol |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
