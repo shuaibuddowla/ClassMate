@@ -2,12 +2,13 @@
    ClassMate MBSTU Transit Tracker - Google Maps Material Design 3 Spec
    ========================================================================== */
 
-/* Main Viewport Container */
+/* Main Viewport Container - Edge-to-Edge Full Height */
 .transit-container {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: calc(100vh - 64px);
+  min-height: 100%;
+  flex: 1 1 100%;
   background-color: #0b0f19;
   color: #f1f5f9;
   font-family: inherit;
@@ -17,9 +18,74 @@
 
 @media (max-width: 768px) {
   .transit-container {
-    height: calc(100dvh - 58px);
+    height: 100%;
     min-height: 100%;
   }
+}
+
+/* Transit Tab: Full-Window Map Layout between left and right sidebars */
+.workspace.is-transit-active {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+@media (min-width: 1001px) {
+  .workspace.is-transit-active {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+}
+
+.workspace.is-transit-active .content.is-transit-content {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 1000px) {
+  .workspace.is-transit-active {
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .workspace.is-transit-active .content.is-transit-content {
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+}
+
+.is-transit-layout {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+}
+
+.is-transit-pane {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.is-transit-pane > section.transit-tab-section {
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 1 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.is-transit-pane > section.transit-tab-section[hidden] {
+  display: none !important;
 }
 
 /* Map Canvas (85%+ Viewport) */

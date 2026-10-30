@@ -993,12 +993,16 @@ function TabDeck({
     );
   };
   return (
-    <div className="tab-layout">
-      <div className="primary-pane">
+    <div className={`tab-layout ${current === "transit" ? "is-transit-layout" : ""}`}>
+      <div className={`primary-pane ${current === "transit" ? "is-transit-pane" : ""}`}>
         {Array.from(new Set([...visited, current]))
           .filter((value) => value !== "notices")
           .map((value) => (
-            <section hidden={value !== current} key={value}>
+            <section
+              hidden={value !== current}
+              key={value}
+              className={value === "transit" ? "transit-tab-section" : undefined}
+            >
               {render(value)}
             </section>
           ))}
@@ -1353,7 +1357,7 @@ function Home({
         </div>
       </aside>
       <ResizeHandle {...panels.sidebar} className="sidebar-resizer" />
-      <div className="workspace">
+      <div className={`workspace ${tab === "transit" ? "is-transit-active" : ""}`}>
         {!online && (
           <div className="offline">
             <WifiOff size={15} />
@@ -1378,7 +1382,7 @@ function Home({
           </div>
         )}
         <ErrorBox error={batches.error || linkError} />
-        <main className="content">
+        <main className={`content ${tab === "transit" ? "is-transit-content" : ""}`}>
           <TabDeck
             key={batch}
             desktop={desktop}
