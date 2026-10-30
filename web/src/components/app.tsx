@@ -1003,14 +1003,14 @@ function TabDeck({
             </section>
           ))}
       </div>
-      {tab !== "transit" && <ResizeHandle {...resizeNotices} className="notices-resizer" />}
+      <ResizeHandle {...resizeNotices} className="notices-resizer" />
       <div
         ref={rail}
         className={`notice-pane ${tab === "notices" ? "mobile-active" : ""}`}
         role="complementary"
         tabIndex={desktop ? 0 : -1}
         aria-label="Batch notices"
-        style={tab === "transit" ? { display: "none" } : undefined}
+        
       >
         {ctx.batch ? (
           <Notices

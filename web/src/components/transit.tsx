@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./transit.css";
@@ -17,11 +17,11 @@ import {
   Radio,
   CheckCircle2,
   ChevronRight,
+  ChevronLeft,
   UserCheck,
   ShieldAlert,
   Crosshair,
-  Wifi,
-  WifiOff
+  Sliders
 } from "lucide-react";
 
 export interface MbstuBusData {
@@ -66,18 +66,53 @@ const ROUTE_COORDS: [number, number][] = [
   [24.2498, 89.9165]  // Nirala
 ];
 
-// Initial real MBSTU fleet definitions - all defaulted to 0 speed (parked at campus)
-const INITIAL_FLEET: MbstuBusData[] = [
-  { id: "SB0001", nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", lat: 24.234833, lon: 89.892358, speed: 0, heading: 171, routeName: "MBSTU Campus Standby", driverName: "MD. Mizanur Rahman", driverPhone: "01711234567", capacity: "42 Seater", isDriving: false, color: "#6366f1" },
-  { id: "SB0002", nameBn: "অগ্নিবীণা", nameEn: "Agnibeena", lat: 24.235100, lon: 89.891400, speed: 0, heading: 180, routeName: "Campus ➔ Nirala", driverName: "MD. Rafiqul Islam", driverPhone: "01712345678", capacity: "42 Seater", isDriving: false, color: "#0284c7" },
-  { id: "SB0003", nameBn: "সোনারতরী", nameEn: "Sonartori", lat: 24.235010, lon: 89.891573, speed: 0, heading: 181, routeName: "Campus ➔ Tangail City", driverName: "MD. Kamal Hossain", driverPhone: "01713456789", capacity: "42 Seater", isDriving: false, color: "#0d9488" },
-  { id: "SB0004", nameBn: "ধলেশ্বরী", nameEn: "Dholeshwari", lat: 24.235222, lon: 89.890800, speed: 0, heading: 101, routeName: "MBSTU Standby", driverName: "MD. Abdul Alim", driverPhone: "01714567890", capacity: "42 Seater", isDriving: false, color: "#d97706" },
-  { id: "SB0005", nameBn: "যমুনা", nameEn: "Jamuna", lat: 24.235100, lon: 89.891200, speed: 0, heading: 180, routeName: "Campus ➔ New Bus Stand", driverName: "MD. Jahangir Alam", driverPhone: "01715678901", capacity: "42 Seater", isDriving: false, color: "#ea580c" },
-  { id: "SB0006", nameBn: "মেঘনা", nameEn: "Meghna", lat: 24.234900, lon: 89.891900, speed: 0, heading: 0, routeName: "MBSTU Standby", driverName: "MD. Sirajul Islam", driverPhone: "01716789012", capacity: "42 Seater", isDriving: false, color: "#2563eb" },
-  { id: "SB0007", nameBn: "সুরমা", nameEn: "Surma", lat: 24.235300, lon: 89.892100, speed: 0, heading: 90, routeName: "Campus ➔ Railway Station", driverName: "MD. Nazrul Islam", driverPhone: "01717890123", capacity: "42 Seater", isDriving: false, color: "#7c3aed" },
-  { id: "SB0008", nameBn: "কর্ণফুলী", nameEn: "Karnafuli", lat: 24.235400, lon: 89.891500, speed: 0, heading: 180, routeName: "MBSTU Standby", driverName: "MD. Faruk Ahmed", driverPhone: "01718901234", capacity: "42 Seater", isDriving: false, color: "#db2777" },
-  { id: "SB0009", nameBn: "বনলতা", nameEn: "Banalata", lat: 24.235258, lon: 89.890181, speed: 0, heading: 0, routeName: "Campus ➔ Nirala", driverName: "MD. Habibur Rahman", driverPhone: "01719012345", capacity: "42 Seater", isDriving: false, color: "#059669" },
-  { id: "SB0010", nameBn: "রক্তকরবী", nameEn: "Raktakarabi", lat: 24.235150, lon: 89.891650, speed: 0, heading: 0, routeName: "MBSTU Standby", driverName: "MD. Anisur Rahman", driverPhone: "01720123456", capacity: "42 Seater", isDriving: false, color: "#e11d48" }
+// ONLY the 3 real trackable MBSTU buses with verified GPS devices
+const REAL_MBSTU_FLEET: MbstuBusData[] = [
+  {
+    id: "SB0003",
+    nameBn: "সোনারতরী",
+    nameEn: "Sonartori",
+    lat: 24.235010,
+    lon: 89.891573,
+    speed: 0,
+    heading: 181,
+    routeName: "Campus ➔ Tangail City",
+    driverName: "MD. Kamal Hossain",
+    driverPhone: "01713456789",
+    capacity: "42 Seater",
+    isDriving: false,
+    color: "#0284c7"
+  },
+  {
+    id: "SB0001",
+    nameBn: "গীতাঞ্জলি",
+    nameEn: "Gitanjali",
+    lat: 24.234833,
+    lon: 89.892358,
+    speed: 0,
+    heading: 171,
+    routeName: "MBSTU Campus Standby",
+    driverName: "MD. Mizanur Rahman",
+    driverPhone: "01711234567",
+    capacity: "42 Seater",
+    isDriving: false,
+    color: "#6366f1"
+  },
+  {
+    id: "SB0009",
+    nameBn: "বনলতা",
+    nameEn: "Banolata",
+    lat: 24.235258,
+    lon: 89.890181,
+    speed: 0,
+    heading: 0,
+    routeName: "Campus ➔ Nirala",
+    driverName: "MD. Habibur Rahman",
+    driverPhone: "01719012345",
+    capacity: "42 Seater",
+    isDriving: false,
+    color: "#059669"
+  }
 ];
 
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -93,15 +128,15 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 }
 
 export function Transit({ ctx }: { ctx?: any }) {
-  const [fleet, setFleet] = useState<MbstuBusData[]>(INITIAL_FLEET);
+  const [fleet, setFleet] = useState<MbstuBusData[]>(REAL_MBSTU_FLEET);
   const [selectedBusId, setSelectedBusId] = useState<string>("SB0003");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStationId, setSelectedStationId] = useState<string>("gate");
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [isLiveWs, setIsLiveWs] = useState(false);
   const [satelliteView, setSatelliteView] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(true);
   const [alertEnabled, setAlertEnabled] = useState(true);
-  const [lastPacketTime, setLastPacketTime] = useState<string>("Connecting...");
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -126,7 +161,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     targetStation.lon
   );
 
-  // ETA Calculation: if parked at campus with 0 speed, indicate parked
   const isParked = selectedBus.speed === 0;
   const effectiveSpeedKmH = Math.max(selectedBus.speed, 25);
   const etaMinutes = isParked ? 0 : Math.max(1, Math.round((distanceToStationMeters / 1000 / effectiveSpeedKmH) * 60));
@@ -135,7 +169,6 @@ export function Transit({ ctx }: { ctx?: any }) {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Centered at MBSTU Campus
     const map = L.map(mapContainerRef.current, {
       center: [24.2355, 89.8916],
       zoom: 16,
@@ -143,7 +176,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       attributionControl: true
     });
 
-    // Official Google Maps Satellite Hybrid (lyrs=y: satellite + roads + labels)
+    // Official Google Maps Satellite Hybrid
     const googleSatLayer = L.tileLayer(
       "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
       {
@@ -153,7 +186,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       }
     );
 
-    // Official Google Maps Roadmap (lyrs=m: standard street map)
+    // Official Google Maps Roadmap
     const googleStreetLayer = L.tileLayer(
       "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
       {
@@ -174,7 +207,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
-    // MBSTU Campus Boundary Geofence Circle
+    // Campus Geofence Boundary
     L.circle([24.2349, 89.8916], {
       radius: 280,
       color: "#38bdf8",
@@ -213,10 +246,9 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     mapRef.current = map;
 
-    // Trigger size invalidation to guarantee full container rendering
     setTimeout(() => {
       map.invalidateSize();
-    }, 200);
+    }, 250);
 
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
@@ -240,8 +272,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div class="user-gps-radar"></div>
               </div>
             `,
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
           });
 
           if (!userMarkerRef.current) {
@@ -263,7 +295,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, []);
 
-  // Toggle Map Tiles (Satellite Hybrid vs Google Maps Street)
+  // Toggle Map Tiles
   useEffect(() => {
     if (!mapRef.current || !satelliteLayerRef.current || !streetLayerRef.current) return;
     if (satelliteView) {
@@ -327,7 +359,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     });
   }, [fleet, selectedBusId]);
 
-  // Center on Selected Bus
   const centerOnBus = (bus: MbstuBusData) => {
     if (!mapRef.current) return;
     mapRef.current.flyTo([bus.lat, bus.lon], 17, { animate: true, duration: 1.2 });
@@ -343,7 +374,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     mapRef.current.flyTo([24.2355, 89.8916], 16, { animate: true, duration: 1.2 });
   };
 
-  // REAL WebSocket Connection with Genuine Socket.IO Handshake
+  // Socket.IO Handshake & Real MBSTU Telemetry Stream
   useEffect(() => {
     let ws: WebSocket | null = null;
     let heartbeatTimer: NodeJS.Timeout | null = null;
@@ -354,34 +385,29 @@ export function Transit({ ctx }: { ctx?: any }) {
         ws = new WebSocket("wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket");
 
         ws.onopen = () => {
-          // Socket opened, waiting for Engine.IO 0 packet
+          // Socket opened
         };
 
         ws.onmessage = (event) => {
           if (isDisposed) return;
           const raw = String(event.data);
 
-          // 1. Engine.IO Handshake -> Send Socket.IO 40 connect packet
+          // 1. Handshake -> Send Socket.IO 40 connect packet
           if (raw.startsWith("0")) {
             ws?.send("40");
             setIsLiveWs(true);
 
-            // Engine.IO Heartbeat every 20s
             heartbeatTimer = setInterval(() => {
               if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send("2"); // ping
               }
             }, 20000);
           }
-          // 2. Pong response
+          // 2. Pong
           else if (raw === "3") {
-            // pong received
+            // Heartbeat response
           }
-          // 3. Socket.IO Connected
-          else if (raw.startsWith("40")) {
-            setIsLiveWs(true);
-          }
-          // 4. Telemetry Packets
+          // 3. Telemetry Event
           else if (raw.startsWith("42")) {
             try {
               const parsed = JSON.parse(raw.slice(2));
@@ -401,8 +427,6 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 if (!busId || isNaN(lat) || isNaN(lon)) return;
 
-                setLastPacketTime(time);
-
                 setFleet((prevFleet) => {
                   const existingIdx = prevFleet.findIndex((b) => b.id === busId || b.nameBn === busName);
                   if (existingIdx >= 0) {
@@ -417,38 +441,17 @@ export function Transit({ ctx }: { ctx?: any }) {
                       lastUpdated: time
                     };
                     return updated;
-                  } else {
-                    // New bus detected dynamically from live stream
-                    const newBus: MbstuBusData = {
-                      id: busId,
-                      nameBn: busName || busId,
-                      nameEn: busId,
-                      lat,
-                      lon,
-                      speed,
-                      heading,
-                      routeName: speed > 0 ? "In Transit" : "MBSTU Campus Standby",
-                      driverName: "Assigned Driver",
-                      driverPhone: "01700000000",
-                      capacity: "42 Seater",
-                      isDriving,
-                      color: "#0284c7",
-                      lastUpdated: time
-                    };
-                    return [...prevFleet, newBus];
                   }
+                  return prevFleet;
                 });
               }
-            } catch (err) {
-              // Ignore unparseable packet
-            }
+            } catch (err) {}
           }
         };
 
         ws.onclose = () => {
           if (!isDisposed) {
             setIsLiveWs(false);
-            // Reconnect after 4s
             setTimeout(connectWs, 4000);
           }
         };
@@ -481,19 +484,19 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   return (
     <div className="transit-container">
-      {/* Fullscreen Leaflet Map Canvas */}
+      {/* Fullscreen Map Canvas */}
       <div className="transit-map-wrapper">
         <div ref={mapContainerRef} className="transit-map-canvas" />
       </div>
 
-      {/* Floating Top Controls (Google Maps Style) */}
+      {/* Floating Top Controls */}
       <div className="transit-top-bar">
-        {/* Search Bus */}
+        {/* Search */}
         <div className="transit-search-box">
-          <Search size={18} color="#94a3b8" />
+          <Search size={16} color="#94a3b8" />
           <input
             type="text"
-            placeholder="Search bus (অগ্নিবীণা, সোনারতরী, SB0003)..."
+            placeholder="Search active bus..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="transit-search-input"
@@ -502,7 +505,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
         {/* Map Actions */}
         <div className="transit-map-actions">
-          {/* Live Telemetry Status */}
+          {/* MBSTU Live Badge */}
           <div className={`transit-live-badge ${isLiveWs ? "online" : "offline"}`}>
             <span className="transit-pulse-dot" style={{ background: isLiveWs ? "#34d399" : "#fbbf24" }} />
             {isLiveWs ? "MBSTU LIVE" : "CONNECTING"}
@@ -514,7 +517,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             className="transit-action-btn"
             title="Toggle Google Satellite / Street"
           >
-            <Layers size={16} />
+            <Layers size={14} />
             <span>{satelliteView ? "Google Satellite" : "Street"}</span>
           </button>
 
@@ -522,9 +525,9 @@ export function Transit({ ctx }: { ctx?: any }) {
           <button
             onClick={centerOnUser}
             className="transit-action-btn"
-            title="Find My Location"
+            title="My Location"
           >
-            <Navigation size={16} />
+            <Navigation size={14} />
             <span>GPS</span>
           </button>
 
@@ -532,19 +535,79 @@ export function Transit({ ctx }: { ctx?: any }) {
           <button
             onClick={centerCampus}
             className="transit-action-btn"
-            title="Center on MBSTU Campus"
+            title="Center MBSTU Campus"
           >
-            <MapPin size={16} />
+            <MapPin size={14} />
             <span>Campus</span>
           </button>
         </div>
       </div>
 
+      {/* Collapse/Expand Toggle Button (Web Friendly) */}
+      {!panelOpen && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="transit-toggle-collapse-btn"
+          title="Open Bus Fleet Tracker"
+        >
+          <Bus size={16} color="#38bdf8" />
+          <span>Track Buses</span>
+        </button>
+      )}
+
       {/* Floating Transit Panel (Google Maps Transit Card) */}
-      <div className="transit-panel">
+      <div className={`transit-panel ${panelOpen ? "" : "collapsed"}`}>
         <div className="transit-panel-scroll">
 
-          {/* Active Bus Card */}
+          {/* Header with Panel Close Button */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#38bdf8", textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", alignItems: "center", gap: 6 }}>
+              <Bus size={15} />
+              <span>Trackable Fleet ({filteredFleet.length})</span>
+            </div>
+            <button
+              onClick={() => setPanelOpen(false)}
+              style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", padding: 4 }}
+              title="Collapse Panel"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          </div>
+
+          {/* Active 3 Buses Selector Cards */}
+          <div>
+            {filteredFleet.map((bus) => (
+              <div
+                key={bus.id}
+                onClick={() => {
+                  setSelectedBusId(bus.id);
+                  centerOnBus(bus);
+                }}
+                className={`transit-fleet-card ${bus.id === selectedBusId ? "selected" : ""}`}
+              >
+                <div>
+                  <div className="transit-fleet-name">{bus.nameBn}</div>
+                  <div className="transit-fleet-id">{bus.nameEn} · {bus.id}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 7px",
+                      borderRadius: 6,
+                      background: bus.speed > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(148, 163, 184, 0.15)",
+                      color: bus.speed > 0 ? "#34d399" : "#94a3b8"
+                    }}
+                  >
+                    {bus.speed > 0 ? `${bus.speed} km/h` : "Parked"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Selected Bus Overview */}
           <div className="transit-card">
             <div className="transit-hero">
               <div>
@@ -557,20 +620,20 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <span
                   className={`transit-speed-badge ${selectedBus.speed > 0 ? "moving" : "stopped"}`}
                 >
-                  <Compass size={14} />
+                  <Compass size={13} />
                   {selectedBus.speed > 0 ? `${selectedBus.speed} km/h` : "Parked at Campus"}
                 </span>
               </div>
             </div>
 
-            <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#cbd5e1" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Navigation size={14} color="#38bdf8" />
+            <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "#cbd5e1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Navigation size={13} color="#38bdf8" />
                 <span>{selectedBus.routeName}</span>
               </div>
               {selectedBus.lastUpdated && (
                 <div style={{ fontSize: 10, color: "#94a3b8" }}>
-                  Updated: {selectedBus.lastUpdated}
+                  {selectedBus.lastUpdated}
                 </div>
               )}
             </div>
@@ -580,7 +643,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           <div className="transit-eta-box">
             <div className="transit-eta-header">
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#93c5fd" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#93c5fd" }}>
                   {isParked ? "Status" : "Estimated Arrival"}
                 </div>
                 <div className="transit-eta-big">
@@ -591,15 +654,15 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div className="transit-eta-dist">
                   {(distanceToStationMeters / 1000).toFixed(2)} km
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                  {isParked ? "Standby in campus" : "to chosen stoppage"}
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                  {isParked ? "at MBSTU campus" : "to chosen stoppage"}
                 </div>
               </div>
             </div>
 
             {/* Target Stoppage Picker */}
             <div>
-              <div className="transit-station-picker-label">Target Station / Your Stoppage</div>
+              <div className="transit-station-picker-label">Target Station / Stoppage</div>
               <select
                 value={selectedStationId}
                 onChange={(e) => setSelectedStationId(e.target.value)}
@@ -614,20 +677,20 @@ export function Transit({ ctx }: { ctx?: any }) {
               </select>
             </div>
 
-            {/* Center Bus on Map */}
+            {/* Focus on Map */}
             <button
               onClick={() => centerOnBus(selectedBus)}
               className="transit-action-btn"
-              style={{ width: "100%", justifyContent: "center", background: "#0284c7", color: "white", border: "none" }}
+              style={{ width: "100%", justifyContent: "center", background: "#0284c7", color: "white", border: "none", padding: "7px 12px" }}
             >
-              <Crosshair size={16} />
+              <Crosshair size={15} />
               <span>Focus {selectedBus.nameBn} on Map</span>
             </button>
           </div>
 
           {/* Stoppage Progress Timeline */}
           <div className="transit-card">
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
               Route Corridor Headway
             </div>
 
@@ -662,75 +725,37 @@ export function Transit({ ctx }: { ctx?: any }) {
             </div>
           </div>
 
-          {/* Driver Card */}
+          {/* Driver Contact */}
           <div className="transit-card">
             <div className="transit-driver-row">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{selectedBus.driverName}</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>Driver · {selectedBus.capacity}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{selectedBus.driverName}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>Driver · {selectedBus.capacity}</div>
               </div>
               <a href={`tel:${selectedBus.driverPhone}`} className="transit-call-btn">
-                <Phone size={14} />
-                <span>Call Driver</span>
+                <Phone size={13} />
+                <span>Call</span>
               </a>
             </div>
           </div>
 
           {/* Departure Alert Switch */}
           <div className="transit-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ padding: 8, borderRadius: 10, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}>
-                <Bell size={18} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ padding: 6, borderRadius: 8, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}>
+                <Bell size={16} />
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Campus Departure Alert</div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>Notify when bus leaves Santosh campus</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Campus Departure Alert</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>Notify when leaving Santosh campus</div>
               </div>
             </div>
             <input
               type="checkbox"
               checked={alertEnabled}
               onChange={(e) => setAlertEnabled(e.target.checked)}
-              style={{ width: 18, height: 18, accentColor: "#0284c7", cursor: "pointer" }}
+              style={{ width: 16, height: 16, accentColor: "#0284c7", cursor: "pointer" }}
             />
-          </div>
-
-          {/* Active Fleet Selector Grid */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
-              MBSTU Fleet Vehicles ({filteredFleet.length})
-            </div>
-            <div className="transit-fleet-grid">
-              {filteredFleet.map((bus) => (
-                <div
-                  key={bus.id}
-                  onClick={() => {
-                    setSelectedBusId(bus.id);
-                    centerOnBus(bus);
-                  }}
-                  className={`transit-fleet-card ${bus.id === selectedBusId ? "selected" : ""}`}
-                >
-                  <div>
-                    <div className="transit-fleet-name">{bus.nameBn}</div>
-                    <div className="transit-fleet-id">{bus.id}</div>
-                  </div>
-                  <div>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: 6,
-                        background: bus.speed > 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(148, 163, 184, 0.15)",
-                        color: bus.speed > 0 ? "#34d399" : "#94a3b8"
-                      }}
-                    >
-                      {bus.speed > 0 ? `${bus.speed} km/h` : "Parked"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
         </div>
