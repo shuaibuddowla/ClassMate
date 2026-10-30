@@ -8984,3 +8984,256 @@ flowchart TD
 | **Departure Alerts** | Android APK | **VERIFIED** | [`ClassMateTransitManager.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt) channel `transit_departure_alerts` (Android 13+ guarded) |
 | **RFID Offline Buffer** | IoT Hardware | **VERIFIED** | ESP32 SPIFFS offline attendance buffering with replay reconciliation |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+---
+
+## 157. Production Transit Premium UI/UX Refactoring, Unified Dock Architecture, Interactive Stop Radar & Audio/Haptic Alerts (Oct 30, 2026 - Master State)
+
+### A. Executive Architectural Synthesis of Latest Antigravity Goal & Production Evolution
+
+Following the stabilization of the MBSTU Live Bus Tracking telemetry stream and the resolution of the Engine.IO v4 heartbeat cycle (Commit `f208b34`), a dedicated UI/UX audit session (`f299dd3b-5ee4-474d-a380-72de6b93c62b`, initiated under `/goal`) was conducted using physical Android device screenshots (`media_1793371208004_3574d412.png`) and desktop browser viewports. 
+
+This engineering pass tackled several visual and ergonomic friction points:
+1. **Asymmetric Floating Overlays**: The top bus selector overlay had a width of `540px` while the bottom transit sheet was constrained to `440px`, causing a 100px visual imbalance and awkward right-edge misalignment.
+2. **Stop Name Clipping in Approaching Card**: High-density stoppage labels (e.g., *Baitun Nur Jame Mosque Mor*) were truncated with trailing ellipses (`M...`) due to rigid single-line `white-space: nowrap` constraints.
+3. **Map Control & FAB Collisions**: Leaflet's default square zoom buttons collided directly with the custom Material 3 Floating Action Buttons (FABs) in the bottom-right corner.
+4. **Lack of Off-Screen Spatial Awareness**: When students panned across Tangail city away from the active bus, no visual guidance existed to indicate vehicle direction or offer one-tap recentering.
+5. **Static Stop Sign Markers**: Map stoppage markers were passive graphics without interactive details, arrival countdowns, or distance calculations.
+6. **Harsh OS Scrollbars**: Desktop Windows browsers rendered grey vertical scrollbars across navigation rails.
+
+All issues were resolved, verified, and deployed directly to production (`https://classmatebd.vercel.app/#transit`) under Git Commit `0dcf902` on branch `feature/live-bus-tracking`.
+
+```mermaid
+flowchart TD
+    subgraph Viewport ["Unified Transit Canvas (Desktop & Mobile)"]
+        TOP["Symmetrical Top Dock (540px)<br>Bus Chips + Live Telemetry Badge"]
+        MAP["Map Canvas: Leaflet + Google Satellite Tiles<br>(No Leaflet Zoom Controls)"]
+        FAB["Unified M3 FAB Vertical Stack<br>Zoom (+/-) | Recenter Bus | Satellite/Roadmap | Campus"]
+        BOTTOM["Symmetrical Bottom Dock (540px)<br>Approaching Stop + Searchable 28-Stop Corridor"]
+        RADAR["Off-Screen Radar Pill<br>(Pans camera to active bus when out-of-view)"]
+    end
+
+    subgraph AudioEngine ["Synthesized Alert Subsystem"]
+        PROX{"Bus Distance <= 200m?"}
+        PROX -->|Yes| CHIME["Web Audio API Oscillator<br>(Synthesized Crystal Double-Chime)"]
+        PROX -->|Yes| HAPTIC["Tactile Haptic Vibration<br>(navigator.vibrate [200, 100, 200])"]
+        PROX -->|No| SILENT["Passive Background Tracking"]
+    end
+
+    subgraph InteractivePopups ["Stop Marker Interactions"]
+        PIN["Click Red Lollipop BUS Stop"] --> POPUP["Frosted Glass Callout<br>Bengali/English Name + Campus Tag<br>Live Distance from Bus + Travel Time<br>1-Tap Proximity Alert Arming"]
+    end
+
+    TOP --> MAP
+    BOTTOM --> MAP
+    FAB --> MAP
+    RADAR --> MAP
+    MAP --> PROX
+```
+
+---
+
+### B. Symmetrical Docking Architecture & Responsive Ergonomics
+
+#### 1. 540px Unified Symmetrical Dock Layout
+- **The Issue**: Top overlay bar had `width: 540px`, whereas the bottom sheet card had `width: 440px`. The 100px disparity broke visual cohesion and created mismatched margins on widescreen displays.
+- **Implementation**: Aligned both the top floating overlay (`.transit-overlay-bar`) and bottom sheet (`.transit-bottom-sheet`) to the exact same responsive dimensions:
+  ```css
+  /* Unified symmetrical dock width for desktop & tablets */
+  .transit-overlay-bar {
+    width: min(540px, calc(100% - 36px));
+    left: 18px;
+  }
+  .transit-bottom-sheet {
+    width: min(540px, calc(100% - 36px));
+    left: 18px;
+    right: auto;
+    bottom: 18px;
+  }
+  ```
+
+#### 2. Adaptive Desktop/Mobile Card Header
+- **Desktop Adaptation**: The mobile drag handle pill (`.transit-sheet-drag-handle`) is hidden on desktop viewports (`min-width: 769px` -> `display: none`).
+- **Interactive Header**: The bus identity card header (`.transit-bus-header-card`) acts as the interactive toggle trigger on desktop, complete with accessibility semantics:
+  ```tsx
+  <div
+    className="transit-bus-header-card"
+    onClick={() => setSheetExpanded((prev) => !prev)}
+    role="button"
+    tabIndex={0}
+    aria-expanded={sheetExpanded}
+    aria-label={`Toggle route stops for ${selectedBus.nameBn}`}
+  >
+  ```
+- **Mobile Gesture Retention**: Mobile viewports retain fluid touch drag handles and swipe-to-expand/collapse gestures (`onTouchStart`, `onTouchEnd`).
+
+#### 3. Custom Glassmorphic Scrollbars (`globals.css`)
+- Replaced default browser scrollbars with auto-hiding, rounded thin tracks:
+  ```css
+  .sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .sidebar:hover {
+    scrollbar-color: var(--border) transparent;
+  }
+  .sidebar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .sidebar:hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+  ```
+
+---
+
+### C. Multi-Line Stop Clamping & Searchable 28-Stop Corridor
+
+#### 1. Stop Name Multi-Line Clamping
+- In the "Next Approaching Stop" card, longer stop names (*Baitun Nur Jame Mosque Mor*, *Santosh Prottoy-71 Square*) were clipped.
+- Replaced `white-space: nowrap` and `text-overflow: ellipsis` with standard webkit line clamping:
+  ```css
+  .transit-next-stop-en {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.28;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+  ```
+
+#### 2. Real-Time Stoppage Search Filter
+- Integrated an in-sheet search bar (`.transit-stepper-search-row`) above the stop list.
+- Enables instant filtering across all 28 corridor stops by English name, Bengali name, or stop order number:
+  ```tsx
+  const filteredStops = useMemo(() => {
+    if (!stopFilter.trim()) return CORRIDOR_STATIONS;
+    const q = stopFilter.toLowerCase().trim();
+    return CORRIDOR_STATIONS.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.nameBn.includes(q) ||
+        String(s.order).includes(q)
+    );
+  }, [stopFilter]);
+  ```
+- Accompanied by a quick-clear (`X`) button to instantly reset search queries.
+
+#### 3. Automated Next Stop Viewport Centering
+- When students expand the bottom sheet, the list automatically smooth-scrolls to bring the active approaching stop into the center of the scroll area:
+  ```tsx
+  const approachingStopRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (sheetExpanded && approachingStopRef.current) {
+      const timer = setTimeout(() => {
+        approachingStopRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 180);
+      return () => clearTimeout(timer);
+    }
+  }, [sheetExpanded, nextApproachingStopInfo?.station?.id]);
+  ```
+
+---
+
+### D. Unified Material 3 Floating Action Button (FAB) Stack
+
+- **Removal of Redundant Controls**: Leaflet default zoom controls were disabled (`zoomControl: false`).
+- **Cohesive Vertical Action Stack**:
+  1. **Zoom In (`+`) & Zoom Out (`-`) Pill Group (`.transit-fab-group`)**: Unified capsule container with frosted backdrop blur and clean divider line.
+  2. **Recenter on Active Bus (`LocateFixed`)**: Highlights with active cyan glow (`.active-track`) and pulse effect when tracking is engaged.
+  3. **Satellite / Roadmap Hybrid Layer Toggle (`Layers`)**: Seamlessly toggles between Google Maps Satellite Hybrid tiles (`y` / `s,h`) and OpenStreetMap street roadmap tiles.
+  4. **MBSTU Santosh Campus Recenter (`MapPin`)**: Instantly flies camera back to university center (`[24.2365, 89.8920]`, zoom 17).
+- **Collision Avoidance**: Repositioned Leaflet attribution text to bottom-left / offset right, ensuring it never overlaps with the FAB stack.
+
+---
+
+### E. Interactive Map Popups & Synthesized Audio/Haptic Alerts
+
+#### 1. Frosted-Glass Stop Markers Popups
+- Tapping any of the 28 red lollipop bus sign markers on the map displays a custom frosted-glass Leaflet popup (`.transit-stop-popup`):
+  - **Badge & Order**: Stop number (`Stop #14`), English name, Bengali name, and optional `Campus` badge.
+  - **Live Kinematics**: Dynamic live distance from active bus (computed via Haversine) and estimated driving time.
+  - **Proximity Alert Trigger**: 1-tap button to arm/disarm proximity arrival alerts directly from the map marker.
+
+#### 2. Synthesized Web Audio Arrival Chime & Haptics
+- Avoids external audio file downloads, latency, or missing asset errors by synthesizing a crystal two-tone chime via Web Audio API oscillators:
+  ```typescript
+  export function playCrystalArrivalChime() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const now = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      // Note 1: E6 (1318.51 Hz) -> Note 2: B6 (1975.53 Hz)
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(1318.51, now);
+      osc1.frequency.exponentialRampToValueAtTime(1975.53, now + 0.18);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+      osc1.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.5);
+    } catch {
+      // Audio autoplay policy fallback
+    }
+  }
+  ```
+- Coupled with tactile device vibration: `navigator.vibrate?.([200, 100, 200])`.
+
+---
+
+### F. Off-Screen Active Bus Radar & Real-Time Reconnection Safeguards
+
+#### 1. Off-Screen Radar Pill (`.transit-offscreen-radar`)
+- When user pans away such that `map.getBounds().contains([bus.lat, bus.lon]) === false`, a glassmorphic floating pill appears directly below the top bar:
+  > **🚌 [Bus Name] is off-screen · Tap to view**
+- Tapping the pill triggers `map.flyTo([bus.lat, bus.lon], 17, { animate: true, duration: 0.9 })`, centering the user back on transit kinematics.
+
+#### 2. Campus Standby & Wire Protocol Hardening
+- **Engine.IO v4 Handshake**: Preserves pure passive pong semantics (client only sends packet `"3"` in response to server `"2"`; client never sends unsolicited pings).
+- **Campus Standby Semantics**: Vehicles parked near Prottoy-71 with `speed === 0` are rendered as **`Live GPS · Campus Standby`** with a cyan glowing dot (`#38bdf8`) rather than displaying false staleness.
+
+---
+
+### G. Comprehensive Master Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Unified Symmetrical Dock** | Web Companion | **PRODUCTION** | 540px symmetrical top overlay & bottom sheet; tested across mobile & desktop viewports |
+| **Stop Name Clamping** | Web Companion | **PRODUCTION** | `-webkit-line-clamp: 2`; long stoppage names (*Baitun Nur Jame Mosque Mor*) fully legible |
+| **Material 3 FAB Stack** | Web Companion | **PRODUCTION** | Leaflet zoom disabled; vertical stack: Zoom In/Out, Recenter Bus, Satellite/Roadmap, Campus |
+| **Off-Screen Bus Radar** | Web Companion | **PRODUCTION** | Dynamic bounds detection; flying camera animation to off-screen vehicle |
+| **Interactive Stop Popups** | Web Companion | **PRODUCTION** | Clickable red lollipop markers with live distance, ETA, and 1-tap alert button |
+| **Synthesized Chimes & Haptics** | Web Companion | **PRODUCTION** | Web Audio API crystal two-tone chime (1318Hz -> 1975Hz) + `navigator.vibrate` |
+| **Corridor Stop Search** | Web Companion | **PRODUCTION** | Instant filter by English, Bengali, or stop number; auto-scrolls to next approaching stop |
+| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt) (805 lines); OSMDroid MapView + OkHttp Engine.IO v4 protocol |
+| **Engine.IO v4 Handshake** | Web & Android | **PRODUCTION** | Server-initiated ping (`2`); client responds with pong (`3`); zero disconnect loops |
+| **Campus Standby Semantics**| Web & Android | **PRODUCTION** | `speed === 0` classified as `Live GPS · Campus Standby` with cyan dot; no false staleness |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green dot; Batch relocated to Settings |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commit `0dcf902` on `feature/live-bus-tracking`) |
+| **Preview Endpoint** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/transit-preview` |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
