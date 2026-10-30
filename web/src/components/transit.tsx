@@ -1439,7 +1439,31 @@ export function Transit({ ctx }: { ctx?: any }) {
         <>
           {/* Top Floating Overlay (z-20) */}
           <div className="transit-top-overlay">
-            {/* Header Glassmorphic Bar with 2-Tab Switcher */}
+            {/* Dedicated Top Floating Segmented Switcher Pill */}
+            <div className="transit-top-nav-row">
+              <div className="transit-segmented-tabs">
+                <button
+                  onClick={() => setActiveView("list")}
+                  className="transit-seg-tab"
+                  type="button"
+                  aria-selected={false}
+                >
+                  <List size={15} />
+                  <span>তালিকা</span>
+                </button>
+                <button
+                  onClick={() => switchToMap()}
+                  className="transit-seg-tab active"
+                  type="button"
+                  aria-selected={true}
+                >
+                  <MapIcon size={15} />
+                  <span>ম্যাপ</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Header Glassmorphic Bar (Zero Text Truncation) */}
             <div className="transit-header-pill">
               <div className="transit-header-left">
                 <div
@@ -1479,27 +1503,6 @@ export function Transit({ ctx }: { ctx?: any }) {
                   </div>
                   <span className="transit-header-sub">Santosh Campus ⇄ Nirala (City Center) Loop</span>
                 </div>
-              </div>
-
-              {/* View Switcher: Back to [তালিকা] */}
-              <div className="transit-map-tab-toggle">
-                <button
-                  onClick={() => setActiveView("list")}
-                  className="transit-map-tab-btn"
-                  title="তালিকা ভিউতে যান"
-                  type="button"
-                >
-                  <List size={14} />
-                  <span>তালিকা</span>
-                </button>
-                <button
-                  className="transit-map-tab-btn active"
-                  title="ম্যাপ ভিউ সক্রিয়"
-                  type="button"
-                >
-                  <MapIcon size={14} />
-                  <span>ম্যাপ</span>
-                </button>
               </div>
 
               {/* Mode Toggle Button */}
