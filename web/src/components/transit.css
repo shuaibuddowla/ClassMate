@@ -387,6 +387,7 @@
 .transit-bus-chip:focus-visible,
 .transit-expand-toggle-btn:focus-visible,
 .transit-bell-alert-btn:focus-visible,
+.transit-stepper-alert-btn:focus-visible,
 .transit-sheet-drag-handle:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 3px;
@@ -432,7 +433,7 @@
 }
 
 .transit-bottom-sheet.collapsed {
-  height: 236px;
+  height: auto;
 }
 
 .transit-bottom-sheet.expanded {
@@ -443,7 +444,7 @@
 
 @media (max-width: 640px) {
   .transit-bottom-sheet.collapsed {
-    height: 244px;
+    height: auto;
   }
   .transit-bottom-sheet.expanded {
     height: 62vh;
@@ -814,6 +815,29 @@
   flex-shrink: 0;
 }
 
+.transit-stepper-alert-btn {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.transit-stepper-alert-btn:hover,
+.transit-stepper-alert-btn.armed {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.24);
+}
+
 .transit-bell-alert-btn:hover {
   color: #38bdf8;
   border-color: rgba(56, 189, 248, 0.4);
@@ -854,6 +878,11 @@
 .transit-status-dot.fresh {
   background: #34d399;
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.65);
+}
+
+.transit-status-dot.standby {
+  background: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.65);
 }
 
 .transit-status-dot.estimated {
@@ -1442,7 +1471,7 @@
     right: auto;
     bottom: 18px;
     width: min(440px, calc(100% - 36px));
-    height: 230px;
+    height: auto;
     border: 1px solid rgba(226, 232, 240, 0.16);
     border-radius: 24px;
     background: rgba(9, 15, 28, 0.92);
@@ -1450,7 +1479,7 @@
   }
 
   .transit-bottom-sheet.collapsed {
-    height: 236px;
+    height: auto;
   }
 
   .transit-bottom-sheet.expanded {

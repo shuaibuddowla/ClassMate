@@ -66,6 +66,7 @@ const BUS_METADATA: { [id: string]: { nameEn: string; color: string; routeName: 
   SB0001: { nameEn: "Gitanjali", color: "#6366f1", routeName: "MBSTU Campus Standby" },
   SB0002: { nameEn: "Agnibeena", color: "#0284c7", routeName: "Campus ➔ Nirala (City Center)" },
   SB0003: { nameEn: "Sonartori", color: "#0d9488", routeName: "Campus ➔ Tangail City Loop" },
+  SB0005: { nameEn: "Sangshaptak", color: "#8b5cf6", routeName: "Campus ➔ Tangail City Loop" },
   SB0009: { nameEn: "Banolata", color: "#059669", routeName: "Campus ➔ Kagmari ➔ Nirala" },
   SB0010: { nameEn: "Raktakarabi", color: "#e11d48", routeName: "MBSTU Campus Standby" }
 };
@@ -125,63 +126,40 @@ function getBearingDegrees(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 function parseTelemetryTimestamp(value: unknown, receivedAt: number): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const timestamp = value < 1_000_000_000_000 ? value * 1000 : value;
-    return timestamp <= receivedAt + 30_000 ? Math.min(timestamp, receivedAt) : receivedAt;
-  }
-  if (typeof value !== "string" || !value.trim()) return receivedAt;
-
-  const raw = value.trim();
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
-  let timestamp = Number.NaN;
-  if (hasTimezone) {
-    timestamp = Date.parse(raw);
-  } else {
-    const parts = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-    if (parts) {
-      const [, year, month, day, hour, minute, second = "0", meridiem] = parts;
-      let hourOfDay = Number(hour);
-      if (meridiem?.toUpperCase() === "PM" && hourOfDay < 12) hourOfDay += 12;
-      if (meridiem?.toUpperCase() === "AM" && hourOfDay === 12) hourOfDay = 0;
-      timestamp = new Date(Number(year), Number(month) - 1, Number(day), hourOfDay, Number(minute), Number(second)).getTime();
-    } else {
-      timestamp = Date.parse(raw);
-    }
-  }
-  return Number.isFinite(timestamp) && timestamp <= receivedAt + 30_000 ? Math.min(timestamp, receivedAt) : receivedAt;
+  // Always anchor to real packet arrival time to avoid false staleness from hardware GPS clock drift
+  return receivedAt;
 }
 
 function predictBusPosition(bus: MbstuBusData, now: number): DisplayBusData {
-  if (!bus.receivedAt) {
-    return { ...bus, positionAgeSeconds: null, isEstimated: false, isStale: true };
-  }
+  const ageSeconds = bus.receivedAt ? Math.max(0, (now - bus.receivedAt) / 1000) : 0;
+  // A bus parked on campus standby is stationary and active, not stale. Only flag stale if silent for > 10 minutes.
+  const isStale = ageSeconds > 600;
+  const isEstimated = bus.isDriving && bus.speed > 0 && ageSeconds > 2 && ageSeconds <= 20;
 
-  const ageSeconds = Math.max(0, (now - bus.receivedAt) / 1000);
-  const projectedSeconds = Math.min(ageSeconds, MAX_PREDICTION_SECONDS);
-  const distanceMeters = bus.isDriving && bus.speed > 0 && bus.speed <= 100 && bus.hasDirection !== false
-    ? (bus.speed * 1000 * projectedSeconds) / 3600
-    : 0;
   let lat = bus.lat;
   let lon = bus.lon;
 
-  if (distanceMeters > 0) {
-    const earthRadius = 6371000;
-    const bearing = (bus.heading * Math.PI) / 180;
-    const angularDistance = distanceMeters / earthRadius;
-    const lat1 = (bus.lat * Math.PI) / 180;
-    const lon1 = (bus.lon * Math.PI) / 180;
-    const lat2 = Math.asin(
-      Math.sin(lat1) * Math.cos(angularDistance) +
-        Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
-    );
-    const lon2 =
-      lon1 +
-      Math.atan2(
-        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
-        Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+  if (bus.isDriving && bus.speed > 0 && bus.speed <= 100 && ageSeconds <= 15) {
+    const distanceMeters = (bus.speed * 1000 * ageSeconds) / 3600;
+    if (distanceMeters > 0) {
+      const earthRadius = 6371000;
+      const bearing = (bus.heading * Math.PI) / 180;
+      const angularDistance = distanceMeters / earthRadius;
+      const lat1 = (bus.lat * Math.PI) / 180;
+      const lon1 = (bus.lon * Math.PI) / 180;
+      const lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(angularDistance) +
+          Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing)
       );
-    lat = (lat2 * 180) / Math.PI;
-    lon = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+      const lon2 =
+        lon1 +
+        Math.atan2(
+          Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
+          Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
+        );
+      lat = (lat2 * 180) / Math.PI;
+      lon = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+    }
   }
 
   return {
@@ -189,8 +167,8 @@ function predictBusPosition(bus: MbstuBusData, now: number): DisplayBusData {
     lat,
     lon,
     positionAgeSeconds: ageSeconds,
-    isEstimated: ageSeconds > 1,
-    isStale: ageSeconds > MAX_PREDICTION_SECONDS
+    isEstimated,
+    isStale
   };
 }
 
@@ -728,7 +706,6 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (isDemoMode) return;
 
     let ws: WebSocket | null = null;
-    let heartbeatTimer: NodeJS.Timeout | null = null;
     let isDisposed = false;
 
     const connect = () => {
@@ -746,14 +723,8 @@ export function Transit({ ctx }: { ctx?: any }) {
           if (raw.startsWith("0")) {
             ws?.send("40");
             setWsStatus("connected");
-
-            heartbeatTimer = setInterval(() => {
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send("2");
-              }
-            }, 22000);
           }
-          // 2. Server Ping/Pong
+          // 2. Server Ping ("2") -> Engine.IO v4 protocol requires client to pong ("3")
           else if (raw === "2") {
             ws?.send("3");
           }
@@ -765,11 +736,11 @@ export function Transit({ ctx }: { ctx?: any }) {
               const evt = parsed[0];
               const payload = parsed[1];
 
-              if (evt === "flutter-bus-data" || evt === "studentGpsData") {
+              if (evt === "flutter-bus-data" || evt === "studentGpsData" || evt === "student-gps-data") {
                 const busId = payload.id || payload.busId;
                 const busName = payload.busName || busId;
-                const lat = Number(payload.lat);
-                const lon = Number(payload.lon || payload.long);
+                const lat = Number(payload.lat ?? payload.latitude);
+                const lon = Number(payload.lon ?? payload.long ?? payload.longitude);
                 const reportedSpeed = Number(payload.speed);
                 const hasReportedSpeed = payload.speed != null && Number.isFinite(reportedSpeed);
                 const speed = hasReportedSpeed ? Math.max(0, reportedSpeed) : 0;
@@ -777,7 +748,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                 const hasReportedHeading = payload.heading != null && Number.isFinite(reportedHeading);
                 const heading = hasReportedHeading ? ((reportedHeading % 360) + 360) % 360 : 0;
                 const packetReceivedAt = Date.now();
-                const receivedAt = parseTelemetryTimestamp(payload.time, packetReceivedAt);
+                const receivedAt = packetReceivedAt;
                 const time = payload.time || new Date().toLocaleTimeString();
 
                 if (!busId || isNaN(lat) || isNaN(lon)) return;
@@ -876,7 +847,6 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     return () => {
       isDisposed = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (ws) ws.close();
     };
   }, [isDemoMode]);
@@ -1090,23 +1060,21 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <span className={`transit-speed-pill ${selectedBus.isStale ? "stale" : selectedBus.speed > 0 ? "moving" : "stopped"}`}>
                     <Compass size={12} />
                     {selectedBus.isStale
-                      ? `Last ${Math.round(selectedBus.speed)} km/h`
+                      ? `Parked (${Math.floor(selectedBus.positionAgeSeconds || 0)}s)`
                       : selectedBus.speed > 0
                       ? `${Math.round(selectedBus.speed)} km/h`
-                      : "At stand"}
+                      : "Standby"}
                   </span>
                   <span className="transit-gps-coords-text">
                     <span title={`${selectedBus.lat.toFixed(5)}, ${selectedBus.lon.toFixed(5)}`}>
                       {selectedBus.lat.toFixed(4)}°N, {selectedBus.lon.toFixed(4)}°E
                     </span>
                     <span className={selectedBus.isStale ? "is-stale" : selectedBus.isEstimated ? "is-estimated" : "is-live-fix"}>
-                      {selectedBus.positionAgeSeconds == null
-                        ? "Saved · waiting for GPS"
-                        : selectedBus.isStale
-                        ? `Stale · ${Math.floor(selectedBus.positionAgeSeconds)}s`
+                      {selectedBus.speed === 0
+                        ? "Live GPS · Campus Standby"
                         : selectedBus.isEstimated
-                        ? `Estimated · +${Math.floor(selectedBus.positionAgeSeconds)}s`
-                        : "GPS · live"}
+                        ? `Estimated · +${Math.floor(selectedBus.positionAgeSeconds || 0)}s`
+                        : "Live GPS · Active"}
                     </span>
                   </span>
                 </div>
@@ -1128,13 +1096,13 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <div className="transit-next-info">
                     <div className="transit-next-banner-tag">
                       <span className="transit-next-pulse-dot" />
-                    <span>
-                      {selectedBus.isStale
-                        ? "LAST ESTIMATE · GPS DELAYED"
-                        : selectedBus.isEstimated
-                        ? "PREDICTED NEXT STOP"
-                        : "NEXT APPROACHING STOP"}
-                    </span>
+                      <span>
+                        {nextApproachingStopInfo.isStandby
+                          ? "CAMPUS STANDBY · NEXT STOP"
+                          : selectedBus.isEstimated
+                          ? "PREDICTED NEXT STOP"
+                          : "NEXT APPROACHING STOP"}
+                      </span>
                     </div>
                     <div className="transit-next-stop-en">{formatStopTitle(nextApproachingStopInfo.station.name)}</div>
                     <div className="transit-next-sub-row">
@@ -1149,15 +1117,10 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 <div className="transit-next-right">
                   <div className="transit-next-eta-container">
-                    {selectedBus.isStale ? (
-                      <>
-                        <span className="transit-next-delayed-badge">GPS DELAYED</span>
-                        <span className="transit-next-eta-lbl">Arrival estimate paused</span>
-                      </>
-                    ) : nextApproachingStopInfo.isStandby ? (
+                    {nextApproachingStopInfo.isStandby ? (
                       <>
                         <span className="transit-next-standby-badge">STANDBY</span>
-                        <span className="transit-next-eta-lbl">~{nextApproachingStopInfo.etaMinutes} min if it departs</span>
+                        <span className="transit-next-eta-lbl">~{nextApproachingStopInfo.etaMinutes} min once departs</span>
                       </>
                     ) : (
                       <>
@@ -1191,15 +1154,11 @@ export function Transit({ ctx }: { ctx?: any }) {
               {/* Sheet Footer Row */}
               <div className="transit-sheet-footer-row">
                 <div className="transit-sheet-status-text">
-                  <span className={`transit-status-dot ${selectedBus.isStale ? "stale" : selectedBus.isEstimated ? "estimated" : "fresh"}`} />
+                  <span className={`transit-status-dot ${selectedBus.speed > 0 ? "fresh" : "standby"}`} />
                   <span>
-                    {selectedBus.isStale
-                      ? "GPS update delayed"
-                      : selectedBus.isEstimated
-                      ? "Position estimated between GPS updates"
-                      : selectedBus.speed > 0
-                      ? "Bus is moving"
-                      : "Bus is at the stand"}
+                    {selectedBus.speed > 0
+                      ? `In transit (${Math.round(selectedBus.speed)} km/h)`
+                      : "Parked at Campus Standby"}
                   </span>
                 </div>
 
@@ -1266,13 +1225,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                                   e.stopPropagation();
                                   toggleStopAlert(st.id);
                                 }}
-                                style={{
-                                  background: "transparent",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  color: isAlerted ? "#38bdf8" : "#64748b",
-                                  padding: 2
-                                }}
+                                className={`transit-stepper-alert-btn ${isAlerted ? "armed" : ""}`}
                                 type="button"
                                 title={isAlerted ? "Turn off in-page arrival alert" : "Alert me while this page is open"}
                                 aria-label={isAlerted ? `Turn off alert for ${st.name}` : `Alert me when the bus is near ${st.name}`}
