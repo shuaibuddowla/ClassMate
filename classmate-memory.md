@@ -9237,3 +9237,358 @@ flowchart TD
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commit `0dcf902` on `feature/live-bus-tracking`) |
 | **Preview Endpoint** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/transit-preview` |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+---
+
+## 158. Production Transit Multi-View Architecture (2-Tab Bus List, Route Stoppage Timeline & Map Auto-Focus) & Full-Window Viewport Mechanics (Oct 30, 2026)
+
+### A. Architectural Context & Multi-View Paradigm Shift
+
+To provide an intuitive, high-velocity transit experience matching modern mobile transit applications (e.g., Google Maps / Citymapper), the ClassMate Transit subsystem was restructured from a single-screen map tracker into a cohesive 3-tier transit hub:
+
+```mermaid
+flowchart TD
+    A["Transit Navigation Tab Selected<br>(#transit / R.id.nav_transit)"] --> B{"Active View State Machine<br>(activeView: 'list' | 'detail' | 'map')"}
+
+    subgraph View 1: Default Bus List Screen
+        B -->|"Default (activeView === 'list')"| C["TransitListView"]
+        C --> C1["Header: Active Fleet Summary & Road Simulation Toggle"]
+        C --> C2["Segmented Switcher: [তালিকা] (List) | [নকশা] (Map)"]
+        C --> C3["Real-time Search Filter (Bengali/English/ID/Destination)"]
+        C --> C4["Quick Status Chips (All, Moving, Standby, To Campus, To City)"]
+        C --> C5["Material 3 Bus Cards (Route Progress %, Speed, Next Stop ETA)"]
+    end
+
+    subgraph View 2: Route & Stoppage Corridor Timeline
+        C5 -->|"Tap Any Bus Card"| D["TransitDetailView (activeView === 'detail')"]
+        D --> D1["Top App Bar: Back Navigation (←) & Live Speed Badge"]
+        D --> D2["Hero Live Tracking Card: Next Approaching Stop & ETA"]
+        D --> D3["Primary CTA: 'মানচিত্রে দেখুন' (Track on Map)"]
+        D --> D4["17/28-Station Vertical Milestone Corridor Timeline"]
+        D --> D5["Pulsing Glowing Node & NEXT Badge on Approaching Stop"]
+        D --> D6["Sticky Bottom Summary Bar with Quick Action FABs"]
+    end
+
+    subgraph View 3: Full-Window Map View & Auto-Focus
+        C2 -->|"Tap [নকশা] Tab"| E["TransitMapView (activeView === 'map')"]
+        D3 -->|"Tap 'মানচিত্রে দেখুন'"| E
+        D4 -->|"Tap Any Stoppage Row"| F["TransitStoppageActionSheet"]
+        F -->|"🔔 Toggle Stop Alert"| F1["Web Audio Crystal Chime + Device Vibration"]
+        F -->|"🗺️ 'মানচিত্রে দেখুন'"| E
+        E --> E1["Google Satellite Hybrid / Roadmap Edge-to-Edge Canvas"]
+        E --> E2["Dedicated Floating Top Tab Switcher Row (.transit-top-nav-row)"]
+        E --> E3["Smooth Camera FlyTo ([bus.lat, bus.lon], zoom 17)"]
+        E --> E4["Approaching Road Geometry Polyline Highlight"]
+    end
+
+    E2 -->|"Tap [তালিকা] Tab"| C
+    D1 -->|"Tap Back Button (←)"| C
+```
+
+---
+
+### B. Full-Window Map Viewport Geometry & Sidebar Alignment (Commit `17785ed`)
+
+#### 1. The Container Clipping & Margin Misalignment Bug
+- **Symptom**: When navigating to the Transit tab (`#transit`), the map canvas did not expand edge-to-edge between the persistent desktop left sidebar navigation rail and the right notices rail. Instead, it was constrained by fixed max-widths, unintended top/bottom margins, and inherited flex bounds intended for scrollable academic feeds.
+- **Root Cause**:
+  - In [`web/src/components/app.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/app.tsx), `<div className="workspace">`, `<main className="content">`, and `<div className="tab-layout">` enforced layout padding (`padding: 18px 24px`), max-width constraints (`max-width: 1400px`), and vertical scrollbars (`overflow-y: auto`).
+  - Leaflet requires an absolute coordinate bounding container to accurately compute viewport tiles without dropped frames or visual white seam gaps during pan/zoom.
+
+#### 2. Clean Viewport Override Engine
+- Added scoped dynamic classes in [`app.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/app.tsx):
+  - Workspace: `<div className={`workspace ${tab === "transit" ? "is-transit-active" : ""}`}>`
+  - Content Main: `<main className={`content ${tab === "transit" ? "is-transit-content" : ""}`}>`
+  - Tab Deck: `<div className={`tab-layout ${current === "transit" ? "is-transit-layout" : ""}`}>`
+  - Primary Pane: `<div className={`primary-pane ${current === "transit" ? "is-transit-pane" : ""}`}>`
+  - Section Wrapper: `<section className={value === "transit" ? "transit-tab-section" : undefined}>`
+- Configured edge-to-edge full window rules in [`web/src/components/transit.css`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.css):
+  ```css
+  /* Transit Tab: Full-Window Map Layout between left and right sidebars */
+  .workspace.is-transit-active {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+
+  @media (min-width: 1001px) {
+    .workspace.is-transit-active {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+  }
+
+  .workspace.is-transit-active .content.is-transit-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  @media (max-width: 1000px) {
+    .workspace.is-transit-active {
+      height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px)) !important;
+      max-height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0px)) !important;
+    }
+  }
+
+  .is-transit-layout,
+  .is-transit-pane,
+  .is-transit-pane > section.transit-tab-section {
+    height: 100% !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  ```
+- **Result**: The Leaflet map canvas (`.transit-map-canvas`) expands to 100% width and 100% height between navigation rails on desktop, and seamlessly fills the screen above the bottom navigation bar on mobile without overflow jitter.
+
+---
+
+### C. View 1: Default 2-Tab Bus List Screen (`TransitListView`, Commit `1a0b34f`)
+
+#### 1. Header & Live Fleet Summary (`.transit-list-header-card`)
+- **Title & Status Badge**: Displays `MBSTU বাস ট্র্যাকিং` paired with a live active vehicle counter:
+  - Computed via `displayFleet.filter(b => now - b.lastPingMs < 120_000).length`.
+  - Format: `৩ টি সক্রিয় বাস • ৫ টি নিবন্ধিত` with a pulsing emerald dot (`#34d399`).
+- **Road Simulation Demo Toggle (`.transit-list-demo-btn`)**:
+  - One-tap switch between actual university telemetry and simulated live kinematics (`সিমুলেশন চালু` / `লাইভ বন্ধ`), enabling comprehensive testing outside of university transit operational hours.
+
+#### 2. Segmented 2-Tab Switcher (`.transit-segmented-tabs`)
+- Provides instant switching between:
+  - **`[তালিকা]` (List)**: Default view showing all fleet cards, route progress, and status filters.
+  - **`[নকশা]` (Map)**: Full-window satellite/roadmap tracker.
+- Tapping `[নকশা]` executes `switchToMap()`:
+  ```typescript
+  const switchToMap = useCallback((busId?: string) => {
+    if (busId) {
+      setSelectedBusId(busId);
+      setDetailBusId(busId);
+    }
+    setActiveView("map");
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+        const target = (busId ? displayFleet.find((b) => b.id === busId) : selectedBus) || displayFleet[0];
+        if (target) {
+          mapRef.current.flyTo([target.lat, target.lon], 17, { animate: true, duration: 0.8 });
+        }
+      }
+    }, 150);
+  }, [displayFleet, selectedBus]);
+  ```
+
+#### 3. Real-Time Search & Status Filter Chips
+- **Instant Search Box (`.transit-list-search-wrapper`)**:
+  - Input with search icon and placeholder: `"বাস খুঁজুন (নাম, নম্বর বা রুট)"`.
+  - Case-insensitive substring filtering matching Bengali name (`nameBn`), English name (`name`), short ID (`SB0001`), or destination (`Nirala`, `Campus`).
+- **Filter Chips (`.transit-filter-chip-row`)**:
+  - `সব বাস` (All): Displays complete active and registered fleet.
+  - `সচল বাস` (Moving / Driving): Filters buses with `speed > 0`.
+  - `স্ট্যান্ডবাই` (Standby): Filters vehicles safely parked (`speed === 0`).
+  - `ক্যাম্পাসমুখী` (To Campus): Vehicles heading toward Santosh Campus.
+  - `শহরমুখী` (To City): Vehicles heading toward Tangail City Center / Nirala.
+  - Reset Button: One-tap clear resetting query and filter to defaults.
+
+#### 4. Material 3 Fleet Card Architecture (`.transit-bus-card`)
+- **Card Header**:
+  - Primary Title: Bold Bengali bus name (`সোনারতরী`, `অগ্নিবীণা`, `রক্তকরবী`).
+  - Identifier Chip: Short bus ID (`SB0003`, `SB0002`) tinted with the vehicle's signature brand color (`bus.color`).
+  - Quick Map Pin FAB (`.transit-bus-card-map-action`): Tapping directly launches map mode focused on that vehicle without opening the detail screen.
+- **Route Subtitle**: `Campus ➔ Nirala (City Center) • সন্তোষ টু টাঙ্গাইল`.
+- **Kinematics & Metrics Row**:
+  - Route Progress Badge: `৪০% সম্পন্ন`, computed via:
+    $$	ext{Progress \%} = \min\left(100, \max\left(5, 	ext{round}\left(rac{	ext{approachingStopIndex}}{	ext{totalStops}} 	imes 100ight)ight)ight)$$
+  - Live Speed Pill: Displays live speed (`১৭ কিমি/ঘ`) with cyan glowing indicator when moving, or `স্ট্যান্ডবাই` with muted amber styling when stationary.
+  - Freshness Timestamp: Relative age formatting (`এখনই`, `১ মিনিট আগে`, `৫ মিনিট আগে`).
+- **Visual Progress Bar Track (`.transit-bus-progress-track`)**:
+  - Linear track filled to the calculated route percentage with smooth CSS transition.
+  - Features an embedded circular white pin marker indicating the vehicle's position along the road.
+- **Next Stoppage & ETA Footer**:
+  - Clock icon with start time (`০৮:০০ AM`).
+  - Next Approaching Stoppage name (`শান্তিনগর মোড়`).
+  - Dynamic estimated arrival time (`~৩ মিনিট`).
+- **Interaction**: Tapping anywhere on the card sets `selectedBusId`, `detailBusId`, and transitions `activeView = "detail"`.
+
+---
+
+### D. View 2: Route & Stoppage Corridor Timeline (`TransitDetailView`, Commit `1a0b34f`)
+
+#### 1. Top App Bar (`.transit-detail-header-bar`)
+- **Back Navigation (`.transit-detail-back-btn`)**:
+  - Accessible back arrow (`<ArrowLeft size={20} />`) with keyboard navigation support.
+  - Tapping resets view mode back to the bus list (`setActiveView("list")`).
+- **Vehicle Title Group**: Displays Bengali name, short ID chip, and active speed badge.
+
+#### 2. Live Tracking Hero Card (`.transit-detail-hero-card`)
+- Pinned prominently at the top of the detail screen.
+- **Next Approaching Stop Typography**: Renders the upcoming stop in 20sp bold Bengali text (`শান্তিনগর মোড়`).
+- **Kinematics Readout**: Distance remaining in kilometers (`১.২ কিমি`) and approximate live ETA (`~৩ মিনিট`).
+- **Summary Metrics**: Real-time speed (`১৭ কিমি/ঘ`), distance from origin, and status (`সচল` / `স্ট্যান্ডবাই`).
+- **Primary CTA (`.transit-detail-map-cta-btn`)**:
+  - Large button: `🗺️ মানচিত্রে দেখুন` (Track on Map).
+  - Triggers `switchToMap(detailBus.id)` to immediately transition to full-screen tracking.
+
+#### 3. 17/28-Station Vertical Milestone Corridor Timeline (`.transit-corridor-timeline`)
+- Connects the entire MBSTU Santosh Campus & Tangail City road corridor:
+  - Stoppages: *Mukto Mancho, Academic Buildings, First Gate, Shena Nagar, Kagmari, DC Lake, Kumudini, Nirala*, etc.
+- **Continuous Milestone Rail (`.transit-timeline-track`)**:
+  - Vertical connector line with high-contrast milestone nodes.
+- **Node State Machine (`.transit-timeline-node`)**:
+  - *Passed Stops*: Dimmed circular node with muted text.
+  - *Active Approaching Stop*: High-visibility glowing container (`#38bdf8` / `#10b981`), pulsing bus icon node (`<Bus size={14} />`), and bold `NEXT` indicator pill.
+  - *Upcoming Stops*: Clean hollow milestone rings showing order number (`#14`, `#15`).
+- **Station Data Display**:
+  - Order badge (`স্টপ #১৪`), Bengali name, English name, and cumulative corridor distance.
+  - Estimated arrival timestamp.
+  - Stoppage Bell Action (`.transit-stop-alert-btn`): Direct 1-tap arrival alert toggle.
+- **Stoppage Click Interaction**: Tapping any station row opens the contextual `TransitStoppageActionSheet`.
+
+#### 4. Sticky Bottom Status Bar (`.transit-detail-sticky-bar`)
+- Floating pill pinned to the bottom of the viewport.
+- Displays approaching stop name, distance remaining, and quick action FABs: Map FAB (`মানচিত্রে দেখুন`) and Bell Alert FAB (`🔔`).
+
+---
+
+### E. View 3: Stoppage Quick Action Sheet & Map Auto-Focus Mechanics (Commits `1a0b34f`, `6ee9f73`)
+
+#### 1. Contextual Stoppage Action Sheet (`TransitStoppageActionSheet`)
+- Rendered as an elevated bottom sheet modal (`.transit-modal-overlay`, `.transit-action-sheet`) when any stoppage row is tapped:
+  - Drag pill handle for mobile swipe dismissal.
+  - Header with stop sequence (`স্টপ #১৪`), Bengali name, and English name.
+  - Dynamic distance readout calculated via Haversine formula from current bus GPS coordinates:
+    $$	ext{dist} = 2 R rcsin\left(\sqrt{\sin^2\left(rac{\Delta\phi}{2}ight) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(rac{\Delta\lambda}{2}ight)}ight)$$
+- **Dual Action Controls**:
+  1. **`🔔 এই স্টপেজের আগমন বিজ্ঞপ্তি চালু করুন`**:
+     - Arms arrival alarm for that specific station.
+     - Plays crystal Web Audio double chime and triggers haptic pulse.
+     - Shows confirmation toast: `[Stop Name] আগমন বিজ্ঞপ্তি চালু করা হয়েছে`.
+  2. **`🗺️ মানচিত্রে দেখুন`**:
+     - Automatically invokes `switchToMap(detailBus.id)` and closes the modal.
+     - Transitions `activeView = "map"`, invalidates Leaflet canvas dimensions, flies camera to `[bus.lat, bus.lon]` at zoom 17, and highlights the approaching road corridor into that stop.
+
+#### 2. Decoupled Top Floating Navigation Overlay in Map Mode (Commit `6ee9f73`)
+- **The Visual Crowding Bug**: Initially, the 2-tab segmented switch (`[তালিকা]` / `[নকশা]`) was nested inside `.transit-header-pill` alongside the bus title, speed badge, and demo toggle. On narrower screens, this caused button text truncation and visual overcrowding.
+- **Resolution**:
+  - Decoupled the segmented tab switch into its own dedicated floating top row (`.transit-top-nav-row`):
+    ```tsx
+    {/* Dedicated Top Floating Segmented Switcher Pill */}
+    <div className="transit-top-nav-row">
+      <div className="transit-segmented-tabs">
+        <button
+          onClick={() => setActiveView("list")}
+          className={`transit-seg-tab ${activeView === "list" ? "active" : ""}`}
+          type="button"
+          aria-selected={activeView === "list"}
+        >
+          <List size={15} />
+          <span>তালিকা</span>
+        </button>
+        <button
+          onClick={() => switchToMap()}
+          className={`transit-seg-tab ${activeView === "map" ? "active" : ""}`}
+          type="button"
+          aria-selected={activeView === "map"}
+        >
+          <MapIcon size={15} />
+          <span>ম্যাপ</span>
+        </button>
+      </div>
+    </div>
+    ```
+  - Positioned `.transit-header-pill` directly below `.transit-top-nav-row`, providing ample breathing room for bus identity and live kinematics.
+  - Enforced CSS button resets (`.transit-container button.transit-seg-tab`) to neutralize global button style leakage:
+    ```css
+    /* Dedicated Top Floating Segmented Switcher in Map Overlay */
+    .transit-top-nav-row {
+      width: 100%;
+      display: flex;
+      margin-bottom: 2px;
+    }
+
+    .transit-top-nav-row .transit-segmented-tabs {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.94) !important;
+      backdrop-filter: blur(24px) !important;
+      -webkit-backdrop-filter: blur(24px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    /* Force override global button backgrounds on segmented tabs */
+    .transit-container button.transit-seg-tab,
+    .transit-seg-tab {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      color: #94a3b8 !important;
+      padding: 8px 16px !important;
+      min-height: 38px !important;
+      border-radius: 12px !important;
+      cursor: pointer !important;
+      font-size: 13.5px !important;
+      font-weight: 700 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 7px !important;
+    }
+
+    .transit-container button.transit-seg-tab.active,
+    .transit-seg-tab.active {
+      background: #38bdf8 !important;
+      color: #0b0f19 !important;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4) !important;
+      font-weight: 800 !important;
+    }
+    ```
+
+---
+
+### F. Native Android APK Feature Alignment & Parity Roadmap
+
+The Android APK transit architecture is implemented in:
+- [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt) (805 lines)
+- [`ClassMateTransitManager.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt)
+- [`ClassMateTransitState.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitState.kt)
+
+#### Android APK 3-View Parity Blueprint:
+1. **`TransitListComposeView`**:
+   - Material 3 Compose screen matching Web `TransitListView`.
+   - Top segmented tab switch (`[তালিকা]` / `[ম্যাপ]`).
+   - Fleet cards with route progress bar, live speed badges (`ClassMateTransitState.speedKmh`), and last ping timestamps.
+2. **`TransitDetailTimelineComposeView`**:
+   - Vertical `LazyColumn` corridor timeline matching Web `TransitDetailView`.
+   - Hero card with Next Approaching Stop and `মানচিত্রে দেখুন` CTA.
+   - Milestone nodes with pulsing cyan indicator for active approaching stop.
+3. **`TransitMapComposeView`**:
+   - Production OSMDroid `MapView` with Google Satellite Hybrid / Mapnik tile overlays.
+   - Vehicle heading rotation markers (`BusMarkerOverlay`).
+   - Floating Material 3 FAB stack (Zoom, Recenter, Satellite toggle, Campus).
+4. **Shared Reactive State Management**:
+   - `TransitViewModel` exposes StateFlows: `activeFleet`, `selectedBus`, `activeView`, `alertedStops`.
+   - Engine.IO v4 OkHttp WebSocket handles background streaming with passive pong semantics.
+
+---
+
+### G. Comprehensive Master Production Verification Matrix (Oct 30, 2026 - Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Full-Window Map Viewport** | Web Companion | **PRODUCTION** | Scoped `is-transit-*` classes in [`app.tsx`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/components/app.tsx); Leaflet canvas 100% height between sidebars (Commit `17785ed`) |
+| **2-Tab Bus List Screen** | Web Companion | **PRODUCTION** | Default view on `#transit`; active fleet counter, search filter, status chips, route progress bars (Commit `1a0b34f`) |
+| **Route Stoppage Timeline** | Web Companion | **PRODUCTION** | Hero live tracking card, 17/28-station vertical timeline, glowing `NEXT` stop node, sticky bottom bar |
+| **Stoppage Action Sheet** | Web Companion | **PRODUCTION** | Contextual bottom sheet on stop click; 1-tap arrival alert & direct `মানচিত্রে দেখুন` auto-focus |
+| **Map Auto-Focus (`flyTo`)**| Web Companion | **PRODUCTION** | `mapRef.current.flyTo([lat, lon], 17, { duration: 0.8 })` with approaching road polyline highlight |
+| **Decoupled Top Tab Switcher**| Web Companion | **PRODUCTION** | Dedicated `.transit-top-nav-row` floating above `.transit-header-pill`; zero button crowding (Commit `6ee9f73`) |
+| **Native Transit Screen** | Android APK | **VERIFIED** | [`ClassMateTransitScreen.kt`](file:///D:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitScreen.kt); OSMDroid MapView + OkHttp Engine.IO v4 protocol |
+| **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
+| **Batch Screen Header** | Android APK | **VERIFIED** | Clean header (`Batch`, `CSE Batch 22 • Session 24-25`), back arrow `←`, tested on `6478ab80` |
+| **Daily Security Audit** | Antigravity Cron| **SCHEDULED** | `classmate-daily-security-audit` scheduled daily at 09:00 AM (Asia/Dhaka) |
+| **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `17785ed`, `1a0b34f`, `6ee9f73`) |
+| **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
