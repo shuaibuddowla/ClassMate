@@ -320,7 +320,14 @@ function playArrivalChime() {
 
 export function Transit({ ctx }: { ctx?: any }) {
   // Navigation & View Mode: "list" (Image 1) | "detail" (Image 2) | "map" (Live Google Maps)
-  const [activeView, setActiveView] = useState<"list" | "detail" | "map">("list");
+  const [activeView, setActiveView] = useState<"list" | "detail" | "map">(() => {
+    if (typeof window !== "undefined") {
+      const v = new URLSearchParams(window.location.search).get("view");
+      if (v === "map" || v === "list" || v === "detail") return v as any;
+      if (new URLSearchParams(window.location.search).get("app") === "android") return "map";
+    }
+    return "map";
+  });
   const [detailBusId, setDetailBusId] = useState<string | null>(null);
   const [listSearch, setListSearch] = useState<string>("");
   const [listFilter, setListFilter] = useState<"all" | "driving" | "standby" | "to_campus" | "to_city">("all");
