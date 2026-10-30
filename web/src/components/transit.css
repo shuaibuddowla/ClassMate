@@ -3035,3 +3035,187 @@
   background: var(--primary, #0284c7) !important;
   color: #ffffff !important;
 }
+
+/* Reference inspired Bengali transit UI: warm white surfaces and magenta route accent. */
+.transit-container {
+  --transit-pink: #b71454;
+  --transit-pink-dark: #941044;
+  --transit-pink-soft: #fbeaf0;
+  background: #f6f6f8;
+  color: #20212a;
+}
+
+.transit-list-screen {
+  max-width: none;
+  padding: 0 18px 28px;
+  gap: 14px;
+  background: #fff;
+  scrollbar-color: #d8d8dd transparent;
+}
+
+.transit-list-header-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 -18px;
+  padding: 22px 24px 16px;
+  border: 0;
+  border-radius: 0 0 30px 30px;
+  background: linear-gradient(145deg, #c2185b 0%, #a90f50 100%);
+  box-shadow: 0 8px 24px rgba(141, 16, 69, .18);
+}
+
+.transit-list-header-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -5%; right: -5%; bottom: 56px; height: 24px;
+  opacity: .18;
+  background: repeating-linear-gradient(0deg, transparent 0 6px, #fff 7px 8px, transparent 9px 13px);
+  border-radius: 50%;
+  transform: rotate(-2deg);
+}
+
+.transit-list-main-title { color: #fff; font-size: 21px; letter-spacing: 0; }
+.transit-list-live-badge { color: rgba(255,255,255,.9); }
+.transit-list-demo-btn {
+  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25);
+  color: #fff; min-height: 34px;
+}
+.transit-list-demo-btn:hover { background: rgba(255,255,255,.25); }
+.transit-list-header-card .transit-segmented-tabs {
+  padding: 4px; gap: 4px; border: 0; border-radius: 18px;
+  background: rgba(255,255,255,.17);
+}
+.transit-container .transit-list-header-card button.transit-seg-tab,
+.transit-container .transit-top-nav-row button.transit-seg-tab {
+  color: #fff !important; border-radius: 14px !important; min-height: 42px !important;
+}
+.transit-container .transit-list-header-card button.transit-seg-tab.active,
+.transit-container .transit-top-nav-row button.transit-seg-tab.active {
+  color: var(--transit-pink) !important; background: #fff !important;
+  box-shadow: 0 3px 12px rgba(77, 6, 37, .14) !important;
+}
+
+.transit-list-search-input-box {
+  min-height: 52px; border: 1px solid transparent; border-radius: 17px;
+  background: #f3f4f6; color: #282932;
+}
+.transit-list-search-input-box:focus-within { border-color: #e6a3bb; box-shadow: 0 0 0 3px #fbeaf0; }
+.transit-list-search-input { color: #282932; font-size: 14px; }
+.transit-list-search-input::placeholder { color: #85868e; }
+.transit-search-icon { color: #71727b; }
+.transit-filter-chips-row { min-height: 40px; gap: 8px; padding-bottom: 2px; }
+.transit-filter-chip, .transit-filter-chip-icon {
+  flex: 0 0 auto; min-height: 38px; height: 38px; border-radius: 999px;
+  background: #fff; border: 1px solid #e2e2e6; color: #34353d;
+}
+.transit-filter-chip.active { background: var(--transit-pink) !important; border-color: var(--transit-pink) !important; color: #fff !important; }
+.transit-filter-chip-icon { color: var(--transit-pink); }
+.transit-cards-list-container { gap: 14px; padding-bottom: 24px; }
+.transit-bus-card {
+  border: 1px solid #f0f0f2; border-radius: 22px; background: #f7f8fa;
+  color: #24252c; box-shadow: none; padding: 18px 17px 15px;
+}
+.transit-bus-card:hover { background: #fff; border-color: #f1d1dc; box-shadow: 0 7px 22px rgba(60, 20, 37, .07); }
+.transit-bus-name-bn, .transit-route-text { color: #24252c; }
+.transit-route-text { color: #6e6f77; }
+.transit-bus-card-map-action { background: #fff; }
+.transit-progress-pill { color: #4f5058; }
+.transit-route-progress-track { background: #e2e3e7; }
+.transit-route-progress-fill { background: linear-gradient(90deg, #db6c94, #b71454) !important; }
+.transit-route-progress-pin { background: #fff; border-color: #b71454 !important; color: #b71454; }
+.transit-bus-card-footer { flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.transit-next-stop-tag { flex: 1 1 65%; color: #65666e; }
+.transit-next-stop-tag strong { color: #282932; }
+.transit-duration-tag { color: var(--transit-pink); }
+.transit-empty-state {
+  width: 100%; box-sizing: border-box; padding: 28px 20px; border: 1px solid #eeeef1;
+  border-radius: 22px; background: #f8f8fa; color: #33343c; text-align: center;
+}
+.transit-empty-state h2 { color: #25262d; font-size: 17px; }
+.transit-empty-state p { color: #73747d; }
+.transit-empty-icon { color: var(--transit-pink); }
+.transit-empty-action { color: #fff; background: var(--transit-pink); border-color: var(--transit-pink); }
+
+.transit-detail-screen { max-width: none; background: #fff; color: #23242c; scrollbar-color: #d8d8dd transparent; }
+.transit-detail-header-bar, .transit-timeline-container, .transit-detail-stats-card {
+  color: #282932; background: #f7f8fa; border-color: #ececf0; box-shadow: 0 4px 16px rgba(20,20,30,.04);
+}
+.transit-detail-bus-name, .transit-station-main-title, .transit-station-km { color: #26272e; }
+.transit-detail-subtitle, .transit-station-sub-title { color: #777880; }
+.transit-detail-back-btn { background: #fff; border-color: #eee; color: var(--transit-pink); }
+.transit-detail-bus-chip, .transit-approaching-badge { background: var(--transit-pink-soft); color: var(--transit-pink); }
+.transit-detail-header-speed { background: #e9f6ef; color: #27724a; }
+.transit-detail-hero-card { background: linear-gradient(145deg,#fff4f7,#fff); border-color: #f1cbd8; box-shadow: 0 8px 26px rgba(100,20,50,.08); }
+.transit-hero-eyebrow, .transit-station-eta, .transit-meta-tap-hint { color: var(--transit-pink); }
+.transit-hero-approaching-title, .transit-hero-stat-value { color: #25262d; }
+.transit-hero-approaching-sub { color: #74757d; }
+.transit-timeline-item:hover { background: #faf1f4; }
+.transit-timeline-item.is-approaching { background: #fff3f7; border-color: #efc0d1; box-shadow: none; }
+.transit-timeline-node { background: #fff; color: #777880; }
+.transit-timeline-node.active-bus-node { background: var(--transit-pink); color: #fff; box-shadow: 0 0 12px #bd155655; }
+.transit-detail-bottom-bar { background: rgba(255,255,255,.96); border-color: #eee; color: #282932; }
+
+.transit-top-overlay { top: max(12px, env(safe-area-inset-top)); left: 14px; right: 14px; gap: 9px; }
+.transit-top-nav-row .transit-segmented-tabs {
+  padding: 4px; background: rgba(255,255,255,.96) !important; border: 1px solid #eee !important;
+  border-radius: 18px; box-shadow: 0 5px 18px rgba(22,20,26,.12) !important;
+}
+.transit-header-pill {
+  background: rgba(255,255,255,.97); border: 1px solid #eee; border-radius: 22px;
+  box-shadow: 0 5px 18px rgba(22,20,26,.12); color: #24252c;
+}
+.transit-header-main-title { color: #24252c; }
+.transit-header-sub { color: #777880; }
+.transit-status-pill { color: #4f5058; background: #f6f6f8; }
+.transit-mode-toggle-btn { color: var(--transit-pink); background: #fff2f6; border-color: #f2cad8; }
+.transit-chips-scroll { scrollbar-width: none; }
+.transit-bus-chip { color: #303139; background: rgba(255,255,255,.96); border-color: #eee !important; box-shadow: 0 3px 12px rgba(20,20,30,.1) !important; }
+.transit-chip-speed { color: #777880; }
+.transit-chip-speed.moving { color: #287449; }
+.transit-chip-speed.stale { color: #a56716; }
+.transit-chip-waiting { color: #4e4f57; background: rgba(255,255,255,.96); border: 1px solid #eee; }
+.transit-fab-btn, .transit-fab-group { color: var(--transit-pink); background: #fff; border-color: #eee; box-shadow: 0 4px 14px rgba(15,15,25,.18); }
+.transit-fab-btn.active-track { color: var(--transit-pink); background: #fff0f5; }
+.transit-bottom-sheet { color: #282932; background: rgba(255,255,255,.98); border-color: #eee; box-shadow: 0 -8px 30px rgba(15,15,25,.13); }
+.transit-bus-route-name, .transit-bus-name-en, .transit-gps-coords { color: #777880; }
+.transit-speed-pill.active { color: #287449; background: #e9f6ef; }
+.transit-approaching-card { color: #31323a; background: #fff5f8; border-color: #f1d3de; }
+.transit-approaching-eyebrow, .transit-eta-val, .transit-eta-sub { color: var(--transit-pink); }
+.transit-approaching-name { color: #25262d; }
+.transit-approaching-bn { color: #777880; }
+
+@media (min-width: 760px) {
+  .transit-list-screen { max-width: 820px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+  .transit-list-header-card { margin-left: -28px; margin-right: -28px; padding-left: 34px; padding-right: 34px; }
+  .transit-cards-list-container { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; }
+}
+
+:root:not([data-theme="dark"]) .transit-container .transit-list-header-card button.transit-seg-tab.active {
+  background: #fff !important;
+  color: #b71454 !important;
+  box-shadow: 0 3px 12px rgba(77, 6, 37, .14) !important;
+}
+:root:not([data-theme="dark"]) .transit-container .transit-list-header-card button.transit-seg-tab:not(.active) {
+  background: transparent !important;
+  color: #fff !important;
+}
+.transit-bus-card .transit-bus-id-chip { background: #fbeaf0 !important; color: #a90f50 !important; }
+.transit-bus-card .transit-bus-card-map-action svg { color: #b71454 !important; }
+.transit-container .transit-top-nav-row button.transit-seg-tab:not(.active) { color: #62636b !important; }
+.transit-container .transit-top-nav-row button.transit-seg-tab.active { color: #b71454 !important; }
+.transit-hero-eta-box { background: #fff; border-color: #f1d3de; }
+.transit-hero-eta-val { color: #b71454; }
+.transit-hero-eta-unit { color: #777880; }
+.transit-hero-stats-row { background: #f4f5f7; }
+.transit-stat-label { color: #777880; }
+.transit-stat-val { color: #25262d; }
+.transit-hero-map-btn { background: #b71454 !important; color: #fff !important; box-shadow: 0 4px 14px rgba(183,20,84,.2); }
+.transit-hero-map-btn:hover { background: #941044 !important; }
+.transit-timeline-meta-bar { color: #666770; }
+.transit-timeline-bell-btn { background: #fff; color: #b71454; border-color: #eee; }
+.transit-timeline-bell-btn.armed { background: #e9f6ef; color: #287449; border-color: #ccebd9; }
+.transit-bottom-label { color: #777880; }
+.transit-bottom-name { color: #26272e; }
+.transit-bottom-map-btn { background: #b71454 !important; color: #fff !important; }

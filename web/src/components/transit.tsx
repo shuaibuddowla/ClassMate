@@ -68,12 +68,12 @@ export interface CorridorStation {
 export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
   { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
-  { id: "soh_hall", name: "Bangabandhu / SOH Hall Bus Stop", nameBn: "বঙ্গবন্ধু / এসওএইচ হল বাস স্টপ", lat: 24.23835, lon: 89.89042, order: 3, isCampus: true },
+  { id: "soh_hall", name: "SOH Hall Bus Stop", nameBn: "এসওএইচ হল বাস স্টপ", lat: 24.23835, lon: 89.89042, order: 3, isCampus: true },
   { id: "mannan_hall", name: "Mannan Hall Bus Stop", nameBn: "মান্নান হল বাস স্টপ", lat: 24.23855, lon: 89.89105, order: 4, isCampus: true },
   { id: "ab2", name: "Academic Building-2 Bus Stop", nameBn: "একাডেমিক ভবন-২ বাস স্টপ", lat: 24.23712, lon: 89.89152, order: 5, isCampus: true },
   { id: "fifth_gate", name: "Fifth Gate Bus Stop", nameBn: "পঞ্চম গেট বাস স্টপ", lat: 24.23578, lon: 89.89178, order: 6, isCampus: true },
-  { id: "prottoy_71", name: "Prottoy-71 Bus Stop", nameBn: "প্রত্যয়-৭১ বাস স্টপ", lat: 24.23482, lon: 89.89195, order: 7, isCampus: true },
-  { id: "first_gate", name: "First Gate (Main Gate) Bus Stop", nameBn: "প্রথম গেট (প্রধান ফটক) বাস স্টপ", lat: 24.23363, lon: 89.89218, order: 8, isCampus: true },
+  { id: "prottoi_71", name: "Prottoi-71 Bus Stop", nameBn: "প্রত্যয়-৭১ বাস স্টপ", lat: 24.23482, lon: 89.89195, order: 7, isCampus: true },
+  { id: "first_gate", name: "First Gate Bus Stop", nameBn: "প্রথম গেট বাস স্টপ", lat: 24.23363, lon: 89.89218, order: 8, isCampus: true },
   { id: "arif_nagar", name: "Arif Nagar Bus Stop", nameBn: "আরিফ নগর বাস স্টপ", lat: 24.23398, lon: 89.89635, order: 9, isCampus: false },
   { id: "shena_nagar", name: "Shena Nagar Bus Stop", nameBn: "সেনা নগর বাস স্টপ", lat: 24.23404, lon: 89.89991, order: 10, isCampus: false },
   { id: "kagmari_more", name: "Kagmari More Bus Stop", nameBn: "কাগমারী মোড় বাস স্টপ", lat: 24.23488, lon: 89.90125, order: 11, isCampus: false },
@@ -82,18 +82,18 @@ export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "baby_stand", name: "Baby Stand Bus Stop", nameBn: "বেবি স্ট্যান্ড বাস স্টপ", lat: 24.24415, lon: 89.90445, order: 14, isCampus: false },
   { id: "shantikunja", name: "Shantikunja More Bus Stop", nameBn: "শান্তিকুঞ্জ মোড় বাস স্টপ", lat: 24.24665, lon: 89.90735, order: 15, isCampus: false },
   { id: "nirala_more", name: "Nirala More Bus Stop", nameBn: "নিরালা মোড় বাস স্টপ", lat: 24.24985, lon: 89.91485, order: 16, isCampus: false },
-  { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.25125, lon: 89.91445, order: 17, isCampus: false },
-  { id: "taltola", name: "Taltola-Shimultoli Road Bus Stop", nameBn: "তালতলা-শিমুলতলী রোড স্টপ", lat: 24.25285, lon: 89.91415, order: 18, isCampus: false },
-  { id: "bottola", name: "Bottola Road Bus Stop", nameBn: "বটতলা রোড বাস স্টপ", lat: 24.25845, lon: 89.91395, order: 19, isCampus: false },
-  { id: "dc_lake", name: "DC Lake Bus Stop", nameBn: "ডিসি লেক বাস স্টপ", lat: 24.26245, lon: 89.91545, order: 20, isCampus: false },
-  { id: "district_stop", name: "District Bus Stop", nameBn: "ডিস্ট্রিক্ট বাস স্টপ", lat: 24.26195, lon: 89.91635, order: 21, isCampus: false },
-  { id: "kazi_nazrul", name: "Kazi-Nazrul Sarani Bus Stop", nameBn: "কাজী নজরুল সরণি বাস স্টপ", lat: 24.26175, lon: 89.91695, order: 22, isCampus: false },
-  { id: "baitun_nur", name: "Baitun Nur Jame Mosque Mor", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", lat: 24.25985, lon: 89.91715, order: 23, isCampus: false },
-  { id: "cnb_more", name: "C & B More Bus Stop", nameBn: "সি অ্যান্ড বি মোড় বাস স্টপ", lat: 24.25895, lon: 89.91765, order: 24, isCampus: false },
-  { id: "kumudini_gate", name: "Kumudini College Gate Bus Stop", nameBn: "কুমুদিনী কলেজ গেট বাস স্টপ", lat: 24.25715, lon: 89.91885, order: 25, isCampus: false },
-  { id: "registry_para", name: "Registry Para Road Bus Stop", nameBn: "রেজিস্ট্রি পাড়া রোড বাস স্টপ", lat: 24.25355, lon: 89.91965, order: 26, isCampus: false },
-  { id: "puraton_stand", name: "Puraton Bus Stand Bus Stop", nameBn: "পুরাতন বাস স্ট্যান্ড স্টপ", lat: 24.25245, lon: 89.91955, order: 27, isCampus: false },
-  { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.25135, lon: 89.91665, order: 28, isCampus: false }
+  { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.25135, lon: 89.91665, order: 17, isCampus: false },
+  { id: "puraton_stand", name: "Puraton Bus Stand Bus Stop", nameBn: "পুরাতন বাস স্ট্যান্ড বাস স্টপ", lat: 24.25245, lon: 89.91955, order: 18, isCampus: false },
+  { id: "registry_para", name: "Registry Para Road Bus Stop", nameBn: "রেজিস্ট্রি পাড়া রোড বাস স্টপ", lat: 24.25355, lon: 89.91965, order: 19, isCampus: false },
+  { id: "kumudini_gate", name: "Kumudini College Gate Bus Stop", nameBn: "কুমুদিনী কলেজ গেট বাস স্টপ", lat: 24.25715, lon: 89.91885, order: 20, isCampus: false },
+  { id: "cnb_more", name: "C & B More Bus Stop", nameBn: "সি অ্যান্ড বি মোড় বাস স্টপ", lat: 24.25895, lon: 89.91765, order: 21, isCampus: false },
+  { id: "baitun_nur", name: "Baitun Nur Jame Mosque Mor", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", lat: 24.25985, lon: 89.91715, order: 22, isCampus: false },
+  { id: "kazi_nazrul", name: "Kazi-Nazrul Sarani Bus Stop", nameBn: "কাজী নজরুল সরণি বাস স্টপ", lat: 24.26175, lon: 89.91695, order: 23, isCampus: false },
+  { id: "district_stop", name: "District Bus Stop", nameBn: "ডিস্ট্রিক্ট বাস স্টপ", lat: 24.26195, lon: 89.91635, order: 24, isCampus: false },
+  { id: "dc_lake", name: "DC Lake Bus Stop", nameBn: "ডিসি লেক বাস স্টপ", lat: 24.26245, lon: 89.91545, order: 25, isCampus: false },
+  { id: "bottola", name: "Bottola Road Bus Stop", nameBn: "বটতলা রোড বাস স্টপ", lat: 24.25845, lon: 89.91395, order: 26, isCampus: false },
+  { id: "taltola", name: "Taltola-Shimultoli Road Bus Stop", nameBn: "তালতলা-শিমুলতলী রোড স্টপ", lat: 24.25285, lon: 89.91415, order: 27, isCampus: false },
+  { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.25125, lon: 89.91445, order: 28, isCampus: false }
 ];
 
 const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }> = {
@@ -305,6 +305,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   const busMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const stopMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const campusCircleRef = useRef<L.Circle | null>(null);
+  const demoBusInjectedRef = useRef(false);
 
   // Update clock every second for live ETA and freshness calculations
   useEffect(() => {
@@ -403,7 +404,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Filtered Fleet for List View (Image 1)
   const filteredFleet = useMemo(() => {
-    let result = displayFleet.length > 0 ? displayFleet : INITIAL_FLEET;
+    let result = displayFleet;
 
     if (listFilter === "driving") {
       result = result.filter((b) => b.speed > 0);
@@ -521,6 +522,44 @@ export function Transit({ ctx }: { ctx?: any }) {
     }, 150);
   }, [displayFleet, selectedBus]);
 
+  const toggleDemoMode = useCallback(() => {
+    if (!isDemoMode) {
+      const existingDemoBus = fleet.some((bus) => bus.id === "SB0003");
+      if (!existingDemoBus) {
+        const template = INITIAL_FLEET.find((bus) => bus.id === "SB0003") || INITIAL_FLEET[0];
+        const [lat, lon] = REAL_STREET_POLYLINE[0];
+        setFleet((current) => [
+          ...current,
+          {
+            ...template,
+            id: "SB0003",
+            lat,
+            lon,
+            speed: 32,
+            heading: 180,
+            hasDirection: true,
+            isDriving: true,
+            lastUpdated: new Date().toISOString(),
+            status: "Road Demo (32 km/h)"
+          }
+        ]);
+        setSelectedBusId("SB0003");
+        setDetailBusId("SB0003");
+        demoBusInjectedRef.current = true;
+      }
+      setIsDemoMode(true);
+      return;
+    }
+
+    setIsDemoMode(false);
+    if (demoBusInjectedRef.current) {
+      setFleet((current) => current.filter((bus) => bus.id !== "SB0003"));
+      setSelectedBusId((current) => (current === "SB0003" ? "" : current));
+      setDetailBusId((current) => (current === "SB0003" ? null : current));
+      demoBusInjectedRef.current = false;
+    }
+  }, [fleet, isDemoMode]);
+
   // Center Selected Bus on Map
   const centerSelectedBus = useCallback(() => {
     if (selectedBus && mapRef.current) {
@@ -625,16 +664,16 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     if (!polylineCasingRef.current) {
       polylineCasingRef.current = L.polyline(REAL_STREET_POLYLINE, {
-        color: "#0f172a",
-        weight: 8,
-        opacity: 0.65,
+        color: "#ffffff",
+        weight: 9,
+        opacity: 0.92,
         lineCap: "round",
         lineJoin: "round"
       }).addTo(map);
     }
     if (!polylineRef.current) {
       polylineRef.current = L.polyline(REAL_STREET_POLYLINE, {
-        color: "#60a5fa",
+        color: "#bd1556",
         weight: 5,
         opacity: 0.95,
         lineCap: "round",
@@ -644,10 +683,10 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!campusCircleRef.current) {
       campusCircleRef.current = L.circle([24.23488, 89.89155], {
         radius: 58,
-        color: "#38bdf8",
+        color: "#bd1556",
         weight: 1.5,
-        fillColor: "#38bdf8",
-        fillOpacity: 0.22,
+        fillColor: "#e83e7c",
+        fillOpacity: 0.18,
         dashArray: "4, 4"
       }).addTo(map);
     }
@@ -944,17 +983,31 @@ export function Transit({ ctx }: { ctx?: any }) {
             <div className="transit-list-title-box">
               <h1 className="transit-list-main-title">MBSTU বাস লাইভ ট্র্যাকার</h1>
               <div className="transit-list-live-badge">
-                <span className="transit-pulse-dot" style={{ background: "#34d399" }} />
-                <span>{freshFleetCount}টি লাইভ বাস • গত ১০ মিনিট</span>
+                <span
+                  className="transit-pulse-dot"
+                  style={{ background: isDemoMode ? "#ffe0eb" : freshFleetCount > 0 ? "#86efac" : "#fcd34d" }}
+                />
+                <span>
+                  {isDemoMode
+                    ? "ডেমো মোড · সিমুলেটেড লোকেশন"
+                    : freshFleetCount > 0
+                    ? `${freshFleetCount}টি বাস লাইভ · GPS আপডেট হচ্ছে`
+                    : wsStatus === "connected"
+                    ? "লাইভ ফিড সংযুক্ত · GPS-এর অপেক্ষায়"
+                    : wsStatus === "disconnected"
+                    ? "সংযোগ ফিরিয়ে আনা হচ্ছে"
+                    : "লাইভ ফিডে সংযুক্ত হচ্ছে"}
+                </span>
               </div>
             </div>
 
             <button
-              onClick={() => setIsDemoMode((prev) => !prev)}
+              onClick={toggleDemoMode}
               className="transit-list-demo-btn"
-              title="Toggle road preview demo"
+              title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
+              aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
             >
-              {isDemoMode ? <Radio size={13} color="#38bdf8" /> : <Play size={13} color="#34d399" />}
+              {isDemoMode ? <Radio size={13} /> : <Play size={13} />}
               <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
             </button>
           </div>
@@ -1057,15 +1110,26 @@ export function Transit({ ctx }: { ctx?: any }) {
 
         {/* Bus Cards List */}
         <div className="transit-cards-list-container">
-          {filteredFleet.map((bus) => {
+          {filteredFleet.length > 0 ? filteredFleet.map((bus) => {
             const nextInfo = getNextStopForBus(bus);
             const progressPct = getBusProgress(bus);
             const ageText =
-              bus.positionAgeSeconds !== null && bus.positionAgeSeconds !== undefined
-                ? bus.positionAgeSeconds < 15
-                  ? "এইমাত্র"
-                  : `${bus.positionAgeSeconds} সে আগে`
-                : "সক্রিয়";
+              bus.positionAgeSeconds == null
+                ? "GPS সময় অজানা"
+                : bus.isStale
+                ? `${bus.positionAgeSeconds} সে আগে · বিলম্ব`
+                : bus.isEstimated
+                ? `অনুমিত · ${bus.positionAgeSeconds} সে আগে`
+                : bus.positionAgeSeconds < 15
+                ? "এইমাত্র"
+                : `${bus.positionAgeSeconds} সে আগে`;
+            const liveStatus = bus.isStale
+              ? "GPS বিলম্বিত"
+              : bus.isEstimated
+              ? "অনুমিত অবস্থান"
+              : bus.speed > 0
+              ? `${Math.round(bus.speed)} কিমি/ঘ`
+              : "স্ট্যান্ডবাই";
 
             return (
               <div
@@ -1078,6 +1142,16 @@ export function Transit({ ctx }: { ctx?: any }) {
                 className="transit-bus-card"
                 role="button"
                 tabIndex={0}
+                aria-label={`${bus.nameBn}, ${formatBusShortId(bus.id)}. ${bus.routeName}. ${bus.isStale ? "GPS বিলম্বিত" : liveStatus}`}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedBusId(bus.id);
+                    setDetailBusId(bus.id);
+                    setActiveView("detail");
+                  }
+                }}
               >
                 {/* Header Row */}
                 <div className="transit-bus-card-header">
@@ -1088,37 +1162,37 @@ export function Transit({ ctx }: { ctx?: any }) {
                     </span>
                   </div>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       switchToMap(bus.id);
                     }}
                     className="transit-bus-card-map-action"
                     title="Track on map"
+                    aria-label={`${bus.nameBn}-কে ম্যাপে দেখুন`}
                   >
                     <MapPin size={15} color={bus.color} />
                   </button>
                 </div>
 
-                {/* Subtitle & Frequency */}
+                {/* Route */}
                 <div className="transit-bus-card-route-row">
                   <span className="transit-route-text">{bus.routeName}</span>
-                  <span className="transit-dot-sep">•</span>
-                  <span className="transit-frequency-text">প্রতিদিন</span>
                 </div>
 
                 {/* Progress Metric Row */}
                 <div className="transit-bus-metric-row">
-                  <div className="transit-progress-pill">
+                  <div className={`transit-progress-pill ${bus.isStale ? "stale" : ""}`}>
                     <span className="transit-progress-bar-icon" />
-                    <span>{progressPct}% পথ শেষ</span>
+                    <span>{bus.isStale ? "GPS বিলম্বিত" : `${progressPct}% পথ শেষ`}</span>
                   </div>
                   <span className="transit-dot-sep">•</span>
                   <div className="transit-status-live-pill">
                     <span
                       className="transit-pulse-dot"
-                      style={{ background: bus.speed > 0 ? "#10b981" : "#fbbf24" }}
+                      style={{ background: bus.isStale ? "#f97316" : bus.speed > 0 ? "#10b981" : "#fbbf24" }}
                     />
-                    <span>{bus.speed > 0 ? `${Math.round(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই"}</span>
+                    <span>{liveStatus}</span>
                   </div>
                   <span className="transit-update-time">{ageText}</span>
                 </div>
@@ -1145,17 +1219,41 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 {/* Footer Times / Next Stop */}
                 <div className="transit-bus-card-footer">
-                  <span className="transit-time-tag">০৭:৩০ AM</span>
-                  <span className="transit-duration-tag">
-                    {bus.speed > 0 ? `~${nextInfo.etaMinutes} মি ড্রাইভ` : "স্ট্যান্ডবাই"}
-                  </span>
                   <span className="transit-next-stop-tag">
                     পরবর্তী: <strong>{nextInfo.station.nameBn}</strong>
+                  </span>
+                  <span className="transit-duration-tag">
+                    {bus.isStale ? "ETA স্থগিত" : bus.speed > 0 ? `~${nextInfo.etaMinutes} মি` : "স্ট্যান্ডবাই"}
                   </span>
                 </div>
               </div>
             );
-          })}
+          }) : (
+            <div className="transit-empty-state" aria-live="polite">
+              <div className="transit-empty-icon"><Radio size={22} /></div>
+              <h2>{displayFleet.length === 0 ? "এখনো কোনো বাসের GPS পাওয়া যায়নি" : "এই ফিল্টারে কোনো বাস নেই"}</h2>
+              <p>
+                {displayFleet.length === 0
+                  ? wsStatus === "connected"
+                    ? "লাইভ ফিড সংযুক্ত। বাসের ট্র্যাকার লোকেশন পাঠালে এখানে দেখা যাবে।"
+                    : "লাইভ ফিডে যুক্ত হচ্ছি। সংযোগ হলেই বাসের অবস্থান দেখা যাবে।"
+                  : "অন্য ফিল্টার বেছে নিন বা সার্চ মুছে আবার দেখুন।"}
+              </p>
+              {displayFleet.length === 0 ? (
+                <button type="button" onClick={toggleDemoMode} className="transit-empty-action">
+                  <Play size={14} /> ডেমো চালিয়ে দেখুন
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setListSearch(""); setListFilter("all"); }}
+                  className="transit-empty-action"
+                >
+                  ফিল্টার মুছুন
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1469,9 +1567,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div
                   className="transit-header-icon-box"
                   style={{
-                    backgroundColor: `${selectedBus?.color || "#0284c7"}25`,
-                    color: selectedBus?.color || "#38bdf8",
-                    border: `1px solid ${selectedBus?.color || "#0284c7"}60`
+                    backgroundColor: "#fce8ef",
+                    color: "#b71454",
+                    border: "1px solid #f5c2d3"
                   }}
                 >
                   <Bus size={20} />
@@ -1479,7 +1577,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
                 <div className="transit-header-titles">
                   <div className="transit-header-title-row">
-                    <span className="transit-header-main-title">MBSTU Bus Tracker</span>
+                  <span className="transit-header-main-title">MBSTU বাস ট্র্যাকার</span>
                     <span
                       className={`transit-status-pill ${isDemoMode ? "demo" : wsStatus === "connected" && freshFleetCount > 0 ? "live" : wsStatus === "disconnected" ? "reconnecting" : "waiting"}`}
                       aria-live="polite"
@@ -1491,29 +1589,29 @@ export function Transit({ ctx }: { ctx?: any }) {
                         }}
                       />
                       {isDemoMode
-                        ? "Road Demo"
+                        ? "ডেমো মোড"
                         : wsStatus === "connected" && freshFleetCount > 0
-                        ? `Live · ${freshFleetCount} ${freshFleetCount === 1 ? "bus" : "buses"}`
+                        ? `${freshFleetCount}টি বাস লাইভ`
                         : wsStatus === "connected"
-                        ? "Waiting for GPS"
+                        ? "GPS-এর অপেক্ষায়"
                         : wsStatus === "disconnected"
-                        ? "Reconnecting"
-                        : "Connecting"}
+                        ? "সংযোগ ফিরছে"
+                        : "সংযোগ হচ্ছে"}
                     </span>
                   </div>
-                  <span className="transit-header-sub">Santosh Campus ⇄ Nirala (City Center) Loop</span>
+                  <span className="transit-header-sub">সন্তোষ ক্যাম্পাস ⇄ নিরালা শহর লুপ</span>
                 </div>
               </div>
 
               {/* Mode Toggle Button */}
               <button
-                onClick={() => setIsDemoMode((prev) => !prev)}
+                onClick={toggleDemoMode}
                 className="transit-mode-toggle-btn"
-                title={isDemoMode ? "Return to live bus tracking" : "Preview the map with a simulated bus"}
-                aria-label={isDemoMode ? "Return to live tracking" : "Preview road demo"}
+                title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
+                aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস দেখুন"}
               >
                 {isDemoMode ? <Radio size={14} color="#38bdf8" /> : <Play size={14} color="#34d399" />}
-                <span>{isDemoMode ? "Go live" : "Try demo"}</span>
+                <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
               </button>
             </div>
 
