@@ -2494,20 +2494,34 @@
 }
 
 .transit-bus-card-map-action {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--primary, #38bdf8) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary, #38bdf8) 25%, transparent);
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(183, 20, 84, 0.08);
+  border: 1px solid rgba(183, 20, 84, 0.22);
+  color: var(--transit-pink, #b71454);
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .transit-bus-card-map-action:hover {
-  transform: scale(1.08);
-  background: color-mix(in srgb, var(--primary, #38bdf8) 22%, transparent);
+  background: rgba(183, 20, 84, 0.16);
+  transform: translateY(-1px);
+}
+
+.transit-card-route-inline {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 175px;
 }
 
 .transit-bus-card-route-row {
@@ -2599,6 +2613,20 @@
   transition: left 0.4s ease;
 }
 
+.transit-route-progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 1px 0 2px;
+}
+
+.transit-track-endpoint {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
 /* Card Footer */
 .transit-bus-card-footer {
   display: flex;
@@ -2608,6 +2636,42 @@
   color: var(--muted, #94a3b8);
   padding-top: 4px;
   border-top: 1px dashed rgba(148, 163, 184, 0.15);
+  gap: 8px;
+}
+
+.transit-card-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.transit-next-label {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.transit-next-name {
+  font-size: 11.5px;
+  color: var(--text, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transit-next-dist {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.transit-card-footer-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .transit-time-tag {
@@ -3591,22 +3655,27 @@
 .transit-list-search-input { color: #282932; font-size: 14px; }
 .transit-list-search-input::placeholder { color: #85868e; }
 .transit-search-icon { color: #71727b; }
-.transit-filter-chips-row { min-height: 40px; gap: 8px; padding-bottom: 2px; }
+.transit-filter-chips-row { min-height: 40px; gap: 8px; padding-bottom: 2px; padding-right: 28px; }
 .transit-filter-chip, .transit-filter-chip-icon {
   flex: 0 0 auto; min-height: 38px; height: 38px; border-radius: 999px;
   background: #fff; border: 1px solid #e2e2e6; color: #34353d;
 }
 .transit-filter-chip.active { background: var(--transit-pink) !important; border-color: var(--transit-pink) !important; color: #fff !important; }
 .transit-filter-chip-icon { color: var(--transit-pink); }
-.transit-cards-list-container { gap: 14px; padding-bottom: 24px; }
+.transit-cards-list-container { gap: 10px; padding-bottom: 24px; }
 .transit-bus-card {
-  border: 1px solid #f0f0f2; border-radius: 22px; background: #f7f8fa;
-  color: #24252c; box-shadow: none; padding: 18px 17px 15px;
+  border: 1px solid #f0f0f2; border-radius: 18px; background: #f7f8fa;
+  color: #24252c; box-shadow: none; padding: 12px 14px 10px;
+  gap: 8px;
 }
 .transit-bus-card:hover { background: #fff; border-color: #f1d1dc; box-shadow: 0 7px 22px rgba(60, 20, 37, .07); }
 .transit-bus-name-bn, .transit-route-text { color: #24252c; }
 .transit-route-text { color: #6e6f77; }
-.transit-bus-card-map-action { background: #fff; }
+.transit-bus-card-map-action {
+  background: #fdf2f6;
+  border-color: #f7cedb;
+  color: var(--transit-pink);
+}
 .transit-bus-metric-row { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 .transit-progress-pill { color: #4f5058; white-space: nowrap; flex-shrink: 0; }
 .transit-status-live-pill { white-space: nowrap; flex-shrink: 0; }
@@ -3614,7 +3683,7 @@
 .transit-route-progress-track { background: #e2e3e7; }
 .transit-route-progress-fill { background: linear-gradient(90deg, #db6c94, #b71454) !important; }
 .transit-route-progress-pin { background: #fff; border-color: #b71454 !important; color: #b71454; }
-.transit-bus-card-footer { flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.transit-bus-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px 8px; flex-wrap: nowrap; }
 .transit-next-stop-tag { flex: 1 1 65%; color: #65666e; }
 .transit-next-stop-tag strong { color: #282932; }
 .transit-duration-tag { color: var(--transit-pink); }
@@ -4280,20 +4349,25 @@
     gap: 10px;
   }
   .transit-bus-card {
-    padding: 13px 13px 11px;
-    border-radius: 18px;
+    padding: 10px 12px 10px;
+    border-radius: 16px;
+    gap: 6px;
   }
   .transit-bus-name-bn {
-    font-size: 15px;
+    font-size: 14.5px;
   }
   .transit-bus-metric-row {
-    flex-wrap: wrap;
-    gap: 5px 8px;
+    flex-wrap: nowrap;
+    gap: 5px 6px;
     font-size: 11px;
   }
   .transit-bus-card-footer {
-    gap: 6px 8px;
-    font-size: 11.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11px;
+    flex-wrap: nowrap;
   }
   .transit-user-distance-badge,
   .transit-request-loc-pill {

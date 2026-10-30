@@ -10926,3 +10926,35 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`, `4ce6115`, `07980fd`, `a90fd7e`, `d52659c`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+
+
+---
+
+## 174. Transit List View Streamlining & Redundancy Purge (Mobile Web Optimization)
+
+### A. Problem Diagnostic (from User Screenshot `media_1793397687205_fa66367d.jpg`)
+1. **Severe Status Redundancy**: In both `সংশপ্তক` and `অগ্নিবীণা`, the card displayed: `ক্যাম্পাস স্ট্যান্ডবাই • 🟡 স্ট্যান্ডবাই`, repeating "স্ট্যান্ডবাই" twice within 5mm.
+2. **Numeral Inconsistency**: English digits (`6টি বাস লাইভ`, `0005`, `0002`) leaked into Bengali badges.
+3. **Card Viewport Starvation**: Cards were ~220px tall, restricting visible content to only 1.5 cards above the fold on mobile.
+4. **Phantom Progress Slider on Parked Buses**: Parked buses at depot rendered an anchorless 12% progress slider as if already on a trip.
+5. **Rogue Header Button**: `[ ▷ ডেমো ]` button persisted in the list view header.
+6. **Filter Chip Clipping**: `শহরমুখী` was abruptly cut off at `শ...` on the right screen edge.
+
+### B. Architectural & UI/UX Fixes Implemented
+1. **Zero-Redundancy Status Engine**:
+   - For stationary/standby vehicles: strictly one unified pill: `🅿️ ক্যাম্পাস স্ট্যান্ডবাই · এইমাত্র`.
+   - For moving vehicles: `⚡ চলন্ত (২৫ কিমি/ঘ) · ৭৫% সম্পন্ন · এইমাত্র`.
+2. **100% Bengali Numerals**:
+   - Header live count: `৬টি বাস লাইভ · GPS আপডেট হচ্ছে`.
+   - Bus ID chips: `০০০৫`, `০০০২`.
+3. **Card Compaction ($220\text{px} \to 125\text{px}$)**:
+   - Merged Next Stop & User Distance into a single balanced flex row:
+     `পরবর্তী: প্রথম গেট বাস স্টপ (০.১৫ কিমি)` | `📍 আপনার থেকে ৫২৪ মি`.
+   - Suppressed phantom progress slider on parked/standby buses.
+   - Visible cards on mobile increased from **1.5 to 3 full buses**.
+4. **Purged `[ ▷ ডেমো ]` Button**:
+   - Removed developer toggle from list view header; header cleanly hosts title, live count, and segmented tab switcher.
+5. **Filter Carousel Padding**:
+   - Added right-side scroll padding (`padding-right: 28px`) ensuring `শহরমুখী` is never clipped.
+6. **Sleek Map Shortcut**:
+   - Converted the ambiguous circular pin button into a branded pill: `[ 🗺️ ম্যাপ ]`.

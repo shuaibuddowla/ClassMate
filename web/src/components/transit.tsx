@@ -1351,7 +1351,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                     {isDemoMode
                       ? "ডেমো মোড · সিমুলেটেড লোকেশন"
                       : freshFleetCount > 0
-                      ? `${freshFleetCount}টি বাস লাইভ · GPS আপডেট হচ্ছে`
+                      ? `${toBengaliDigits(freshFleetCount)}টি বাস লাইভ · GPS আপডেট হচ্ছে`
                       : wsStatus === "connected"
                       ? "লাইভ ফিড সংযুক্ত · GPS-এর অপেক্ষায়"
                       : wsStatus === "disconnected"
@@ -1360,16 +1360,6 @@ export function Transit({ ctx }: { ctx?: any }) {
                   </span>
                 </div>
               </div>
-
-              <button
-                onClick={toggleDemoMode}
-                className="transit-list-demo-btn"
-                title={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
-                aria-label={isDemoMode ? "লাইভ বাস ট্র্যাকিংয়ে ফিরুন" : "ডেমো বাস চালিয়ে দেখুন"}
-              >
-                {isDemoMode ? <Radio size={13} /> : <Play size={13} />}
-                <span>{isDemoMode ? "লাইভ" : "ডেমো"}</span>
-              </button>
             </div>
 
             {/* Segmented 2-Tab Switcher: [তালিকা] / [ম্যাপ] */}
@@ -1477,6 +1467,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             const nextInfo = getNextStopForBus(bus);
             const progressPct = getBusProgress(bus);
             const isBusOffline = bus.isStale || (bus.positionAgeSeconds != null && bus.positionAgeSeconds > 600);
+            const isMoving = bus.speed > 0;
 
             // Clean natural Bengali time format
             let ageText = "GPS সময় অজানা";
@@ -1485,18 +1476,18 @@ export function Transit({ ctx }: { ctx?: any }) {
               if (s < 20) {
                 ageText = "এইমাত্র";
               } else if (s < 60) {
-                ageText = `${s} সে আগে`;
+                ageText = `${toBengaliDigits(s)} সে আগে`;
               } else if (s < 3600) {
-                ageText = `${Math.floor(s / 60)} মি আগে`;
+                ageText = `${toBengaliDigits(Math.floor(s / 60))} মি আগে`;
               } else {
-                ageText = `${Math.floor(s / 3600)} ঘণ্টা আগে`;
+                ageText = `${toBengaliDigits(Math.floor(s / 3600))} ঘণ্টা আগে`;
               }
             }
 
-            // Clean non-duplicated status metrics
-            const progressLabel = bus.speed > 0 ? `${progressPct}% পথ শেষ` : (isBusOffline ? "টার্মিনাল স্ট্যান্ডবাই" : "ক্যাম্পাস স্ট্যান্ডবাই");
-            const liveLabel = isBusOffline ? "GPS বিলম্বিত" : (bus.speed > 0 ? `${Math.round(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই");
-            const liveDotColor = isBusOffline ? "#f97316" : (bus.speed > 0 ? "#10b981" : "#fbbf24");
+            // Distance from user to this bus
+            const userDistM = userLocation
+              ? getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon)
+              : null;
 
             return (
               <div
@@ -1509,7 +1500,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                 className="transit-bus-card"
                 role="button"
                 tabIndex={0}
-                aria-label={`${bus.nameBn}, ${formatBusShortId(bus.id)}. ${bus.routeName}. ${liveLabel}`}
+                aria-label={`${bus.nameBn}, ${toBengaliDigits(formatBusShortId(bus.id))}. ${bus.routeName}`}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
@@ -1520,13 +1511,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                   }
                 }}
               >
-                {/* Header Row */}
+                {/* 1. Header: Bus Name + Bengali ID Chip + Map Shortcut Button */}
                 <div className="transit-bus-card-header">
                   <div className="transit-bus-card-titles">
                     <span className="transit-bus-name-bn">{bus.nameBn}</span>
                     <span className="transit-bus-id-chip" style={{ background: `${bus.color}15`, color: bus.color }}>
-                      {formatBusShortId(bus.id)}
+                      {toBengaliDigits(formatBusShortId(bus.id))}
                     </span>
+                    <span className="transit-card-route-inline">• {bus.routeName}</span>
                   </div>
                   <button
                     type="button"
@@ -1535,64 +1527,73 @@ export function Transit({ ctx }: { ctx?: any }) {
                       switchToMap(bus.id);
                     }}
                     className="transit-bus-card-map-action"
-                    title="Track on map"
+                    title="ম্যাপে দেখুন"
                     aria-label={`${bus.nameBn}-কে ম্যাপে দেখুন`}
                   >
-                    <MapPin size={15} color={bus.color} />
+                    <MapIcon size={12} color={bus.color} />
+                    <span>ম্যাপ</span>
                   </button>
                 </div>
 
-                {/* Route */}
-                <div className="transit-bus-card-route-row">
-                  <span className="transit-route-text">{bus.routeName}</span>
-                </div>
-
-                {/* Progress Metric Row */}
+                {/* 2. Status Metric Row (STRICT ZERO-REDUNDANCY) */}
                 <div className="transit-bus-metric-row">
-                  <div className={`transit-progress-pill ${isBusOffline ? "stale" : ""}`}>
-                    <span className="transit-progress-bar-icon" />
-                    <span>{progressLabel}</span>
-                  </div>
-                  <span className="transit-dot-sep">•</span>
-                  <div className="transit-status-live-pill">
-                    <span
-                      className="transit-pulse-dot"
-                      style={{ background: liveDotColor }}
-                    />
-                    <span>{liveLabel}</span>
-                  </div>
+                  {isMoving ? (
+                    <>
+                      <div className="transit-status-live-pill moving">
+                        <span className="transit-pulse-dot" style={{ background: "#10b981" }} />
+                        <span>⚡ চলন্ত ({toBengaliDigits(Math.round(bus.speed))} কিমি/ঘ)</span>
+                      </div>
+                      <span className="transit-dot-sep">•</span>
+                      <div className="transit-progress-pill">
+                        <span>{toBengaliDigits(progressPct)}% সম্পন্ন</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="transit-status-live-pill standby">
+                      <span className="transit-pulse-dot" style={{ background: isBusOffline ? "#f97316" : "#fbbf24" }} />
+                      <span>🅿️ {isBusOffline ? "টার্মিনাল স্ট্যান্ডবাই" : "ক্যাম্পাস স্ট্যান্ডবাই"}</span>
+                    </div>
+                  )}
                   <span className="transit-update-time">{ageText}</span>
                 </div>
 
-                {/* Visual Progress Bar Track */}
-                <div className="transit-route-progress-track">
-                  <div
-                    className="transit-route-progress-fill"
-                    style={{
-                      width: `${bus.speed > 0 ? progressPct : 12}%`,
-                      background: `linear-gradient(90deg, ${bus.color}88, ${bus.color})`
-                    }}
-                  />
-                  <div
-                    className="transit-route-progress-pin"
-                    style={{
-                      left: `${bus.speed > 0 ? progressPct : 12}%`,
-                      borderColor: bus.color
-                    }}
-                  >
-                    <Bus size={11} color={bus.color} />
+                {/* 3. Visual Progress Bar Track (ONLY shown when moving; zero phantom sliders for parked buses!) */}
+                {isMoving && (
+                  <div className="transit-route-progress-wrapper">
+                    <span className="transit-track-endpoint">ক্যাম্পাস</span>
+                    <div className="transit-route-progress-track">
+                      <div
+                        className="transit-route-progress-fill"
+                        style={{
+                          width: `${progressPct}%`,
+                          background: `linear-gradient(90deg, ${bus.color}88, ${bus.color})`
+                        }}
+                      />
+                      <div
+                        className="transit-route-progress-pin"
+                        style={{
+                          left: `${progressPct}%`,
+                          borderColor: bus.color
+                        }}
+                      >
+                        <Bus size={10} color={bus.color} />
+                      </div>
+                    </div>
+                    <span className="transit-track-endpoint">শহর</span>
                   </div>
-                </div>
+                )}
 
-                {/* Footer Times / Next Stop & User Distance */}
+                {/* 4. Footer: Next Stop + User Distance (Consolidated single balanced horizontal row) */}
                 <div className="transit-bus-card-footer">
-                  <span className="transit-next-stop-tag">
-                    পরবর্তী: <strong>{nextInfo.station.nameBn}</strong>
-                  </span>
-                  <div className="transit-card-user-distance-box">
-                    {userLocation ? (
+                  <div className="transit-card-footer-left">
+                    <span className="transit-next-label">পরবর্তী:</span>
+                    <strong className="transit-next-name">{nextInfo.station.nameBn}</strong>
+                    <span className="transit-next-dist">({toBengaliDigits(nextInfo.distanceKm)} কিমি)</span>
+                  </div>
+                  <div className="transit-card-footer-right">
+                    {userDistM !== null ? (
                       <span className="transit-user-distance-badge" title="আপনার বর্তমান অবস্থান থেকে এই বাসের দূরত্ব">
-                        📍 আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon))}
+                        📍 আপনার থেকে {formatDistanceUser(userDistM)}
                       </span>
                     ) : (
                       <button
