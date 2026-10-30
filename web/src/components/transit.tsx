@@ -339,34 +339,63 @@ export function Transit({ ctx }: { ctx?: any }) {
   const campusCircleRef = useRef<L.Circle | null>(null);
   const demoBusInjectedRef = useRef(false);
 
+  // User Geolocation State (Real-time device tracking)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [locPermission, setLocPermission] = useState<"prompt" | "granted" | "denied">("prompt");
+  const userMarkerRef = useRef<L.Marker | null>(null);
+
   // Update clock every second for live ETA and freshness calculations
   useEffect(() => {
     const timer = setInterval(() => setClockNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Restore cached fleet from previous session for zero-latency initial UI
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem("classmate_mbstu_fleet");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setFleet(parsed);
-          setSelectedBusId(parsed[0].id);
+  // Request & watch user geolocation
+  const requestLocation = useCallback(() => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude
+        });
+        setLocPermission("granted");
+        if (mapRef.current && activeView === "map") {
+          mapRef.current.flyTo([pos.coords.latitude, pos.coords.longitude], 16, { animate: true, duration: 0.8 });
         }
-      }
-    } catch (e) {}
-  }, []);
+      },
+      () => setLocPermission("denied"),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, [activeView]);
 
-  // Save fleet updates to cache
   useEffect(() => {
-    if (fleet.length > 0) {
-      try {
-        localStorage.setItem("classmate_mbstu_fleet", JSON.stringify(fleet));
-      } catch (e) {}
-    }
-  }, [fleet]);
+    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+    try {
+      // Purge old mock fleet from localStorage so only authentic live buses are shown
+      localStorage.removeItem("classmate_mbstu_fleet");
+    } catch (e) {}
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude
+        });
+        setLocPermission("granted");
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocPermission("denied");
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   const displayFleet = useMemo(
     () => fleet.map((bus) => predictBusPosition(bus, clockNow)),
@@ -862,8 +891,8 @@ export function Transit({ ctx }: { ctx?: any }) {
               : ""
           }
           ${bus.isDriving ? `<div class="transit-bus-radar-ring" style="border-color: ${bus.color};"></div>` : ""}
-          <div class="transit-bus-badge ${bus.isStale ? "is-stale" : ""}" style="border-color: ${bus.color};">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
+          <div class="transit-bus-badge" style="border-color: ${bus.color};">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="transit-bus-icon-svg" xmlns="http://www.w3.org/2000/svg">
               <path d="M4 16.5C4 17.33 4.67 18 5.5 18H6V19.5C6 20.33 6.67 21 7.5 21H8.5C9.33 21 10 20.33 10 19.5V18H14V19.5C14 20.33 14.67 21 15.5 21H16.5C17.33 21 18 20.33 18 19.5V18H18.5C19.33 18 20 17.33 20 16.5V6.5C20 3.8 17.8 3 12 3C6.2 3 4 3.8 4 6.5V16.5Z" fill="${bus.color}"/>
               <path d="M5.8 7H18.2C18.4 7 18.5 7.15 18.5 7.35V11.2C18.5 11.4 18.4 11.5 18.2 11.5H5.8C5.6 11.5 5.5 11.4 5.5 11.2V7.35C5.5 7.15 5.6 7 5.8 7Z" fill="#ffffff" fill-opacity="0.95"/>
               <rect x="8.5" y="4.5" width="7" height="1.4" rx="0.7" fill="#ffffff" fill-opacity="0.9"/>
@@ -880,8 +909,8 @@ export function Transit({ ctx }: { ctx?: any }) {
       const icon = L.divIcon({
         className: "transit-bus-marker-container",
         html,
-        iconSize: [42, 46],
-        iconAnchor: [21, 46]
+        iconSize: [44, 48],
+        iconAnchor: [22, 48]
       });
 
       let marker = busMarkersRef.current.get(bus.id);
@@ -900,6 +929,78 @@ export function Transit({ ctx }: { ctx?: any }) {
       }
     });
   }, [displayFleet, selectedBusId]);
+
+  // 6.1 Render Live User Geolocation Marker on Map
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    if (!userLocation) {
+      if (userMarkerRef.current) {
+        map.removeLayer(userMarkerRef.current);
+        userMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const html = `
+      <div class="transit-user-marker">
+        <div class="transit-user-marker-pulse"></div>
+        <div class="transit-user-marker-dot"></div>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      className: "transit-user-location-wrapper",
+      html,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lon], {
+        icon,
+        zIndexOffset: 1500
+      }).addTo(map);
+      userMarkerRef.current.bindPopup(
+        "<div style='font-weight:700; font-size:12px; text-align:center;'>📍 আপনার অবস্থান<br/><span style='font-size:10px; color:#64748b; font-weight:normal;'>You are here</span></div>",
+        { offset: [0, -8] }
+      );
+    } else {
+      userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lon]);
+    }
+  }, [userLocation]);
+
+  // 6.2 Auto-Adapt Map View to Active Bus Location & Forward Route Window
+  const lastCameraPanRef = useRef<number>(0);
+  useEffect(() => {
+    if (!mapRef.current || !selectedBus || activeView !== "map") return;
+    const now = Date.now();
+    // Throttle auto-adaptation so user drag/zoom isn't interrupted
+    if (now - lastCameraPanRef.current < 2600) return;
+    lastCameraPanRef.current = now;
+
+    const map = mapRef.current;
+    const busIdx = findClosestPolylineIndex([selectedBus.lat, selectedBus.lon], REAL_STREET_POLYLINE);
+    const forwardPoints: [number, number][] = [[selectedBus.lat, selectedBus.lon]];
+
+    // Collect next 18-20 route points ahead of the bus along the road corridor
+    for (let s = 1; s <= 20; s++) {
+      forwardPoints.push(REAL_STREET_POLYLINE[(busIdx + s) % REAL_STREET_POLYLINE.length]);
+    }
+
+    if (nextApproachingStopInfo?.station) {
+      forwardPoints.push([nextApproachingStopInfo.station.lat, nextApproachingStopInfo.station.lon]);
+    }
+
+    const bounds = L.latLngBounds(forwardPoints);
+    map.fitBounds(bounds, {
+      paddingTopLeft: [75, 30],
+      paddingBottomRight: [50, 30],
+      maxZoom: 17,
+      animate: true
+    });
+  }, [selectedBus?.lat, selectedBus?.lon, activeView, nextApproachingStopInfo?.station]);
 
   // 7. Road Demo Simulation Loop
   useEffect(() => {
@@ -933,7 +1034,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     return () => clearInterval(interval);
   }, [isDemoMode]);
 
-  // 8. WebSocket Connection to transport.mbstu.ac.bd
+  // 8. Live Socket.IO (Engine.IO v4) Connection to transport.mbstu.ac.bd
   useEffect(() => {
     if (isDemoMode) {
       setWsStatus("connected");
@@ -942,69 +1043,129 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     let isDisposed = false;
     let ws: WebSocket | null = null;
+    let reconnectTimeout: any = null;
 
     const connect = () => {
       try {
         setWsStatus("connecting");
-        ws = new WebSocket("wss://transport.mbstu.ac.bd");
+        // Genuine university telemetry Engine.IO v4 endpoint
+        ws = new WebSocket("wss://transport.mbstu.ac.bd/socket.io/?EIO=4&transport=websocket");
 
         ws.onopen = () => {
           if (!isDisposed) {
-            setWsStatus("connected");
+            setWsStatus("connecting");
           }
         };
 
         ws.onmessage = (event) => {
           if (isDisposed) return;
-          try {
-            const data = JSON.parse(event.data);
-            const list = Array.isArray(data) ? data : data?.buses || [data];
-            const valid = list.filter((b: any) => b && typeof b.lat === "number" && typeof b.lon === "number");
+          const msg = typeof event.data === "string" ? event.data : "";
+          if (!msg) return;
 
-            if (valid.length > 0) {
-              setFleet((prevFleet) => {
-                const map = new Map<string, MbstuBusData>();
-                prevFleet.forEach((b) => map.set(b.id, b));
+          // 1. Engine.IO Handshake response
+          if (msg.startsWith("0")) {
+            // Send Socket.IO connect frame to default namespace "/"
+            try {
+              ws?.send("40");
+            } catch (e) {}
+            if (!isDisposed) setWsStatus("connected");
+            return;
+          }
 
-                valid.forEach((raw: any) => {
-                  const id = String(raw.id || raw.bus_id || "SB0001").toUpperCase();
-                  const info = KNOWN_BUS_INFO[id] || {
-                    nameBn: raw.nameBn || raw.name_bn || raw.name || "MBSTU বাস",
-                    nameEn: raw.nameEn || raw.name || id,
-                    color: "#0284c7",
-                    defaultRoute: "MBSTU Transport Corridor"
-                  };
-                  const speedVal = typeof raw.speed === "number" ? Math.max(0, raw.speed) : 0;
-                  const { heading, hasDirection } = normalizeBusHeading(raw.heading, 0);
-                  const timestampMs = parseServerTimestamp(raw.timestamp || raw.last_updated || raw.time || raw.updated_at);
-                  const lastUpdated = timestampMs ? new Date(timestampMs).toISOString() : new Date().toISOString();
+          // 2. Engine.IO Heartbeat Ping from Server -> Reply with Pong ("3")
+          if (msg === "2") {
+            try {
+              ws?.send("3");
+            } catch (e) {}
+            return;
+          }
 
-                  map.set(id, {
-                    id,
-                    nameBn: info.nameBn,
-                    nameEn: info.nameEn,
-                    lat: raw.lat,
-                    lon: raw.lon,
-                    speed: speedVal,
-                    heading,
-                    hasDirection,
-                    routeName: raw.routeName || raw.route_name || info.defaultRoute,
-                    status: speedVal > 0 ? `In transit (${Math.round(speedVal)} km/h)` : "Parked at Campus Standby",
-                    color: info.color,
-                    isDriving: speedVal > 0,
-                    lastUpdated
-                  });
+          // 3. Socket.IO Connected ACK
+          if (msg.startsWith("40")) {
+            if (!isDisposed) setWsStatus("connected");
+            return;
+          }
+
+          // 4. Socket.IO Event Packet ("42[...]")
+          if (msg.startsWith("42")) {
+            try {
+              const payload = JSON.parse(msg.slice(2));
+              if (!Array.isArray(payload) || payload.length < 2) return;
+              const [eventName, rawData] = payload;
+
+              // Only process bus telemetry events
+              if (
+                eventName === "flutter-bus-data" ||
+                eventName === "studentGpsData" ||
+                eventName === "student-gps-data"
+              ) {
+                const list = Array.isArray(rawData) ? rawData : [rawData];
+                const valid = list.filter((b: any) => {
+                  if (!b) return false;
+                  const lat = typeof b.lat === "number" ? b.lat : typeof b.latitude === "number" ? b.latitude : null;
+                  const lon = typeof b.lon === "number" ? b.lon : typeof b.long === "number" ? b.long : typeof b.longitude === "number" ? b.longitude : null;
+                  return lat !== null && lon !== null && lat > 20 && lat < 28 && lon > 85 && lon < 95;
                 });
 
-                return Array.from(map.values());
-              });
-            }
-          } catch (e) {}
+                if (valid.length > 0) {
+                  setFleet((prevFleet) => {
+                    const map = new Map<string, MbstuBusData>();
+                    prevFleet.forEach((b) => map.set(b.id, b));
+
+                    valid.forEach((raw: any) => {
+                      const id = String(raw.id || raw.busId || raw.bus_id || raw.imei || "SB0001").toUpperCase();
+                      const lat = typeof raw.lat === "number" ? raw.lat : raw.latitude;
+                      const lon = typeof raw.lon === "number" ? raw.lon : (raw.long ?? raw.longitude);
+                      const nameFromPacket = raw.busName || raw.nameBn || raw.name;
+
+                      // Match known metadata or use packet info
+                      let info = KNOWN_BUS_INFO[id];
+                      if (!info && nameFromPacket) {
+                        const matchKey = Object.keys(KNOWN_BUS_INFO).find((k) => KNOWN_BUS_INFO[k].nameBn === nameFromPacket);
+                        if (matchKey) info = KNOWN_BUS_INFO[matchKey];
+                      }
+                      if (!info) {
+                        info = {
+                          nameBn: nameFromPacket || "MBSTU বাস",
+                          nameEn: raw.nameEn || id,
+                          color: "#0284c7",
+                          defaultRoute: "MBSTU Transport Corridor"
+                        };
+                      }
+
+                      const speedVal = typeof raw.speed === "number" ? Math.max(0, raw.speed) : 0;
+                      const { heading, hasDirection } = normalizeBusHeading(raw.heading, 0);
+                      const isDriving = raw.isDriving ?? speedVal > 0;
+
+                      map.set(id, {
+                        id,
+                        nameBn: info.nameBn,
+                        nameEn: info.nameEn,
+                        lat,
+                        lon,
+                        speed: speedVal,
+                        heading,
+                        hasDirection,
+                        routeName: raw.routeName || raw.route_name || info.defaultRoute,
+                        status: isDriving ? `চলন্ত (${Math.round(speedVal)} কিমি/ঘ)` : "ক্যাম্পাস স্ট্যান্ডবাই",
+                        color: info.color,
+                        isDriving,
+                        lastUpdated: new Date().toISOString()
+                      });
+                    });
+
+                    return Array.from(map.values());
+                  });
+                }
+              }
+            } catch (err) {}
+          }
         };
 
         ws.onclose = () => {
           if (!isDisposed) {
             setWsStatus("disconnected");
+            reconnectTimeout = setTimeout(connect, 4000);
           }
         };
 
@@ -1014,7 +1175,10 @@ export function Transit({ ctx }: { ctx?: any }) {
           }
         };
       } catch (err) {
-        setWsStatus("disconnected");
+        if (!isDisposed) {
+          setWsStatus("disconnected");
+          reconnectTimeout = setTimeout(connect, 5000);
+        }
       }
     };
 
@@ -1022,6 +1186,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     return () => {
       isDisposed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (ws) ws.close();
     };
   }, [isDemoMode]);
@@ -1276,41 +1441,64 @@ export function Transit({ ctx }: { ctx?: any }) {
                   </div>
                 </div>
 
-                {/* Footer Times / Next Stop */}
+                {/* Footer Times / Next Stop & User Distance */}
                 <div className="transit-bus-card-footer">
                   <span className="transit-next-stop-tag">
                     পরবর্তী: <strong>{nextInfo.station.nameBn}</strong>
                   </span>
-                  <span className="transit-duration-tag">
-                    {bus.speed > 0 ? `~${nextInfo.etaMinutes} মি` : (isBusOffline ? "GPS বিলম্বিত" : "স্ট্যান্ডবাই")}
-                  </span>
+                  <div className="transit-card-user-distance-box">
+                    {userLocation ? (
+                      <span className="transit-user-distance-badge" title="আপনার বর্তমান অবস্থান থেকে এই বাসের দূরত্ব">
+                        📍 আপনার থেকে {((getDistanceMeters(userLocation.lat, userLocation.lon, bus.lat, bus.lon)) / 1000).toFixed(1)} কিমি
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestLocation();
+                        }}
+                        className="transit-request-loc-pill"
+                        title="আপনার থেকে বাসের দূরত্ব জানতে লোকেশন চালু করুন"
+                      >
+                        📍 দূরত্ব মাপুন
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           }) : (
             <div className="transit-empty-state" aria-live="polite">
-              <div className="transit-empty-icon"><Radio size={22} /></div>
-              <h2>{displayFleet.length === 0 ? "এখনো কোনো বাসের GPS পাওয়া যায়নি" : "এই ফিল্টারে কোনো বাস নেই"}</h2>
+              <div className="transit-empty-icon"><Radio size={26} /></div>
+              <h2>{displayFleet.length === 0 ? "বর্তমানে কোনো বাস ট্র্যাকে নেই" : "এই ফিল্টারে কোনো বাস পাওয়া যায়নি"}</h2>
               <p>
                 {displayFleet.length === 0
                   ? wsStatus === "connected"
-                    ? "লাইভ ফিড সংযুক্ত। বাসের ট্র্যাকার লোকেশন পাঠালে এখানে দেখা যাবে।"
-                    : "লাইভ ফিডে যুক্ত হচ্ছি। সংযোগ হলেই বাসের অবস্থান দেখা যাবে।"
+                    ? "লাইভ ফিড সংযুক্ত রয়েছে। বিশ্ববিদ্যালয়ের বাস চলাচল শুরু করলে এবং ট্র্যাকার সংকেত পাঠালে এখানে স্বয়ংক্রিয়ভাবে দেখতে পাবেন।"
+                    : "বিশ্ববিদ্যালয়ের লাইভ ট্র্যাকিং ফিডে সংযুক্ত হচ্ছে..."
                   : "অন্য ফিল্টার বেছে নিন বা সার্চ মুছে আবার দেখুন।"}
               </p>
-              {displayFleet.length === 0 ? (
-                <button type="button" onClick={toggleDemoMode} className="transit-empty-action">
-                  <Play size={14} /> ডেমো চালিয়ে দেখুন
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setListSearch(""); setListFilter("all"); }}
-                  className="transit-empty-action"
-                >
-                  ফিল্টার মুছুন
-                </button>
-              )}
+              <div style={{ marginTop: 14 }}>
+                {displayFleet.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={toggleDemoMode}
+                    className="transit-empty-action"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                  >
+                    <Play size={14} /> <span>{isDemoMode ? "লাইভ মোডে ফিরুন" : "🚀 ডেমো বাস চালিয়ে দেখুন"}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setListSearch(""); setListFilter("all"); }}
+                    className="transit-empty-action"
+                  >
+                    ফিল্টার মুছুন
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1813,6 +2001,23 @@ export function Transit({ ctx }: { ctx?: any }) {
               aria-label="Recenter map on campus"
             >
               <MapPin size={18} color="#38bdf8" />
+            </button>
+
+            {/* Locate Me / User Location FAB */}
+            <button
+              onClick={() => {
+                if (userLocation && mapRef.current) {
+                  mapRef.current.flyTo([userLocation.lat, userLocation.lon], 16, { animate: true, duration: 0.8 });
+                } else {
+                  requestLocation();
+                }
+              }}
+              className={`transit-fab-btn ${userLocation ? "has-user-loc" : ""}`}
+              title={userLocation ? "আমার বর্তমান অবস্থান দেখুন" : "লোকেশন চালু করে আমার অবস্থান দেখুন"}
+              aria-label="Locate me on map"
+              type="button"
+            >
+              <Navigation size={18} color={userLocation ? "#10b981" : "#94a3b8"} />
             </button>
           </div>
 
