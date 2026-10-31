@@ -319,6 +319,177 @@ function playArrivalChime() {
    Main Transit Tracker Component
    ========================================================================== */
 
+
+/* ==========================================================================
+   Unified Stoppage Milestone, Direction & Monotonic Progress Engine
+   ========================================================================== */
+
+export function getCorridorMilestoneKm(lat: number, lon: number): number {
+  let closestIdx = 0;
+  let minD = Infinity;
+  for (let i = 0; i < CORRIDOR_STATIONS.length; i++) {
+    const st = CORRIDOR_STATIONS[i];
+    const d = getDistanceMeters(lat, lon, st.lat, st.lon);
+    if (d < minD) {
+      minD = d;
+      closestIdx = i;
+    }
+  }
+
+  const baseKm = CORRIDOR_MILESTONES_KM[closestIdx] ?? 0;
+  if (closestIdx < CORRIDOR_STATIONS.length - 1) {
+    const nextSt = CORRIDOR_STATIONS[closestIdx + 1];
+    const dNext = getDistanceMeters(lat, lon, nextSt.lat, nextSt.lon);
+    const segLen = getDistanceMeters(CORRIDOR_STATIONS[closestIdx].lat, CORRIDOR_STATIONS[closestIdx].lon, nextSt.lat, nextSt.lon);
+    if (segLen > 0 && dNext < segLen) {
+      const frac = 1 - (dNext / segLen);
+      const nextKm = CORRIDOR_MILESTONES_KM[closestIdx + 1] ?? baseKm;
+      return baseKm + (nextKm - baseKm) * Math.max(0, Math.min(1, frac));
+    }
+  }
+  return baseKm;
+}
+
+const busDirectionHistory = new Map<string, {
+  direction: "to_city" | "to_campus";
+  lastMilestone: number;
+  lastUpdate: number;
+}>();
+
+export function resolveBusProgress(
+  bus: MbstuBusData,
+  overrideDir?: "to_city" | "to_campus" | null
+) {
+  const busKm = getCorridorMilestoneKm(bus.lat, bus.lon);
+  const totalKm = CORRIDOR_MILESTONES_KM[CORRIDOR_MILESTONES_KM.length - 1] ?? 8.41;
+
+  let direction: "to_city" | "to_campus" = "to_city";
+
+  if (overrideDir) {
+    direction = overrideDir;
+  } else {
+    const cached = busDirectionHistory.get(bus.id);
+    direction = cached?.direction || "to_city";
+
+    const routeStr = (bus.routeName || bus.status || "").toLowerCase();
+    if (routeStr.includes("campus") && routeStr.includes("nirala")) {
+      direction = routeStr.indexOf("campus") < routeStr.indexOf("nirala") ? "to_city" : "to_campus";
+    } else if (bus.speed > 2 && bus.hasDirection && typeof bus.heading === "number") {
+      const h = bus.heading;
+      if (h >= 190 && h <= 345) {
+        direction = "to_campus";
+      } else if (h >= 20 && h <= 175) {
+        direction = "to_city";
+      }
+    } else if (cached && Math.abs(busKm - cached.lastMilestone) > 0.06) {
+      direction = busKm > cached.lastMilestone ? "to_city" : "to_campus";
+    } else if (bus.speed <= 2) {
+      direction = busKm <= 2.0 ? "to_city" : "to_campus";
+    }
+
+    busDirectionHistory.set(bus.id, {
+      direction,
+      lastMilestone: busKm,
+      lastUpdate: Date.now()
+    });
+  }
+
+  const isToCampus = direction === "to_campus";
+  const originName = isToCampus ? "নিরালা মোড় (টাঙ্গাইল শহর)" : "মাভাবিপ্রবি ক্যাম্পাস";
+  const destinationName = isToCampus ? "মাভাবিপ্রবি ক্যাম্পাস" : "নিরালা মোড় (টাঙ্গাইল শহর)";
+  const originSub = isToCampus ? "টাঙ্গাইল শহর থেকে যাত্রা" : "ক্যাম্পাস প্রাঙ্গণ থেকে যাত্রা";
+  const tripSummary = isToCampus
+    ? "টাঙ্গাইল শহর থেকে ক্যাম্পাস অভিমুখে যাত্রী পরিবহন চলছে"
+    : "মাভাবিপ্রবি ক্যাম্পাস থেকে টাঙ্গাইল শহর অভিমুখে যাত্রা চলছে";
+
+  // Build ordered stations
+  const activeStations = isToCampus
+    ? [...CORRIDOR_STATIONS].reverse().map((st, i) => {
+        const origIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === st.id);
+        const origKm = CORRIDOR_MILESTONES_KM[origIdx] ?? 0;
+        return {
+          ...st,
+          activeOrder: i + 1,
+          activeDistanceKm: Math.max(0, parseFloat((totalKm - origKm).toFixed(2)))
+        };
+      })
+    : CORRIDOR_STATIONS.map((st, i) => ({
+        ...st,
+        activeOrder: i + 1,
+        activeDistanceKm: CORRIDOR_MILESTONES_KM[i] ?? 0
+      }));
+
+  // Determine next station along activeStations with 25m hysteresis (NO BLINKING)
+  let nextIdx = 0;
+  let distanceKm = "0.05";
+
+  if (!isToCampus) {
+    for (let i = 0; i < CORRIDOR_MILESTONES_KM.length; i++) {
+      const m = CORRIDOR_MILESTONES_KM[i];
+      if (m > busKm - 0.025) {
+        nextIdx = i;
+        distanceKm = Math.max(0.05, m - busKm).toFixed(2);
+        break;
+      }
+      if (i === CORRIDOR_MILESTONES_KM.length - 1) {
+        nextIdx = 27;
+        distanceKm = "0.05";
+      }
+    }
+  } else {
+    const busFromCity = totalKm - busKm;
+    const revMilestones = [...CORRIDOR_MILESTONES_KM].reverse().map((m) => Math.max(0, totalKm - m));
+    for (let i = 0; i < revMilestones.length; i++) {
+      const m = revMilestones[i];
+      if (m > busFromCity - 0.025) {
+        nextIdx = i;
+        distanceKm = Math.max(0.05, m - busFromCity).toFixed(2);
+        break;
+      }
+      if (i === revMilestones.length - 1) {
+        nextIdx = 27;
+        distanceKm = "0.05";
+      }
+    }
+  }
+
+  const nextStation = activeStations[nextIdx] || activeStations[0];
+  const effectiveSpeed = Math.max(bus.speed, 25);
+  const etaMinutes = Math.max(1, Math.round((parseFloat(distanceKm) / effectiveSpeed) * 60));
+
+  // Build smooth path segment from bus to nextStation
+  const busPolyIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
+  const stopPolyIdx = findClosestPolylineIndex([nextStation.lat, nextStation.lon], REAL_STREET_POLYLINE);
+  const pathSegment: [number, number][] = [[bus.lat, bus.lon]];
+  
+  if (busPolyIdx <= stopPolyIdx) {
+    for (let p = busPolyIdx + 1; p <= stopPolyIdx; p++) {
+      pathSegment.push(REAL_STREET_POLYLINE[p]);
+    }
+  } else {
+    for (let p = busPolyIdx - 1; p >= stopPolyIdx; p--) {
+      pathSegment.push(REAL_STREET_POLYLINE[p]);
+    }
+  }
+  pathSegment.push([nextStation.lat, nextStation.lon]);
+
+  return {
+    direction,
+    isToCampus,
+    originName,
+    destinationName,
+    originSub,
+    tripSummary,
+    activeStations,
+    nextIndex: nextIdx,
+    nextStation,
+    distanceKm,
+    etaMinutes,
+    isStandby: bus.speed <= 2,
+    pathSegment
+  };
+}
+
 export function Transit({ ctx }: { ctx?: any }) {
   // Navigation & View Mode: "list" (Image 1) | "detail" (Image 2) | "map" (Live Google Maps)
   const [activeView, setActiveView] = useState<"list" | "detail" | "map">(() => {
@@ -676,38 +847,15 @@ export function Transit({ ctx }: { ctx?: any }) {
   }, []);
 
   // Helper to find next stop and ETA for ANY bus
+  // Helper to find next stop and ETA for ANY bus (Non-blinking corridor projection)
   const getNextStopForBus = useCallback((bus: MbstuBusData) => {
-    const busIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
-    let targetCandidate = stationPolyIndices[0];
-    let minForwardSteps = Infinity;
-
-    for (const item of stationPolyIndices) {
-      let forwardSteps = item.idx - busIdx;
-      if (forwardSteps < 0) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
-      }
-      const directDist = getDistanceMeters(bus.lat, bus.lon, item.station.lat, item.station.lon);
-      if (directDist < 40) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
-      }
-      if (forwardSteps > 0 && forwardSteps < minForwardSteps) {
-        minForwardSteps = forwardSteps;
-        targetCandidate = item;
-      }
-    }
-
-    const nextStation = targetCandidate.station;
-    const distanceMeters = getDistanceMeters(bus.lat, bus.lon, nextStation.lat, nextStation.lon);
-    const distanceKm = (distanceMeters / 1000).toFixed(2);
-    const effectiveSpeed = Math.max(bus.speed, 25);
-    const etaMinutes = Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
-
+    const progress = resolveBusProgress(bus);
     return {
-      station: nextStation,
-      distanceKm,
-      etaMinutes
+      station: progress.nextStation,
+      distanceKm: progress.distanceKm,
+      etaMinutes: progress.etaMinutes
     };
-  }, [stationPolyIndices]);
+  }, []);
 
   // Route Progress percentage helper
   const getBusProgress = useCallback((bus: MbstuBusData) => {
@@ -750,58 +898,19 @@ export function Transit({ ctx }: { ctx?: any }) {
   }, [displayFleet, listFilter, listSearch, getNextStopForBus]);
 
   // Compute Next Approaching Stop for the currently selected bus (Map & Details)
+  // Compute Next Approaching Stop for the currently selected bus (Map & Details - Zero Blinking)
   const nextApproachingStopInfo = useMemo(() => {
     if (!selectedBus) return null;
-
-    const busIdx = findClosestPolylineIndex([selectedBus.lat, selectedBus.lon], REAL_STREET_POLYLINE);
-    let targetCandidate = stationPolyIndices[0];
-    let minForwardSteps = Infinity;
-
-    for (const item of stationPolyIndices) {
-      let forwardSteps = item.idx - busIdx;
-      if (forwardSteps < 0) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
-      }
-      const directDist = getDistanceMeters(selectedBus.lat, selectedBus.lon, item.station.lat, item.station.lon);
-      if (directDist < 40) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
-      }
-      if (forwardSteps > 0 && forwardSteps < minForwardSteps) {
-        minForwardSteps = forwardSteps;
-        targetCandidate = item;
-      }
-    }
-
-    const nextStation = targetCandidate.station;
-    const pathSegment: [number, number][] = [[selectedBus.lat, selectedBus.lon]];
-    let curr = busIdx;
-    const dest = targetCandidate.idx;
-    let guard = 0;
-    while (curr !== dest && guard < REAL_STREET_POLYLINE.length) {
-      curr = (curr + 1) % REAL_STREET_POLYLINE.length;
-      pathSegment.push(REAL_STREET_POLYLINE[curr]);
-      guard++;
-    }
-    pathSegment.push([nextStation.lat, nextStation.lon]);
-
-    const distanceMeters = pathSegment.slice(1).reduce((total, point, index) => {
-      const previous = pathSegment[index];
-      return total + getDistanceMeters(previous[0], previous[1], point[0], point[1]);
-    }, 0);
-    const distanceKm = (distanceMeters / 1000).toFixed(2);
-    const isStandby = selectedBus.speed === 0;
-    const effectiveSpeed = Math.max(selectedBus.speed, 25);
-    const etaMinutes = Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
-
+    const progress = resolveBusProgress(selectedBus);
     return {
-      station: nextStation,
-      distanceMeters,
-      distanceKm,
-      etaMinutes,
-      isStandby,
-      pathSegment
+      station: progress.nextStation,
+      distanceMeters: Math.round(parseFloat(progress.distanceKm) * 1000),
+      distanceKm: progress.distanceKm,
+      etaMinutes: progress.etaMinutes,
+      isStandby: progress.isStandby,
+      pathSegment: progress.pathSegment
     };
-  }, [selectedBus, stationPolyIndices]);
+  }, [selectedBus]);
 
   // Toggle Alert for a Stop
   const toggleStopAlert = useCallback((stopId: string) => {
@@ -945,8 +1054,8 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [24.2365, 89.8914],
-      zoom: 17,
+      center: [24.2440, 89.9080],
+      zoom: 15.5,
       zoomControl: false,
       attributionControl: false,
       preferCanvas: true
@@ -1017,6 +1126,9 @@ export function Transit({ ctx }: { ctx?: any }) {
       if (!readyFired) {
         readyFired = true;
         setMapLoadingState("ready");
+        try {
+          (window as any).ClassMateNativeBridge?.onMapReady?.();
+        } catch (_) {}
       }
     };
 
@@ -1885,92 +1997,38 @@ export function Transit({ ctx }: { ctx?: any }) {
     );
   };
 
-  // Direction-Aware Route & Station Sequence Calculations
-  const detectedDirection = useMemo<"to_city" | "to_campus">(() => {
-    if (!detailBus) return "to_city";
-    if (detailBus.speed > 0 && detailBus.hasDirection && typeof detailBus.heading === "number") {
-      const h = detailBus.heading;
-      if ((h >= 240 && h <= 360) || (h >= 0 && h <= 50)) return "to_campus";
-      if (h >= 70 && h <= 220) return "to_city";
-    }
-    const distCampus = getDistanceMeters(detailBus.lat, detailBus.lon, CORRIDOR_STATIONS[0].lat, CORRIDOR_STATIONS[0].lon);
-    const distCity = getDistanceMeters(detailBus.lat, detailBus.lon, CORRIDOR_STATIONS[CORRIDOR_STATIONS.length - 1].lat, CORRIDOR_STATIONS[CORRIDOR_STATIONS.length - 1].lon);
-    if (distCity < 1200 && distCampus > 2500) return "to_campus";
-    return "to_city";
-  }, [detailBus]);
+  // Unified Detail Bus Progress Engine (Trip Origin, Destination, Stoppage Sequence & Next Stop)
+  const detailBusProgress = useMemo(() => {
+    if (!detailBus) return null;
+    return resolveBusProgress(detailBus, timelineDirectionOverride);
+  }, [detailBus, timelineDirectionOverride]);
 
-  const activeDirection = timelineDirectionOverride || detectedDirection;
-  const isToCampus = activeDirection === "to_campus";
-
-  // Ordered stations in active travel direction with accurate corridor distances
+  const activeDirection = detailBusProgress?.direction || "to_city";
+  const isToCampus = detailBusProgress?.isToCampus || false;
   const activeRouteStations = useMemo(() => {
-    const totalKm = CORRIDOR_MILESTONES_KM[CORRIDOR_MILESTONES_KM.length - 1] ?? 6.3;
-    if (isToCampus) {
-      return [...CORRIDOR_STATIONS].reverse().map((st, i) => {
-        const origIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === st.id);
-        const origKm = CORRIDOR_MILESTONES_KM[origIdx] ?? 0;
-        return {
-          ...st,
-          activeOrder: i + 1,
-          activeDistanceKm: Math.max(0, parseFloat((totalKm - origKm).toFixed(2)))
-        };
-      });
-    }
-    return CORRIDOR_STATIONS.map((st, i) => ({
+    return detailBusProgress?.activeStations || CORRIDOR_STATIONS.map((st, i) => ({
       ...st,
       activeOrder: i + 1,
       activeDistanceKm: CORRIDOR_MILESTONES_KM[i] ?? 0
     }));
-  }, [isToCampus]);
+  }, [detailBusProgress]);
 
-  // Compute Next Approaching Stop along activeRouteStations
   const activeNextStopInfo = useMemo(() => {
-    if (!detailBus) {
+    if (!detailBusProgress) {
       return {
         nextIndex: 0,
-        station: activeRouteStations[0],
+        station: CORRIDOR_STATIONS[0],
         distanceKm: "0.00",
         etaMinutes: 1
       };
     }
-
-    let closestIdx = 0;
-    let minD = Infinity;
-    activeRouteStations.forEach((st, idx) => {
-      const d = getDistanceMeters(detailBus.lat, detailBus.lon, st.lat, st.lon);
-      if (d < minD) {
-        minD = d;
-        closestIdx = idx;
-      }
-    });
-
-    let targetIdx = closestIdx;
-    if (closestIdx < activeRouteStations.length - 1) {
-      const curSt = activeRouteStations[closestIdx];
-      const nextSt = activeRouteStations[closestIdx + 1];
-      const dNext = getDistanceMeters(detailBus.lat, detailBus.lon, nextSt.lat, nextSt.lon);
-      const betweenSt = getDistanceMeters(curSt.lat, curSt.lon, nextSt.lat, nextSt.lon);
-
-      if (detailBus.speed > 0 && dNext < betweenSt) {
-        targetIdx = closestIdx + 1;
-      } else if (minD < 45 && closestIdx < activeRouteStations.length - 1) {
-        targetIdx = closestIdx + 1;
-      }
-    }
-
-    const targetSt = activeRouteStations[targetIdx];
-    const distM = getDistanceMeters(detailBus.lat, detailBus.lon, targetSt.lat, targetSt.lon);
-    const distKm = (distM / 1000).toFixed(2);
-    const effectiveSpeed = Math.max(detailBus.speed, 25);
-    const etaMinutes = Math.max(1, Math.round((distM / 1000 / effectiveSpeed) * 60));
-
     return {
-      nextIndex: targetIdx,
-      station: targetSt,
-      distanceKm: distKm,
-      etaMinutes
+      nextIndex: detailBusProgress.nextIndex,
+      station: detailBusProgress.nextStation,
+      distanceKm: detailBusProgress.distanceKm,
+      etaMinutes: detailBusProgress.etaMinutes
     };
-  }, [detailBus, activeRouteStations]);
+  }, [detailBusProgress]);
 
   // Automatic Timeline Follow: Pin Current Stop in Upward Visible Area
   const scrollToLiveBus = useCallback((smooth = true) => {
@@ -2044,6 +2102,45 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <MapIcon size={14} />
                 <span>ম্যাপ</span>
               </button>
+            </div>
+          </div>
+
+          {/* Trip Origin & Destination Summary Card */}
+          <div className="transit-trip-summary-card">
+            <div className="transit-trip-header">
+              <span className="transit-trip-title">বাসের রুট ও যাত্রার অভিমুখ</span>
+              <button
+                type="button"
+                className="transit-trip-swap-btn"
+                onClick={() => {
+                  const nextDir = activeDirection === "to_city" ? "to_campus" : "to_city";
+                  setTimelineDirectionOverride(nextDir);
+                  userScrolledAwayRef.current = false;
+                  setIsUserScrolledTimeline(false);
+                }}
+                title="যাত্রার দিক পরিবর্তন করুন"
+              >
+                <span>⇄ দিক পরিবর্তন</span>
+              </button>
+            </div>
+
+            <div className="transit-trip-endpoints">
+              <div className="transit-trip-point origin">
+                <span className="transit-trip-badge">উৎস (প্রস্থান)</span>
+                <strong className="transit-trip-name">{detailBusProgress?.originName || "মাভাবিপ্রবি ক্যাম্পাস"}</strong>
+                <span className="transit-trip-sub">{detailBusProgress?.originSub || "ক্যাম্পাস প্রাঙ্গণ থেকে"}</span>
+              </div>
+              <div className="transit-trip-arrow">➔</div>
+              <div className="transit-trip-point dest">
+                <span className="transit-trip-badge dest-badge">গন্তব্য</span>
+                <strong className="transit-trip-name">{detailBusProgress?.destinationName || "নিরালা মোড় (টাঙ্গাইল শহর)"}</strong>
+                <span className="transit-trip-sub">{isToCampus ? "মাভাবিপ্রবি ক্যাম্পাস" : "টাঙ্গাইল শহর"}</span>
+              </div>
+            </div>
+
+            <div className="transit-trip-caption">
+              <span className="transit-trip-pulse" />
+              <span>{detailBusProgress?.tripSummary}</span>
             </div>
           </div>
 

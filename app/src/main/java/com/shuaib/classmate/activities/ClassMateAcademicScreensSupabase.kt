@@ -1853,40 +1853,29 @@ internal class ClassMateAcademicScreensSupabase(
         val bridge = com.shuaib.classmate.transit.ClassMateTransitBridge(activity)
 
         bridge.onBackStateChanged = { canGoBack ->
-
             activity.runOnUiThread {
-
                 backCallback.isEnabled = canGoBack
-
             }
+        }
 
+        bridge.onMapReadyCallback = {
+            activity.runOnUiThread {
+                if (loadingView?.visibility == View.VISIBLE) {
+                    loadingView?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
+                        loadingView?.visibility = View.GONE
+                    }?.start()
+                }
+            }
         }
 
         webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
 
-
-
         webView.webChromeClient = object : android.webkit.WebChromeClient() {
-
             override fun onGeolocationPermissionsShowPrompt(
-
                 origin: String?,
-
                 callback: android.webkit.GeolocationPermissions.Callback?
-
             ) {
-
                 callback?.invoke(origin, true, false)
-
-            }
-
-            override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                if (newProgress >= 70 && loadingView?.visibility == View.VISIBLE) {
-                    loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
-                        loadingView?.visibility = View.GONE
-                    }?.start()
-                }
             }
         }
 
@@ -1895,31 +1884,24 @@ internal class ClassMateAcademicScreensSupabase(
         webView.webViewClient = object : android.webkit.WebViewClient() {
 
             override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
-
                 super.onPageFinished(view, url)
-
-                loadingView?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
-
-                    loadingView.visibility = View.GONE
-
-                }?.start()
-
+                // Loading view is smoothly faded out by bridge.onMapReadyCallback when Leaflet renders tiles.
+                // Safety guard: dismiss after 2.5s if offline or tile callback delayed to avoid getting stuck.
+                loadingView?.postDelayed({
+                    if (loadingView?.visibility == View.VISIBLE) {
+                        loadingView?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
+                            loadingView?.visibility = View.GONE
+                        }?.start()
+                    }
+                }, 2500)
             }
 
-
-
             override fun onReceivedError(
-
                 view: android.webkit.WebView?,
-
                 request: android.webkit.WebResourceRequest?,
-
                 error: android.webkit.WebResourceError?
-
             ) {
-
                 super.onReceivedError(view, request, error)
-
                 if (request?.isForMainFrame == true) {
                     val failingUrl = request.url?.toString() ?: ""
                     android.util.Log.w("ClassMateTransit", "Transit load error: ${error?.errorCode} ${error?.description} for $failingUrl")
@@ -1927,15 +1909,10 @@ internal class ClassMateAcademicScreensSupabase(
                         view?.loadUrl("file:///android_asset/transit/index.html")
                     }
                 }
-
             }
-
         }
 
-
-
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map"
-
+        val transitUrl = "file:///android_asset/transit/index.html"
         webView.loadUrl(transitUrl)
 
     }
@@ -12411,10 +12388,8 @@ internal class ClassMateAcademicScreensSupabase(
             onResume()
             resumeTimers()
             val currentUrl = url ?: ""
-            if (ClassMateAcademicCache.online(activity)) {
-                if (currentUrl.startsWith("file://") || currentUrl.isBlank() || !currentUrl.contains("classmatebd.vercel.app")) {
-                    loadUrl("https://classmatebd.vercel.app/transit-preview?app=android&view=map")
-                }
+            if (currentUrl.isBlank()) {
+                loadUrl("file:///android_asset/transit/index.html")
             }
         }
     }
