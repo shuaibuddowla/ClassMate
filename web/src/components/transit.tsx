@@ -336,7 +336,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string>("");
-  const [satelliteView, setSatelliteView] = useState<boolean>(false);
+  const [satelliteView, setSatelliteView] = useState<boolean>(true);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [clockNow, setClockNow] = useState<number>(() => Date.now());
@@ -975,28 +975,24 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, []);
 
-  // 2. Tile Layer (Satellite vs Street)
+  // 2. Tile Layer (Always HD Esri/Maxar Satellite View, Street view disabled)
   useEffect(() => {
     if (!mapRef.current) return;
     if (tileLayerRef.current) {
       mapRef.current.removeLayer(tileLayerRef.current);
     }
 
-    const tileUrl = satelliteView
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const tileUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
     const layer = L.tileLayer(tileUrl, {
-      subdomains: satelliteView ? [] : ["a", "b", "c"],
-      attribution: satelliteView
-        ? "Tiles &copy; Esri, Maxar, Microsoft"
-        : "&copy; OpenStreetMap contributors",
+      subdomains: [],
+      attribution: "Tiles &copy; Esri, Maxar, Microsoft",
       maxZoom: 20,
-      maxNativeZoom: satelliteView ? 19 : 19
+      maxNativeZoom: 19
     });
     layer.addTo(mapRef.current);
     tileLayerRef.current = layer;
-  }, [satelliteView]);
+  }, []);
 
   // 3. Render Street Polyline & Campus Circle
   useEffect(() => {
@@ -2264,7 +2260,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           </div>
 
           <div className="transit-action-sheet-dist-row">
-            <MapPin size={15} color="#38bdf8" />
+            <MapPin size={15} color="#b71454" />
             <span>বর্তমান বাস থেকে দূরত্ব: <strong>{toBengaliDigits(distKm)} কিমি</strong></span>
           </div>
 
@@ -2526,18 +2522,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                 title={`Center map on ${selectedBus.nameBn}`}
                 aria-label={`Center map on selected bus ${selectedBus.nameBn}`}
               >
-                <LocateFixed size={18} color={!isBusOffscreen ? "#38bdf8" : "#94a3b8"} />
+                <LocateFixed size={18} color={!isBusOffscreen ? "#b71454" : "#94a3b8"} />
               </button>
             )}
-
-            <button
-              onClick={() => setSatelliteView((prev) => !prev)}
-              className="transit-fab-btn"
-              title={satelliteView ? "সড়ক ম্যাপে (OpenStreetMap) ফিরুন" : "এইচডি স্যাটেলাইট ম্যাপ (Esri/Maxar) দেখুন"}
-              aria-label={satelliteView ? "Switch to OpenStreetMap" : "Switch to Esri Maxar Satellite"}
-            >
-              <Layers size={18} color={satelliteView ? "#b71454" : "#0284c7"} />
-            </button>
 
             {/* Locate Me / User Location FAB */}
             <button
@@ -2557,7 +2544,7 @@ export function Transit({ ctx }: { ctx?: any }) {
               aria-label="Locate me on map"
               type="button"
             >
-              <Navigation size={18} color={userLocation ? "#10b981" : "#94a3b8"} />
+              <Navigation size={18} color={userLocation ? "#10b981" : "#b71454"} />
             </button>
           </div>
 

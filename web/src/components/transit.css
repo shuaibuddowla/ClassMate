@@ -5438,3 +5438,235 @@ body.is-android-app .transit-detail-screen {
 body.is-android-app .transit-timeline-scroll-container {
   padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
 }
+
+
+/* =========================================================================
+   Stoppage Action Sheet Theme & Navigation Bar Clearance
+   ========================================================================= */
+.transit-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(15, 23, 42, 0.5) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  /* Lift safely above the Android Bottom Navigation Bar (~70-80px) */
+  padding: 16px 16px calc(86px + env(safe-area-inset-bottom, 0px)) 16px !important;
+  box-sizing: border-box !important;
+}
+
+.transit-action-sheet {
+  background: #ffffff !important;
+  border: 1px solid #f2cfdb !important;
+  border-radius: 24px !important;
+  width: min(480px, 100%) !important;
+  padding: 14px 18px 18px !important;
+  box-shadow: 0 -8px 36px rgba(183, 20, 84, 0.14), 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  animation: slideUpSheet 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+}
+
+.transit-sheet-drag-pill {
+  width: 42px !important;
+  height: 4.5px !important;
+  border-radius: 999px !important;
+  background: #e2e8f0 !important;
+  margin: 0 auto !important;
+}
+
+.transit-action-sheet-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.transit-action-sheet-order {
+  display: inline-block !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: var(--transit-pink, #b71454) !important;
+  background: #fbeaf0 !important;
+  border: 1px solid #f8d2df !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+}
+
+.transit-action-sheet-name {
+  margin: 4px 0 0 !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.3px !important;
+}
+
+.transit-action-sheet-en {
+  font-size: 12px !important;
+  color: #64748b !important;
+  display: block !important;
+  margin-top: 1px !important;
+}
+
+.transit-sheet-close-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.transit-sheet-close-btn:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.transit-action-sheet-dist-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+  color: #334155 !important;
+  background: #fdf2f5 !important;
+  border: 1px solid #fce4ec !important;
+  padding: 9px 12px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+}
+
+.transit-action-sheet-dist-row strong {
+  color: var(--transit-pink, #b71454) !important;
+}
+
+.transit-action-sheet-buttons {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 9px !important;
+}
+
+.transit-action-btn-alert {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
+  color: #1e293b !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.18s ease !important;
+}
+
+.transit-action-btn-alert:hover {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+.transit-action-btn-alert.armed {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #065f46 !important;
+}
+
+.transit-action-btn-map {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 14px !important;
+  background: var(--transit-pink, #b71454) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(183, 20, 84, 0.25) !important;
+  transition: all 0.18s ease !important;
+}
+
+.transit-action-btn-map:hover {
+  background: #9d0f46 !important;
+}
+
+/* =========================================================================
+   Map Header: Align Upward with List View Header (Zero Drop/Jump)
+   ========================================================================= */
+.transit-top-overlay {
+  position: absolute !important;
+  top: 12px !important;
+  left: 14px !important;
+  right: 14px !important;
+  gap: 8px !important;
+  z-index: 25 !important;
+}
+
+@media (max-width: 640px) {
+  .transit-top-overlay {
+    top: 12px !important;
+    left: 10px !important;
+    right: 10px !important;
+  }
+}
+
+/* =========================================================================
+   Map Controls & Bus Card: Float Cleanly Above Android Bottom Navigation Bar
+   ========================================================================= */
+.transit-fab-controls,
+.transit-fab-controls.no-card,
+.transit-fab-controls.no-sheet {
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+  right: 14px !important;
+  z-index: 25 !important;
+}
+
+.transit-fab-controls.has-card,
+.transit-fab-controls.sheet-collapsed {
+  bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;
+  right: 14px !important;
+  z-index: 25 !important;
+}
+
+.transit-map-bus-card {
+  position: absolute !important;
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 22 !important;
+}
+
+@media (max-width: 640px) {
+  .transit-fab-controls,
+  .transit-fab-controls.no-card,
+  .transit-fab-controls.no-sheet {
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+    right: 10px !important;
+  }
+
+  .transit-fab-controls.has-card,
+  .transit-fab-controls.sheet-collapsed {
+    bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;
+    right: 10px !important;
+  }
+
+  .transit-map-bus-card {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
