@@ -167,10 +167,13 @@ fun ClassMateFloatingNavigationBar(
                     val selectedIndex = visibleTabs.indexOf(selectedTab).coerceAtLeast(0)
                     val targetOffset = tabWidth * selectedIndex
 
-                    // Snappy, buttery-smooth 200ms indicator slide
+                    // Dynamic Morphing Fluid Pill with Damped Spring Physics (Concept 1)
                     val animatedIndicatorOffset by animateDpAsState(
                         targetValue = targetOffset,
-                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = 0.72f,
+                            stiffness = 380f
+                        ),
                         label = "indicatorOffset"
                     )
 
