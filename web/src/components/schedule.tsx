@@ -559,14 +559,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     ? rawRoutineEntries.filter((s) => Boolean(editable.data?.[s.semester_course_id]))
     : rawRoutineEntries;
 
-  const entries =
-    mode === "bus"
-      ? (buses.data || []).filter((s) =>
-          ["closed", "office_open"].includes(s.schedule_kind)
-            ? s.schedule_kind === kind
-            : s.weekdays?.includes(day),
-        )
-      : teacherAssignedEntries;
+  const entries = teacherAssignedEntries;
 
   const isSlotLive = (s: Row) => {
     if (mode !== "routine" || date !== dhakaToday() || closed) return false;
@@ -616,13 +609,11 @@ export function Schedule({ ctx }: { ctx: Context }) {
               </h1>
             )}
           </div>
-          {mode !== "calendar" &&
-            (mode === "bus"
-              ? busPermission.data
-              : Object.values(editable.data || {}).some(Boolean)) && (
+          {mode === "routine" &&
+            Object.values(editable.data || {}).some(Boolean) && (
               <button className="primary" onClick={() => setEditing({})}>
                 <Plus size={18} />
-                {mode === "bus" ? "Add Bus" : "Add Period"}
+                Add Period
               </button>
             )}
         </div>
@@ -848,17 +839,17 @@ export function Schedule({ ctx }: { ctx: Context }) {
           ) : (
             <>
               <ErrorBox
-                error={mode === "bus" ? buses.error : routine.error}
+                error={mode === "bus" ? null : routine.error}
                 retry={() =>
-                  mode === "bus" ? buses.refetch() : routine.refetch()
+                  mode === "bus" ? null : routine.refetch()
                 }
               />
-              {(mode === "bus" ? buses.isPending : routine.isPending) ? (
+              {(mode === "bus" ? false : routine.isPending) ? (
                 <>
                   <Skeleton />
                   <Skeleton />
                 </>
-              ) : sortedEntries.length === 0 ? (
+              ) : (mode === "bus" ? Object.keys(mbstuSchedules).length === 0 : sortedEntries.length === 0) ? (
                 (() => {
                   const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
                   const anim =
@@ -1081,42 +1072,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                           });
                         })()}
                       </div>
-
-                      {(() => {
-                        const customEntries = (buses.data || []).filter((s) =>
-                          ["closed", "office_open"].includes(s.schedule_kind)
-                            ? s.schedule_kind === kind
-                            : s.weekdays?.includes(day),
-                        );
-                        if (!customEntries.length) return null;
-                        return (
-                          <div className="bus-custom-section">
-                            <h4 className="bus-custom-title">অতিরিক্ত / কাস্টম রুট ({customEntries.length})</h4>
-                            <div className="schedule-list">
-                              {customEntries.map((s) => (
-                                <button
-                                  className="card schedule-row bus-row"
-                                  disabled={!busPermission.data}
-                                  key={s.id}
-                                  onClick={() => setEditing(s)}
-                                >
-                                  <span className="bus-icon">
-                                    <Bus />
-                                  </span>
-                                  <div>
-                                    <small>Campus → City</small>
-                                    <strong>{formatTime(s.departure_time)}</strong>
-                                  </div>
-                                  <div>
-                                    <small>City → Campus</small>
-                                    <strong>{formatTime(s.city_departure_time)}</strong>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
                     </div>
                   ) : (
                   <div className="schedule-list">

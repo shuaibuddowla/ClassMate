@@ -2212,7 +2212,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                val canEdit = if (busMode) canEditBus()
+                val canEdit = if (busMode) false
 
 
 
@@ -3132,13 +3132,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val hasMbstu = if (requestedBusMode) {
+            val isPureMbstu = if (requestedBusMode) {
                 snapshot?.optJSONArray("entries")?.let { arr ->
-                    (0 until arr.length()).any { arr.optJSONObject(it)?.optBoolean("is_mbstu") == true }
+                    arr.length() > 0 && (0 until arr.length()).all { arr.optJSONObject(it)?.optBoolean("is_mbstu") == true }
                 } ?: false
             } else true
 
-            if (snapshot == null || (!hasMbstu && ClassMateAcademicCache.online(activity)) || (force && ClassMateAcademicCache.online(activity))) {
+            if (snapshot == null || (!isPureMbstu && ClassMateAcademicCache.online(activity)) || (force && ClassMateAcademicCache.online(activity))) {
 
 
 
@@ -3147,19 +3147,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
                     val mbstuBuses = fetchMbstuLiveBusScheduleEntries(activity)
-                    val customBuses = runCatching {
-                        ClassMateAuthApi.rows("bus_schedules", "select=id,route_name,departure_time,city_departure_time,schedule_kind,origin,destination,weekdays,notes,active&active=eq.true&order=departure_time")
-                    }.getOrDefault(JSONArray())
-
-                    val mergedEntries = JSONArray()
-                    for (i in 0 until mbstuBuses.length()) {
-                        mergedEntries.put(mbstuBuses.getJSONObject(i))
-                    }
-                    for (i in 0 until customBuses.length()) {
-                        mergedEntries.put(customBuses.getJSONObject(i))
-                    }
-
-                    snapshot = JSONObject().put("entries", mergedEntries).put("saved_at", System.currentTimeMillis())
+                    snapshot = JSONObject().put("entries", mbstuBuses).put("saved_at", System.currentTimeMillis())
 
 
 
@@ -3363,7 +3351,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val allEntries = rows(data.optJSONArray("entries") ?: JSONArray())
+            val allEntries = rows(data.optJSONArray("entries") ?: JSONArray()).let { list -> if (requestedBusMode) list.filter { it.optBoolean("is_mbstu") } else list }
 
 
 
@@ -3445,7 +3433,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "schedule" else "schedules" } else if (entries.size == 1) "class" else "classes"}")
+            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "bus" else "buses" } else if (entries.size == 1) "class" else "classes"}")
 
 
 
