@@ -2696,15 +2696,42 @@
   max-width: 760px;
   height: 100%;
   margin: 0 auto;
-  padding: 16px 16px 90px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+  padding: 0;
+  overflow: hidden; /* Header stays constant; screen does NOT scroll */
   display: flex;
   flex-direction: column;
-  gap: 16px;
   box-sizing: border-box;
+}
+
+/* Constant Pinned Header Section */
+.transit-detail-pinned-top {
+  flex-shrink: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 6px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Scrollable Timeline Area (ONLY THIS SCROLLS) */
+.transit-timeline-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px calc(90px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.transit-timeline-scroll-container::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* Top App Bar */
@@ -5276,4 +5303,138 @@ body.is-android-app .transit-detail-screen {
 .transit-timeline-item.is-passed .transit-station-eta {
   color: #64748b !important;
   font-weight: 500 !important;
+}
+
+
+/* =========================================================================
+   Laser-Straight Centered Rail Timeline & Live Node Connection
+   ========================================================================= */
+.transit-timeline-item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 8px 8px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  box-sizing: border-box;
+}
+
+.transit-timeline-item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.transit-timeline-item.is-approaching {
+  background: #fff5f8;
+  outline: 1.5px solid rgba(183, 20, 84, 0.35);
+  box-shadow: 0 4px 14px rgba(183, 20, 84, 0.08);
+}
+
+.transit-timeline-item.is-passed {
+  opacity: 0.65;
+}
+
+/* Dedicated Rail Column (Guaranteed mathematically centered) */
+.transit-timeline-rail {
+  position: relative;
+  width: 32px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+}
+
+/* Connecting Rail Line */
+.transit-timeline-rail-line {
+  position: absolute;
+  top: 28px;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2.5px;
+  background: #e2e8f0;
+  z-index: 1;
+  border-radius: 1px;
+}
+
+.transit-timeline-rail-line.line-passed {
+  background: #cbd5e1;
+}
+
+/* Active Live Segment Trail between last stop and current bus target */
+.transit-timeline-rail-line.line-live {
+  background: linear-gradient(180deg, #10b981 0%, var(--transit-pink, #b71454) 100%);
+  width: 3px;
+  box-shadow: 0 0 8px rgba(183, 20, 84, 0.35);
+}
+
+.transit-timeline-rail-line.line-upcoming {
+  background: #e2e8f0;
+}
+
+/* Node Styling */
+.transit-timeline-node {
+  position: relative;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  flex-shrink: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.transit-timeline-node.active-bus-node {
+  background: var(--transit-pink, #b71454) !important;
+  border: 2px solid #ffffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(183, 20, 84, 0.6) !important;
+  animation: transitPulse 1.8s infinite;
+}
+
+.transit-timeline-node.passed-node {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+}
+
+.transit-approaching-bus-icon {
+  animation: bounceMini 1.6s infinite ease-in-out;
+}
+
+@keyframes bounceMini {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+/* Pinned Next Stop Telemetry Highlight */
+.transit-telemetry-pill.highlight {
+  border: 1px solid rgba(183, 20, 84, 0.25);
+  background: rgba(183, 20, 84, 0.05);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+
+.transit-telemetry-pill.highlight .transit-pill-val {
+  color: var(--transit-pink, #b71454);
+  font-weight: 900;
+}
+
+/* Mobile Ergonomics & Android Shell */
+body.is-android-app .transit-detail-screen {
+  padding-bottom: 0 !important;
+}
+
+body.is-android-app .transit-timeline-scroll-container {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
 }
