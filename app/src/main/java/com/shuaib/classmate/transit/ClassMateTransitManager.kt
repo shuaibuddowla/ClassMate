@@ -100,12 +100,6 @@ class ClassMateTransitBridge(
 ) {
 
     var onBackStateChanged: ((Boolean) -> Unit)? = null
-    var onMapReadyCallback: (() -> Unit)? = null
-
-    @JavascriptInterface
-    fun onMapReady() {
-        onMapReadyCallback?.invoke()
-    }
 
     @JavascriptInterface
     fun setCanGoBack(canGoBack: Boolean) {
