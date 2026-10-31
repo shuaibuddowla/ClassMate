@@ -10045,7 +10045,6 @@ A visual and structural audit of the live transit map interface on physical mobi
    - **Roadmap Resolution**: Implement a slight coordinate jitter / spiderfy dispersion or cluster pill when markers are within 15 meters of each other at current zoom levels.
 
 ---
----
 
 ## 163. Production Transit Bottom Sheet Tap Isolation, Card Restyling, Rogue Text Removal & Unified Header (Commit `423101f`)
 
@@ -11091,6 +11090,12 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 | **Bidirectional Native Android Bridge & Haptics** | Android APK & Web | **PRODUCTION** | `ClassMateTransitBridge` wired to native `Vibrator`, arrival notifications & predictive back handling (Commit `59e8fbc`) |
 | **Android Tab Navigation Interceptor Resolution** | Android APK | **PRODUCTION** | Routed `R.id.nav_transit` to `academicScreens.render` in `ClassMateAuthActivity.kt` lines 2095-2101 & hardened Compose fallback (Commit `2e6db6f`) |
 | **Physical Device Verified APK Installation** | Android APK | **VERIFIED** | Streamed `app-debug.apk` install to device `6478ab80`, live screen capture verified (Commit `2e6db6f`) |
+| **In-App Location Permission & Distance Tracking** | Web Companion & APK | **PRODUCTION** | In-app explanation modal, runtime `ACCESS_FINE_LOCATION` bridge, Bengali distance formatting (`৪৫০ মি দূরে`), graceful denial (`📍 দূরত্ব দেখুন`) (Commit `588df50`) |
+| **Transit Tab Horizontal Gesture Isolation** | Android APK | **PRODUCTION** | `swipeHost.canSwipe` isolates `R.id.nav_transit`, preventing accidental parent tab switches during map pan/zoom/timeline manipulation (Commit `588df50`) |
+| **Collision-Free Search & 4-Row Compact Feed** | Web Companion & APK | **PRODUCTION** | Absolute positioned search icon with instant clear button; 4 dedicated rows for vehicle ID, corridor, next stop, and proximity (Commit `588df50`) |
+| **28-Stop Direction-Aware Timeline & Live Node** | Web Companion & APK | **PRODUCTION** | Campus ➔ City and City ➔ Campus bidirectional routing, dynamic milestone inversion, and live bus position node with speed and ETA (Commit `588df50`) |
+| **Intelligent Timeline Auto-Scroll & Recenter** | Web Companion & APK | **PRODUCTION** | Automatic viewport centering on active bus with manual touch pause and floating `[ 🎯 বাসের অবস্থানে ফিরুন ]` action pill (Commit `588df50`) |
+| **Map Camera Stabilization & Pulse Indicator** | Web Companion & APK | **PRODUCTION** | Purged 2.6s periodic `fitBounds` camera lock; added pulsing royal blue user marker and dedicated recenter FABs (Commit `588df50`) |
 
 ---
 
@@ -11142,31 +11147,117 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 
 ---
 
-## 181. ClassMate Transit — UI/UX Refinement & Location-Aware Bus Tracking
+## 181. ClassMate Transit — UI/UX Refinement, Location-Aware Bus Tracking & Directional Timelines
 
-### 181.1 Overview & Requirements
-Addressed complete Master UI/UX and location-aware bus tracking specification across native Android and web:
-1. **First-Time Location Permission**: Clean in-app modal dialog explaining why location is needed (bus proximity tracking). "Allow Location" (`লোকেশন চালু করুন`) & "Not Now" (`এখন নয়`). Native runtime permission requests (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) via bidirectional bridge. Graceful denial handling with `📍 দূরত্ব দেখুন` pill and option to open Android app settings if permanently denied. Persisted in `localStorage`.
-2. **Gesture Isolation**: Disconnected horizontal swipe gesture tabs when Transit tab is active (`selectedTab != R.id.nav_transit`), allowing natural map panning, pinching, and timeline gestures without accidental tab switching.
-3. **Bus List & Search UI**: Locked search icon (`position: absolute`, zero collision with text or clear button), compact 4-row cards with bus name, Bengali badge, live status, corridor route, next stop, and user proximity distance.
-4. **28-Stop Direction-Aware Timeline**: Support for Campus ➔ City (`ক্যাম্পাস ➔ শহর`) and City ➔ Campus (`শহর ➔ ক্যাম্পাস`). Reverses stop sequence, milestones, and ETAs dynamically. Prominent **Live Bus Position Node** between passed stops and next stop showing live avatar, speed, and user distance.
-5. **Intelligent Auto-Scrolling**: Centers live bus in the timeline viewport (~2-3 previous, ~2-3 upcoming stops). Automatically pauses auto-follow when user manually scrolls/touches and displays floating pill `[ 🎯 বাসের অবস্থানে ফিরুন ]` to return smoothly.
-6. **Map Camera Stability & Positioning**: Removed aggressive periodic 2.6s `fitBounds` camera lock to prevent camera jumps while panning. Added explicit recenter FABs for bus and user. Royal blue pulsing GPS user marker.
+### 181.1 Problem Diagnostics & Architectural Requirements (User Request Step 31637)
+1. **User Requirement & Production Scope**:
+   Following successful deployment of the live OpenStreetMap transit map in the native Android app, the user requested a comprehensive production polish pass covering 9 core architectural requirements:
+   - First-time location permission explanation modal and distance badging.
+   - Elimination of gesture collision between horizontal ViewPager tabs and Leaflet map navigation.
+   - Search bar text collision fix and 4-row compact card layout.
+   - Support for all 28 MBSTU corridor stops in both directions (Campus ➔ City and City ➔ Campus).
+   - Dynamic live bus node placed directly on the timeline between passed and upcoming stops.
+   - Intelligent auto-scrolling to keep the moving bus in view while respecting manual scrolling with a floating recenter pill.
+   - Camera stabilization by removing the disruptive 2.6s periodic fitBounds reset.
 
-### 181.2 File Changes & Commit (`588df50`)
-* **`app/src/main/AndroidManifest.xml`**: Added `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`.
-* **`app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt`**:
-  - `swipeHost.canSwipe = { direction -> !manageOpen && selectedTab != R.id.nav_transit && destination(direction) != null }`.
-  - Added `onRequestPermissionsResult(9901)` invoking `window.__onLocationPermissionResult(granted)` in WebView.
-* **`app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt`**:
-  - Added `hasLocationPermission()`, `requestLocationPermission()`, and `openAppSettings()` to `ClassMateTransitBridge`.
-* **`web/src/components/transit.tsx` & `transit.css`**:
-  - Implemented in-app permission modal dialog with Allow/Dismiss and settings fallback.
-  - Implemented direction-aware route computation (`detectedDirection`, `activeRouteStations`, sequence reversal).
-  - Implemented live bus position card node on timeline line.
-  - Implemented auto-scrolling with manual touch detection and floating recenter pill.
-  - Locked search bar layout with absolute search icon and clear button.
-  - High-contrast typography for light and dark modes.
-* **Deploy & Verification**:
-  - Vercel: Built and deployed to `https://classmatebd.vercel.app` (HTTP 200).
-  - Android APK: Assembled `app-debug.apk` in 1m 54s, installed via ADB streamed install on physical phone `6478ab80`, and verified with live screenshots.
+### 181.2 Location Permission Pipeline & Distance Computation (`ACCESS_FINE_LOCATION`)
+1. **Two-Stage Permission Architecture**:
+   - **Educational Modal Dialog**: `transit-permission-modal` appears upon first entry into the Transit tab. Cleanly explains why location access is requested: *"বিশ্ববিদ্যালয়ের বাসগুলো আপনার বর্তমান অবস্থান থেকে কত দূরে আছে তা জানতে এবং নিকটবর্তী বাস সহজে ট্র্যাক করতে লোকেশন অ্যাক্সেস প্রয়োজন"*.
+   - **User Choice**: `[লোকেশন চালু করুন]` (Allow Location) vs `[এখন নয়]` (Not Now).
+   - Persisted in client `localStorage` under key `classmate_transit_loc_prompted` to prevent repeated prompts on subsequent visits.
+2. **Android Runtime Permission Delegation via Bidirectional Bridge**:
+   - In `AndroidManifest.xml`:
+     ```xml
+     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+     ```
+   - In `ClassMateTransitManager.kt` (`ClassMateTransitBridge`):
+     - `hasLocationPermission()`: Queries `ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED`.
+     - `requestLocationPermission()`: Calls `ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 9901)`.
+     - `openAppSettings()`: Launches `Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))` if permissions are permanently denied.
+   - In `ClassMateAuthActivity.kt`:
+     ```kotlin
+     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+         if (requestCode == 9901) {
+             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+             academicScreens.postToTransitWebView("window.__onLocationPermissionResult && window.__onLocationPermissionResult($granted);")
+         }
+     }
+     ```
+3. **Distance Calculation & Graceful Degradation**:
+   - Real-time Haversine distance calculated between user `[lat, lon]` and vehicle telemetry coordinates.
+   - Natural Bengali string formatting: `< 1 km` formatted in meters (`📍 আপনার থেকে ৪৫০ মি দূরে`), `≥ 1 km` formatted in kilometers (`১.২ কিমি দূরে`).
+   - If permission is denied or dismissed, all transit features (live map, schedules, bus list, stops) operate normally.
+   - The distance badge is replaced with a clean pill `📍 দূরত্ব দেখুন` that allows students to re-request permission anytime with a single tap.
+   - User GPS watcher is restricted to foreground active transit usage and automatically unwatched on unmount or tab change.
+
+### 181.3 Navigation Gesture Isolation (`ClassMateAuthActivity.kt`)
+1. **The Issue**:
+   When students swiped or panned across the Leaflet map or dragged the timeline, the parent ViewPager / `SwipeHost` intercepted horizontal swipe motions, accidentally switching tabs from Transit to Timetable or Notices.
+2. **The Fix**:
+   Updated the touch interception logic in `ClassMateAuthActivity.kt`:
+   ```kotlin
+   swipeHost.canSwipe = { direction ->
+       !manageOpen && selectedTab != R.id.nav_transit && destination(direction) != null
+   }
+   ```
+   When `selectedTab == R.id.nav_transit`, parent horizontal swipe gestures are completely disabled, giving the Leaflet map and timeline 100% gesture isolation for smooth panning, pinching, rotating, and horizontal dragging.
+   Parent swipe gestures automatically resume as soon as the user switches to any other tab (*Timetable, Notices, Courses, Settings*).
+
+### 181.4 Search UI Collision Fix & Zero-Collision 4-Row Feed (`transit.tsx`, `transit.css`)
+1. **Search Input Layout Isolation**:
+   - Fixed the search magnifying glass icon with `position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none;`.
+   - Applied asymmetric padding to input field: `padding: 10px 42px 10px 40px;`.
+   - Added instant clear button `(✕)` pinned to the right edge.
+   - Guarantees zero text collision with the search icon even with long Bengali queries.
+2. **Compact 4-Row Bus Card Design**:
+   - Row 1: Bus avatar + bold Bengali name + colored ID chip (`সোনারতরী ০০০৩`) on the left; live status badge (`⚡ চলন্ত` or `🅿️ ক্যাম্পাস স্ট্যান্ডবাই`) on the right.
+   - Row 2: Full route corridor pill (`🧭 ক্যাম্পাস ⇄ নিরালা`).
+   - Row 3: Next stop banner with location pin (`📍 পরবর্তী স্টপ: মুক্তমঞ্চ বাস স্টপ (০.১৩ কিমি)`).
+   - Row 4: User proximity badge (`📍 আপনার থেকে ৪৫০ মি দূরে`) + freshness timestamp (`৫১ সে আগে`) + direct map CTA button (`[🗺️ ম্যাপ]`).
+
+### 181.5 28-Stop Direction-Aware Milestone Timeline
+1. **Bidirectional Route Sequencing**:
+   - Supports both travel directions:
+     - `🏫 ক্যাম্পাস ➔ শহর` (Campus ➔ Nirala / Tangail City)
+     - `🏙️ শহর ➔ ক্যাম্পাস` (Nirala / Tangail City ➔ Campus)
+   - Automatically detects active direction by comparing bus coordinates against corridor bearings, while allowing instantaneous manual direction toggle via top pills.
+   - Dynamically inverts station order, monotonic mileage calculations, ETA projections, and passed status along the active travel path.
+2. **Dedicated Live Bus Position Node**:
+   - Rather than merely highlighting an approaching stop, a dedicated **Live Bus Position Node** is rendered directly on the vertical timeline track between the last passed stop and the upcoming stop.
+   - Displays real-time bus avatar, live speed indicator (`⚡ গতি: ৩২ কিমি/ঘ`), and user proximity distance.
+   - Passed stops feature faded checkmarks (`✓`) and milestone distances.
+   - Upcoming stops feature numbered milestone nodes (`১, ২, ৩...`) with cumulative mileage and drive ETA.
+
+### 181.6 Intelligent Auto-Scrolling & Manual Touch Pause
+1. **Auto-Centering**:
+   - On timeline opening or route selection, viewport automatically calculates the scroll offset to position the live bus node in the vertical center (showing ~2-3 passed and ~2-3 upcoming stops).
+   - Smoothly follows the vehicle as it advances along the road corridor.
+2. **Manual Touch Pause & Recenter Pill**:
+   - Monitored via `onTouchStart` and `onWheel` event listeners on `.transit-corridor-timeline`.
+   - When a student scrolls to inspect earlier or later stops, auto-follow is temporarily suspended to prevent jarring viewport resets.
+   - A floating pill appears at the bottom: `[ 🎯 বাসের অবস্থানে ফিরুন ]`.
+   - Tapping the pill triggers smooth scroll back to the active bus position and re-engages automatic tracking.
+   - Native scrollbars hidden via `scrollbar-width: none; -ms-overflow-style: none; ::-webkit-scrollbar { display: none; }`.
+
+### 181.7 Map Camera Stabilization & GPS User Marker
+1. **Stabilization**:
+   - Purged the disruptive 2.6-second periodic `fitBounds` camera lock that previously snapped the map viewport back during user interaction.
+   - Added dedicated recenter FABs: bus focus (`LocateFixed`) and user location focus (`Navigation`).
+2. **User Location Marker**:
+   - Pulsing royal blue user dot (`.transit-user-marker-pulse`, `#2563eb`) with white border and soft animated halo, distinctly differentiated from crimson/emerald bus markers.
+
+### 181.8 Build Verification, Commits & Deployment
+1. **Web Production**:
+   - Built and verified with Next.js (`npm --prefix web run build`, 0 errors).
+   - Deployed live to Vercel production: `https://classmatebd.vercel.app` (HTTP 200).
+2. **Native Android APK**:
+   - Compiled with Gradle (`assembleDebug` SUCCESS in 1m 54s).
+   - Generated 58.4MB production-ready `app-debug.apk`.
+   - Streamed ADB install to physical test device **OnePlus Nord CE4 (`6478ab80`)** (`Success`).
+   - Verified live screen capture: OpenStreetMap tiles, location permission prompt, distance badging, and gesture isolation operating seamlessly.
+3. **Repository Commits**:
+   - `588df50`: `feat(transit): refine UI/UX, location-aware tracking, direction reversal and 28-stop timeline`
+   - `acdd062`: `docs(memory): document section 181 for transit UI/UX refinement and location tracking`
+   - Branch: `feature/live-bus-tracking` (pushed to remote `origin/feature/live-bus-tracking`).
