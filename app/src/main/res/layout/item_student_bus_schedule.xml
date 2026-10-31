@@ -85,36 +85,35 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Call Pilot Pill Button -->
+            <!-- Track Bus Pill Button -->
             <LinearLayout
-                android:id="@+id/btnCallPilot"
+                android:id="@+id/btnTrackBus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="6dp"
-                android:background="@drawable/bg_badge_green"
+                android:background="@drawable/bg_badge_blue"
                 android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone">
+                android:focusable="true">
 
                 <ImageView
                     android:layout_width="14dp"
                     android:layout_height="14dp"
-                    android:layout_marginEnd="5dp"
-                    android:src="@drawable/ic_phone"
-                    app:tint="#059669"
+                    android:layout_marginEnd="4dp"
+                    android:src="@drawable/ic_location"
+                    app:tint="@color/cm_primary"
                     android:importantForAccessibility="no" />
 
                 <TextView
-                    android:id="@+id/tvCallPilotText"
+                    android:id="@+id/tvTrackBusText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="কল"
+                    android:text="ট্র্যাক"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:textColor="#059669" />
+                    android:textColor="@color/cm_primary" />
             </LinearLayout>
         </LinearLayout>
 

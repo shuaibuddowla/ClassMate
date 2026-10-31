@@ -900,12 +900,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 <>
                   {mode === "bus" ? (
                     <div className="bus-schedule-view">
-                      <BusHero
-                        mbstuSchedules={mbstuSchedules}
-                        date={date}
-                        kind={kind}
-                        liveSynced={mbstuLiveSynced}
-                      />
                       <div className="bus-filter-bar">
                         <button
                           type="button"
@@ -985,16 +979,29 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                       <span className="bus-name-en">{info.nameEn}</span>
                                     </div>
                                   </div>
-                                  {bus.pilotContact && (
-                                    <a
-                                      href={`tel:${bus.pilotContact}`}
-                                      className="bus-pilot-call-btn"
-                                      title="পাইলটকে সরাসরি কল করুন"
-                                    >
-                                      <Phone size={13} />
-                                      <span>কল পাইলট</span>
-                                    </a>
-                                  )}
+                                  <button
+                                    type="button"
+                                    className="bus-track-action-btn"
+                                    title={`${info.nameBn} লাইভ ম্যাপে ট্র্যাক করুন`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (typeof window !== "undefined") {
+                                        (window as any).__classmateInitialBusId = bus.busId;
+                                        if ((window as any).__classmateSelectBus) {
+                                          (window as any).__classmateSelectBus(bus.busId);
+                                        }
+                                        window.location.hash = `#transit?bus=${encodeURIComponent(bus.busId)}`;
+                                        window.dispatchEvent(
+                                          new CustomEvent("classmate-select-bus", {
+                                            detail: { busId: bus.busId }
+                                          })
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <Navigation size={13} />
+                                    <span>ট্র্যাক</span>
+                                  </button>
                                 </div>
 
                                 <div className="bus-route-strip">

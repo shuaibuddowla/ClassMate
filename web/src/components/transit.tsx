@@ -529,7 +529,16 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
-  const [selectedBusId, setSelectedBusId] = useState<string>("");
+  const [selectedBusId, setSelectedBusId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash || "";
+      const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+      const searchParams = new URLSearchParams(window.location.search);
+      const b = hashParams?.get("bus") || hashParams?.get("busId") || searchParams.get("bus") || searchParams.get("busId") || (window as any).__classmateInitialBusId;
+      if (b) return b;
+    }
+    return "";
+  });
   const [satelliteView, setSatelliteView] = useState<boolean>(true);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
@@ -992,10 +1001,37 @@ export function Transit({ ctx }: { ctx?: any }) {
   const freshFleetCount = displayFleet.filter((bus) => bus.positionAgeSeconds !== null && !bus.isStale).length;
 
   // Active Bus (ONLY when explicitly selected/tapped by the user)
-  const selectedBus = useMemo(
-    () => (selectedBusId ? displayFleet.find((b) => b.id === selectedBusId) || null : null),
-    [displayFleet, selectedBusId]
-  );
+  const selectedBus = useMemo<MbstuBusData | null>(() => {
+    if (!selectedBusId) return null;
+    const found = displayFleet.find((b) => b.id === selectedBusId);
+    if (found) return found;
+    const rawFound = fleet.find((b) => b.id === selectedBusId);
+    if (rawFound) return predictBusPosition(rawFound, clockNow);
+    const info = busInfoMap[selectedBusId] || KNOWN_BUS_INFO[selectedBusId];
+    if (info) {
+      const sched = schedulesMap[selectedBusId] || MBSTU_BUS_SCHEDULES[selectedBusId];
+      const nextTime = sched?.fromCampus || "৮:০০ AM";
+      return {
+        id: selectedBusId,
+        nameBn: info.nameBn,
+        nameEn: info.nameEn,
+        lat: 24.2378,
+        lon: 89.8911,
+        speed: 0,
+        heading: 0,
+        hasDirection: false,
+        routeName: info.defaultRoute,
+        status: `স্ট্যান্ডবাই (পরবর্তী ট্রিপ: ${nextTime})`,
+        color: info.color,
+        isDriving: false,
+        lastUpdated: new Date().toISOString(),
+        positionAgeSeconds: 0,
+        isStale: false,
+        isEstimated: true
+      };
+    }
+    return null;
+  }, [displayFleet, fleet, selectedBusId, clockNow, busInfoMap, schedulesMap]);
 
   // Detailed Bus for Detail View
   const detailBus = useMemo(
@@ -1280,6 +1316,51 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, [checkBusInBounds]);
 
+  // Global Bus Selection Listener & Handler
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleSelect = (busId: string) => {
+      if (!busId) return;
+      setSelectedBusId(busId);
+      setDetailBusId(busId);
+      setActiveView("map");
+      setTimeout(() => {
+        switchToMap(busId);
+      }, 100);
+    };
+
+    (window as any).__classmateSelectBus = handleSelect;
+
+    const onHashChange = () => {
+      const hash = window.location.hash || "";
+      const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+      const b = hashParams?.get("bus") || hashParams?.get("busId") || (window as any).__classmateInitialBusId;
+      if (b) handleSelect(b);
+    };
+
+    const onCustomEvent = (e: any) => {
+      if (e?.detail?.busId) handleSelect(e.detail.busId);
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("classmate-select-bus", onCustomEvent);
+
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("classmate-select-bus", onCustomEvent);
+    };
+  }, [switchToMap]);
+
+  // Auto-center camera when a bus is newly selected
+  useEffect(() => {
+    if (!selectedBus || !mapRef.current) return;
+    const timer = setTimeout(() => {
+      centerSelectedBus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [selectedBus?.id, centerSelectedBus]);
+
   // Fly to campus
   const recenterCampus = useCallback(() => {
     if (mapRef.current) {
@@ -1546,12 +1627,16 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // 6. Render Active Bus Markers (with Spiderfier cluster fan-out for terminal standby buses)
   const spiderfiedFleet = useMemo(() => {
-    if (displayFleet.length === 0) return [];
+    const baseList = [...displayFleet];
+    if (selectedBus && !baseList.some((b) => b.id === selectedBus.id)) {
+      baseList.push(selectedBus);
+    }
+    if (baseList.length === 0) return [];
     const result: Array<MbstuBusData & { displayLat: number; displayLon: number }> = [];
     const clusters: Array<MbstuBusData[]> = [];
 
     // Group buses into spatial clusters if within 25 meters of each other (e.g. terminal parking)
-    displayFleet.forEach((bus) => {
+    baseList.forEach((bus) => {
       const foundCluster = clusters.find((cluster) =>
         cluster.some((cBus) => getDistanceMeters(cBus.lat, cBus.lon, bus.lat, bus.lon) < 25)
       );
@@ -1580,7 +1665,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     });
 
     return result;
-  }, [displayFleet]);
+  }, [displayFleet, selectedBus]);
 
   useEffect(() => {
     if (!mapRef.current) return;

@@ -840,6 +840,13 @@ internal class ClassMateAcademicScreensSupabase(
 
             if (tab == R.id.nav_transit) {
                 resumeTransitWebView()
+                pendingTransitBusId?.let { targetBus ->
+                    tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+                        postDelayed({
+                            evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                        }, 200)
+                    }
+                }
             } else {
                 pauseTransitWebView()
             }
@@ -1785,6 +1792,28 @@ internal class ClassMateAcademicScreensSupabase(
 
     @android.annotation.SuppressLint("SetJavaScriptEnabled")
 
+    private var pendingTransitBusId: String? = null
+
+    fun openTransitForBus(busId: String) {
+        val authActivity = activity as? ClassMateAuthActivity
+        val cleanBusId = if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
+        pendingTransitBusId = cleanBusId
+
+        // 1. Navigate directly to transit tab
+        authActivity?.selectHomeTab(R.id.nav_transit)
+
+        // 2. Select and focus on the corresponding bus in the webview
+        val webView = tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)
+            ?: activity.findViewById<android.webkit.WebView>(R.id.transit_webview)
+
+        webView?.post {
+            webView.evaluateJavascript(
+                "if (window.__classmateSelectBus) { window.__classmateSelectBus('$cleanBusId'); } else { window.__classmateInitialBusId = '$cleanBusId'; window.location.hash = '#transit?bus=$cleanBusId'; }",
+                null
+            )
+        }
+    }
+
     private fun setupTransit(root: View) {
 
         val webView = root.findViewById<android.webkit.WebView>(R.id.transit_webview) ?: return
@@ -1869,6 +1898,9 @@ internal class ClassMateAcademicScreensSupabase(
                         loadingView?.visibility = View.GONE
                     }?.start()
                 }
+                pendingTransitBusId?.let { targetBus ->
+                    webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                }
             }
         }
 
@@ -1912,7 +1944,8 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map&v=20261101_dynamic"
+        val busParam = pendingTransitBusId?.let { "&bus=$it" } ?: ""
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map$busParam&v=20261101_track"
         webView.clearCache(true)
         webView.loadUrl(transitUrl)
 
@@ -3441,65 +3474,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val summaryEntries = entries.filter { it.optBoolean("is_mbstu") || (it.optString("schedule_kind") in setOf("office_open", "closed") && !it.isNull("city_departure_time")) }
-
-
-
-            root.v<View>(R.id.busSummary).visibility = if (requestedBusMode && summaryEntries.isNotEmpty()) View.VISIBLE else View.GONE
-
-
-
-            if (requestedBusMode && summaryEntries.isNotEmpty()) {
-
-
-
-                updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
-
-
-
-                if (effectiveDate == LocalDate.now()) {
-
-
-
-                    val tick = object : Runnable {
-
-
-
-                        override fun run() {
-
-
-
-                            if (!active(root) || request != timetableRequest || !busMode || calendarMode) return
-
-
-
-                            if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
-
-
-
-                            root.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000)
-
-
-
-                        }
-
-
-
-                    }
-
-
-
-                    root.postDelayed(tick, 60_000 - System.currentTimeMillis() % 60_000)
-
-
-
-                }
-
-
-
-            }
-
-
+            root.v<View>(R.id.busSummary).visibility = View.GONE
 
             val empty = entries.isEmpty()
 
@@ -3589,18 +3564,13 @@ internal class ClassMateAcademicScreensSupabase(
                     tvBusSubtitle.visibility = View.GONE
                 }
 
-                val btnCallPilot = card.v<View>(R.id.btnCallPilot)
-                if (pilotContact.isNotBlank()) {
-                    btnCallPilot.visibility = View.VISIBLE
-                    btnCallPilot.setOnClickListener {
+                val btnTrackBus = card.findViewById<View>(R.id.btnTrackBus)
+                btnTrackBus?.apply {
+                    visibility = View.VISIBLE
+                    setOnClickListener {
                         com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-                        runCatching {
-                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$pilotContact"))
-                            it.context.startActivity(dialIntent)
-                        }
+                        openTransitForBus(busNo)
                     }
-                } else {
-                    btnCallPilot.visibility = View.GONE
                 }
 
                 val tvRouteName = card.v<TextView>(R.id.tvRouteName)
@@ -3642,7 +3612,12 @@ internal class ClassMateAcademicScreensSupabase(
                     card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddBus(item, requestedBusKind); true }
                     card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
                 } else {
-                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it) }
+                    card.setOnClickListener {
+                        com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                        if (isMbstu && busNo.isNotBlank()) {
+                            openTransitForBus(busNo)
+                        }
+                    }
                 }
             } else recycler(root, R.id.rvPeriods, R.layout.item_period, entries) { card, item ->
 

@@ -1006,6 +1006,32 @@ strong {
   border-style: solid;
   line-height: 1;
 }
+
+.bus-track-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0284c7;
+  background: color-mix(in srgb, #0284c7 12%, transparent);
+  border: 1px solid color-mix(in srgb, #0284c7 25%, transparent);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+:root[data-theme="dark"] .bus-track-action-btn {
+  color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  border-color: color-mix(in srgb, #38bdf8 30%, transparent);
+}
+.bus-track-action-btn:hover {
+  background: color-mix(in srgb, #0284c7 22%, transparent);
+  transform: scale(1.04);
+}
+
 .bus-pilot-call-btn {
   display: inline-flex;
   align-items: center;
@@ -1021,7 +1047,33 @@ strong {
   transition: all 0.15s ease;
   flex-shrink: 0;
 }
-:root[data-theme="dark"] .bus-pilot-call-btn {
+:root[data-theme="dark"] 
+.bus-track-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0284c7;
+  background: color-mix(in srgb, #0284c7 12%, transparent);
+  border: 1px solid color-mix(in srgb, #0284c7 25%, transparent);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+:root[data-theme="dark"] .bus-track-action-btn {
+  color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  border-color: color-mix(in srgb, #38bdf8 30%, transparent);
+}
+.bus-track-action-btn:hover {
+  background: color-mix(in srgb, #0284c7 22%, transparent);
+  transform: scale(1.04);
+}
+
+.bus-pilot-call-btn {
   color: #34d399;
 }
 .bus-pilot-call-btn:hover {
