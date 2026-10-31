@@ -983,13 +983,16 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
 
     const tileUrl = satelliteView
-      ? "https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
     const layer = L.tileLayer(tileUrl, {
-      subdomains: satelliteView ? ["0", "1", "2", "3"] : ["a", "b", "c"],
-      maxZoom: 19,
-      maxNativeZoom: satelliteView ? 20 : 19
+      subdomains: satelliteView ? [] : ["a", "b", "c"],
+      attribution: satelliteView
+        ? "Tiles &copy; Esri, Maxar, Microsoft"
+        : "&copy; OpenStreetMap contributors",
+      maxZoom: 20,
+      maxNativeZoom: satelliteView ? 19 : 19
     });
     layer.addTo(mapRef.current);
     tileLayerRef.current = layer;
@@ -2554,8 +2557,8 @@ export function Transit({ ctx }: { ctx?: any }) {
             <button
               onClick={() => setSatelliteView((prev) => !prev)}
               className="transit-fab-btn"
-              title={satelliteView ? "সড়ক ম্যাপে (OpenStreetMap) ফিরুন" : "গুগল স্যাটেলাইট ম্যাপ দেখুন"}
-              aria-label={satelliteView ? "Switch to OpenStreetMap" : "Switch to Google Satellite"}
+              title={satelliteView ? "সড়ক ম্যাপে (OpenStreetMap) ফিরুন" : "এইচডি স্যাটেলাইট ম্যাপ (Esri/Maxar) দেখুন"}
+              aria-label={satelliteView ? "Switch to OpenStreetMap" : "Switch to Esri Maxar Satellite"}
             >
               <Layers size={18} color={satelliteView ? "#b71454" : "#0284c7"} />
             </button>
