@@ -11087,6 +11087,10 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 | **5-Tab Bottom Navigation** | Android APK | **VERIFIED** | Center transit slot with pulsing green badge; Batch relocated to Settings |
 | **Production Web Radar** | Web Companion | **PRODUCTION** | Live at `https://classmatebd.vercel.app/#transit` (Commits `10f56bc`, `25ad6da`, `f258016`, `423101f`, `a3af691`, `81989e9`, `4ce6115`, `07980fd`, `a90fd7e`, `d52659c`, `50f173f`, `3003b17`, `3751f1c`, `fdba0fd`) |
 | **Dual Repo Memory Mirror** | Android & Main | **SYNCHRONIZED** | Synced across `AndroidStudioProjects/ClassMate` and `Code & Scripts/ClassMate-main` |
+| **Native Android Production Transit WebView Shell** | Android APK | **PRODUCTION** | `ClassMateAcademicScreensSupabase.kt` with `LAYER_TYPE_HARDWARE`, geolocation delegation & offline asset fallback (Commit `59e8fbc`) |
+| **Bidirectional Native Android Bridge & Haptics** | Android APK & Web | **PRODUCTION** | `ClassMateTransitBridge` wired to native `Vibrator`, arrival notifications & predictive back handling (Commit `59e8fbc`) |
+| **Android Tab Navigation Interceptor Resolution** | Android APK | **PRODUCTION** | Routed `R.id.nav_transit` to `academicScreens.render` in `ClassMateAuthActivity.kt` lines 2095-2101 & hardened Compose fallback (Commit `2e6db6f`) |
+| **Physical Device Verified APK Installation** | Android APK | **VERIFIED** | Streamed `app-debug.apk` install to device `6478ab80`, live screen capture verified (Commit `2e6db6f`) |
 
 ---
 
