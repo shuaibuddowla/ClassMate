@@ -160,19 +160,138 @@ export interface MbstuBusSchedule {
   toCampus: string;
   fromCampusMin: number;
   toCampusMin: number;
+  campusToDistrict?: string[];
+  districtToCampus?: string[];
+  pilotContact?: string;
 }
 
 export const MBSTU_BUS_SCHEDULES: Record<string, MbstuBusSchedule> = {
-  SB0001: { busId: "SB0001", nameBn: "গীতাঞ্জলি", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
-  SB0002: { busId: "SB0002", nameBn: "অগ্নিবীণা", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
-  SB0003: { busId: "SB0003", nameBn: "সোনারতরী", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
-  SB0005: { busId: "SB0005", nameBn: "সংশপ্তক", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
-  SB0009: { busId: "SB0009", nameBn: "বনলতা", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
-  SB0010: { busId: "SB0010", nameBn: "রক্তকরবী", fromCampus: "10:00 AM", toCampus: "10:30 AM", fromCampusMin: 10 * 60, toCampusMin: 10 * 60 + 30 },
-  SB5442: { busId: "SB5442", nameBn: "সঞ্চয়িতা", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
-  SB5448: { busId: "SB5448", nameBn: "রাখালী", fromCampus: "2:30 PM", toCampus: "3:00 PM", fromCampusMin: 14 * 60 + 30, toCampusMin: 15 * 60 },
-  SB5488: { busId: "SB5488", nameBn: "রাখালী", fromCampus: "2:30 PM", toCampus: "3:00 PM", fromCampusMin: 14 * 60 + 30, toCampusMin: 15 * 60 }
+  SB0001: {
+    busId: "SB0001",
+    nameBn: "গীতাঞ্জলি",
+    fromCampus: "8:00 AM",
+    toCampus: "8:30 AM",
+    fromCampusMin: 8 * 60,
+    toCampusMin: 8 * 60 + 30,
+    campusToDistrict: ["8:00 AM", "9:00 AM", "1:10 PM", "2:30 PM"],
+    districtToCampus: ["8:30 AM", "9:30 AM", "1:40 PM", "3:00 PM"],
+    pilotContact: ""
+  },
+  SB0002: {
+    busId: "SB0002",
+    nameBn: "অগ্নিবীণা",
+    fromCampus: "8:00 AM",
+    toCampus: "8:30 AM",
+    fromCampusMin: 8 * 60,
+    toCampusMin: 8 * 60 + 30,
+    campusToDistrict: ["8:00 AM", "9:00 AM", "10:00 AM", "1:10 PM", "2:30 PM"],
+    districtToCampus: ["8:30 AM", "9:30 AM", "10:30 AM", "1:40 PM", "3:00 PM"],
+    pilotContact: "01721162819"
+  },
+  SB0003: {
+    busId: "SB0003",
+    nameBn: "সোনারতরী",
+    fromCampus: "4:10 PM",
+    toCampus: "4:40 PM",
+    fromCampusMin: 16 * 60 + 10,
+    toCampusMin: 16 * 60 + 40,
+    campusToDistrict: ["4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM"],
+    districtToCampus: ["4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM"],
+    pilotContact: "01716658738"
+  },
+  SB0005: {
+    busId: "SB0005",
+    nameBn: "সংশপ্তক",
+    fromCampus: "8:00 AM",
+    toCampus: "8:30 AM",
+    fromCampusMin: 8 * 60,
+    toCampusMin: 8 * 60 + 30,
+    campusToDistrict: ["8:00 AM", "9:00 AM", "1:10 PM", "2:30 PM"],
+    districtToCampus: ["8:30 AM", "9:30 AM", "1:40 PM", "3:00 PM"],
+    pilotContact: "01799148449"
+  },
+  SB0009: {
+    busId: "SB0009",
+    nameBn: "বনলতা",
+    fromCampus: "4:10 PM",
+    toCampus: "4:40 PM",
+    fromCampusMin: 16 * 60 + 10,
+    toCampusMin: 16 * 60 + 40,
+    campusToDistrict: ["4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM"],
+    districtToCampus: ["4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM"],
+    pilotContact: "01719221530"
+  },
+  SB0010: {
+    busId: "SB0010",
+    nameBn: "রক্তকরবী",
+    fromCampus: "10:00 AM",
+    toCampus: "10:30 AM",
+    fromCampusMin: 10 * 60,
+    toCampusMin: 10 * 60 + 30,
+    campusToDistrict: ["10:00 AM", "4:10 PM"],
+    districtToCampus: ["10:30 AM", "4:40 PM"],
+    pilotContact: "01688686781"
+  },
+  SB5442: {
+    busId: "SB5442",
+    nameBn: "সঞ্চয়িতা",
+    fromCampus: "4:10 PM",
+    toCampus: "4:40 PM",
+    fromCampusMin: 16 * 60 + 10,
+    toCampusMin: 16 * 60 + 40,
+    campusToDistrict: ["4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM"],
+    districtToCampus: ["4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM"],
+    pilotContact: "01710802028"
+  },
+  SB5448: {
+    busId: "SB5448",
+    nameBn: "রাখালী",
+    fromCampus: "2:30 PM",
+    toCampus: "3:00 PM",
+    fromCampusMin: 14 * 60 + 30,
+    toCampusMin: 15 * 60,
+    campusToDistrict: ["2:30 PM", "4:10 PM", "5:15 PM", "6:20 PM"],
+    districtToCampus: ["3:00 PM", "4:40 PM", "5:45 PM", "7:00 PM"],
+    pilotContact: "01710802028"
+  },
+  SB5488: {
+    busId: "SB5488",
+    nameBn: "রাখালী",
+    fromCampus: "2:30 PM",
+    toCampus: "3:00 PM",
+    fromCampusMin: 14 * 60 + 30,
+    toCampusMin: 15 * 60,
+    campusToDistrict: ["2:30 PM", "4:10 PM", "5:15 PM", "6:20 PM"],
+    districtToCampus: ["3:00 PM", "4:40 PM", "5:45 PM", "7:00 PM"],
+    pilotContact: "01710802028"
+  }
 };
+
+export function parseScheduleTimeToMinutes(tStr: string): number | null {
+  const m = tStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === "PM" && h < 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+export function computeNextDeparture(times: string[] | undefined, currentMin: number): { str: string; min: number } {
+  if (!times || times.length === 0) return { str: "--:--", min: 0 };
+  const parsed = times
+    .map((t) => ({ str: t, min: parseScheduleTimeToMinutes(t) }))
+    .filter((x): x is { str: string; min: number } => x.min !== null);
+  parsed.sort((a, b) => a.min - b.min);
+  const upcoming = parsed.find((x) => x.min >= currentMin);
+  return upcoming || parsed[0] || { str: "--:--", min: 0 };
+}
+
+export function getTangailMinutes(nowMs: number = Date.now()): number {
+  const d = new Date(nowMs + (6 * 3600 * 1000) + (new Date().getTimezoneOffset() * 60 * 1000));
+  return d.getHours() * 60 + d.getMinutes();
+}
 
 export function getScheduleRemaining(targetMin: number, nowMs: number): { text: string; isPast: boolean; diffMin: number } {
   const d = new Date(nowMs + (6 * 3600 * 1000) + (new Date().getTimezoneOffset() * 60 * 1000));
@@ -397,6 +516,17 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [listFilter, setListFilter] = useState<"all" | "driving" | "standby" | "to_campus" | "to_city">("all");
   const [selectedStoppageAction, setSelectedStoppageAction] = useState<CorridorStation | null>(null);
 
+  // Dynamic Fleet Metadata & Schedules (from official MBSTU Wheels API)
+  const [busInfoMap, setBusInfoMap] = useState<Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }>>(KNOWN_BUS_INFO);
+  const [imeiMap, setImeiMap] = useState<Record<string, string>>(GPS_IMEI_TO_BUS);
+  const [schedulesMap, setSchedulesMap] = useState<Record<string, MbstuBusSchedule>>(MBSTU_BUS_SCHEDULES);
+  const busInfoMapRef = useRef(busInfoMap);
+  busInfoMapRef.current = busInfoMap;
+  const imeiMapRef = useRef(imeiMap);
+  imeiMapRef.current = imeiMap;
+  const schedulesMapRef = useRef(schedulesMap);
+  schedulesMapRef.current = schedulesMap;
+
   // Live Fleet State
   const [fleet, setFleet] = useState<MbstuBusData[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string>("");
@@ -442,6 +572,140 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Native Android Shell & Bridge Integration
   const [isAndroidApp, setIsAndroidApp] = useState<boolean>(false);
+
+  // Dynamically fetch live bus names & schedules from MBSTU Wheels API
+  useEffect(() => {
+    let isMounted = true;
+
+    if (typeof window !== "undefined") {
+      try {
+        const cachedNames = localStorage.getItem("classmate_mbstu_bus_names");
+        if (cachedNames) {
+          const parsed = JSON.parse(cachedNames);
+          if (parsed && typeof parsed === "object") {
+            if (parsed.imeiMap) setImeiMap((prev) => ({ ...prev, ...parsed.imeiMap }));
+            if (parsed.infoMap) setBusInfoMap((prev) => ({ ...prev, ...parsed.infoMap }));
+          }
+        }
+        const cachedSched = localStorage.getItem("classmate_mbstu_bus_schedules");
+        if (cachedSched) {
+          const parsed = JSON.parse(cachedSched);
+          if (parsed && typeof parsed === "object") {
+            setSchedulesMap((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch (_) {}
+    }
+
+    const fetchMbstuLiveApi = async () => {
+      // 1. Fetch Bus Names & IMEI mapping
+      try {
+        const res = await fetch("https://transport.mbstu.ac.bd/api/bus-names/");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            const newImei: Record<string, string> = { ...GPS_IMEI_TO_BUS };
+            const newInfo: Record<string, any> = { ...KNOWN_BUS_INFO };
+
+            json.data.forEach((b: any) => {
+              const busNo = String(b.busNo || "").trim();
+              const gpsNo = String(b.gpsNo || "").trim();
+              const busName = String(b.busName || "").trim();
+              if (gpsNo && busNo) {
+                newImei[gpsNo] = busNo;
+              }
+              if (busNo) {
+                newInfo[busNo] = {
+                  ...(newInfo[busNo] || { color: "#6366f1", defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর" }),
+                  nameBn: busName || newInfo[busNo]?.nameBn || busNo,
+                  nameEn: newInfo[busNo]?.nameEn || busNo,
+                };
+              }
+            });
+
+            if (isMounted) {
+              setImeiMap(newImei);
+              setBusInfoMap(newInfo);
+              try {
+                localStorage.setItem("classmate_mbstu_bus_names", JSON.stringify({ imeiMap: newImei, infoMap: newInfo }));
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("MBSTU bus-names fetch failed, using fallback:", err);
+      }
+
+      // 2. Fetch Live Bus Schedule Routine
+      try {
+        const res = await fetch("https://transport.mbstu.ac.bd/api/bus-schedule/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "success" })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === "success" && Array.isArray(json.data)) {
+            const currentMin = getTangailMinutes();
+            const newSched: Record<string, MbstuBusSchedule> = { ...MBSTU_BUS_SCHEDULES };
+
+            json.data.forEach((b: any) => {
+              const busNo = String(b.busNo || "").trim();
+              if (!busNo) return;
+              const nextFrom = computeNextDeparture(b.campusToDistrict, currentMin);
+              const nextTo = computeNextDeparture(b.districtToCampus, currentMin);
+
+              newSched[busNo] = {
+                busId: busNo,
+                nameBn: String(b.busName || "").trim() || newSched[busNo]?.nameBn || busNo,
+                fromCampus: nextFrom.str,
+                toCampus: nextTo.str,
+                fromCampusMin: nextFrom.min,
+                toCampusMin: nextTo.min,
+                campusToDistrict: Array.isArray(b.campusToDistrict) ? b.campusToDistrict : [],
+                districtToCampus: Array.isArray(b.districtToCampus) ? b.districtToCampus : [],
+                pilotContact: String(b.pilotContact || "").trim()
+              };
+            });
+
+            if (isMounted) {
+              setSchedulesMap(newSched);
+              try {
+                localStorage.setItem("classmate_mbstu_bus_schedules", JSON.stringify(newSched));
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("MBSTU bus-schedule fetch failed, using fallback:", err);
+      }
+    };
+
+    fetchMbstuLiveApi();
+    const interval = setInterval(fetchMbstuLiveApi, 5 * 60 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Compute active schedules dynamically based on current Tangail clock
+  const activeSchedules = useMemo(() => {
+    const currentMin = getTangailMinutes(clockNow);
+    const result: Record<string, MbstuBusSchedule> = {};
+    Object.entries(schedulesMap).forEach(([id, s]) => {
+      const nextFrom = computeNextDeparture(s.campusToDistrict, currentMin);
+      const nextTo = computeNextDeparture(s.districtToCampus, currentMin);
+      result[id] = {
+        ...s,
+        fromCampus: nextFrom.str,
+        toCampus: nextTo.str,
+        fromCampusMin: nextFrom.min,
+        toCampusMin: nextTo.min
+      };
+    });
+    return result;
+  }, [schedulesMap, clockNow]);
 
   const retryMapLoad = useCallback(() => {
     setMapLoadingState("loading");
@@ -1564,26 +1828,29 @@ export function Transit({ ctx }: { ctx?: any }) {
                     const map = new Map<string, MbstuBusData>();
                     prevFleet.forEach((b) => map.set(b.id, b));
 
+                    const curImeiMap = imeiMapRef.current;
+                    const curInfoMap = busInfoMapRef.current;
+
                     valid.forEach((raw: any) => {
                       let rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
                       const imei = String(raw.imei || "").trim();
-                      if (imei && GPS_IMEI_TO_BUS[imei]) {
-                        rawId = GPS_IMEI_TO_BUS[imei];
+                      if (imei && curImeiMap[imei]) {
+                        rawId = curImeiMap[imei];
                       }
                       if (rawId === "SB5488") rawId = "SB5448";
 
                       const nameFromPacket = String(raw.busName || raw.nameBn || raw.name || "").trim();
 
-                      // Resolve info against recognized official university fleet
-                      let info = rawId ? KNOWN_BUS_INFO[rawId] : undefined;
+                      // Resolve info against recognized official university fleet (dynamically updated)
+                      let info = rawId ? curInfoMap[rawId] : undefined;
                       let resolvedId = rawId;
 
                       if (!info && nameFromPacket) {
-                        const matchKey = Object.keys(KNOWN_BUS_INFO).find(
-                          (k) => KNOWN_BUS_INFO[k].nameBn === nameFromPacket || nameFromPacket.includes(KNOWN_BUS_INFO[k].nameBn)
+                        const matchKey = Object.keys(curInfoMap).find(
+                          (k) => curInfoMap[k].nameBn === nameFromPacket || nameFromPacket.includes(curInfoMap[k].nameBn)
                         );
                         if (matchKey) {
-                          info = KNOWN_BUS_INFO[matchKey];
+                          info = curInfoMap[matchKey];
                           if (!resolvedId || !resolvedId.startsWith("SB")) resolvedId = matchKey;
                         }
                       }
@@ -1930,17 +2197,17 @@ export function Transit({ ctx }: { ctx?: any }) {
                 </div>
 
                 {/* 4.1 Schedule Timetable Strip */}
-                {MBSTU_BUS_SCHEDULES[bus.id] && (
+                {activeSchedules[bus.id] && (
                   <div className="transit-card-schedule-strip">
                     <div className="transit-card-schedule-col">
                       <Clock size={11} color="#b71454" />
                       <span className="transit-card-sched-label">ক্যাম্পাস:</span>
-                      <strong className="transit-card-sched-time">{MBSTU_BUS_SCHEDULES[bus.id].fromCampus}</strong>
+                      <strong className="transit-card-sched-time">{activeSchedules[bus.id].fromCampus}</strong>
                     </div>
                     <div className="transit-card-sched-sep">•</div>
                     <div className="transit-card-schedule-col">
                       <span className="transit-card-sched-label">শহর:</span>
-                      <strong className="transit-card-sched-time">{MBSTU_BUS_SCHEDULES[bus.id].toCampus}</strong>
+                      <strong className="transit-card-sched-time">{activeSchedules[bus.id].toCampus}</strong>
                     </div>
                   </div>
                 )}
@@ -2031,7 +2298,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           </div>
 
           <div className="transit-timetable-grid">
-            {Object.values(MBSTU_BUS_SCHEDULES).filter((s, idx, arr) => arr.findIndex(x => x.busId === s.busId) === idx).map((sched) => {
+            {Object.values(activeSchedules).filter((s, idx, arr) => arr.findIndex(x => x.busId === s.busId) === idx).map((sched) => {
               const liveBus = displayFleet.find((b) => b.id === sched.busId);
               const isLive = Boolean(liveBus);
               return (
@@ -2040,7 +2307,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span
                         className="transit-chip-dot"
-                        style={{ backgroundColor: KNOWN_BUS_INFO[sched.busId]?.color || "#b71454" }}
+                        style={{ backgroundColor: busInfoMap[sched.busId]?.color || "#b71454" }}
                       />
                       <span className="transit-timetable-item-name">{sched.nameBn}</span>
                     </div>
@@ -2068,6 +2335,16 @@ export function Transit({ ctx }: { ctx?: any }) {
                       </span>
                     </div>
                   </div>
+
+                  {sched.pilotContact && (
+                    <a
+                      href={`tel:${sched.pilotContact}`}
+                      className="transit-timetable-pilot-link"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      📞 পাইলট: {toBengaliDigits(sched.pilotContact)}
+                    </a>
+                  )}
                 </div>
               );
             })}
@@ -2119,31 +2396,59 @@ export function Transit({ ctx }: { ctx?: any }) {
       }
     }
 
-    // 3. Schedule Time-Window Matching (when stopped or mid-corridor)
-    const schedule = MBSTU_BUS_SCHEDULES[detailBus.id];
+    // 3. Schedule Time-Window Matching across all daily departure times (Hybrid Direction Engine)
+    const schedule = activeSchedules[detailBus.id] || schedulesMap[detailBus.id] || MBSTU_BUS_SCHEDULES[detailBus.id];
     if (schedule) {
-      const now = new Date(clockNow + (6 * 3600 * 1000) + (new Date().getTimezoneOffset() * 60 * 1000));
-      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const nowMin = getTangailMinutes(clockNow);
 
-      let diffFromCampus = nowMin - schedule.fromCampusMin;
-      if (diffFromCampus < -720) diffFromCampus += 1440;
-      let diffToCampus = nowMin - schedule.toCampusMin;
-      if (diffToCampus < -720) diffToCampus += 1440;
+      const campusDepartures = (schedule.campusToDistrict && schedule.campusToDistrict.length > 0)
+        ? schedule.campusToDistrict
+        : [schedule.fromCampus];
+      const districtDepartures = (schedule.districtToCampus && schedule.districtToCampus.length > 0)
+        ? schedule.districtToCampus
+        : [schedule.toCampus];
 
-      // In window of campus departure
-      if (diffFromCampus >= -10 && diffFromCampus <= 45) {
+      const campusMins = campusDepartures.map(parseScheduleTimeToMinutes).filter((m): m is number => m !== null);
+      const districtMins = districtDepartures.map(parseScheduleTimeToMinutes).filter((m): m is number => m !== null);
+
+      // Check active departure window (-10 to +45 mins)
+      const inCampusWindow = campusMins.some((m) => {
+        let diff = nowMin - m;
+        if (diff < -720) diff += 1440;
+        return diff >= -10 && diff <= 45;
+      });
+
+      const inDistrictWindow = districtMins.some((m) => {
+        let diff = nowMin - m;
+        if (diff < -720) diff += 1440;
+        return diff >= -10 && diff <= 45;
+      });
+
+      if (inCampusWindow && !inDistrictWindow) {
         if (hysteresis) hysteresis.tripDirection = "to_city";
         return "to_city";
       }
-      // In window of city departure back to campus
-      if (diffToCampus >= -10 && diffToCampus <= 45) {
+      if (inDistrictWindow && !inCampusWindow) {
         if (hysteresis) hysteresis.tripDirection = "to_campus";
         return "to_campus";
       }
 
-      const elapsedFrom = diffFromCampus >= 0 ? diffFromCampus : diffFromCampus + 1440;
-      const elapsedTo = diffToCampus >= 0 ? diffToCampus : diffToCampus + 1440;
-      if (elapsedTo < elapsedFrom) {
+      // If between windows, determine which trip departed most recently
+      let minElapsedCampus = Infinity;
+      campusMins.forEach((m) => {
+        let diff = nowMin - m;
+        if (diff < 0) diff += 1440;
+        if (diff < minElapsedCampus) minElapsedCampus = diff;
+      });
+
+      let minElapsedDistrict = Infinity;
+      districtMins.forEach((m) => {
+        let diff = nowMin - m;
+        if (diff < 0) diff += 1440;
+        if (diff < minElapsedDistrict) minElapsedDistrict = diff;
+      });
+
+      if (minElapsedDistrict < minElapsedCampus) {
         if (hysteresis) hysteresis.tripDirection = "to_campus";
         return "to_campus";
       } else {
@@ -2306,26 +2611,37 @@ export function Transit({ ctx }: { ctx?: any }) {
           </div>
 
           {/* Schedule Departures Card matching official timetable */}
-          {MBSTU_BUS_SCHEDULES[detailBus.id] && (
+          {activeSchedules[detailBus.id] && (
             <div className="transit-schedule-banner">
               <div className="transit-schedule-banner-title">
-                <Clock size={12} color="#b71454" />
-                <span>পরবর্তী শিডিউল প্রস্থান (Next Departures)</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <Clock size={12} color="#b71454" />
+                  <span>পরবর্তী শিডিউল প্রস্থান (Next Departures)</span>
+                </div>
+                {activeSchedules[detailBus.id].pilotContact && (
+                  <a
+                    href={`tel:${activeSchedules[detailBus.id].pilotContact}`}
+                    className="transit-schedule-pilot-btn"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    📞 কল পাইলট ({toBengaliDigits(activeSchedules[detailBus.id].pilotContact || "")})
+                  </a>
+                )}
               </div>
               <div className="transit-schedule-row">
                 <div className={`transit-schedule-box ${!isToCampus ? "active-leg" : ""}`}>
                   <span className="transit-schedule-tag">From Campus</span>
-                  <strong className="transit-schedule-time">{MBSTU_BUS_SCHEDULES[detailBus.id].fromCampus}</strong>
+                  <strong className="transit-schedule-time">{activeSchedules[detailBus.id].fromCampus}</strong>
                   <span className="transit-schedule-countdown">
-                    ({getScheduleRemaining(MBSTU_BUS_SCHEDULES[detailBus.id].fromCampusMin, clockNow).text})
+                    ({getScheduleRemaining(activeSchedules[detailBus.id].fromCampusMin, clockNow).text})
                   </span>
                 </div>
                 <div className="transit-schedule-arrow">➔</div>
                 <div className={`transit-schedule-box ${isToCampus ? "active-leg" : ""}`}>
                   <span className="transit-schedule-tag">To Campus</span>
-                  <strong className="transit-schedule-time">{MBSTU_BUS_SCHEDULES[detailBus.id].toCampus}</strong>
+                  <strong className="transit-schedule-time">{activeSchedules[detailBus.id].toCampus}</strong>
                   <span className="transit-schedule-countdown">
-                    ({getScheduleRemaining(MBSTU_BUS_SCHEDULES[detailBus.id].toCampusMin, clockNow).text})
+                    ({getScheduleRemaining(activeSchedules[detailBus.id].toCampusMin, clockNow).text})
                   </span>
                 </div>
               </div>
@@ -2983,12 +3299,12 @@ export function Transit({ ctx }: { ctx?: any }) {
               </div>
 
               {/* Row 2.5: Official Bus Schedule Depatures */}
-              {MBSTU_BUS_SCHEDULES[selectedBus.id] && (
+              {activeSchedules[selectedBus.id] && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 10px", background: "#f8fafc", borderRadius: 8, fontSize: 11, color: "#64748b", margin: "4px 0", border: "1px solid #f1f5f9" }}>
                   <Clock size={11} color="#b71454" />
                   <span>শিডিউল প্রস্থান:</span>
                   <span style={{ color: "#b71454", fontWeight: 700 }}>
-                    ক্যাম্পাস {MBSTU_BUS_SCHEDULES[selectedBus.id].fromCampus} • শহর {MBSTU_BUS_SCHEDULES[selectedBus.id].toCampus}
+                    ক্যাম্পাস {activeSchedules[selectedBus.id].fromCampus} • শহর {activeSchedules[selectedBus.id].toCampus}
                   </span>
                 </div>
               )}

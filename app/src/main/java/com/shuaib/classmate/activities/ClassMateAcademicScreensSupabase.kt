@@ -1908,7 +1908,8 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map"
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map&v=20261101_dynamic"
+        webView.clearCache(true)
         webView.loadUrl(transitUrl)
 
     }
