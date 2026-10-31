@@ -30,7 +30,8 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Clock,
-  Check
+  Check,
+  AlertCircle
 } from "lucide-react";
 
 /* ==========================================================================
@@ -345,6 +346,9 @@ export function Transit({ ctx }: { ctx?: any }) {
   const [stopFilter, setStopFilter] = useState<string>("");
   const [isBusOffscreen, setIsBusOffscreen] = useState<boolean>(false);
 
+  // Map Readiness & Loading Empty State
+  const [mapLoadingState, setMapLoadingState] = useState<"loading" | "ready" | "error">("loading");
+
   // Map DOM & Leaflet Refs
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -375,6 +379,19 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Native Android Shell & Bridge Integration
   const [isAndroidApp, setIsAndroidApp] = useState<boolean>(false);
+
+  const retryMapLoad = useCallback(() => {
+    setMapLoadingState("loading");
+    if (mapRef.current) {
+      mapRef.current.invalidateSize();
+      if (tileLayerRef.current) {
+        tileLayerRef.current.redraw();
+      }
+    }
+    setTimeout(() => {
+      setMapLoadingState("ready");
+    }, 1200);
+  }, []);
 
   const triggerNativeHaptic = useCallback((ms = 15) => {
     if (typeof window !== "undefined") {
@@ -995,8 +1012,26 @@ export function Transit({ ctx }: { ctx?: any }) {
       updateWhenZooming: false,
       updateInterval: 150
     });
+    let readyFired = false;
+    const onMapReady = () => {
+      if (!readyFired) {
+        readyFired = true;
+        setMapLoadingState("ready");
+      }
+    };
+
+    layer.once("load", onMapReady);
+    layer.once("tileload", onMapReady);
+
+    // Timeout guard so the empty state never blocks longer than 1.2s
+    const timer = setTimeout(onMapReady, 1200);
+
     layer.addTo(mapRef.current);
     tileLayerRef.current = layer;
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, []);
 
   // 3. Render Street Polyline & Campus Circle
@@ -2352,6 +2387,68 @@ export function Transit({ ctx }: { ctx?: any }) {
         }}
       >
         <div ref={mapContainerRef} className="transit-map-canvas" />
+
+        {/* Empty State / Loading Handler until Map Loads */}
+        <div
+          className={`transit-map-loading-overlay ${mapLoadingState === "ready" ? "is-ready" : ""}`}
+          aria-hidden={mapLoadingState === "ready"}
+        >
+          {mapLoadingState === "error" ? (
+            <div className="transit-map-error-card" role="alert">
+              <div className="transit-map-error-icon">
+                <AlertCircle size={28} />
+              </div>
+              <h3 className="transit-map-error-title">ম্যাপ লোড করতে সমস্যা হয়েছে</h3>
+              <p className="transit-map-error-desc">
+                ইন্টারনেট সংযোগ চেক করুন অথবা স্যাটেলাইট স্তর পুনরায় লোড করুন।
+              </p>
+              <button
+                type="button"
+                className="transit-map-retry-btn"
+                onClick={retryMapLoad}
+              >
+                <RefreshCw size={14} />
+                <span>পুনরায় চেষ্টা করুন</span>
+              </button>
+            </div>
+          ) : (
+            <div className="transit-map-skeleton-card" role="status" aria-live="polite">
+              <div className="transit-map-radar-pulse">
+                <div className="radar-circle circle-1" />
+                <div className="radar-circle circle-2" />
+                <div className="radar-circle circle-3" />
+                <div className="radar-center-bus">
+                  <Bus size={22} />
+                </div>
+              </div>
+
+              <div className="transit-map-loading-text-group">
+                <div className="transit-map-loading-headline">
+                  মাভাবিপ্রবি বাস ট্র্যাকার লোড হচ্ছে…
+                </div>
+                <div className="transit-map-loading-subline">
+                  <span className="transit-loading-spinner" />
+                  <span>স্যাটেলাইট স্তর ও করিডোর স্টপেজ প্রস্তুত হচ্ছে</span>
+                </div>
+              </div>
+
+              <div className="transit-map-loading-chips">
+                <span className="transit-loading-chip">
+                  <span className="transit-chip-dot" />
+                  ৮০টি রুট পয়েন্ট
+                </span>
+                <span className="transit-loading-chip">
+                  <span className="transit-chip-dot" />
+                  ২৮টি বাস স্টপ
+                </span>
+                <span className="transit-loading-chip">
+                  <span className="transit-chip-dot" />
+                  লাইভ ফ্লিট টেলিমেট্রি
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {activeView === "map" && (

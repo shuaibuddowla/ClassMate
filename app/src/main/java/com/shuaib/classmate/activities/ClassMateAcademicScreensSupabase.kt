@@ -1786,6 +1786,8 @@ internal class ClassMateAcademicScreensSupabase(
         val webView = root.findViewById<android.webkit.WebView>(R.id.transit_webview) ?: return
 
         val loadingView = root.findViewById<View>(R.id.transit_loading_view)
+        loadingView?.visibility = View.VISIBLE
+        loadingView?.alpha = 1f
 
 
 

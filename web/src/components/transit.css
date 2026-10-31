@@ -5670,3 +5670,259 @@ body.is-android-app .transit-timeline-scroll-container {
     bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+
+/* ==========================================================================
+   Map Loading & Empty State Overlay
+   ========================================================================== */
+
+.transit-map-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  background: radial-gradient(ellipse at 50% 45%, #0f172a 0%, #090d16 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s ease;
+  pointer-events: auto;
+}
+
+.transit-map-loading-overlay.is-ready {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.transit-map-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+  gap: 18px;
+  animation: transitFadeIn 0.3s ease;
+}
+
+/* Concentric Radar Pulse */
+.transit-map-radar-pulse {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.radar-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
+  animation: radarExpand 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.radar-circle.circle-1 {
+  width: 48px;
+  height: 48px;
+  animation-delay: 0s;
+}
+
+.radar-circle.circle-2 {
+  width: 72px;
+  height: 72px;
+  animation-delay: 0.5s;
+}
+
+.radar-circle.circle-3 {
+  width: 96px;
+  height: 96px;
+  animation-delay: 1s;
+}
+
+@keyframes radarExpand {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+.radar-center-bus {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(2, 132, 199, 0.75), 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  animation: busPulse 2s infinite ease-in-out;
+}
+
+@keyframes busPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 18px rgba(2, 132, 199, 0.65), 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 26px rgba(56, 189, 248, 0.9), 0 6px 16px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.transit-map-loading-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transit-map-loading-headline {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.2px;
+}
+
+.transit-map-loading-subline {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.transit-loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(56, 189, 248, 0.3);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: transitSpin 0.8s linear infinite;
+}
+
+@keyframes transitSpin {
+  to { transform: rotate(360deg); }
+}
+
+.transit-map-loading-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.transit-loading-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 20px;
+}
+
+.transit-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+/* Map Load Error Card */
+.transit-map-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 20px;
+  padding: 22px 20px;
+  max-width: 300px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  gap: 10px;
+}
+
+.transit-map-error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transit-map-error-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.transit-map-error-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.transit-map-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  outline: none;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
+.transit-map-retry-btn:active {
+  transform: scale(0.96);
+  background: #0369a1;
+}
+
+@keyframes transitFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

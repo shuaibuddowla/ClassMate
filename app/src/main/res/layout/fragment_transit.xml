@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A">
+    android:background="#090D16">
 
     <WebView
         android:id="@+id/transit_webview"
@@ -17,22 +17,73 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:orientation="vertical"
-        android:background="#0F172A"
-        android:visibility="gone">
+        android:padding="24dp"
+        android:background="#090D16"
+        android:visibility="visible">
 
-        <ProgressBar
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:indeterminateTint="#38BDF8" />
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp">
+
+            <ProgressBar
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:indeterminateTint="#0284C7" />
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_bus_filled"
+                android:tint="#38BDF8" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Connecting to MBSTU Transit Telemetry…"
-            android:textColor="#94A3B8"
-            android:textSize="12sp"
+            android:layout_marginTop="16dp"
+            android:text="মাভাবিপ্রবি বাস ট্র্যাকার লোড হচ্ছে…"
+            android:textColor="#F8FAFC"
+            android:textSize="15sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="স্যাটেলাইট স্তর ও লাইভ রুট প্রস্তুত হচ্ছে"
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_transit_chip"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="৮০টি রুট পয়েন্ট"
+                android:textColor="#CBD5E1"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_transit_chip"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="২৮টি বাস স্টপ"
+                android:textColor="#CBD5E1"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>

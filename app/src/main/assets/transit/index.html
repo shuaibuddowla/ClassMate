@@ -495,6 +495,144 @@
       from { opacity: 0; transform: translateY(-8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Map Empty / Loading State Overlay */
+    .transit-map-loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      background: radial-gradient(ellipse at 50% 45%, #0f172a 0%, #090d16 100%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s ease;
+      pointer-events: auto;
+    }
+    .transit-map-loading-overlay.is-ready {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .transit-map-skeleton-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 320px;
+      width: 100%;
+      gap: 18px;
+    }
+    .transit-map-radar-pulse {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .radar-circle {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
+      animation: radarExpand 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+    .radar-circle.circle-1 {
+      width: 48px;
+      height: 48px;
+      animation-delay: 0s;
+    }
+    .radar-circle.circle-2 {
+      width: 72px;
+      height: 72px;
+      animation-delay: 0.5s;
+    }
+    .radar-circle.circle-3 {
+      width: 96px;
+      height: 96px;
+      animation-delay: 1s;
+    }
+    @keyframes radarExpand {
+      0% { transform: scale(0.6); opacity: 0.8; }
+      50% { opacity: 0.4; }
+      100% { transform: scale(1.25); opacity: 0; }
+    }
+    .radar-center-bus {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border: 2px solid #ffffff;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 20px rgba(2, 132, 199, 0.75);
+      z-index: 2;
+    }
+    .transit-map-loading-headline {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f8fafc;
+      letter-spacing: -0.2px;
+      margin-bottom: 4px;
+    }
+    .transit-map-loading-subline {
+      font-size: 12px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .transit-loading-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(56, 189, 248, 0.3);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: transitSpin 0.8s linear infinite;
+    }
+    @keyframes transitSpin {
+      to { transform: rotate(360deg); }
+    }
+    .transit-map-loading-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .transit-loading-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 20px;
+    }
+    .transit-chip-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
   </style>
 </head>
 <body>
@@ -534,6 +672,41 @@
 
   <!-- Map Container -->
   <div id="map"></div>
+
+  <!-- Empty / Loading State Overlay until Map Loads -->
+  <div class="transit-map-loading-overlay" id="mapLoadingOverlay">
+    <div class="transit-map-skeleton-card">
+      <div class="transit-map-radar-pulse">
+        <div class="radar-circle circle-1"></div>
+        <div class="radar-circle circle-2"></div>
+        <div class="radar-circle circle-3"></div>
+        <div class="radar-center-bus">🚌</div>
+      </div>
+
+      <div>
+        <div class="transit-map-loading-headline">মাভাবিপ্রবি বাস ট্র্যাকার লোড হচ্ছে…</div>
+        <div class="transit-map-loading-subline">
+          <span class="transit-loading-spinner"></span>
+          <span>স্যাটেলাইট স্তর ও করিডোর স্টপেজ প্রস্তুত হচ্ছে</span>
+        </div>
+      </div>
+
+      <div class="transit-map-loading-chips">
+        <span class="transit-loading-chip">
+          <span class="transit-chip-dot"></span>
+          ৮০টি রুট পয়েন্ট
+        </span>
+        <span class="transit-loading-chip">
+          <span class="transit-chip-dot"></span>
+          ২৮টি বাস স্টপ
+        </span>
+        <span class="transit-loading-chip">
+          <span class="transit-chip-dot"></span>
+          লাইভ ফ্লিট টেলিমেট্রি
+        </span>
+      </div>
+    </div>
+  </div>
 
   <!-- Floating Controls -->
   <div class="fab-stack">
@@ -630,6 +803,14 @@
       document.getElementById("offlineBanner").style.display = "flex";
     });
 
+    function hideLoadingOverlay() {
+      const el = document.getElementById("mapLoadingOverlay");
+      if (el) {
+        el.classList.add("is-ready");
+        setTimeout(() => { el.style.display = "none"; }, 400);
+      }
+    }
+
     // Initialize Map with Esri World Imagery (Satellite) by default
     function initTransitMap() {
       if (!window.navigator.onLine) {
@@ -704,6 +885,10 @@
           subdomains: ["a", "b", "c"]
         }).addTo(map);
       }
+
+      tileLayer.once("load", hideLoadingOverlay);
+      tileLayer.once("tileload", hideLoadingOverlay);
+      setTimeout(hideLoadingOverlay, 1000);
     }
 
     function toggleMapLayer() {
