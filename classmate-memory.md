@@ -12573,7 +12573,10 @@ Using Python reverse-engineering scripts (`scripts/download_mbstu_chunks.py`, `s
 #### D. Location-Aware Proximity & Haversine Distance Calculation
 - Student location is captured via HTML5 Geolocation API (`navigator.geolocation.watchPosition`) or Android native `FusedLocationProviderClient`.
 - Distance between the user and each moving bus is calculated in real time using the Haversine formula:
-  $$d = 2R rcsin\left(\sqrt{\sin^2\left(rac{\Delta \phi}{2}ight) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(rac{\Delta \lambda}{2}ight)}ight)$$
+  $$d = 2R rcsin\left(\sqrt{\sin^2\left(rac{\Delta \phi}{2}
+ight) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(rac{\Delta \lambda}{2}
+ight)}
+ight)$$
 - Formatted as `X m away` (< 1,000m) or `Y.Z km away` (>= 1,000m) on the selected bus telemetry card alongside current speed in km/h.
 
 ---
@@ -13425,3 +13428,192 @@ To deliver the optimal user experience without fragile reverse-engineered scrape
 | **Terminal Turnaround Filter** | Web & Android APK | **PRODUCTION** | Victoria Road heading filter ($240^\circ-360^\circ$ / $0^\circ-50^\circ$) preventing terminus flutters (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
 | **Multi-Bus Horizontal Carousel Switcher** | Web & Android APK | **PRODUCTION** | Scrollable chip carousel atop timeline for 0ms one-tap bus switching without navigation pop (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v201) |
+
+---
+
+## 202. Dynamic MBSTU Wheels Bus Schedule Integration, Timetable Overhaul, Pilot Direct Dialing, and Next.js SSR Resilience Architecture
+
+### 202.1 Operational Context & Architectural Goal (User Request 412)
+In User Request 412, following the transit exploration and fleet discovery, the user mandated a unified upgrade of the bus schedule subsystem across both the Android APK and the Next.js companion web application:
+> *"Now, one more thing, we need to upgrade. The app, the web version, and the website of the ClassMate app has a bus schedule toggle in the timetable. So, in the toggle, I have added bus schedules by hardcoding. They are backed by the Supabase database, but I want you to integrate the MBSTU wheels bus schedules there also so it works simultaneously without any harassment or problem we can face if bus schedule changes and we may need to upgrade it manually. So, these things will be automated, right? So, do this and you can change the UI of the bus schedule toggle in the timetable. You have the right to change the UI, but make sure it doesn't look bad. Keep it minimal and useful for the user. Think about yourself as a software engineering architect and a UI/UX designer, of course, professional. So, good to go."*
+
+#### Key Objectives:
+1. **Automated Dynamic Synchronization**: Eliminate manual updates and hardcoded database interventions by integrating real-time bus schedule synchronization from the university's MBSTU Wheels backend (`https://transport.mbstu.ac.bd/api/bus-schedule/` and `/api/bus-names/`).
+2. **Minimalist, High-Utility UI Overhaul**: Redesign the bus schedule toggle inside the Timetable screen (`mode === "bus"` on Web, `R.id.btnBusMode` on Android) into a modern, card-based interface adhering strictly to ClassMate brand tokens (`cm_surface`, `cm_border_glass`, `#6366f1`, `#b71454`, `#059669`).
+3. **Emergency Pilot Direct Dialing**: Embed direct click-to-call links (`tel:`) and native Android dialer intents (`Intent.ACTION_DIAL`) directly on each bus card so students can contact the driver/helper with zero friction.
+4. **Resilient Offline-First Fallbacks**: Graceful multi-tier data resolution: live MBSTU Wheels sync -> local persistent cache (`localStorage` on Web, `cacheDir/mbstu_live_bus_schedules.json` on Android) -> normalized fallback model (`MBSTU_BUS_SCHEDULES`).
+5. **Next.js SSR Prerender Resilience**: Ensure all browser-only globals (`window`, `AudioContext`, `localStorage`) are guarded cleanly during Next.js App Router build-time static page generation (`npm run build`).
+
+```mermaid
+flowchart TD
+    subgraph Client UI Layer
+        A["Timetable Tab (Bus Mode)"] --> B["Hero Card: Next Departures & Live Sync Pill"]
+        A --> C["Direction Filter Bar (All / Campus / City)"]
+        A --> D["Bus Card Grid (8 Active Campus Buses)"]
+        D --> E["1-Tap Pilot Calling (tel: / ACTION_DIAL)"]
+        D --> F["Interactive Timechips (Next, Active, Past)"]
+    end
+
+    subgraph Data Resolution Pipeline
+        G["Schedule Request"] --> H{"Online Check"}
+        H -- Yes --> I["POST https://transport.mbstu.ac.bd/api/bus-schedule/"]
+        I -- 200 OK --> J["Update In-Memory State & Cache"]
+        H -- No / Error --> K{"Local Cache Available?"}
+        K -- Yes --> L["Read localStorage / cacheDir File"]
+        K -- No --> M["Fallback to Embedded MBSTU_BUS_SCHEDULES"]
+    end
+
+    subgraph Cross-Platform Clients
+        J --> N["Web: web/src/components/schedule.tsx"]
+        J --> O["Android: ClassMateAcademicScreensSupabase.kt"]
+    end
+```
+
+---
+
+### 202.2 Centralized Transit Data Modeling (`web/src/lib/transit-data.ts`)
+To prevent code duplication and circular dependencies between transit tracking and academic timetable screens, all fleet definitions, driver contacts, schedule rosters, and time projection helpers were centralized into [`web/src/lib/transit-data.ts`](file:///D:/Code%20&%20Scripts/ClassMate-main/web/src/lib/transit-data.ts):
+
+1. **Normalized Data Interface (`MbstuBusSchedule`)**:
+   ```typescript
+   export interface MbstuBusSchedule {
+     busId: string;
+     nameBn: string;
+     fromCampus: string;
+     toCampus: string;
+     fromCampusMin: number;
+     toCampusMin: number;
+     campusToDistrict?: string[];
+     districtToCampus?: string[];
+     pilotContact?: string;
+   }
+   ```
+2. **Fleet Nomenclature & Theming (`KNOWN_BUS_INFO`)**:
+   Maps official vehicle numbers (`SB0001` through `SB5488`) to authentic university names, English phonetic subtitles, and distinctive brand palette accents:
+   - `SB0001`: **গীতাঞ্জলি** (*Gitanjali*, `#6366f1` / Indigo)
+   - `SB0002`: **অগ্নিবীণা** (*Agnibina*, `#f97316` / Orange)
+   - `SB0003`: **সোনারতরী** (*Sonartori*, `#0284c7` / Sky Blue)
+   - `SB0005`: **সংশপ্তক** (*Shangshaptak*, `#8b5cf6` / Violet)
+   - `SB0007`: **ধলেশ্বরী** (*Dhaleshwari*, `#10b981` / Emerald)
+   - `SB0009`: **বনলতা** (*Banolata*, `#059669` / Teal)
+   - `SB0010`: **রক্তকরবী** (*Raktakarabi*, `#ec4899` / Pink)
+   - `SB5442`: **সঞ্চয়িতা** (*Sanchayita*, `#0ea5e9` / Light Blue)
+   - `SB5448` / `SB5488`: **রাখালী** (*Rakhali*, `#e11d48` / Rose)
+3. **Hardware GPS IMEI Mappings (`GPS_IMEI_TO_BUS`)**:
+   Binds raw telematics tracker serials (`353701091171641`, `9175769656`, `7026087428`, etc.) directly to logical fleet IDs.
+4. **Time Calculation & Localization Utilities**:
+   - `parseScheduleTimeToMinutes(tStr)`: Parses 12-hour AM/PM timestamps (`"8:30 AM"`, `"1:10 PM"`) into minutes from midnight ($0 \dots 1439$).
+   - `computeNextDeparture(times, currentMin)`: Finds the nearest future trip in the day roster; if all trips for the day have passed, wraps to the first morning trip.
+   - `getTangailMinutes(nowMs)`: Accurately converts wall-clock epoch timestamps into Dhaka/Tangail local time ($UTC+6$) minutes.
+   - `toBengaliDigits(num)`: Converts Western Arabic numerals into authentic Bengali glyphs ($0 \dots 9 \to ০ \dots ৯$).
+   - `getScheduleRemaining(targetMin, nowMs)`: Produces contextual relative countdown labels (e.g. `১৫মি বাকি`, `১ঘণ্টা ২০মি বাকি`, or elapsed `১০মি আগে ছেড়েছে`).
+
+---
+
+### 202.3 Web Timetable Bus Schedule Overhaul (`web/src/components/schedule.tsx` & `globals.css`)
+
+#### A. Redesigned Next Departure Hero (`BusHero`)
+- **Live Sync Indicator**: A sleek pill (`bus-hero-sync-pill`) featuring a pulsating green dot (`pulse-dot`) indicating `MBSTU Wheels লাইভ সিঙ্কড · ৮টি বাস` (or `MBSTU Wheels অটো-রুটিন` in cached mode).
+- **Direct Live Radar Button**: `bus-hero-radar-btn` with `Navigation` icon. Clicking smoothly sets `window.location.hash = "transit"`, instantly switching views to the live GPS tracker without navigation loss.
+- **Dual Stat Cards**:
+  - 🏛️ **ক্যাম্পাস হতে পরবর্তী প্রস্থান**: Bold departure time, assigned bus name badge, and dynamic remaining countdown badge.
+  - 🏙️ **শহর (নিরালা) হতে পরবর্তী প্রস্থান**: Next return trip time, bus name badge, and remaining countdown badge.
+
+#### B. Ergonomic Direction Filter Bar (`bus-filter-bar`)
+Horizontal pill selector allowing students to toggle visible cards:
+- **সব বাস (৮টি)**: Displays full fleet cards with dual departure columns.
+- **🏛️ ক্যাম্পাস ➔ শহর**: Filters view to prioritize outward campus trips.
+- **🏙️ শহর ➔ ক্যাম্পাস**: Filters view to prioritize inbound city returns.
+
+#### C. Fleet Card Grid & Interactive Timechips
+- **Card Geometry & Theming**: Encased in `.bus-fleet-card` with `var(--surface)` background, rounded 20px corners, subtle glass border, and soft hover lift.
+- **Pilot Calling**: Floating pill `bus-pilot-call-btn` (`tel:<pilotContact>`) enabling instant 1-tap phone calls to drivers.
+- **Route Corridor Strip**: `.bus-route-strip` with `MapPin` icon indicating the corridor (e.g., `ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)`).
+- **Multi-Trip Timechips (`bus-departure-chip`)**:
+  - The upcoming departure trip is highlighted with an emerald `.is-next` badge (`পরবর্তী`).
+  - Departures that have already passed are softly dimmed with `.is-past`.
+
+---
+
+### 202.4 Android Native Timetable Bus Schedule Overhaul (`item_student_bus_schedule.xml` & `ClassMateAcademicScreensSupabase.kt`)
+
+#### A. Card Layout Modernization (`item_student_bus_schedule.xml`)
+Replaced the legacy basic text layout with a modern, high-density `MaterialCardView`:
+- **Card Styling**: `app:cardCornerRadius="22dp"`, `app:cardElevation="0dp"`, `app:cardBackgroundColor="@color/cm_surface"`, `app:strokeColor="@color/cm_border_glass"`, `app:strokeWidth="1dp"`.
+- **Top Header**: Bus icon inside tinted container (`ivBusIcon`), bold Bengali name (`tvBusScheduleName`), English subtitle (`tvBusSubtitle`), `#SB000x` pill (`tvBusIdTag`), and pilot call button (`btnCallPilot`).
+- **Route Corridor Description**: `tvRouteName` with soft secondary typography (`@color/cm_text_secondary`).
+- **Dual Departure Columns**:
+  - Outbound: `tvCampusDepartureLabel` (`ক্যাম্পাস ➔ শহর`), `tvCampusDeparture` with uniform auto-sizing text (`13sp` to `18sp`), and `tvCampusDepartureList` multi-trip summary text.
+  - Inbound: `tvCityDepartureLabel` (`শহর ➔ ক্যাম্পাস`), `tvCityDeparture`, and `tvCityDepartureList`.
+  - Inset vertical divider (`departureDivider`) separating directions.
+
+#### B. Background Sync Engine (`ClassMateAcademicScreensSupabase.kt`)
+1. **Network Sync (`fetchMbstuLiveBusScheduleEntries`)**:
+   - Executes non-blocking HTTP request via `OkHttpClient` to `https://transport.mbstu.ac.bd/api/bus-schedule/` with `{"status":"success"}` payload.
+   - Automatically writes successful responses to `context.cacheDir/mbstu_live_bus_schedules.json`.
+   - On offline detection or network timeout (5s), reads cached JSON seamlessly; falls back to embedded 8-bus baseline if cache is absent.
+2. **Schema Normalization**:
+   - Implemented `parse12hToLocalTime` and `format12hTo24hSql` to bridge 12-hour AM/PM MBSTU arrays into 24-hour SQL time formats required by existing timetable adapters.
+   - Enriched entries with `bus_no`, `bus_name_bn`, `bus_name_en`, `pilot_contact`, and formatted departure arrays.
+3. **Interactive Binding & Pilot Phone Calling**:
+   - Wire `btnCallPilot` click listener to launch `Intent.ACTION_DIAL` with `Uri.parse("tel:$pilotContact")` accompanied by native haptic feedback (`ClassMateHaptics.selection`).
+   - Safely wrapped in `runCatching` to handle devices without dialer capabilities.
+   - Bound multi-trip departures with bullet separators (`joinToString("  •  ")`).
+
+---
+
+### 202.5 Debugging & Problem-Solving Experiences
+
+#### A. Next.js SSR Prerender `ReferenceError: window is not defined`
+- **Symptom**: During `npm --prefix web run build`, static page optimization halted on:
+  ```
+  Error occurred prerendering page "/": ReferenceError: window is not defined
+      at <unknown> (web/.next/server/app/page.js:1:297702)
+  ```
+- **Root Cause**: Next.js App Router executes page components in a Node.js SSR runtime during static generation. Code in `schedule.tsx` and `transit.tsx` called `window.addEventListener`, `window.location.hash`, and `new AudioContext()` outside client lifecycle hooks.
+- **Resolution**:
+  1. Extracted all pure data types and constants into `@/lib/transit-data.ts`.
+  2. Wrapped browser-dependent state initializers in `typeof window !== "undefined"` checks:
+     ```typescript
+     [mbstuSchedules, setMbstuSchedules] = useState<Record<string, MbstuBusSchedule>>(() => {
+       if (typeof window !== "undefined") {
+         try {
+           const cached = localStorage.getItem("classmate_mbstu_bus_schedules");
+           if (cached) return JSON.parse(cached);
+         } catch (_) {}
+       }
+       return MBSTU_BUS_SCHEDULES;
+     });
+     ```
+  3. Guarded audio playback synthesizer initialization so audio contexts are only instantiated inside browser user interaction handlers.
+  4. Verified static site compilation: `npm run build` compiled 15/15 routes successfully in 741ms.
+
+#### B. MBSTU Wheels Schedule Array vs SQL Time Adapter Compatibility
+- **Symptom**: MBSTU Wheels schedule API returns arrays of 12-hour strings (`campusToDistrict: ["8:00 AM", "9:00 AM", "1:10 PM"]`), whereas ClassMate's timetable sorting engines expect scalar 24-hour SQL strings (`"08:00:00"`).
+- **Resolution**:
+  - Implemented dual-representation normalization in `fetchMbstuLiveBusScheduleEntries`:
+    - Preserved full 12-hour arrays under `campus_departure_list` and `city_departure_list` for chip rendering.
+    - Converted the first trip to 24-hour SQL format (`format12hTo24hSql`) under `departure_time` and `city_departure_time` for flawless backward compatibility with routine time sorting.
+
+---
+
+### 202.6 Master Production Verification Matrix (Updated Master State v202)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Dynamic MBSTU Wheels Bus Schedule Sync** | Web & Android APK | **PRODUCTION** | Live polling of `https://transport.mbstu.ac.bd/api/bus-schedule/` with offline cache fallback (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Timetable Bus Schedule UI Overhaul** | Web & Android APK | **PRODUCTION** | Modern card layout, Next Departure Hero with countdowns, 3-way direction filter bar, timechips (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Pilot Direct Dialing (`tel:` / `ACTION_DIAL`)** | Web & Android APK | **PRODUCTION** | 1-tap driver call button on all bus cards, verified with telephone URIs and native dialer intents |
+| **Next.js SSR Prerender Resilience** | Web Companion | **PRODUCTION** | Guarded `window` and `AudioContext`, clean static build (15/15 pages in 741ms), deployed to Vercel production (`https://classmate-2wznfknac-sum-carry.vercel.app`) |
+| **Android APK Native Bus Schedule Binding** | Android APK | **PRODUCTION** | Built via `./gradlew.bat assembleDebug` -> `BUILD SUCCESSFUL in 1m 34s` |
+| **Zero-Unsolicited-UI Governance Enforcement** | Web & Android APK | **PRODUCTION** | Soft ClassMate palettes, pink markers `#b71454`, lollipop stops; zero unauthorized styling (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Instant Offline-First Bootstrap** | Android APK Assets | **PRODUCTION** | Bundled `leaflet.js`, `leaflet.css`, `socket.io.min.js`, `index.html` in `assets/transit/`, zero black screen (<50ms load) (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Schmitt-Trigger Next-Stop Hysteresis** | Web & Android APK | **PRODUCTION** | 1D milestone projection, 35m arrival / 20m departure threshold, 0 stop flips in 230 simulation frames (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Ghost Bus GPS Signal Filter** | Web & Android APK | **PRODUCTION** | Non-reporting / off-corridor buses filtered from active map/timeline, segregated to standby timetable (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Cross-Track Off-Route Detection** | Web & Android APK | **PRODUCTION** | $d_{\perp} > 260\text{m}$ detection, amber bypass warning banner, suppresses wrong stop jumping (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Terminal Turnaround Filter** | Web & Android APK | **PRODUCTION** | Victoria Road heading filter ($240^\circ-360^\circ$ / $0^\circ-50^\circ$) preventing terminus flutters (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Multi-Bus Horizontal Carousel Switcher** | Web & Android APK | **PRODUCTION** | Scrollable chip carousel atop timeline for 0ms one-tap bus switching without navigation pop (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v202) |
+

@@ -751,45 +751,387 @@ strong {
   font-size: 23px;
   margin-top: 5px;
 }
+/* ==========================================================================
+   MBSTU Wheels Central Bus Timetable & Fleet Styling
+   ========================================================================== */
 .bus-hero {
-  background: #142e57;
+  background: linear-gradient(135deg, #142e57 0%, #1a3c72 100%);
   border-radius: 24px;
-  padding: 26px;
+  padding: 24px;
   margin-bottom: 20px;
   color: white;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(20, 46, 87, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 :root[data-theme="dark"] .bus-hero {
-  background: linear-gradient(135deg, #16161c 0%, #1d1d24 100%);
+  background: linear-gradient(135deg, #131722 0%, #1c2233 100%);
   border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
-:root[data-theme="dark"] .bus-hero .eyebrow,
-:root[data-theme="dark"] .bus-hero small {
+.bus-hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 2;
+}
+.bus-hero-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  text-transform: uppercase;
+}
+.bus-hero-radar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  backdrop-filter: blur(8px);
+}
+.bus-hero-radar-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+.bus-hero-main-title {
+  position: relative;
+  z-index: 2;
+}
+.bus-hero-main-title h2 {
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 700;
+  margin: 0;
+  color: white;
+  letter-spacing: -0.3px;
+}
+.bus-hero-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #b4c9e8;
+  line-height: 1.4;
+}
+:root[data-theme="dark"] .bus-hero-sub {
   color: var(--muted);
 }
-.bus-hero .eyebrow {
-  color: #b4c9e8;
+.bus-hero-next-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+  position: relative;
+  z-index: 2;
 }
-.bus-hero > div {
+.bus-hero-stat-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px;
   display: flex;
-  gap: 35px;
-  margin-top: 17px;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(10px);
 }
-.bus-hero h2 {
-  font-size: 30px;
+:root[data-theme="dark"] .bus-hero-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
 }
-.bus-hero small {
+.bus-hero-stat-card small {
+  font-size: 11.5px;
   color: #b4c9e8;
+  font-weight: 500;
+}
+:root[data-theme="dark"] .bus-hero-stat-card small {
+  color: var(--muted);
+}
+.bus-hero-stat-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  margin: 2px 0;
+  line-height: 1.15;
+}
+.bus-hero-stat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  margin-top: 3px;
+}
+.bus-hero-bus-tag {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 7px;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+}
+.bus-hero-remaining {
+  color: #6ee7b7;
+  font-weight: 600;
 }
 .hero-bus {
   position: absolute;
   right: 12px;
   bottom: -10px;
   opacity: 0.08;
-  width: 160px;
-  height: 160px;
+  width: 170px;
+  height: 170px;
+  pointer-events: none;
 }
+
+/* Direction Filter Bar */
+.bus-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.bus-filter-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.bus-filter-bar button:hover {
+  background: var(--soft);
+}
+.bus-filter-bar button.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+/* Bus Fleet Cards Grid */
+.bus-fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.bus-fleet-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.bus-fleet-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="dark"] .bus-fleet-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+:root[data-theme="dark"] .bus-fleet-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.bus-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.bus-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.bus-badge-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.bus-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bus-name-bn {
+  font-size: 17.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.bus-name-en {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  display: block;
+  margin-top: 2px;
+}
+.bus-id-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  line-height: 1;
+}
+.bus-pilot-call-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #059669;
+  background: color-mix(in srgb, #10b981 12%, transparent);
+  border: 1px solid color-mix(in srgb, #10b981 25%, transparent);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .bus-pilot-call-btn {
+  color: #34d399;
+}
+.bus-pilot-call-btn:hover {
+  background: color-mix(in srgb, #10b981 22%, transparent);
+  transform: scale(1.02);
+}
+.bus-route-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--soft);
+  padding: 6px 11px;
+  border-radius: 10px;
+  width: fit-content;
+  max-width: 100%;
+}
+.bus-card-timings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 2px;
+}
+.bus-timing-column {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.bus-timing-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bus-timing-next-hint {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+}
+.bus-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bus-departure-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--soft);
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.bus-departure-chip.is-next {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.bus-departure-chip.is-past {
+  opacity: 0.5;
+}
+.bus-departure-chip .chip-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: white;
+  text-transform: uppercase;
+}
+.bus-no-timing {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Custom & Administrative Bus Schedules Section */
+.bus-custom-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border);
+}
+.bus-custom-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px;
+}
+
+@media (max-width: 640px) {
+  .bus-hero-next-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .bus-fleet-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .calendar-surface {
   background: var(--surface);
   border: 1px solid var(--border);
