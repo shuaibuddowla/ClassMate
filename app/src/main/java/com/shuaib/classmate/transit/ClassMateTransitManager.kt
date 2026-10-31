@@ -150,4 +150,50 @@ class ClassMateTransitBridge(
     fun notifyBusSelected(busCode: String) {
         onBusSelected?.invoke(busCode)
     }
+
+    @JavascriptInterface
+    fun hasLocationPermission(): Boolean {
+        return try {
+            val fine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            fine || coarse
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun requestLocationPermission() {
+        try {
+            if (context is android.app.Activity) {
+                context.runOnUiThread {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                        context,
+                        arrayOf(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        ),
+                        9901
+                    )
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    @JavascriptInterface
+    fun openAppSettings() {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {}
+    }
 }

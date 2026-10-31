@@ -1853,7 +1853,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         }
 
-        swipeHost.canSwipe = { direction -> !manageOpen && destination(direction)!=null }
+        swipeHost.canSwipe = { direction -> !manageOpen && selectedTab != R.id.nav_transit && destination(direction)!=null }
 
         swipeHost.onSwipe = { direction -> destination(direction)?.let { next ->
 
@@ -3310,6 +3310,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 9901) {
+            val isGranted = grantResults.isNotEmpty() && grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            val webView = findViewById<android.webkit.WebView>(R.id.transit_webview)
+            webView?.post {
+                webView.evaluateJavascript("if (window.__onLocationPermissionResult) { window.__onLocationPermissionResult(" + isGranted + "); }", null)
+            }
+        }
+    }
+
     override fun onResume() {
 
         super.onResume()
