@@ -68,64 +68,64 @@ export interface CorridorStation {
 
 export const CORRIDOR_MILESTONES_KM: number[] = [
   0.00,  // 1: Mukto Mancho Bus Stop
-  0.23,  // 2: Academic Building-1 Bus Stop
-  0.38,  // 3: SOH Hall Bus Stop
-  0.46,  // 4: Mannan Hall Bus Stop
-  0.65,  // 5: Academic Building-2 Bus Stop
-  0.82,  // 6: Fifth Gate Bus Stop
-  0.95,  // 7: Prottoi-71 Bus Stop
-  1.10,  // 8: First Gate Bus Stop
-  1.55,  // 9: Arif Nagar Bus Stop
-  1.95,  // 10: Shena Nagar Bus Stop
-  2.15,  // 11: Kagmari More Bus Stop
-  2.55,  // 12: Kagmari Bridge-1 Bus Stop
-  2.98,  // 13: Kagmari Bridge-2 Bus Stop
-  3.32,  // 14: Baby Stand Bus Stop
-  3.68,  // 15: Shantikunja More Bus Stop
-  4.45,  // 16: Nirala More Bus Stop
-  4.80,  // 17: Boro Kalibari More Bus Stop
-  5.15,  // 18: Puraton Bus Stand Bus Stop
-  5.30,  // 19: Registry Para Road Bus Stop
-  5.75,  // 20: Kumudini College Gate Bus Stop
-  6.00,  // 21: C & B More Bus Stop
-  6.15,  // 22: Baitun Nur Jame Mosque Mor
-  6.40,  // 23: Kazi-Nazrul Sarani Bus Stop
-  6.50,  // 24: District Bus Stop
-  6.65,  // 25: DC Lake Bus Stop
-  7.15,  // 26: Bottola Road Bus Stop
-  7.75,  // 27: Taltola-Shimultoli Road Bus Stop
-  7.95   // 28: Pouro Uddan Bus Stop
+  0.29,  // 2: Academic Building-1 Bus Stop
+  0.42,  // 3: Bangabandhu Hall Bus Stop
+  0.52,  // 4: Mannan Hall Bus Stop
+  0.68,  // 5: Academic Building-2 Bus Stop
+  0.88,  // 6: Fifth Gate Bus Stop
+  0.99,  // 7: Prottoi-71 Bus Stop
+  1.12,  // 8: First Gate Bus Stop
+  1.52,  // 9: Arif Nagar Bus Stop
+  1.71,  // 10: Shena Nagar Bus Stop
+  2.02,  // 11: Kagmari More Bus Stop
+  2.90,  // 12: Kagmari Bridge-1 Bus Stop
+  3.03,  // 13: Kagmari Bridge-2 Bus Stop
+  3.47,  // 14: Baby Stand Bus Stop
+  3.83,  // 15: Shantikunja More Bus Stop
+  4.58,  // 16: Nirala More Bus Stop
+  4.86,  // 17: Boro Kalibari More Bus Stop
+  5.19,  // 18: Puraton Bus Stand Bus Stop
+  5.33,  // 19: Registry Para Road Bus Stop
+  5.83,  // 20: Kumudini College Gate Bus Stop
+  6.11,  // 21: C & B More Bus Stop
+  6.42,  // 22: Baitun Nur Jame Mosque Mor
+  6.59,  // 23: Kazi-Nazrul Sarani Bus Stop
+  6.63,  // 24: District Bus Stop
+  6.68,  // 25: DC Lake Bus Stop
+  7.41,  // 26: Bottola Road Bus Stop
+  8.24,  // 27: Taltola-Shimultoli Road Bus Stop
+  8.41   // 28: Pouro Uddan Bus Stop
 ];
 
 export const CORRIDOR_STATIONS: CorridorStation[] = [
-  { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.23512, lon: 89.89025, order: 1, isCampus: true },
-  { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.23715, lon: 89.89038, order: 2, isCampus: true },
-  { id: "soh_hall", name: "SOH Hall Bus Stop", nameBn: "এসওএইচ হল বাস স্টপ", lat: 24.23835, lon: 89.89042, order: 3, isCampus: true },
-  { id: "mannan_hall", name: "Mannan Hall Bus Stop", nameBn: "মান্নান হল বাস স্টপ", lat: 24.23855, lon: 89.89105, order: 4, isCampus: true },
-  { id: "ab2", name: "Academic Building-2 Bus Stop", nameBn: "একাডেমিক ভবন-২ বাস স্টপ", lat: 24.23712, lon: 89.89152, order: 5, isCampus: true },
-  { id: "fifth_gate", name: "Fifth Gate Bus Stop", nameBn: "পঞ্চম গেট বাস স্টপ", lat: 24.23578, lon: 89.89178, order: 6, isCampus: true },
-  { id: "prottoi_71", name: "Prottoi-71 Bus Stop", nameBn: "প্রত্যয়-৭১ বাস স্টপ", lat: 24.23482, lon: 89.89195, order: 7, isCampus: true },
-  { id: "first_gate", name: "First Gate Bus Stop", nameBn: "প্রথম গেট বাস স্টপ", lat: 24.23363, lon: 89.89218, order: 8, isCampus: true },
-  { id: "arif_nagar", name: "Arif Nagar Bus Stop", nameBn: "আরিফ নগর বাস স্টপ", lat: 24.23398, lon: 89.89635, order: 9, isCampus: false },
-  { id: "shena_nagar", name: "Shena Nagar Bus Stop", nameBn: "সেনা নগর বাস স্টপ", lat: 24.23404, lon: 89.89991, order: 10, isCampus: false },
-  { id: "kagmari_more", name: "Kagmari More Bus Stop", nameBn: "কাগমারী মোড় বাস স্টপ", lat: 24.23488, lon: 89.90125, order: 11, isCampus: false },
-  { id: "kagmari_bridge_1", name: "Kagmari Bridge-1 Bus Stop", nameBn: "কাগমারী ব্রিজ-১ বাস স্টপ", lat: 24.23800, lon: 89.90250, order: 12, isCampus: false },
-  { id: "kagmari_bridge_2", name: "Kagmari Bridge-2 Bus Stop", nameBn: "কাগমারী ব্রিজ-২ বাস স্টপ", lat: 24.24155, lon: 89.90426, order: 13, isCampus: false },
-  { id: "baby_stand", name: "Baby Stand Bus Stop", nameBn: "বেবি স্ট্যান্ড বাস স্টপ", lat: 24.24415, lon: 89.90445, order: 14, isCampus: false },
-  { id: "shantikunja", name: "Shantikunja More Bus Stop", nameBn: "শান্তিকুঞ্জ মোড় বাস স্টপ", lat: 24.24665, lon: 89.90735, order: 15, isCampus: false },
-  { id: "nirala_more", name: "Nirala More Bus Stop", nameBn: "নিরালা মোড় বাস স্টপ", lat: 24.24985, lon: 89.91485, order: 16, isCampus: false },
-  { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.25135, lon: 89.91665, order: 17, isCampus: false },
-  { id: "puraton_stand", name: "Puraton Bus Stand Bus Stop", nameBn: "পুরাতন বাস স্ট্যান্ড বাস স্টপ", lat: 24.25245, lon: 89.91955, order: 18, isCampus: false },
-  { id: "registry_para", name: "Registry Para Road Bus Stop", nameBn: "রেজিস্ট্রি পাড়া রোড বাস স্টপ", lat: 24.25355, lon: 89.91965, order: 19, isCampus: false },
-  { id: "kumudini_gate", name: "Kumudini College Gate Bus Stop", nameBn: "কুমুদিনী কলেজ গেট বাস স্টপ", lat: 24.25715, lon: 89.91885, order: 20, isCampus: false },
-  { id: "cnb_more", name: "C & B More Bus Stop", nameBn: "সি অ্যান্ড বি মোড় বাস স্টপ", lat: 24.25895, lon: 89.91765, order: 21, isCampus: false },
-  { id: "baitun_nur", name: "Baitun Nur Jame Mosque Mor", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", lat: 24.25985, lon: 89.91715, order: 22, isCampus: false },
-  { id: "kazi_nazrul", name: "Kazi-Nazrul Sarani Bus Stop", nameBn: "কাজী নজরুল সরণি বাস স্টপ", lat: 24.26175, lon: 89.91695, order: 23, isCampus: false },
-  { id: "district_stop", name: "District Bus Stop", nameBn: "ডিস্ট্রিক্ট বাস স্টপ", lat: 24.26195, lon: 89.91635, order: 24, isCampus: false },
-  { id: "dc_lake", name: "DC Lake Bus Stop", nameBn: "ডিসি লেক বাস স্টপ", lat: 24.26245, lon: 89.91545, order: 25, isCampus: false },
-  { id: "bottola", name: "Bottola Road Bus Stop", nameBn: "বটতলা রোড বাস স্টপ", lat: 24.25845, lon: 89.91395, order: 26, isCampus: false },
-  { id: "taltola", name: "Taltola-Shimultoli Road Bus Stop", nameBn: "তালতলা-শিমুলতলী রোড স্টপ", lat: 24.25285, lon: 89.91415, order: 27, isCampus: false },
-  { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.25125, lon: 89.91445, order: 28, isCampus: false }
+  { id: "mukto_mancho", name: "Mukto Mancho Bus Stop", nameBn: "মুক্তমঞ্চ বাস স্টপ", lat: 24.2351628, lon: 89.8903235, order: 1, isCampus: true },
+  { id: "ab1", name: "Academic Building-1 Bus Stop", nameBn: "একাডেমিক ভবন-১ বাস স্টপ", lat: 24.2376120, lon: 89.8906140, order: 2, isCampus: true },
+  { id: "bangabandhu_hall", name: "Bangabandhu Hall Bus Stop", nameBn: "বঙ্গবন্ধু হল বাস স্টপ", lat: 24.2387690, lon: 89.8907720, order: 3, isCampus: true },
+  { id: "mannan_hall", name: "Mannan Hall Bus Stop", nameBn: "মান্নান হল বাস স্টপ", lat: 24.2388189, lon: 89.8914966, order: 4, isCampus: true },
+  { id: "ab2", name: "Academic Building-2 Bus Stop", nameBn: "একাডেমিক ভবন-২ বাস স্টপ", lat: 24.2375223, lon: 89.8919773, order: 5, isCampus: true },
+  { id: "fifth_gate", name: "Fifth Gate Bus Stop", nameBn: "পঞ্চম গেট বাস স্টপ", lat: 24.2358444, lon: 89.8921924, order: 6, isCampus: true },
+  { id: "prottoi_71", name: "Prottoi-71 Bus Stop", nameBn: "প্রত্যয়-৭১ বাস স্টপ", lat: 24.2348539, lon: 89.8922845, order: 7, isCampus: true },
+  { id: "first_gate", name: "First Gate Bus Stop", nameBn: "প্রথম গেট বাস স্টপ", lat: 24.2336866, lon: 89.8924726, order: 8, isCampus: true },
+  { id: "arif_nagar", name: "Arif Nagar Bus Stop", nameBn: "আরিফ নগর বাস স্টপ", lat: 24.2339655, lon: 89.8963754, order: 9, isCampus: false },
+  { id: "shena_nagar", name: "Shena Nagar Bus Stop", nameBn: "সেনা নগর বাস স্টপ", lat: 24.2340554, lon: 89.8982729, order: 10, isCampus: false },
+  { id: "kagmari_more", name: "Kagmari More Bus Stop", nameBn: "কাগমারী মোড় বাস স্টপ", lat: 24.2343881, lon: 89.9010761, order: 11, isCampus: false },
+  { id: "kagmari_bridge_1", name: "Kagmari Bridge-1 Bus Stop", nameBn: "কাগমারী ব্রিজ-১ বাস স্টপ", lat: 24.2415710, lon: 89.9044815, order: 12, isCampus: false },
+  { id: "kagmari_bridge_2", name: "Kagmari Bridge-2 Bus Stop", nameBn: "কাগমারী ব্রিজ-২ বাস স্টপ", lat: 24.2416603, lon: 89.9057177, order: 13, isCampus: false },
+  { id: "baby_stand", name: "Baby Stand Bus Stop", nameBn: "বেবি স্ট্যান্ড বাস স্টপ", lat: 24.2431396, lon: 89.9096431, order: 14, isCampus: false },
+  { id: "shantikunja", name: "Shantikunja More Bus Stop", nameBn: "শান্তিকুঞ্জ মোড় বাস স্টপ", lat: 24.2437113, lon: 89.9131581, order: 15, isCampus: false },
+  { id: "nirala_more", name: "Nirala More Bus Stop", nameBn: "নিরালা মোড় বাস স্টপ", lat: 24.2502948, lon: 89.9141733, order: 16, isCampus: false },
+  { id: "boro_kalibari", name: "Boro Kalibari More Bus Stop", nameBn: "বড় কালীবাড়ি মোড় বাস স্টপ", lat: 24.2513898, lon: 89.9167214, order: 17, isCampus: false },
+  { id: "puraton_stand", name: "Puraton Bus Stand Bus Stop", nameBn: "পুরাতন বাস স্ট্যান্ড বাস স্টপ", lat: 24.2515237, lon: 89.9197610, order: 18, isCampus: false },
+  { id: "registry_para", name: "Registry Para Road Bus Stop", nameBn: "রেজিস্ট্রি পাড়া রোড বাস স্টপ", lat: 24.2525991, lon: 89.9203629, order: 19, isCampus: false },
+  { id: "kumudini_gate", name: "Kumudini College Gate Bus Stop", nameBn: "কুমুদিনী কলেজ গেট বাস স্টপ", lat: 24.2568615, lon: 89.9218230, order: 20, isCampus: false },
+  { id: "cnb_more", name: "C & B More Bus Stop", nameBn: "সি অ্যান্ড বি মোড় বাস স্টপ", lat: 24.2593741, lon: 89.9220221, order: 21, isCampus: false },
+  { id: "baitun_nur", name: "Baitun Nur Jame Mosque Mor", nameBn: "বায়তুন নূর জামে মসজিদ মোড়", lat: 24.2621358, lon: 89.9223621, order: 22, isCampus: false },
+  { id: "kazi_nazrul", name: "Kazi-Nazrul Sarani Bus Stop", nameBn: "কাজী নজরুল সরণি বাস স্টপ", lat: 24.2634321, lon: 89.9228288, order: 23, isCampus: false },
+  { id: "district_stop", name: "District Bus Stop", nameBn: "ডিস্ট্রিক্ট বাস স্টপ", lat: 24.2636260, lon: 89.9225570, order: 24, isCampus: false },
+  { id: "dc_lake", name: "DC Lake Bus Stop", nameBn: "ডিসি লেক বাস স্টপ", lat: 24.2640217, lon: 89.9222622, order: 25, isCampus: false },
+  { id: "bottola", name: "Bottola Road Bus Stop", nameBn: "বটতলা রোড বাস স্টপ", lat: 24.2597890, lon: 89.9186330, order: 26, isCampus: false },
+  { id: "taltola", name: "Taltola-Shimultoli Road Bus Stop", nameBn: "তালতলা-শিমুলতলী রোড স্টপ", lat: 24.2531470, lon: 89.9151130, order: 27, isCampus: false },
+  { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.2517480, lon: 89.9145880, order: 28, isCampus: false }
 ];
 
 const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }> = {
@@ -143,8 +143,8 @@ export const INITIAL_FLEET: MbstuBusData[] = [
     id: "SB0003",
     nameBn: "সোনারতরী",
     nameEn: "Sonartori",
-    lat: 24.23482,
-    lon: 89.89195,
+    lat: 24.2348539,
+    lon: 89.8922845,
     speed: 0,
     heading: 181,
     routeName: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)",
@@ -156,8 +156,8 @@ export const INITIAL_FLEET: MbstuBusData[] = [
     id: "SB0002",
     nameBn: "অগ্নিবীণা",
     nameEn: "Agnibina",
-    lat: 24.2515,
-    lon: 89.9165,
+    lat: 24.2431396,
+    lon: 89.9096431,
     speed: 18,
     heading: 260,
     routeName: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)",
@@ -169,8 +169,8 @@ export const INITIAL_FLEET: MbstuBusData[] = [
     id: "SB0010",
     nameBn: "রক্তকরবী",
     nameEn: "Raktakarabi",
-    lat: 24.2350,
-    lon: 89.8919,
+    lat: 24.2351628,
+    lon: 89.8903235,
     speed: 0,
     heading: 0,
     routeName: "মাভাবিপ্রবি পরিবহন করিডোর",
@@ -1002,29 +1002,19 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!polylineCasingRef.current) {
       polylineCasingRef.current = L.polyline(REAL_STREET_POLYLINE, {
         color: "#ffffff",
-        weight: 9,
-        opacity: 0.92,
+        weight: 8,
+        opacity: 0.95,
         lineCap: "round",
         lineJoin: "round"
       }).addTo(map);
     }
     if (!polylineRef.current) {
       polylineRef.current = L.polyline(REAL_STREET_POLYLINE, {
-        color: "#bd1556",
-        weight: 5,
-        opacity: 0.95,
+        color: "#22c55e",
+        weight: 4.5,
+        opacity: 1,
         lineCap: "round",
         lineJoin: "round"
-      }).addTo(map);
-    }
-    if (!campusCircleRef.current) {
-      campusCircleRef.current = L.circle([24.23488, 89.89155], {
-        radius: 58,
-        color: "#bd1556",
-        weight: 1.5,
-        fillColor: "#e83e7c",
-        fillOpacity: 0.18,
-        dashArray: "4, 4"
       }).addTo(map);
     }
   }, []);
