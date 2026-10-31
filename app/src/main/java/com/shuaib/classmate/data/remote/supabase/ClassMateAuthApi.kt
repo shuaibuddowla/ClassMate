@@ -23,7 +23,13 @@ import java.util.concurrent.TimeUnit
 
 /** Google ID-token exchange and authenticated access to the classmate schema. */
 object ClassMateAuthApi {
-    private val http = OkHttpClient()
+    private val http = OkHttpClient.Builder()
+        .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
     private val uploadHttp = OkHttpClient.Builder().writeTimeout(10, TimeUnit.MINUTES)
         .readTimeout(2, TimeUnit.MINUTES).build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()

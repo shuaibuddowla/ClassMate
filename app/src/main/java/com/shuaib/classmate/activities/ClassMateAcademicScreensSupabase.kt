@@ -840,6 +840,12 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+                if (tab == R.id.nav_transit) {
+                    resumeTransitWebView()
+                } else {
+                    pauseTransitWebView()
+                }
+
                 when(tab) {
 
 
@@ -880,7 +886,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                            loadTimetable(root, force = true)
+                            loadTimetable(root, force = false)
 
 
 
@@ -1654,9 +1660,12 @@ internal class ClassMateAcademicScreensSupabase(
 
         root.v<RecyclerView>(id).apply {
 
+            setHasFixedSize(true)
+            setItemViewCacheSize(15)
 
-
-            layoutManager = LinearLayoutManager(activity)
+            if (layoutManager == null) {
+                layoutManager = LinearLayoutManager(activity)
+            }
 
 
 
@@ -1802,13 +1811,20 @@ internal class ClassMateAcademicScreensSupabase(
 
             mediaPlaybackRequiresUserGesture = false
 
-            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+            cacheMode = if (ClassMateAcademicCache.online(activity)) android.webkit.WebSettings.LOAD_DEFAULT else android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
 
             userAgentString = "${userAgentString} ClassMate-Android"
 
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                offscreenPreRaster = true
+            }
+            useWideViewPort = true
+            loadWithOverviewMode = true
         }
 
-
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            webView.setRendererPriorityPolicy(android.webkit.WebView.RENDERER_PRIORITY_IMPORTANT, false)
+        }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
@@ -1860,6 +1876,14 @@ internal class ClassMateAcademicScreensSupabase(
 
             }
 
+            override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                if (newProgress >= 70 && loadingView?.visibility == View.VISIBLE) {
+                    loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
+                        loadingView?.visibility = View.GONE
+                    }?.start()
+                }
+            }
         }
 
 
@@ -5166,7 +5190,8 @@ internal class ClassMateAcademicScreensSupabase(
 
         val list = root.v<RecyclerView>(R.id.rvNotices)
 
-
+        list.setHasFixedSize(true)
+        list.setItemViewCacheSize(12)
 
         if (list.layoutManager == null) list.layoutManager = LinearLayoutManager(activity)
 
@@ -12366,7 +12391,25 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+
+
+    fun pauseTransitWebView() {
+        tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+            onPause()
+            pauseTimers()
+        }
+    }
+
+    fun resumeTransitWebView() {
+        tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+            onResume()
+            resumeTimers()
+        }
+    }
+
+    fun onPause() {
+        stopNoticePoller()
+        pauseTransitWebView()
+    }
+
 }
-
-
-

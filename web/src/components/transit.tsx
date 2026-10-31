@@ -931,7 +931,8 @@ export function Transit({ ctx }: { ctx?: any }) {
       center: [24.2365, 89.8914],
       zoom: 17,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
+      preferCanvas: true
     });
     mapRef.current = map;
 
@@ -988,7 +989,11 @@ export function Transit({ ctx }: { ctx?: any }) {
       subdomains: [],
       attribution: "Tiles &copy; Esri, Maxar, Microsoft",
       maxZoom: 20,
-      maxNativeZoom: 19
+      maxNativeZoom: 19,
+      keepBuffer: 6,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      updateInterval: 150
     });
     layer.addTo(mapRef.current);
     tileLayerRef.current = layer;
@@ -1097,13 +1102,17 @@ export function Transit({ ctx }: { ctx?: any }) {
       let marker = stopMarkersRef.current.get(station.id);
       if (!marker) {
         marker = L.marker([station.lat, station.lon], { icon, zIndexOffset: 200 }).addTo(map);
+        (marker as any).__renderedHtml = html;
         marker.on("click", (e) => {
           L.DomEvent.stopPropagation(e);
           setSelectedStoppageAction(station);
         });
         stopMarkersRef.current.set(station.id, marker);
       } else {
-        marker.setIcon(icon);
+        if ((marker as any).__renderedHtml !== html) {
+          marker.setIcon(icon);
+          (marker as any).__renderedHtml = html;
+        }
         marker.setZIndexOffset(isApproaching ? 500 : 200);
       }
     });
