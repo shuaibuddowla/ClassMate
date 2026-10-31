@@ -11138,3 +11138,35 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
 3. **`web/src/components/transit.tsx`**: Updated `activeView` initialization to default to `"map"` when loaded in Android app (`&view=map`).
 4. **Vercel Production**: Deployed updated bundle to `https://classmatebd.vercel.app` (HTTP 200).
 5. **Physical Device Installation**: Assembled `app-debug.apk` in 1m 51s, installed via ADB streamed install, launched on device `6478ab80`, and captured live verification screenshot confirming OpenStreetMap, frosted header pill, and live peek card rendered.
+
+
+---
+
+## 181. ClassMate Transit — UI/UX Refinement & Location-Aware Bus Tracking
+
+### 181.1 Overview & Requirements
+Addressed complete Master UI/UX and location-aware bus tracking specification across native Android and web:
+1. **First-Time Location Permission**: Clean in-app modal dialog explaining why location is needed (bus proximity tracking). "Allow Location" (`লোকেশন চালু করুন`) & "Not Now" (`এখন নয়`). Native runtime permission requests (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) via bidirectional bridge. Graceful denial handling with `📍 দূরত্ব দেখুন` pill and option to open Android app settings if permanently denied. Persisted in `localStorage`.
+2. **Gesture Isolation**: Disconnected horizontal swipe gesture tabs when Transit tab is active (`selectedTab != R.id.nav_transit`), allowing natural map panning, pinching, and timeline gestures without accidental tab switching.
+3. **Bus List & Search UI**: Locked search icon (`position: absolute`, zero collision with text or clear button), compact 4-row cards with bus name, Bengali badge, live status, corridor route, next stop, and user proximity distance.
+4. **28-Stop Direction-Aware Timeline**: Support for Campus ➔ City (`ক্যাম্পাস ➔ শহর`) and City ➔ Campus (`শহর ➔ ক্যাম্পাস`). Reverses stop sequence, milestones, and ETAs dynamically. Prominent **Live Bus Position Node** between passed stops and next stop showing live avatar, speed, and user distance.
+5. **Intelligent Auto-Scrolling**: Centers live bus in the timeline viewport (~2-3 previous, ~2-3 upcoming stops). Automatically pauses auto-follow when user manually scrolls/touches and displays floating pill `[ 🎯 বাসের অবস্থানে ফিরুন ]` to return smoothly.
+6. **Map Camera Stability & Positioning**: Removed aggressive periodic 2.6s `fitBounds` camera lock to prevent camera jumps while panning. Added explicit recenter FABs for bus and user. Royal blue pulsing GPS user marker.
+
+### 181.2 File Changes & Commit (`588df50`)
+* **`app/src/main/AndroidManifest.xml`**: Added `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`.
+* **`app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt`**:
+  - `swipeHost.canSwipe = { direction -> !manageOpen && selectedTab != R.id.nav_transit && destination(direction) != null }`.
+  - Added `onRequestPermissionsResult(9901)` invoking `window.__onLocationPermissionResult(granted)` in WebView.
+* **`app/src/main/java/com/shuaib/classmate/transit/ClassMateTransitManager.kt`**:
+  - Added `hasLocationPermission()`, `requestLocationPermission()`, and `openAppSettings()` to `ClassMateTransitBridge`.
+* **`web/src/components/transit.tsx` & `transit.css`**:
+  - Implemented in-app permission modal dialog with Allow/Dismiss and settings fallback.
+  - Implemented direction-aware route computation (`detectedDirection`, `activeRouteStations`, sequence reversal).
+  - Implemented live bus position card node on timeline line.
+  - Implemented auto-scrolling with manual touch detection and floating recenter pill.
+  - Locked search bar layout with absolute search icon and clear button.
+  - High-contrast typography for light and dark modes.
+* **Deploy & Verification**:
+  - Vercel: Built and deployed to `https://classmatebd.vercel.app` (HTTP 200).
+  - Android APK: Assembled `app-debug.apk` in 1m 54s, installed via ADB streamed install on physical phone `6478ab80`, and verified with live screenshots.
