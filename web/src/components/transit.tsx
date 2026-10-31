@@ -1013,6 +1013,12 @@ export function Transit({ ctx }: { ctx?: any }) {
     // Dispatch Native Android Push Notification if running in native app
     if (typeof window !== "undefined") {
       const bridge = (window as any).ClassMateNativeBridge;
+      if (bridge?.notifyProximityAlert) {
+        try {
+          const dM = Math.round(getDistanceMeters(selectedBus.lat, selectedBus.lon, reachedStop.lat, reachedStop.lon));
+          bridge.notifyProximityAlert(selectedBus.nameBn, reachedStop.nameBn, 1, dM);
+        } catch (_) {}
+      }
       if (bridge?.onBusDeparted) {
         try {
           bridge.onBusDeparted(
@@ -1038,6 +1044,14 @@ export function Transit({ ctx }: { ctx?: any }) {
       preferCanvas: true
     });
     mapRef.current = map;
+
+    map.whenReady(() => {
+      if (typeof window !== "undefined" && (window as any).ClassMateNativeBridge?.onMapReady) {
+        try {
+          (window as any).ClassMateNativeBridge.onMapReady();
+        } catch (_) {}
+      }
+    });
 
     // Declutter bus stops when zoomed out (< 16) so road corridor and active buses are completely visible
     const updateZoomState = () => {
@@ -2009,7 +2023,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     }));
   }, [isToCampus]);
 
-  // Compute Next Approaching Stop along activeRouteStations
+  // Compute Next Approaching Stop along activeRouteStations using Schmitt-Trigger Hysteresis (Zero Blinking)
   const activeNextStopInfo = useMemo(() => {
     if (!detailBus) {
       return {
@@ -2020,43 +2034,19 @@ export function Transit({ ctx }: { ctx?: any }) {
       };
     }
 
-    let closestIdx = 0;
-    let minD = Infinity;
-    activeRouteStations.forEach((st, idx) => {
-      const d = getDistanceMeters(detailBus.lat, detailBus.lon, st.lat, st.lon);
-      if (d < minD) {
-        minD = d;
-        closestIdx = idx;
-      }
-    });
-
-    let targetIdx = closestIdx;
-    if (closestIdx < activeRouteStations.length - 1) {
-      const curSt = activeRouteStations[closestIdx];
-      const nextSt = activeRouteStations[closestIdx + 1];
-      const dNext = getDistanceMeters(detailBus.lat, detailBus.lon, nextSt.lat, nextSt.lon);
-      const betweenSt = getDistanceMeters(curSt.lat, curSt.lon, nextSt.lat, nextSt.lon);
-
-      if (detailBus.speed > 0 && dNext < betweenSt) {
-        targetIdx = closestIdx + 1;
-      } else if (minD < 45 && closestIdx < activeRouteStations.length - 1) {
-        targetIdx = closestIdx + 1;
-      }
+    const nextInfo = getNextStopForBus(detailBus);
+    let targetIdx = activeRouteStations.findIndex((st) => st.id === nextInfo.station.id);
+    if (targetIdx === -1) {
+      targetIdx = 0;
     }
-
-    const targetSt = activeRouteStations[targetIdx];
-    const distM = getDistanceMeters(detailBus.lat, detailBus.lon, targetSt.lat, targetSt.lon);
-    const distKm = (distM / 1000).toFixed(2);
-    const effectiveSpeed = Math.max(detailBus.speed, 25);
-    const etaMinutes = Math.max(1, Math.round((distM / 1000 / effectiveSpeed) * 60));
 
     return {
       nextIndex: targetIdx,
-      station: targetSt,
-      distanceKm: distKm,
-      etaMinutes
+      station: activeRouteStations[targetIdx] || nextInfo.station,
+      distanceKm: nextInfo.distanceKm,
+      etaMinutes: nextInfo.etaMinutes
     };
-  }, [detailBus, activeRouteStations]);
+  }, [detailBus, activeRouteStations, getNextStopForBus]);
 
   // Automatic Timeline Follow: Pin Current Stop in Upward Visible Area
   const scrollToLiveBus = useCallback((smooth = true) => {
@@ -2274,6 +2264,19 @@ export function Transit({ ctx }: { ctx?: any }) {
                         isPassed ? "line-passed" : isLiveSegment ? "line-live" : "line-upcoming"
                       }`}
                     />
+                  )}
+
+                  {/* Dynamic Bus Needle Card on Live Road Segment */}
+                  {isLiveSegment && detailBus && (
+                    <div className="transit-timeline-live-bus-card-wrapper">
+                      <div className="transit-timeline-live-bus-card" style={{ borderColor: detailBus.color || "#b71454" }}>
+                        <span className="transit-pulse-dot" style={{ background: detailBus.color || "#b71454", width: 7, height: 7 }} />
+                        <span style={{ fontWeight: 800, fontSize: "11px", color: "#1e293b" }}>{detailBus.nameBn}</span>
+                        <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>
+                          {detailBus.speed > 0 ? `${toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ` : "স্ট্যান্ডবাই"}
+                        </span>
+                      </div>
+                    </div>
                   )}
 
                   {/* Node Milestone Circle */}

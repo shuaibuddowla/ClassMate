@@ -85,7 +85,7 @@ internal class ClassMateAcademicScreens(
         }
         val bridge = com.shuaib.classmate.transit.ClassMateTransitBridge(activity)
         webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
-        webView.loadUrl("file:///android_asset/transit/index.html")
+        webView.loadUrl("https://classmatebd.vercel.app/transit-preview?app=android&view=map")
     }
 
     private fun <T : View> View.v(id: Int): T = findViewById(id)

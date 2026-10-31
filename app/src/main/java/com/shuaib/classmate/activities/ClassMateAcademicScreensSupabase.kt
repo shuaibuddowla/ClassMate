@@ -1877,15 +1877,6 @@ internal class ClassMateAcademicScreensSupabase(
             ) {
                 callback?.invoke(origin, true, false)
             }
-
-            override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                if (newProgress >= 90 && loadingView?.visibility == View.VISIBLE) {
-                    loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
-                        loadingView?.visibility = View.GONE
-                    }?.start()
-                }
-            }
         }
 
         webView.webViewClient = object : android.webkit.WebViewClient() {
@@ -1917,7 +1908,7 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        val transitUrl = "file:///android_asset/transit/index.html"
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map"
         webView.loadUrl(transitUrl)
 
     }
