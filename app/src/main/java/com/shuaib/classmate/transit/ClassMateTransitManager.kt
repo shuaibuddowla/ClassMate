@@ -92,6 +92,82 @@ object ClassMateTransitManager {
             // Android 13 notification permission guard
         }
     }
+
+    const val PROXIMITY_CHANNEL_ID = "transit_proximity_alerts"
+    private const val KEY_PROXIMITY_ALERT = "proximity_alert_enabled"
+
+    fun isProximityAlertEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_PROXIMITY_ALERT, true)
+    }
+
+    fun setProximityAlertEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_PROXIMITY_ALERT, enabled).apply()
+    }
+
+    fun initProximityChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "বাসের নিকটবর্তী আগমন অ্যালার্ট"
+            val descriptionText = "ব্যবহারকারীর নিকটবর্তী স্টপেজে বাস পৌঁছানোর পূর্বে নোটিফিকেশন ও অ্যালার্ট"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(PROXIMITY_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+                enableLights(true)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+            }
+            val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    fun showProximityNotification(
+        context: Context,
+        busName: String,
+        stopName: String,
+        etaMinutes: Int,
+        distanceMeters: Int
+    ) {
+        if (!isProximityAlertEnabled(context)) return
+
+        initProximityChannel(context)
+
+        val intent = Intent(context, ClassMateAuthActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("open_tab", "transit")
+        }
+
+        val notifId = (busName + stopName).hashCode()
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notifId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+        )
+
+        val title = "🔔 $busName আপনার কাছাকাছি আসছে!"
+        val distText = if (distanceMeters >= 1000) "${String.format(java.util.Locale.US, "%.1f", distanceMeters / 1000.0)} কিমি" else "$distanceMeters মিটার"
+        val body = "$stopName স্টপেজে পৌঁছাতে আনুমানিক $etaMinutes মিনিট সময় লাগবে (দূরত্ব: $distText)। প্রস্তুত থাকুন।"
+
+        val notification = NotificationCompat.Builder(context, PROXIMITY_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_bus_filled)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(notifId, notification)
+        } catch (_: SecurityException) {
+            // Android 13 notification permission guard
+        }
+    }
 }
 
 class ClassMateTransitBridge(
@@ -100,6 +176,27 @@ class ClassMateTransitBridge(
 ) {
 
     var onBackStateChanged: ((Boolean) -> Unit)? = null
+    var onMapReadyListener: (() -> Unit)? = null
+
+    @JavascriptInterface
+    fun onMapReady() {
+        onMapReadyListener?.invoke()
+    }
+
+    @JavascriptInterface
+    fun notifyProximityAlert(busName: String, stopName: String, etaMinutes: Int, distanceMeters: Int) {
+        ClassMateTransitManager.showProximityNotification(context, busName, stopName, etaMinutes, distanceMeters)
+    }
+
+    @JavascriptInterface
+    fun isProximityAlertEnabled(): Boolean {
+        return ClassMateTransitManager.isProximityAlertEnabled(context)
+    }
+
+    @JavascriptInterface
+    fun setProximityAlertEnabled(enabled: Boolean) {
+        ClassMateTransitManager.setProximityAlertEnabled(context, enabled)
+    }
 
     @JavascriptInterface
     fun setCanGoBack(canGoBack: Boolean) {

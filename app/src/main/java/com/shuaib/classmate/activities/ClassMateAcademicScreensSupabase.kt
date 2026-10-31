@@ -1853,36 +1853,14 @@ internal class ClassMateAcademicScreensSupabase(
         val bridge = com.shuaib.classmate.transit.ClassMateTransitBridge(activity)
 
         bridge.onBackStateChanged = { canGoBack ->
-
             activity.runOnUiThread {
-
                 backCallback.isEnabled = canGoBack
-
             }
-
         }
 
-        webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
-
-
-
-        webView.webChromeClient = object : android.webkit.WebChromeClient() {
-
-            override fun onGeolocationPermissionsShowPrompt(
-
-                origin: String?,
-
-                callback: android.webkit.GeolocationPermissions.Callback?
-
-            ) {
-
-                callback?.invoke(origin, true, false)
-
-            }
-
-            override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                if (newProgress >= 70 && loadingView?.visibility == View.VISIBLE) {
+        bridge.onMapReadyListener = {
+            activity.runOnUiThread {
+                if (loadingView?.visibility == View.VISIBLE) {
                     loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
                         loadingView?.visibility = View.GONE
                     }?.start()
@@ -1890,36 +1868,45 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
+        webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
 
-
-        webView.webViewClient = object : android.webkit.WebViewClient() {
-
-            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
-
-                super.onPageFinished(view, url)
-
-                loadingView?.animate()?.alpha(0f)?.setDuration(250)?.withEndAction {
-
-                    loadingView.visibility = View.GONE
-
-                }?.start()
-
+        webView.webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: android.webkit.GeolocationPermissions.Callback?
+            ) {
+                callback?.invoke(origin, true, false)
             }
 
+            override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                if (newProgress >= 90 && loadingView?.visibility == View.VISIBLE) {
+                    loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
+                        loadingView?.visibility = View.GONE
+                    }?.start()
+                }
+            }
+        }
 
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                // Let JavaScript bridge onMapReady or safety fallback dismiss shimmer
+                view?.postDelayed({
+                    if (loadingView?.visibility == View.VISIBLE) {
+                        loadingView?.animate()?.alpha(0f)?.setDuration(200)?.withEndAction {
+                            loadingView?.visibility = View.GONE
+                        }?.start()
+                    }
+                }, 400)
+            }
 
             override fun onReceivedError(
-
                 view: android.webkit.WebView?,
-
                 request: android.webkit.WebResourceRequest?,
-
                 error: android.webkit.WebResourceError?
-
             ) {
-
                 super.onReceivedError(view, request, error)
-
                 if (request?.isForMainFrame == true) {
                     val failingUrl = request.url?.toString() ?: ""
                     android.util.Log.w("ClassMateTransit", "Transit load error: ${error?.errorCode} ${error?.description} for $failingUrl")
@@ -1927,15 +1914,10 @@ internal class ClassMateAcademicScreensSupabase(
                         view?.loadUrl("file:///android_asset/transit/index.html")
                     }
                 }
-
             }
-
         }
 
-
-
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map"
-
+        val transitUrl = "file:///android_asset/transit/index.html"
         webView.loadUrl(transitUrl)
 
     }
@@ -12401,6 +12383,7 @@ internal class ClassMateAcademicScreensSupabase(
 
     fun pauseTransitWebView() {
         tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+            evaluateJavascript("if (window.pauseLiveTransit) { window.pauseLiveTransit(); }", null)
             onPause()
             pauseTimers()
         }
@@ -12410,12 +12393,7 @@ internal class ClassMateAcademicScreensSupabase(
         tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
             onResume()
             resumeTimers()
-            val currentUrl = url ?: ""
-            if (ClassMateAcademicCache.online(activity)) {
-                if (currentUrl.startsWith("file://") || currentUrl.isBlank() || !currentUrl.contains("classmatebd.vercel.app")) {
-                    loadUrl("https://classmatebd.vercel.app/transit-preview?app=android&view=map")
-                }
-            }
+            evaluateJavascript("if (window.resumeLiveTransit) { window.resumeLiveTransit(); }", null)
         }
     }
 

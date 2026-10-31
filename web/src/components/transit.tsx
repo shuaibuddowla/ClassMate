@@ -207,6 +207,51 @@ export function findClosestPolylineIndex(point: [number, number], polyline: [num
   return closestIndex;
 }
 
+export function projectToCorridorMilestone(
+  lat: number,
+  lon: number,
+  polyline: [number, number][],
+  milestones: number[]
+): { milestoneKm: number; crossTrackMeters: number } {
+  let minDistM = Infinity;
+  let bestMilestoneKm = 0.0;
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const [lat1, lon1] = polyline[i];
+    const [lat2, lon2] = polyline[i + 1];
+    const midLat = ((lat1 + lat2) / 2.0) * Math.PI / 180.0;
+    const kx = 111320.0 * Math.cos(midLat);
+    const ky = 110540.0;
+    const bx = (lon2 - lon1) * kx;
+    const by = (lat2 - lat1) * ky;
+    const px = (lon - lon1) * kx;
+    const py = (lat - lat1) * ky;
+    const segLenSq = bx * bx + by * by;
+    let t = 0.0;
+    if (segLenSq > 1e-6) {
+      t = Math.max(0.0, Math.min(1.0, (px * bx + py * by) / segLenSq));
+    }
+    const qx = t * bx;
+    const qy = t * by;
+    const distM = Math.sqrt((px - qx) * (px - qx) + (py - qy) * (py - qy));
+    if (distM < minDistM) {
+      minDistM = distM;
+      const segStartKm = milestones[i] ?? 0;
+      const segEndKm = milestones[i + 1] ?? segStartKm;
+      bestMilestoneKm = segStartKm + t * (segEndKm - segStartKm);
+    }
+  }
+  return { milestoneKm: bestMilestoneKm, crossTrackMeters: minDistM };
+}
+
+const busHysteresisState = new Map<string, {
+  busId: string;
+  tripDirection: "to_city" | "to_campus";
+  lastStationIndex: number;
+  inArrivalZone: boolean;
+  isOffRoute: boolean;
+  lastUpdated: number;
+}>();
+
 export function toBengaliDigits(num: number | string): string {
   const bnDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
   return String(num).replace(/[0-9]/g, (d) => bnDigits[parseInt(d, 10)] || d);
@@ -675,39 +720,80 @@ export function Transit({ ctx }: { ctx?: any }) {
     }));
   }, []);
 
-  // Helper to find next stop and ETA for ANY bus
+  // Helper to find next stop and ETA with Schmitt-Trigger Hysteresis (Zero Blinking)
   const getNextStopForBus = useCallback((bus: MbstuBusData) => {
-    const busIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
-    let targetCandidate = stationPolyIndices[0];
-    let minForwardSteps = Infinity;
+    let state = busHysteresisState.get(bus.id);
+    if (!state) {
+      state = {
+        busId: bus.id,
+        tripDirection: "to_city",
+        lastStationIndex: 0,
+        inArrivalZone: false,
+        isOffRoute: false,
+        lastUpdated: Date.now()
+      };
+      busHysteresisState.set(bus.id, state);
+    }
 
-    for (const item of stationPolyIndices) {
-      let forwardSteps = item.idx - busIdx;
-      if (forwardSteps < 0) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
+    const { milestoneKm, crossTrackMeters } = projectToCorridorMilestone(
+      bus.lat,
+      bus.lon,
+      REAL_STREET_POLYLINE,
+      CORRIDOR_MILESTONES_KM
+    );
+    state.lastUpdated = Date.now();
+    state.isOffRoute = crossTrackMeters > 260;
+
+    // Terminal Turnaround Filter (Nirala & Pouro Uddan, M > 7.8km)
+    if (milestoneKm > 7.8) {
+      if (bus.heading != null && ((bus.heading >= 240 && bus.heading <= 360) || (bus.heading >= 0 && bus.heading <= 50))) {
+        state.tripDirection = "to_campus";
       }
-      const directDist = getDistanceMeters(bus.lat, bus.lon, item.station.lat, item.station.lon);
-      if (directDist < 40) {
-        forwardSteps += REAL_STREET_POLYLINE.length;
+    } else if (milestoneKm < 0.6) {
+      state.tripDirection = "to_city";
+    }
+
+    const dir = state.tripDirection;
+    let currIdx = state.lastStationIndex;
+
+    if (dir === "to_city") {
+      const targetM = CORRIDOR_MILESTONES_KM[currIdx] ?? 0;
+      const distToTarget = targetM - milestoneKm;
+      if (Math.abs(distToTarget) <= 0.035) {
+        state.inArrivalZone = true;
       }
-      if (forwardSteps > 0 && forwardSteps < minForwardSteps) {
-        minForwardSteps = forwardSteps;
-        targetCandidate = item;
+      if (milestoneKm >= targetM + 0.020 && currIdx < CORRIDOR_STATIONS.length - 1) {
+        state.lastStationIndex = currIdx + 1;
+        state.inArrivalZone = false;
+      }
+    } else {
+      // to_campus
+      const targetM = CORRIDOR_MILESTONES_KM[currIdx] ?? 0;
+      const distToTarget = milestoneKm - targetM;
+      if (Math.abs(distToTarget) <= 0.035) {
+        state.inArrivalZone = true;
+      }
+      if (milestoneKm <= targetM - 0.020 && currIdx > 0) {
+        state.lastStationIndex = currIdx - 1;
+        state.inArrivalZone = false;
       }
     }
 
-    const nextStation = targetCandidate.station;
+    const nextStation = CORRIDOR_STATIONS[state.lastStationIndex] || CORRIDOR_STATIONS[0];
     const distanceMeters = getDistanceMeters(bus.lat, bus.lon, nextStation.lat, nextStation.lon);
     const distanceKm = (distanceMeters / 1000).toFixed(2);
-    const effectiveSpeed = Math.max(bus.speed, 25);
+    const effectiveSpeed = Math.max(bus.speed, 22);
     const etaMinutes = Math.max(1, Math.round((distanceMeters / 1000 / effectiveSpeed) * 60));
 
     return {
       station: nextStation,
       distanceKm,
-      etaMinutes
+      etaMinutes,
+      isOffRoute: state.isOffRoute,
+      direction: state.tripDirection,
+      inArrivalZone: state.inArrivalZone
     };
-  }, [stationPolyIndices]);
+  }, []);
 
   // Route Progress percentage helper
   const getBusProgress = useCallback((bus: MbstuBusData) => {

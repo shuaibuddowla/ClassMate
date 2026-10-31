@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>MBSTU বাস ট্র্যাকার | ClassMate Transit</title>
+  <title>মাভাবিপ্রবি বাস ট্র্যাকার | ClassMate Transit</title>
   
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Socket.IO Client -->
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <!-- Local Offline-First Vendor Libs (Instant 0ms load, zero black screen) -->
+  <link rel="stylesheet" href="leaflet.css" />
+  <script src="leaflet.js"></script>
+  <script src="socket.io.min.js"></script>
 
   <style>
     * {
@@ -38,13 +37,13 @@
     /* Top Controls Overlay */
     .top-controls {
       position: absolute;
-      top: env(safe-area-inset-top, 12px);
-      left: 12px;
-      right: 12px;
+      top: env(safe-area-inset-top, 10px);
+      left: 10px;
+      right: 10px;
       z-index: 1000;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       pointer-events: none;
     }
     .top-bar {
@@ -55,8 +54,8 @@
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 18px;
-      padding: 8px 12px;
+      border-radius: 16px;
+      padding: 7px 12px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
       pointer-events: auto;
     }
@@ -66,19 +65,19 @@
       gap: 8px;
     }
     .brand-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
-      background: rgba(225, 29, 72, 0.15);
-      border: 1px solid rgba(225, 29, 72, 0.3);
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: rgba(2, 132, 199, 0.2);
+      border: 1px solid rgba(2, 132, 199, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #f43f5e;
-      font-size: 16px;
+      color: #38bdf8;
+      font-size: 15px;
     }
     .brand-title {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 800;
       color: #f8fafc;
       letter-spacing: -0.2px;
@@ -90,7 +89,7 @@
       background: rgba(34, 197, 94, 0.15);
       border: 1px solid rgba(34, 197, 94, 0.35);
       color: #4ade80;
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       padding: 2px 7px;
       border-radius: 20px;
@@ -101,48 +100,20 @@
       border-radius: 50%;
       background: #22c55e;
       box-shadow: 0 0 8px #22c55e;
-      animation: pulse 1.8s infinite;
+      animation: pulseDot 1.8s infinite;
     }
-    @keyframes pulse {
+    @keyframes pulseDot {
       0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 0.35; transform: scale(0.8); }
       100% { opacity: 1; transform: scale(1); }
     }
 
-    .view-toggle {
-      display: flex;
-      background: rgba(30, 41, 59, 0.7);
-      border-radius: 12px;
-      padding: 3px;
-      gap: 3px;
-    }
-    .toggle-btn {
-      border: none;
-      outline: none;
-      background: transparent;
-      color: #94a3b8;
-      font-size: 11.5px;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 9px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .toggle-btn.active {
-      background: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
-    }
-
-    /* Horizontal Bus Carousel */
+    /* Multi-Bus Quick Selector Carousel */
     .bus-pills-row {
       display: flex;
-      gap: 8px;
+      gap: 7px;
       overflow-x: auto;
-      padding-bottom: 4px;
+      padding-bottom: 2px;
       pointer-events: auto;
       scrollbar-width: none;
     }
@@ -157,14 +128,14 @@
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      padding: 6px 12px;
-      font-size: 12px;
+      border-radius: 20px;
+      padding: 5px 11px;
+      font-size: 11.5px;
       font-weight: 700;
       color: #f8fafc;
       white-space: nowrap;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     .bus-pill.active {
@@ -172,331 +143,430 @@
       border-color: #38bdf8;
       color: #ffffff;
       box-shadow: 0 4px 16px rgba(2, 132, 199, 0.5);
+      transform: translateY(-1px);
     }
     .bus-pill-dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
     }
-    .bus-pill-code {
-      font-size: 9.5px;
-      background: rgba(255, 255, 255, 0.15);
-      padding: 1px 5px;
-      border-radius: 6px;
-      color: #cbd5e1;
-    }
     .bus-pill-speed {
-      font-size: 10px;
+      font-size: 9.5px;
       color: #4ade80;
       font-weight: 800;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 1px 4px;
+      border-radius: 4px;
     }
 
-    /* Floating Action Buttons */
-    .fab-stack {
-      position: absolute;
-      right: 14px;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      pointer-events: auto;
-    }
-    .fab-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
+    /* User Nearest Stop & Proximity Alert Card */
+    .nearest-stop-card {
       background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #38bdf8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-      cursor: pointer;
-      outline: none;
-      transition: transform 0.15s ease, background 0.2s ease;
-    }
-    .fab-btn:active {
-      transform: scale(0.92);
-      background: rgba(2, 132, 199, 0.85);
-      color: #fff;
-    }
-
-    /* Bottom Bus Detail Sheet */
-    .bottom-sheet {
-      position: absolute;
-      left: 12px;
-      right: 12px;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
-      z-index: 999;
-      background: rgba(15, 23, 42, 0.94);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 22px;
-      padding: 14px 16px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-      pointer-events: auto;
-      transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-    .sheet-header {
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 14px;
+      padding: 8px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      gap: 8px;
+      pointer-events: auto;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+    .nearest-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .nearest-label {
+      font-size: 10.5px;
+      color: #38bdf8;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .nearest-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .nearest-eta {
+      font-size: 10px;
+      color: #cbd5e1;
+    }
+    .alert-toggle-btn {
+      border: none;
+      outline: none;
+      padding: 5px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .alert-toggle-btn.enabled {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      color: #4ade80;
+    }
+    .alert-toggle-btn.disabled {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #94a3b8;
+    }
+
+    /* In-App Proximity Warning Banner */
+    .proximity-banner {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 10px) + 120px);
+      left: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.95), rgba(3, 105, 161, 0.95));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1.5px solid #38bdf8;
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 9px 13px;
+      border-radius: 14px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.45);
+      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Off-Route Warning Banner */
+    .off-route-banner {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 10px) + 120px);
+      left: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(234, 88, 12, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 12px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Floating Controls */
+    .fab-stack {
+      position: absolute;
+      right: 14px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 120px);
+      z-index: 900;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .fab-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .fab-btn:active {
+      transform: scale(0.92);
+      background: #0284c7;
+    }
+
+    /* Bottom Sheet Timeline Card */
+    .bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 950;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 22px 22px 0 0;
+      padding: 12px 14px calc(env(safe-area-inset-bottom, 0px) + 12px) 14px;
+      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.55);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 48vh;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sheet-handle {
+      width: 38px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+      margin: 0 auto 4px auto;
+    }
+    .sheet-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
     .sheet-bus-meta {
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
     }
-    .sheet-bus-code {
-      background: rgba(2, 132, 199, 0.2);
-      border: 1px solid rgba(2, 132, 199, 0.4);
-      color: #38bdf8;
+    .sheet-bus-badge {
+      background: #0284c7;
+      color: #ffffff;
       font-size: 10px;
       font-weight: 800;
       padding: 2px 7px;
-      border-radius: 8px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
     }
     .sheet-bus-name {
-      font-size: 16px;
+      font-size: 14.5px;
       font-weight: 800;
-      color: #ffffff;
+      color: #f8fafc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .sheet-speed-badge {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
+      gap: 4px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      padding: 3px 8px;
+      border-radius: 8px;
     }
     .sheet-speed-val {
-      font-size: 18px;
-      font-weight: 900;
-      color: #38bdf8;
-      line-height: 1.1;
-    }
-    .sheet-eta-val {
-      font-size: 10.5px;
-      font-weight: 700;
+      font-size: 11.5px;
+      font-weight: 800;
       color: #4ade80;
     }
-    .sheet-route-row {
-      font-size: 11.5px;
-      color: #94a3b8;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
 
-    /* Stoppage Timeline Row */
-    .timeline-strip {
+    .sheet-direction-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: relative;
-      background: rgba(30, 41, 59, 0.5);
-      border-radius: 12px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
+      background: rgba(30, 41, 59, 0.7);
+      border-radius: 10px;
+      padding: 5px 10px;
+      font-size: 11.5px;
+      color: #94a3b8;
     }
-    .timeline-node {
+    .direction-title {
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+    .direction-swap-btn {
+      background: rgba(2, 132, 199, 0.25);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Vertical Interactive Timeline */
+    .timeline-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 6px 4px 6px 8px;
+      scrollbar-width: thin;
+      position: relative;
+    }
+    .timeline-rail {
+      position: relative;
       display: flex;
       flex-direction: column;
+      gap: 0px;
+      padding-left: 20px;
+    }
+    .timeline-rail::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      left: 7px;
+      width: 2.5px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+    }
+
+    /* Floating Live Bus Needle on the Rail */
+    .timeline-bus-needle {
+      position: absolute;
+      left: -2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #0284c7;
+      border: 2px solid #ffffff;
+      color: #fff;
+      display: flex;
       align-items: center;
-      gap: 4px;
-      z-index: 2;
+      justify-content: center;
+      font-size: 10px;
+      box-shadow: 0 0 12px rgba(2, 132, 199, 0.85);
+      z-index: 10;
+      transform: translateY(-50%);
+      transition: top 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .timeline-stop-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      font-size: 12px;
     }
     .timeline-dot {
+      position: absolute;
+      left: -20px;
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: #475569;
-      border: 2px solid #1e293b;
+      background: #334155;
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      transform: translateX(3px);
+      z-index: 2;
     }
     .timeline-dot.passed {
       background: #22c55e;
-      box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+      border-color: #22c55e;
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
     }
     .timeline-dot.current {
       background: #38bdf8;
       border-color: #ffffff;
-      box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
-      transform: scale(1.2);
+      box-shadow: 0 0 10px #38bdf8;
+      transform: translateX(3px) scale(1.3);
     }
-    .timeline-label {
-      font-size: 9.5px;
-      font-weight: 700;
-      color: #64748b;
-      max-width: 54px;
-      text-align: center;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .timeline-stop-name {
+      font-weight: 600;
+      color: #94a3b8;
     }
-    .timeline-label.active {
-      color: #38bdf8;
-    }
-
-    /* Driver & Action Bar */
-    .sheet-actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .driver-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .driver-avatar {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: #1e293b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-    .driver-text {
-      display: flex;
-      flex-direction: column;
-    }
-    .driver-name {
-      font-size: 12px;
-      font-weight: 700;
-      color: #f1f5f9;
-    }
-    .driver-role {
-      font-size: 10px;
-      color: #64748b;
-    }
-    .call-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(16, 185, 129, 0.18);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #10b981;
-      padding: 7px 14px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.15s ease;
-    }
-    .call-btn:active {
-      background: rgba(16, 185, 129, 0.35);
-    }
-
-    /* Stoppage Marker Icon */
-    .stop-marker {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: rgba(225, 29, 72, 0.95);
-      border: 2px solid #ffffff;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-    .stop-marker svg {
-      width: 10px;
-      height: 10px;
-      fill: #ffffff;
-    }
-
-    /* Bus Puck Icon */
-    .bus-puck {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      transform: translate(-50%, -50%);
-    }
-    .bus-tag {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 7px;
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.92);
-      border: 1.5px solid #0284c7;
-      color: #ffffff;
-      font-size: 10.5px;
+    .timeline-stop-name.active {
       font-weight: 800;
-      white-space: nowrap;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-      margin-bottom: 2px;
+      color: #f8fafc;
     }
-    .bus-puck-circle {
-      width: 28px;
-      height: 28px;
+    .timeline-stop-meta {
+      font-size: 10.5px;
+      color: #64748b;
+      font-weight: 700;
+    }
+    .timeline-stop-meta.active {
+      color: #38bdf8;
+      font-weight: 800;
+    }
+
+    /* Stoppage Map Markers */
+    .stop-marker {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 2px solid #38bdf8;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .stop-marker.campus {
+      border-color: #a855f7;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+    }
+
+    /* Bus Map Marker & Radar Wave (scale reduced to 1.42) */
+    .bus-marker-container {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .bus-pulse-radar {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(2, 132, 199, 0.28);
+      border: 1.5px solid rgba(56, 189, 248, 0.65);
+      animation: busRadarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+      pointer-events: none;
+    }
+    @keyframes busRadarPulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      50% { opacity: 0.45; }
+      100% { transform: scale(1.42); opacity: 0; }
+    }
+    .bus-marker-icon {
+      position: relative;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background: #0284c7;
-      border: 2.5px solid #ffffff;
+      border: 2px solid #ffffff;
+      color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
-      box-shadow: 0 0 12px rgba(2, 132, 199, 0.7);
+      font-size: 15px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      z-index: 2;
     }
     .bus-heading-arrow {
       position: absolute;
-      top: -10px;
+      top: -8px;
       width: 0;
       height: 0;
-      border-left: 5px solid transparent;
-      border-right: 5px solid transparent;
-      border-bottom: 8px solid #38bdf8;
+      border-left: 4.5px solid transparent;
+      border-right: 4.5px solid transparent;
+      border-bottom: 7.5px solid #38bdf8;
+      z-index: 3;
     }
 
-    /* Offline Toast Banner */
-    .offline-banner {
-      position: absolute;
-      top: calc(env(safe-area-inset-top, 12px) + 94px);
-      left: 14px;
-      right: 14px;
-      z-index: 1000;
-      background: rgba(234, 88, 12, 0.92);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      color: #fff;
-      font-size: 11.5px;
-      font-weight: 700;
-      padding: 8px 14px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-      animation: fadeIn 0.3s ease;
-    }
-    .retry-link {
-      background: #ffffff;
-      color: #ea580c;
-      padding: 4px 10px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 800;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Map Empty / Loading State Overlay */
+    /* Map Empty / Loading State Overlay (0 Black Screen) */
     .transit-map-loading-overlay {
       position: absolute;
       top: 0;
@@ -515,7 +585,7 @@
       -webkit-backdrop-filter: blur(16px);
       opacity: 1;
       visibility: visible;
-      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s ease;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
       pointer-events: auto;
     }
     .transit-map-loading-overlay.is-ready {
@@ -530,12 +600,12 @@
       text-align: center;
       max-width: 320px;
       width: 100%;
-      gap: 18px;
+      gap: 16px;
     }
     .transit-map-radar-pulse {
       position: relative;
-      width: 96px;
-      height: 96px;
+      width: 80px;
+      height: 80px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -544,24 +614,11 @@
       position: absolute;
       border-radius: 50%;
       border: 1.5px solid rgba(56, 189, 248, 0.4);
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
       animation: radarExpand 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
     }
-    .radar-circle.circle-1 {
-      width: 48px;
-      height: 48px;
-      animation-delay: 0s;
-    }
-    .radar-circle.circle-2 {
-      width: 72px;
-      height: 72px;
-      animation-delay: 0.5s;
-    }
-    .radar-circle.circle-3 {
-      width: 96px;
-      height: 96px;
-      animation-delay: 1s;
-    }
+    .radar-circle.circle-1 { width: 40px; height: 40px; animation-delay: 0s; }
+    .radar-circle.circle-2 { width: 60px; height: 60px; animation-delay: 0.5s; }
+    .radar-circle.circle-3 { width: 80px; height: 80px; animation-delay: 1s; }
     @keyframes radarExpand {
       0% { transform: scale(0.6); opacity: 0.8; }
       50% { opacity: 0.4; }
@@ -569,8 +626,8 @@
     }
     .radar-center-bus {
       position: relative;
-      width: 46px;
-      height: 46px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
       border: 2px solid #ffffff;
@@ -578,60 +635,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      box-shadow: 0 0 20px rgba(2, 132, 199, 0.75);
+      font-size: 20px;
+      box-shadow: 0 0 16px rgba(2, 132, 199, 0.75);
       z-index: 2;
     }
     .transit-map-loading-headline {
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 800;
       color: #f8fafc;
       letter-spacing: -0.2px;
       margin-bottom: 4px;
     }
     .transit-map-loading-subline {
-      font-size: 12px;
+      font-size: 11.5px;
       color: #94a3b8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-    .transit-loading-spinner {
-      width: 12px;
-      height: 12px;
-      border: 2px solid rgba(56, 189, 248, 0.3);
-      border-top-color: #38bdf8;
-      border-radius: 50%;
-      animation: transitSpin 0.8s linear infinite;
-    }
-    @keyframes transitSpin {
-      to { transform: rotate(360deg); }
-    }
-    .transit-map-loading-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: center;
-    }
-    .transit-loading-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(30, 41, 59, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #cbd5e1;
-      font-size: 10.5px;
-      font-weight: 700;
-      padding: 4px 9px;
-      border-radius: 20px;
-    }
-    .transit-chip-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
     }
   </style>
 </head>
@@ -643,31 +660,48 @@
       <div class="brand">
         <div class="brand-icon">🚌</div>
         <div>
-          <div class="brand-title">বাস ট্র্যাকার</div>
-        </div>
-        <div class="live-chip">
-          <span class="pulse-dot"></span>
-          <span>৬টি লাইভ</span>
+          <div class="brand-title">মাভাবিপ্রবি বাস ট্র্যাকার</div>
         </div>
       </div>
-      <div class="view-toggle">
-        <button class="toggle-btn" id="btnList" onclick="showListView()">
-          <span>☰</span> তালিকা
-        </button>
-        <button class="toggle-btn active" id="btnMap" onclick="showMapView()">
-          <span>🗺</span> ম্যাপ
-        </button>
+      <div class="live-chip">
+        <span class="pulse-dot"></span>
+        <span id="liveFleetCount">৬টি বাস ট্র্যাকিংয়ে</span>
       </div>
     </div>
 
-    <!-- Bus Quick Selection Carousel -->
+    <!-- Multi-Bus Quick Selection Carousel -->
     <div class="bus-pills-row" id="busPillsRow"></div>
+
+    <!-- User Nearest Stop & Proximity Alert Card -->
+    <div class="nearest-stop-card" id="nearestStopCard">
+      <div class="nearest-meta">
+        <span class="nearest-label">📍 আপনার নিকটবর্তী স্টপ</span>
+        <span class="nearest-name" id="userNearestStopName">লোকেশন নির্ণয় করা হচ্ছে…</span>
+        <span class="nearest-eta" id="userNearestBusEta">নিকটবর্তী বাস খোঁজা হচ্ছে…</span>
+      </div>
+      <button class="alert-toggle-btn enabled" id="btnAlertToggle" onclick="toggleProximityAlert()">
+        <span id="alertIcon">🔔</span>
+        <span id="alertText">অ্যালার্ট চালু</span>
+      </button>
+    </div>
   </div>
 
-  <!-- Offline Banner if disconnected -->
-  <div class="offline-banner" id="offlineBanner" style="display:none;">
-    <span>অফলাইন মোড • রুট ও স্টপ প্রিভিউ সক্রিয়</span>
-    <span class="retry-link" onclick="tryReloadLive()">পুনরায় চেষ্টা করুন</span>
+  <!-- In-App Proximity Warning Banner -->
+  <div class="proximity-banner" id="proximityBanner">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">🔔</span>
+      <div>
+        <div style="font-weight:800;" id="proximityBannerTitle">বাস আপনার কাছাকাছি আসছে!</div>
+        <div style="font-size:10.5px;opacity:0.9;" id="proximityBannerSub">প্রস্তুত থাকুন</div>
+      </div>
+    </div>
+    <span onclick="dismissProximityBanner()" style="cursor:pointer;font-size:16px;opacity:0.7;">✕</span>
+  </div>
+
+  <!-- Off-Route Warning Banner -->
+  <div class="off-route-banner" id="offRouteBanner">
+    <span>⚠️ বাসটি বিকল্প/বাইপাস রুটে চলছে</span>
+    <span style="font-size:10px;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">রুট বিচ্যুতি</span>
   </div>
 
   <!-- Map Container -->
@@ -684,26 +718,10 @@
       </div>
 
       <div>
-        <div class="transit-map-loading-headline">মাভাবিপ্রবি বাস ট্র্যাকার লোড হচ্ছে…</div>
+        <div class="transit-map-loading-headline">মাভাবিপ্রবি লাইভ বাস ট্র্যাকার লোড হচ্ছে…</div>
         <div class="transit-map-loading-subline">
-          <span class="transit-loading-spinner"></span>
-          <span>স্যাটেলাইট স্তর ও করিডোর স্টপেজ প্রস্তুত হচ্ছে</span>
+          <span>২৮টি স্টপ ও করিডোর মানচিত্র প্রস্তুত হচ্ছে</span>
         </div>
-      </div>
-
-      <div class="transit-map-loading-chips">
-        <span class="transit-loading-chip">
-          <span class="transit-chip-dot"></span>
-          ৮০টি রুট পয়েন্ট
-        </span>
-        <span class="transit-loading-chip">
-          <span class="transit-chip-dot"></span>
-          ২৮টি বাস স্টপ
-        </span>
-        <span class="transit-loading-chip">
-          <span class="transit-chip-dot"></span>
-          লাইভ ফ্লিট টেলিমেট্রি
-        </span>
       </div>
     </div>
   </div>
@@ -711,112 +729,199 @@
   <!-- Floating Controls -->
   <div class="fab-stack">
     <button class="fab-btn" onclick="toggleMapLayer()" title="ম্যাপ ভিউ পরিবর্তন">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
         <polyline points="2 17 12 22 22 17"></polyline>
         <polyline points="2 12 12 17 22 12"></polyline>
       </svg>
     </button>
-    <button class="fab-btn" onclick="centerOnUserOrBus()" title="বাসে ফোকাস">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="fab-btn" onclick="centerOnUserOrBus()" title="ফোকাস">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
       </svg>
     </button>
   </div>
 
-  <!-- Bottom Bus Detail Sheet -->
+  <!-- Bottom Bus Detail & Interactive Timeline Sheet -->
   <div class="bottom-sheet" id="busSheet">
-    <div class="sheet-header">
+    <div class="sheet-handle"></div>
+    <div class="sheet-top-row">
       <div class="sheet-bus-meta">
-        <span class="sheet-bus-code" id="sheetBusCode">SB0003</span>
-        <span class="sheet-bus-name" id="sheetBusName">সোনারতরী (Sonartori)</span>
+        <span class="sheet-bus-badge" id="sheetBusCode">SB0003</span>
+        <span class="sheet-bus-name" id="sheetBusName">সোনারতরী</span>
       </div>
       <div class="sheet-speed-badge">
         <span class="sheet-speed-val" id="sheetBusSpeed">২৮ কিমি/ঘ</span>
-        <span class="sheet-eta-val" id="sheetBusEta">পরবর্তী স্টপ: ৩ মিনিট</span>
       </div>
     </div>
 
-    <div class="sheet-route-row" id="sheetBusRoute">
-      <span>ক্যাম্পাস ➔ কাগমারী ➔ নিরালা (শহর কেন্দ্র)</span>
+    <!-- Direction and Manual Swap -->
+    <div class="sheet-direction-bar">
+      <span class="direction-title" id="sheetDirectionText">যাত্রার দিক: ক্যাম্পাস ➔ নিরালা</span>
+      <button class="direction-swap-btn" onclick="toggleTripDirection()">⇄ দিক পরিবর্তন</button>
     </div>
 
-    <!-- Timeline strip -->
-    <div class="timeline-strip" id="timelineStrip"></div>
-
-    <!-- Driver Info & Call -->
-    <div class="sheet-actions">
-      <div class="driver-info">
-        <div class="driver-avatar">👨‍✈️</div>
-        <div class="driver-text">
-          <span class="driver-name" id="sheetDriverName">মোঃ রফিকুল ইসলাম</span>
-          <span class="driver-role">সিনিয়র চালক • মাভাবিপ্রবি পরিবহন</span>
-        </div>
+    <!-- Vertical Interactive Timeline -->
+    <div class="timeline-container" id="timelineContainer">
+      <div class="timeline-rail" id="timelineRail">
+        <!-- Floating live needle -->
+        <div class="timeline-bus-needle" id="timelineNeedle">🚌</div>
+        <!-- Stop items rendered here -->
       </div>
-      <a class="call-btn" id="sheetCallBtn" href="tel:01712345678" onclick="onCallDriver(event)">
-        <span>📞</span> কল করুন
-      </a>
     </div>
   </div>
 
   <script>
-    // Data seeds
-    const POLYLINE_COORDS = [[24.2502948, 89.9141733], [24.251748, 89.914588], [24.253147, 89.915113], [24.253714, 89.915307], [24.256492, 89.916416], [24.258277, 89.918166], [24.259314, 89.918343], [24.259789, 89.918633], [24.262139, 89.918777], [24.262393, 89.919115], [24.26321, 89.920491], [24.263645, 89.921087], [24.263811, 89.92117], [24.264173, 89.921256], [24.2642342, 89.921654], [24.2642516, 89.9218736], [24.264199, 89.9220637], [24.2640217, 89.9222622], [24.2637827, 89.9224838], [24.263626, 89.922557], [24.2634321, 89.9228288], [24.263063, 89.923072], [24.2627508, 89.9227675], [24.2624461, 89.92251], [24.2621358, 89.9223621], [24.2615456, 89.9221908], [24.2611369, 89.9221727], [24.2606873, 89.9221948], [24.2593741, 89.9220221], [24.2568615, 89.921823], [24.254523, 89.921417], [24.253991, 89.921175], [24.2533046, 89.9207629], [24.2525991, 89.9203629], [24.2515237, 89.919761], [24.2519364, 89.9182664], [24.2518339, 89.9176807], [24.2516848, 89.9171558], [24.2513898, 89.9167214], [24.2507906, 89.9155144], [24.2502948, 89.9141733], [24.2490788, 89.9137589], [24.2473088, 89.9132761], [24.2460429, 89.9131742], [24.2437113, 89.9131581], [24.243284, 89.910057], [24.2431396, 89.9096431], [24.241692, 89.906938], [24.2416603, 89.9057177], [24.241571, 89.9044815], [24.241379, 89.904106], [24.240997, 89.903725], [24.2343881, 89.9010761], [24.23423, 89.901018], [24.234061, 89.900742], [24.233995, 89.899546], [24.2340554, 89.8982729], [24.2339655, 89.8963754], [24.233983, 89.894326], [24.2336866, 89.8924726], [24.2348539, 89.8922845], [24.2358444, 89.8921924], [24.237079, 89.892138], [24.23713, 89.891947], [24.2375223, 89.8919773], [24.238052, 89.891953], [24.238344, 89.891939], [24.238527, 89.891845], [24.23862, 89.891641], [24.2388189, 89.8914966], [24.239032, 89.891345], [24.238769, 89.890772], [24.237612, 89.890614], [24.23649, 89.89059], [24.236362, 89.890594], [24.23618, 89.890555], [24.235934, 89.890279], [24.2358, 89.890228], [24.235365, 89.890131], [24.2351628, 89.8903235]];
+    // 1. Data seeds: 80 Polyline vertices & 28 Stations
+    const POLYLINE_COORDS = [[24.2351628, 89.8903235], [24.235365, 89.890131], [24.2358, 89.890228], [24.235934, 89.890279], [24.23618, 89.890555], [24.236362, 89.890594], [24.23649, 89.89059], [24.237612, 89.890614], [24.238769, 89.890772], [24.239032, 89.891345], [24.2388189, 89.8914966], [24.23862, 89.891641], [24.238527, 89.891845], [24.238344, 89.891939], [24.238052, 89.891953], [24.2375223, 89.8919773], [24.23713, 89.891947], [24.237079, 89.892138], [24.2358444, 89.8921924], [24.2348539, 89.8922845], [24.2336866, 89.8924726], [24.233983, 89.894326], [24.2339655, 89.8963754], [24.2340554, 89.8982729], [24.233995, 89.899546], [24.234061, 89.900742], [24.23423, 89.901018], [24.2343881, 89.9010761], [24.240997, 89.903725], [24.241379, 89.904106], [24.241571, 89.9044815], [24.2416603, 89.9057177], [24.241692, 89.906938], [24.2431396, 89.9096431], [24.243284, 89.910057], [24.2437113, 89.9131581], [24.2460429, 89.9131742], [24.2473088, 89.9132761], [24.2490788, 89.9137589], [24.2502948, 89.9141733], [24.2507906, 89.9155144], [24.2513898, 89.9167214], [24.2516848, 89.9171558], [24.2518339, 89.9176807], [24.2519364, 89.9182664], [24.2515237, 89.919761], [24.2525991, 89.9203629], [24.2533046, 89.9207629], [24.253991, 89.921175], [24.254523, 89.921417], [24.2568615, 89.921823], [24.2593741, 89.9220221], [24.2606873, 89.9221948], [24.2611369, 89.9221727], [24.2615456, 89.9221908], [24.2621358, 89.9223621], [24.2624461, 89.92251], [24.2627508, 89.9227675], [24.263063, 89.923072], [24.2634321, 89.9228288], [24.263626, 89.922557], [24.2637827, 89.9224838], [24.2640217, 89.9222622], [24.264199, 89.9220637], [24.2642516, 89.9218736], [24.2642342, 89.921654], [24.264173, 89.921256], [24.263811, 89.92117], [24.263645, 89.921087], [24.26321, 89.920491], [24.262393, 89.919115], [24.262139, 89.918777], [24.259789, 89.918633], [24.259314, 89.918343], [24.258277, 89.918166], [24.256492, 89.916416], [24.253714, 89.915307], [24.253147, 89.915113], [24.251748, 89.914588], [24.2502948, 89.9141733]];
     const STATIONS = [{"id": "mukto_mancho", "name": "Mukto Mancho Bus Stop", "nameBn": "মুক্তমঞ্চ বাস স্টপ", "lat": 24.2351628, "lon": 89.8903235, "order": 1, "isCampus": true}, {"id": "ab1", "name": "Academic Building-1 Bus Stop", "nameBn": "একাডেমিক ভবন-১ বাস স্টপ", "lat": 24.237612, "lon": 89.890614, "order": 2, "isCampus": true}, {"id": "bangabandhu_hall", "name": "Bangabandhu Hall Bus Stop", "nameBn": "বঙ্গবন্ধু হল বাস স্টপ", "lat": 24.238769, "lon": 89.890772, "order": 3, "isCampus": true}, {"id": "mannan_hall", "name": "Mannan Hall Bus Stop", "nameBn": "মান্নান হল বাস স্টপ", "lat": 24.2388189, "lon": 89.8914966, "order": 4, "isCampus": true}, {"id": "ab2", "name": "Academic Building-2 Bus Stop", "nameBn": "একাডেমিক ভবন-২ বাস স্টপ", "lat": 24.2375223, "lon": 89.8919773, "order": 5, "isCampus": true}, {"id": "fifth_gate", "name": "Fifth Gate Bus Stop", "nameBn": "পঞ্চম গেট বাস স্টপ", "lat": 24.2358444, "lon": 89.8921924, "order": 6, "isCampus": true}, {"id": "prottoi_71", "name": "Prottoi-71 Bus Stop", "nameBn": "প্রত্যয়-৭১ বাস স্টপ", "lat": 24.2348539, "lon": 89.8922845, "order": 7, "isCampus": true}, {"id": "first_gate", "name": "First Gate Bus Stop", "nameBn": "প্রথম গেট বাস স্টপ", "lat": 24.2336866, "lon": 89.8924726, "order": 8, "isCampus": true}, {"id": "arif_nagar", "name": "Arif Nagar Bus Stop", "nameBn": "আরিফ নগর বাস স্টপ", "lat": 24.2339655, "lon": 89.8963754, "order": 9, "isCampus": false}, {"id": "shena_nagar", "name": "Shena Nagar Bus Stop", "nameBn": "সেনা নগর বাস স্টপ", "lat": 24.2340554, "lon": 89.8982729, "order": 10, "isCampus": false}, {"id": "kagmari_more", "name": "Kagmari More Bus Stop", "nameBn": "কাগমারী মোড় বাস স্টপ", "lat": 24.2343881, "lon": 89.9010761, "order": 11, "isCampus": false}, {"id": "kagmari_bridge_1", "name": "Kagmari Bridge-1 Bus Stop", "nameBn": "কাগমারী ব্রিজ-১ বাস স্টপ", "lat": 24.241571, "lon": 89.9044815, "order": 12, "isCampus": false}, {"id": "kagmari_bridge_2", "name": "Kagmari Bridge-2 Bus Stop", "nameBn": "কাগমারী ব্রিজ-২ বাস স্টপ", "lat": 24.2416603, "lon": 89.9057177, "order": 13, "isCampus": false}, {"id": "baby_stand", "name": "Baby Stand Bus Stop", "nameBn": "বেবি স্ট্যান্ড বাস স্টপ", "lat": 24.2431396, "lon": 89.9096431, "order": 14, "isCampus": false}, {"id": "shantikunja", "name": "Shantikunja More Bus Stop", "nameBn": "শান্তিকুঞ্জ মোড় বাস স্টপ", "lat": 24.2437113, "lon": 89.9131581, "order": 15, "isCampus": false}, {"id": "nirala_more", "name": "Nirala More Bus Stop", "nameBn": "নিরালা মোড় বাস স্টপ", "lat": 24.2502948, "lon": 89.9141733, "order": 16, "isCampus": false}, {"id": "boro_kalibari", "name": "Boro Kalibari More Bus Stop", "nameBn": "বড় কালীবাড়ি মোড় বাস স্টপ", "lat": 24.2513898, "lon": 89.9167214, "order": 17, "isCampus": false}, {"id": "puraton_stand", "name": "Puraton Bus Stand Bus Stop", "nameBn": "পুরাতন বাস স্ট্যান্ড বাস স্টপ", "lat": 24.2515237, "lon": 89.919761, "order": 18, "isCampus": false}, {"id": "registry_para", "name": "Registry Para Road Bus Stop", "nameBn": "রেজিস্ট্রি পাড়া রোড বাস স্টপ", "lat": 24.2525991, "lon": 89.9203629, "order": 19, "isCampus": false}, {"id": "kumudini_gate", "name": "Kumudini College Gate Bus Stop", "nameBn": "কুমুদিনী কলেজ গেট বাস স্টপ", "lat": 24.2568615, "lon": 89.921823, "order": 20, "isCampus": false}, {"id": "cnb_more", "name": "C & B More Bus Stop", "nameBn": "সি অ্যান্ড বি মোড় বাস স্টপ", "lat": 24.2593741, "lon": 89.9220221, "order": 21, "isCampus": false}, {"id": "baitun_nur", "name": "Baitun Nur Jame Mosque Mor", "nameBn": "বায়তুন নূর জামে মসজিদ মোড়", "lat": 24.2621358, "lon": 89.9223621, "order": 22, "isCampus": false}, {"id": "kazi_nazrul", "name": "Kazi-Nazrul Sarani Bus Stop", "nameBn": "কাজী নজরুল সরণি বাস স্টপ", "lat": 24.2634321, "lon": 89.9228288, "order": 23, "isCampus": false}, {"id": "district_stop", "name": "District Bus Stop", "nameBn": "ডিস্ট্রিক্ট বাস স্টপ", "lat": 24.263626, "lon": 89.922557, "order": 24, "isCampus": false}, {"id": "dc_lake", "name": "DC Lake Bus Stop", "nameBn": "ডিসি লেক বাস স্টপ", "lat": 24.2640217, "lon": 89.9222622, "order": 25, "isCampus": false}, {"id": "bottola", "name": "Bottola Road Bus Stop", "nameBn": "বটতলা রোড বাস স্টপ", "lat": 24.259789, "lon": 89.918633, "order": 26, "isCampus": false}, {"id": "taltola", "name": "Taltola-Shimultoli Road Bus Stop", "nameBn": "তালতলা-শিমুলতলী রোড স্টপ", "lat": 24.253147, "lon": 89.915113, "order": 27, "isCampus": false}, {"id": "pouro_uddan", "name": "Pouro Uddan Bus Stop", "nameBn": "পৌর উদ্যান বাস স্টপ", "lat": 24.251748, "lon": 89.914588, "order": 28, "isCampus": false}];
+    const MILESTONES_KM = [0.0, 0.29, 0.42, 0.52, 0.68, 0.88, 0.99, 1.12, 1.52, 1.71, 2.02, 2.9, 3.03, 3.47, 3.83, 4.58, 4.86, 5.19, 5.33, 5.83, 6.11, 6.42, 6.59, 6.63, 6.68, 7.4, 8.24, 8.41];
+    const TOTAL_CORRIDOR_KM = 8.41;
 
+    // Fleet state
     const FLEET = [
-      { id: "SB0003", nameBn: "সোনারতরী", nameEn: "Sonartori", code: "0003", color: "#0284c7", lat: 24.2378, lon: 89.8942, speed: 28, heading: 175, route: "ক্যাম্পাস ➔ নিরালা", driver: "মোঃ রফিকুল ইসলাম", phone: "01712345678", nextStop: "বেবি স্ট্যান্ড", eta: "৩ মিনিট" },
-      { id: "SB0002", nameBn: "অগ্নিবীণা", nameEn: "Agnibina", code: "0002", color: "#f97316", lat: 24.2440, lon: 89.9070, speed: 32, heading: 355, route: "নিরালা ➔ ক্যাম্পাস", driver: "মোঃ মিজানুর রহমান", phone: "01723456789", nextStop: "কাগমারী মোড়", eta: "৪ মিনিট" },
-      { id: "SB0009", nameBn: "বনলতা", nameEn: "Banolata", code: "0009", color: "#059669", lat: 24.2505, lon: 89.9142, speed: 24, heading: 90, route: "ক্যাম্পাস ➔ নিরালা", driver: "মোঃ কামাল হোসেন", phone: "01734567890", nextStop: "পৌর উদ্যান", eta: "২ মিনিট" },
-      { id: "SB0001", nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", code: "0001", color: "#6366f1", lat: 24.2351, lon: 89.8903, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ডে অপেক্ষমাণ", driver: "মোঃ আলিম উদ্দীন", phone: "01745678901", nextStop: "স্ট্যান্ডবাই", eta: "স্ট্যান্ডবাই" },
-      { id: "SB0005", nameBn: "সংশপ্তক", nameEn: "Shangshaptak", code: "0005", color: "#8b5cf6", lat: 24.2387, lon: 89.8907, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ডে অপেক্ষমাণ", driver: "মোঃ শাহ আলম", phone: "01756789012", nextStop: "স্ট্যান্ডবাই", eta: "স্ট্যান্ডবাই" },
-      { id: "SB0010", nameBn: "রক্তকরবী", nameEn: "Raktakarabi", code: "0010", color: "#ec4899", lat: 24.2376, lon: 89.8919, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ডে অপেক্ষমাণ", driver: "মোঃ শরিফুল ইসলাম", phone: "01767890123", nextStop: "স্ট্যান্ডবাই", eta: "স্ট্যান্ডবাই" }
+      { id: "SB0003", nameBn: "সোনারতরী", nameEn: "Sonartori", code: "0003", color: "#0284c7", lat: 24.2378, lon: 89.8942, speed: 28, heading: 175, route: "ক্যাম্পাস ➔ নিরালা", driver: "মোঃ রফিকুল ইসলাম", phone: "01712345678" },
+      { id: "SB0002", nameBn: "অগ্নিবীণা", nameEn: "Agnibina", code: "0002", color: "#f97316", lat: 24.2440, lon: 89.9070, speed: 32, heading: 355, route: "নিরালা ➔ ক্যাম্পাস", driver: "মোঃ মিজানুর রহমান", phone: "01723456789" },
+      { id: "SB0009", nameBn: "বনলতা", nameEn: "Banolata", code: "0009", color: "#059669", lat: 24.2505, lon: 89.9142, speed: 24, heading: 90, route: "ক্যাম্পাস ➔ নিরালা", driver: "মোঃ কামাল হোসেন", phone: "01734567890" },
+      { id: "SB0001", nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", code: "0001", color: "#6366f1", lat: 24.2351, lon: 89.8903, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ড", driver: "মোঃ আলিম উদ্দীন", phone: "01745678901" },
+      { id: "SB0005", nameBn: "সংশপ্তক", nameEn: "Shangshaptak", code: "0005", color: "#8b5cf6", lat: 24.2387, lon: 89.8907, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ড", driver: "মোঃ শাহ আলম", phone: "01756789012" },
+      { id: "SB0010", nameBn: "রক্তকরবী", nameEn: "Raktakarabi", code: "0010", color: "#ec4899", lat: 24.2376, lon: 89.8919, speed: 0, heading: 0, route: "ক্যাম্পাস স্ট্যান্ড", driver: "মোঃ শরিফুল ইসলাম", phone: "01767890123" }
     ];
+
+    // Stateful trackers per bus for Hysteresis Engine
+    const busTrackers = {};
+    FLEET.forEach(b => {
+      busTrackers[b.id] = {
+        busId: b.id,
+        currentMilestoneKm: 0.0,
+        tripDirection: "to_city",
+        lastStationIndex: 0,
+        inArrivalZone: false,
+        isOffRoute: false,
+        lastUpdated: Date.now()
+      };
+    });
 
     let selectedBusId = "SB0003";
     let map = null;
     let busMarkers = {};
     let currentLayerType = "satellite";
     let tileLayer = null;
+    let userLocation = null;
+    let userNearestStation = null;
+    let isProximityAlertEnabled = true;
+    let notifiedBuses = {};
+    let socket = null;
 
-    // Bengali Digits Helper
+    // Bengali numerals converter
     function toBn(num) {
       const bn = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
       return String(num).replace(/\d/g, d => bn[d]);
     }
 
-    // Check connectivity and try redirecting to production web app if online
-    function tryReloadLive() {
-      if (window.navigator.onLine) {
-        window.location.replace("https://classmatebd.vercel.app/transit-preview?app=android&view=map");
+    // Cumulative polyline distance pre-calculation
+    const cumKm = [0.0];
+    for (let i = 0; i < POLYLINE_COORDS.length - 1; i++) {
+      const [lat1, lon1] = POLYLINE_COORDS[i];
+      const [lat2, lon2] = POLYLINE_COORDS[i+1];
+      const d = haversineMeters(lat1, lon1, lat2, lon2) / 1000.0;
+      cumKm.push(cumKm[cumKm.length - 1] + d);
+    }
+
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180.0;
+      const dLon = (lon2 - lon1) * Math.PI / 180.0;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180.0) * Math.cos(lat2 * Math.PI / 180.0) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // 1D Corridor Projection & Cross-Track Error
+    function projectToCorridor(lat, lon) {
+      let minDistM = Infinity;
+      let bestMilestoneKm = 0.0;
+      for (let i = 0; i < POLYLINE_COORDS.length - 1; i++) {
+        const [lat1, lon1] = POLYLINE_COORDS[i];
+        const [lat2, lon2] = POLYLINE_COORDS[i+1];
+        const midLat = ((lat1 + lat2) / 2.0) * Math.PI / 180.0;
+        const kx = 111320.0 * Math.cos(midLat);
+        const ky = 110540.0;
+        const bx = (lon2 - lon1) * kx;
+        const by = (lat2 - lat1) * ky;
+        const px = (lon - lon1) * kx;
+        const py = (lat - lat1) * ky;
+        const segLenSq = bx*bx + by*by;
+        let t = 0.0;
+        if (segLenSq > 1e-6) {
+          t = Math.max(0.0, Math.min(1.0, (px*bx + py*by) / segLenSq));
+        }
+        const qx = t * bx;
+        const qy = t * by;
+        const distM = Math.sqrt((px - qx)*(px - qx) + (py - qy)*(py - qy));
+        if (distM < minDistM) {
+          minDistM = distM;
+          const segDistKm = Math.sqrt(segLenSq) / 1000.0;
+          bestMilestoneKm = cumKm[i] + t * segDistKm;
+        }
+      }
+      return { milestoneKm: bestMilestoneKm, crossTrackMeters: minDistM };
+    }
+
+    // Hysteresis Stop Engine (Zero Blinking)
+    function updateHysteresis(bus) {
+      const tracker = busTrackers[bus.id];
+      const { milestoneKm, crossTrackMeters } = projectToCorridor(bus.lat, bus.lon);
+      tracker.currentMilestoneKm = milestoneKm;
+      tracker.lastUpdated = Date.now();
+
+      // Off-route check (> 260m)
+      tracker.isOffRoute = crossTrackMeters > 260;
+
+      // Terminal Turnaround Filter (Nirala & Pouro Uddan loop, M > 7.8km)
+      if (milestoneKm > 7.8) {
+        if (bus.heading != null && ((bus.heading >= 240 && bus.heading <= 360) || (bus.heading >= 0 && bus.heading <= 50))) {
+          tracker.tripDirection = "to_campus";
+        }
+      } else if (milestoneKm < 0.6) {
+        tracker.tripDirection = "to_city";
+      }
+
+      // Dual-Threshold Schmitt Trigger
+      const dir = tracker.tripDirection;
+      let currIdx = tracker.lastStationIndex;
+
+      if (dir === "to_city") {
+        const targetM = MILESTONES_KM[currIdx];
+        const distToTarget = targetM - milestoneKm;
+        // Arrival threshold: 35m
+        if (Math.abs(distToTarget) <= 0.035) {
+          tracker.inArrivalZone = true;
+        }
+        // Departure threshold: 20m forward
+        if (milestoneKm >= targetM + 0.020 && currIdx < STATIONS.length - 1) {
+          tracker.lastStationIndex = currIdx + 1;
+          tracker.inArrivalZone = false;
+        }
       } else {
-        alert("ইন্টারনেট সংযোগ নেই। অফলাইন মোডে রুট প্রদর্শিত হচ্ছে।");
+        // to_campus
+        const targetM = MILESTONES_KM[currIdx];
+        const distToTarget = milestoneKm - targetM;
+        if (Math.abs(distToTarget) <= 0.035) {
+          tracker.inArrivalZone = true;
+        }
+        if (milestoneKm <= targetM - 0.020 && currIdx > 0) {
+          tracker.lastStationIndex = currIdx - 1;
+          tracker.inArrivalZone = false;
+        }
       }
+
+      return tracker;
     }
 
-    window.addEventListener("online", () => {
-      document.getElementById("offlineBanner").style.display = "none";
-      tryReloadLive();
-    });
-
-    window.addEventListener("offline", () => {
-      document.getElementById("offlineBanner").style.display = "flex";
-    });
-
-    function hideLoadingOverlay() {
-      const el = document.getElementById("mapLoadingOverlay");
-      if (el) {
-        el.classList.add("is-ready");
-        setTimeout(() => { el.style.display = "none"; }, 400);
-      }
-    }
-
-    // Initialize Map with Esri World Imagery (Satellite) by default
+    // Map initialization
     function initTransitMap() {
-      if (!window.navigator.onLine) {
-        document.getElementById("offlineBanner").style.display = "flex";
-      }
-
       map = L.map("map", {
         center: [24.2375, 89.8920],
         zoom: 15,
@@ -827,7 +932,7 @@
 
       setMapTiles("satellite");
 
-      // Road Casing (White outer border)
+      // Road Casing
       L.polyline(POLYLINE_COORDS, {
         color: "#ffffff",
         weight: 8,
@@ -836,7 +941,7 @@
         lineJoin: "round"
       }).addTo(map);
 
-      // Road Fill (Emerald Green - matching official MBSTU Wheels)
+      // Road Fill (Emerald Green)
       L.polyline(POLYLINE_COORDS, {
         color: "#22c55e",
         weight: 4.5,
@@ -846,19 +951,18 @@
       }).addTo(map);
 
       // Render 28 Stoppages
-      const busSvg = `<svg viewBox="0 0 24 24"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>`;
-
-      STATIONS.forEach(st => {
+      STATIONS.forEach((st, idx) => {
+        const isCamp = st.isCampus;
         const icon = L.divIcon({
           className: "",
-          html: `<div class="stop-marker" title="${st.nameBn}">${busSvg}</div>`,
-          iconSize: [18, 18],
-          iconAnchor: [9, 9]
+          html: `<div class="stop-marker ${isCamp ? 'campus' : ''}" title="${st.nameBn}"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
         });
 
         L.marker([st.lat, st.lon], { icon }).addTo(map).bindTooltip(
-          `<div style="font-size:11px;font-weight:700;color:#fff;">${st.nameBn}</div>`,
-          { direction: "top", offset: [0, -8], className: "bg-slate-900 border border-slate-700 text-white rounded px-1.5 py-0.5" }
+          `<div style="font-size:11px;font-weight:700;color:#fff;">${st.nameBn} (${toBn(MILESTONES_KM[idx])} কিমি)</div>`,
+          { direction: "top", offset: [0, -6], className: "bg-slate-900 border border-slate-700 text-white rounded px-1.5 py-0.5" }
         );
       });
 
@@ -866,6 +970,23 @@
       renderBusMarkers();
       updateBusSheet();
       initLiveSocket();
+      trackUserLocation();
+
+      // Map ready signal
+      map.whenReady(() => {
+        hideLoadingOverlay();
+        if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.onMapReady) {
+          window.ClassMateNativeBridge.onMapReady();
+        }
+      });
+    }
+
+    function hideLoadingOverlay() {
+      const el = document.getElementById("mapLoadingOverlay");
+      if (el) {
+        el.classList.add("is-ready");
+        setTimeout(() => { el.style.display = "none"; }, 350);
+      }
     }
 
     function setMapTiles(type) {
@@ -887,70 +1008,39 @@
       }
 
       tileLayer.once("load", hideLoadingOverlay);
-      tileLayer.once("tileload", hideLoadingOverlay);
-      setTimeout(hideLoadingOverlay, 1000);
+      setTimeout(hideLoadingOverlay, 800);
     }
 
     function toggleMapLayer() {
-      const next = currentLayerType === "satellite" ? "street" : "satellite";
-      setMapTiles(next);
+      setMapTiles(currentLayerType === "satellite" ? "street" : "satellite");
     }
 
+    // Multi-Bus Carousel Switcher
     function renderBusPills() {
       const container = document.getElementById("busPillsRow");
+      if (!container) return;
+
       container.innerHTML = FLEET.map(b => {
-        const activeClass = b.id === selectedBusId ? "active" : "";
+        const isActive = b.id === selectedBusId;
+        const spd = b.speed > 0 ? `${toBn(b.speed)} কিমি` : "স্ট্যান্ড";
         return `
-          <div class="bus-pill ${activeClass}" onclick="selectBus('${b.id}')">
-            <span class="bus-pill-dot" style="background:${b.color};"></span>
+          <div class="bus-pill ${isActive ? 'active' : ''}" onclick="selectBus('${b.id}')">
+            <span class="bus-pill-dot" style="background:${b.color}"></span>
             <span>${b.nameBn}</span>
-            <span class="bus-pill-code">${b.code}</span>
-            ${b.speed > 0 ? `<span class="bus-pill-speed">${toBn(b.speed)} কিমি/ঘ</span>` : `<span style="font-size:9.5px;color:#94a3b8;">স্ট্যান্ডবাই</span>`}
+            <span class="bus-pill-speed">${spd}</span>
           </div>
         `;
       }).join("");
     }
 
-    function createBusMarkerHtml(bus) {
-      const isSelected = bus.id === selectedBusId;
-      return `
-        <div class="bus-puck" onclick="selectBus('${bus.id}')">
-          ${bus.speed > 0 ? `<div class="bus-heading-arrow" style="transform: rotate(${bus.heading}deg);"></div>` : ""}
-          <div class="bus-tag" style="border-color:${bus.color};">
-            <span>${bus.nameBn}</span>
-            ${bus.speed > 0 ? `<span style="color:#4ade80;">${toBn(bus.speed)}</span>` : ""}
-          </div>
-          <div class="bus-puck-circle" style="background:${bus.color};${isSelected ? 'box-shadow: 0 0 16px #38bdf8; transform:scale(1.15);' : ''}">
-            🚌
-          </div>
-        </div>
-      `;
-    }
-
-    function renderBusMarkers() {
-      FLEET.forEach(bus => {
-        const icon = L.divIcon({
-          className: "",
-          html: createBusMarkerHtml(bus),
-          iconSize: [40, 40],
-          iconAnchor: [20, 20]
-        });
-
-        if (busMarkers[bus.id]) {
-          busMarkers[bus.id].setLatLng([bus.lat, bus.lon]);
-          busMarkers[bus.id].setIcon(icon);
-        } else {
-          busMarkers[bus.id] = L.marker([bus.lat, bus.lon], { icon }).addTo(map);
-        }
-      });
-    }
-
     function selectBus(id) {
       selectedBusId = id;
       renderBusPills();
-      renderBusMarkers();
       updateBusSheet();
       centerOnBus();
+      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.vibrateTick) {
+        window.ClassMateNativeBridge.vibrateTick();
+      }
     }
 
     function centerOnBus() {
@@ -961,60 +1051,276 @@
     }
 
     function centerOnUserOrBus() {
-      centerOnBus();
+      if (userLocation && map) {
+        map.flyTo([userLocation.lat, userLocation.lon], 16, { duration: 0.8 });
+      } else {
+        centerOnBus();
+      }
     }
 
+    // Bus Marker Rendering (Pulsing Radar with scale 1.42 max)
+    function renderBusMarkers() {
+      FLEET.forEach(bus => {
+        const tracker = updateHysteresis(bus);
+        const headingDeg = bus.heading || 0;
+
+        const html = `
+          <div class="bus-marker-container">
+            <div class="bus-pulse-radar" style="border-color:${bus.color};"></div>
+            <div class="bus-heading-arrow" style="transform: rotate(${headingDeg}deg); transform-origin: 50% 18px;"></div>
+            <div class="bus-marker-icon" style="background:${bus.color};">🚌</div>
+          </div>
+        `;
+
+        if (!busMarkers[bus.id]) {
+          const icon = L.divIcon({
+            className: "",
+            html: html,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+          });
+          const m = L.marker([bus.lat, bus.lon], { icon }).addTo(map);
+          m.on("click", () => selectBus(bus.id));
+          busMarkers[bus.id] = m;
+        } else {
+          busMarkers[bus.id].setLatLng([bus.lat, bus.lon]);
+          const el = busMarkers[bus.id].getElement();
+          if (el) {
+            el.innerHTML = html;
+          }
+        }
+      });
+    }
+
+    // Direction Toggle
+    function toggleTripDirection() {
+      const tracker = busTrackers[selectedBusId];
+      tracker.tripDirection = tracker.tripDirection === "to_city" ? "to_campus" : "to_city";
+      updateBusSheet();
+      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.vibrateTick) {
+        window.ClassMateNativeBridge.vibrateTick();
+      }
+    }
+
+    // Bottom Sheet & Interactive Timeline Update
     function updateBusSheet() {
       const bus = FLEET.find(b => b.id === selectedBusId) || FLEET[0];
+      const tracker = busTrackers[bus.id] || updateHysteresis(bus);
+
       document.getElementById("sheetBusCode").innerText = bus.id;
       document.getElementById("sheetBusName").innerText = `${bus.nameBn} (${bus.nameEn})`;
-      document.getElementById("sheetBusSpeed").innerText = bus.speed > 0 ? `${toBn(bus.speed)} কিমি/ঘ` : "স্ট্যান্ডবাই";
-      document.getElementById("sheetBusEta").innerText = bus.speed > 0 ? `পরবর্তী স্টপ: ${bus.eta}` : "ক্যাম্পাস স্ট্যান্ডে আছে";
-      document.getElementById("sheetBusRoute").innerText = bus.route;
-      document.getElementById("sheetDriverName").innerText = bus.driver;
-      document.getElementById("sheetCallBtn").href = `tel:${bus.phone}`;
+      document.getElementById("sheetBusSpeed").innerText = bus.speed > 0 ? `${toBn(bus.speed)} কিমি/ঘ` : "অপেক্ষারত";
 
-      // Build timeline strip
-      const sampleStops = [
-        { name: "ক্যাম্পাস", state: "passed" },
-        { name: "প্রথম গেট", state: "passed" },
-        { name: bus.nextStop || "বেবি স্ট্যান্ড", state: "current" },
-        { name: "পুরাতন স্ট্যান্ড", state: "upcoming" },
-        { name: "নিরালা", state: "upcoming" }
-      ];
+      const isToCampus = tracker.tripDirection === "to_campus";
+      document.getElementById("sheetDirectionText").innerText = isToCampus 
+        ? "যাত্রার দিক: শহর ➔ ক্যাম্পাস" 
+        : "যাত্রার দিক: ক্যাম্পাস ➔ নিরালা";
 
-      document.getElementById("timelineStrip").innerHTML = sampleStops.map(s => `
-        <div class="timeline-node">
-          <div class="timeline-dot ${s.state}"></div>
-          <span class="timeline-label ${s.state === 'current' ? 'active' : ''}">${s.name}</span>
-        </div>
-      `).join("");
-    }
-
-    function onCallDriver(e) {
-      const bus = FLEET.find(b => b.id === selectedBusId);
-      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.callDriver) {
-        e.preventDefault();
-        window.ClassMateNativeBridge.callDriver(bus.phone);
-      }
-    }
-
-    function showListView() {
-      // Redirect to list mode in web app
-      if (window.navigator.onLine) {
-        window.location.replace("https://classmatebd.vercel.app/transit-preview?app=android&view=list");
+      // Off-Route banner
+      const offBanner = document.getElementById("offRouteBanner");
+      if (tracker.isOffRoute) {
+        offBanner.style.display = "flex";
       } else {
-        alert("তালিকা দেখতে ইন্টারনেট সংযোগ প্রয়োজন।");
+        offBanner.style.display = "none";
+      }
+
+      // Build ordered stations according to direction
+      const orderedStations = isToCampus 
+        ? [...STATIONS].reverse().map((s, i) => ({ ...s, origIdx: STATIONS.length - 1 - i }))
+        : STATIONS.map((s, i) => ({ ...s, origIdx: i }));
+
+      const currStopIdx = tracker.lastStationIndex;
+      const targetM = MILESTONES_KM[currStopIdx];
+      const mBus = tracker.currentMilestoneKm;
+
+      // Render timeline stops
+      const rail = document.getElementById("timelineRail");
+      const needle = document.getElementById("timelineNeedle");
+
+      const itemsHtml = orderedStations.map((st, i) => {
+        const origI = st.origIdx;
+        const stM = MILESTONES_KM[origI];
+        let state = "upcoming";
+        if (isToCampus) {
+          if (mBus < stM - 0.035) state = "passed";
+          else if (Math.abs(mBus - stM) <= 0.05) state = "current";
+        } else {
+          if (mBus > stM + 0.035) state = "passed";
+          else if (Math.abs(mBus - stM) <= 0.05) state = "current";
+        }
+
+        // ETA calculation
+        const distM = Math.abs(stM - mBus);
+        const effSpeed = Math.max(bus.speed, 22);
+        const etaMin = Math.max(1, Math.round((distM / effSpeed) * 60));
+        const metaText = state === "passed" ? "পার হয়েছে" : (state === "current" ? "পৌঁছেছে" : `${toBn(etaMin)} মি. (${toBn(distM.toFixed(1))} কিমি)`);
+
+        return `
+          <div class="timeline-stop-item" id="stopRow_${origI}">
+            <div class="timeline-dot ${state}"></div>
+            <span class="timeline-stop-name ${state === 'current' ? 'active' : ''}">${st.nameBn}</span>
+            <span class="timeline-stop-meta ${state === 'current' ? 'active' : ''}">${metaText}</span>
+          </div>
+        `;
+      }).join("");
+
+      rail.innerHTML = `<div class="timeline-bus-needle" id="timelineNeedle">🚌</div>` + itemsHtml;
+
+      // Position the needle dynamically on the vertical rail
+      const needleEl = document.getElementById("timelineNeedle");
+      if (needleEl) {
+        let progressFraction = 0;
+        if (isToCampus) {
+          progressFraction = Math.max(0, Math.min(1, (TOTAL_CORRIDOR_KM - mBus) / TOTAL_CORRIDOR_KM));
+        } else {
+          progressFraction = Math.max(0, Math.min(1, mBus / TOTAL_CORRIDOR_KM));
+        }
+        const totalHeight = rail.clientHeight || 300;
+        const needleTop = 15 + progressFraction * (totalHeight - 30);
+        needleEl.style.top = `${needleTop}px`;
       }
     }
 
-    function showMapView() {
-      // already in map view
+    // Geolocation & Nearest Stop Mapping (Feature 6)
+    function trackUserLocation() {
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.watchPosition((pos) => {
+        userLocation = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude
+        };
+        updateNearestStopAndAlert();
+      }, (err) => {
+        console.warn("Location error:", err);
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 10000
+      });
     }
 
+    function updateNearestStopAndAlert() {
+      if (!userLocation) return;
+
+      // Find nearest station to user
+      let minD = Infinity;
+      let nearestIdx = 0;
+      STATIONS.forEach((st, idx) => {
+        const d = haversineMeters(userLocation.lat, userLocation.lon, st.lat, st.lon);
+        if (d < minD) {
+          minD = d;
+          nearestIdx = idx;
+        }
+      });
+
+      userNearestStation = STATIONS[nearestIdx];
+      const nearestDistM = Math.round(minD);
+      const nameEl = document.getElementById("userNearestStopName");
+      if (nameEl) {
+        nameEl.innerText = `${userNearestStation.nameBn} (${toBn(nearestDistM)} মি. দূরে)`;
+      }
+
+      // Find most relevant approaching bus to user's station
+      const targetM = MILESTONES_KM[nearestIdx];
+      let bestBus = null;
+      let minEtaMinutes = Infinity;
+      let minBusDistM = Infinity;
+
+      FLEET.forEach(bus => {
+        const tracker = busTrackers[bus.id];
+        const mBus = tracker.currentMilestoneKm;
+        const isToCampus = tracker.tripDirection === "to_campus";
+
+        let isApproaching = false;
+        let distAlongCorridorKm = 0;
+
+        if (!isToCampus && mBus <= targetM + 0.05) {
+          isApproaching = true;
+          distAlongCorridorKm = targetM - mBus;
+        } else if (isToCampus && mBus >= targetM - 0.05) {
+          isApproaching = true;
+          distAlongCorridorKm = mBus - targetM;
+        }
+
+        if (isApproaching) {
+          const effSpeed = Math.max(bus.speed, 22);
+          const eta = Math.max(1, Math.round((distAlongCorridorKm / effSpeed) * 60));
+          if (eta < minEtaMinutes) {
+            minEtaMinutes = eta;
+            bestBus = bus;
+            minBusDistM = Math.round(distAlongCorridorKm * 1000);
+          }
+        }
+      });
+
+      const etaEl = document.getElementById("userNearestBusEta");
+      if (bestBus && etaEl) {
+        etaEl.innerText = `🚌 ${bestBus.nameBn} • পৌঁছাতে ${toBn(minEtaMinutes)} মিনিট বাকি`;
+
+        // Check if within alert proximity (<= 5 min or <= 1.2km)
+        if (isProximityAlertEnabled && (minEtaMinutes <= 5 || minBusDistM <= 1200)) {
+          triggerProximityNotification(bestBus, userNearestStation, minEtaMinutes, minBusDistM);
+        }
+      } else if (etaEl) {
+        etaEl.innerText = "বর্তমানে এই স্টপে কোনো বাস এগিয়ে আসছে না";
+      }
+    }
+
+    function triggerProximityNotification(bus, stop, etaMin, distM) {
+      const alertKey = `${bus.id}_${stop.id}`;
+      if (notifiedBuses[alertKey]) return; // already alerted
+      notifiedBuses[alertKey] = true;
+
+      // 1. In-App Banner
+      const banner = document.getElementById("proximityBanner");
+      const title = document.getElementById("proximityBannerTitle");
+      const sub = document.getElementById("proximityBannerSub");
+      if (banner && title && sub) {
+        title.innerText = `[${bus.nameBn}] আপনার স্টপেজের কাছাকাছি আসছে!`;
+        sub.innerText = `${stop.nameBn} পৌঁছাতে আনুমানিক ${toBn(etaMin)} মিনিট লাগবে (${toBn(distM)} মি.)। প্রস্তুত থাকুন।`;
+        banner.style.display = "flex";
+      }
+
+      // 2. Call Android Native Bridge for High-Priority Notification + Vibration Chime
+      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.notifyProximityAlert) {
+        window.ClassMateNativeBridge.notifyProximityAlert(bus.nameBn, stop.nameBn, etaMin, distM);
+      }
+    }
+
+    function dismissProximityBanner() {
+      const b = document.getElementById("proximityBanner");
+      if (b) b.style.display = "none";
+    }
+
+    function toggleProximityAlert() {
+      isProximityAlertEnabled = !isProximityAlertEnabled;
+      const btn = document.getElementById("btnAlertToggle");
+      const icon = document.getElementById("alertIcon");
+      const text = document.getElementById("alertText");
+
+      if (isProximityAlertEnabled) {
+        btn.className = "alert-toggle-btn enabled";
+        icon.innerText = "🔔";
+        text.innerText = "অ্যালার্ট চালু";
+      } else {
+        btn.className = "alert-toggle-btn disabled";
+        icon.innerText = "🔕";
+        text.innerText = "অ্যালার্ট বন্ধ";
+      }
+
+      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.setProximityAlertEnabled) {
+        window.ClassMateNativeBridge.setProximityAlertEnabled(isProximityAlertEnabled);
+      }
+      if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.vibrateTick) {
+        window.ClassMateNativeBridge.vibrateTick();
+      }
+    }
+
+    // Live Socket.io connection to MBSTU telemetry
     function initLiveSocket() {
       try {
-        const socket = io("https://transport.mbstu.ac.bd", {
+        socket = io("https://transport.mbstu.ac.bd", {
           path: "/socket.io",
           transports: ["websocket", "polling"],
           reconnection: true,
@@ -1034,6 +1340,7 @@
             });
             renderBusMarkers();
             updateBusSheet();
+            updateNearestStopAndAlert();
           }
         });
       } catch (err) {
@@ -1041,12 +1348,20 @@
       }
     }
 
-    window.__classmateTransitGoBack = function() {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else if (window.ClassMateNativeBridge && window.ClassMateNativeBridge.closeScreen) {
-        window.ClassMateNativeBridge.closeScreen();
+    // Android Tab Lifecycle Hooks (Battery & Data Conservation)
+    window.pauseLiveTransit = function() {
+      if (socket) {
+        try { socket.disconnect(); } catch (_) {}
       }
+    };
+
+    window.resumeLiveTransit = function() {
+      if (socket) {
+        try { socket.connect(); } catch (_) {}
+      } else {
+        initLiveSocket();
+      }
+      updateNearestStopAndAlert();
     };
 
     window.onload = initTransitMap;
