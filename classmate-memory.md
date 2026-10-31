@@ -11261,3 +11261,180 @@ To guarantee 1:1 behavioral and visual parity in the Android APK native layer:
    - `588df50`: `feat(transit): refine UI/UX, location-aware tracking, direction reversal and 28-stop timeline`
    - `acdd062`: `docs(memory): document section 181 for transit UI/UX refinement and location tracking`
    - Branch: `feature/live-bus-tracking` (pushed to remote `origin/feature/live-bus-tracking`).
+
+
+---
+
+## 182. Esri World Imagery (Maxar HD) Satellite Map Upgrade
+
+### 182.1 Problem Diagnostics & User Requirement (Step 32083)
+* **User Feedback & Screenshot Analysis**:
+  - The user observed that while OpenStreetMap raster street view was functional, the satellite view lacked the sharp resolution, architectural detail, and crispness present in the official MBSTU Wheels tracker (`transport.mbstu.ac.bd/MBSTU-Wheels`).
+  - The user submitted side-by-side screenshots (`media_1793410105943_d2bed97d.jpg` and `media_1793410118233_5fa90edd.jpg`) comparing the low-contrast Google Satellite imagery against the razor-sharp campus imagery on MBSTU Wheels.
+* **Root Cause & Tile Provider Investigation**:
+  - Unauthenticated Google Satellite tile URLs (`mt{s}.google.com/vt/lyrs=y`) in standard Leaflet web layers frequently default to lower zoom tier caps, aggressive rate-limiting, and heavy watermarking.
+  - Reverse-engineered the official MBSTU Wheels web application tile configuration and tested high-resolution alternatives across the MBSTU campus bounding box (lat `24.2373`, lon `89.8970`, zoom levels 16 to 20).
+  - Identified **Esri / ArcGIS World Imagery** (`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`), backed by Maxar and Microsoft aerial feeds, as the exact imagery provider powering MBSTU Wheels with clear rooftop visibility, campus road networks, and courtyard boundaries.
+
+### 182.2 Implementation Details (Commit `62b4083`)
+* **`web/src/components/transit.tsx`**:
+  - Replaced the satellite tile layer endpoint:
+    ```typescript
+    const tileUrl = satelliteView
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+    const layer = L.tileLayer(tileUrl, {
+      subdomains: satelliteView ? [] : ["a", "b", "c"],
+      attribution: satelliteView
+        ? "Tiles &copy; Esri, Maxar, Microsoft"
+        : "&copy; OpenStreetMap contributors",
+      maxZoom: 20,
+      maxNativeZoom: 19
+    });
+    ```
+  - Subdomains array set to `[]` to align with the ArcGIS REST tile protocol.
+  - Updated the FAB layer toggle button title and accessibility labels to `"এইচডি স্যাটেলাইট ম্যাপ (Esri/Maxar) দেখুন"` and `"Switch to Esri Maxar Satellite"`.
+
+### 182.3 Verification & Deployment
+* **Next.js Production Build**: Executed `npm --prefix web run build` with zero TypeScript or bundling errors.
+* **Vercel Production**: Deployed and aliased live at `https://classmatebd.vercel.app` (HTTP 200).
+* **Physical Device Screen Capture**: Verified on OnePlus Nord CE4 via ADB screencap, confirming HD satellite tile clarity across campus walkways, academic buildings, and Santosh corridor roads.
+* **Git Commit**: `62b4083`: `feat(transit): upgrade satellite map to Esri World Imagery (Maxar HD) matching MBSTU Wheels` on `feature/live-bus-tracking`.
+
+---
+
+## 183. Bus Route Stoppage Detail Architecture — Pinned Header, Isolated Timeline Scrolling, Laser-Straight Rail Alignment & Upward Auto-Scroll
+
+### 183.1 Problem Diagnostics & User Requirements (Step 32189)
+When a student selects a specific bus from the main transit screen to view its route and live progress, user testing revealed several critical usability and layout defects:
+1. **App-Level Scrolling Flaw**: Tapping a bus caused the entire detail screen to scroll as a single page. Scrolling down caused the top navigation bar, bus title, and next stop badge to vanish offscreen, forcing users to scroll all the way back up to check the bus status or tap back.
+2. **Horizontal Timeline Zigzag Deflection**: The milestone connecting lines and stop circle nodes suffered from horizontal misalignment across varying mobile device viewports (jumping 3–4px left and right) because fixed manual pixel offsets (`left: 23px` vs `left: 19px`) conflicted with dynamic container padding.
+3. **Cluttered Timeline Interruption**: An extra floating capsule card (`transit-timeline-live-bus-card-wrapper`) was injected directly into the vertical list flow displaying redundant text ("বাসের অবস্থান / distance from me"), breaking the continuous node-to-node line.
+4. **Disoriented Initial Viewport**: Entering the stoppage screen displayed the list from stop 1 at the top or an arbitrary middle position, requiring students to manually hunt for where the bus currently was.
+
+### 183.2 Architecture & Engineering Solutions (Commit `2a67beb`)
+1. **Stationary Pinned Top Section (`.transit-detail-pinned-top`)**:
+   - Locked `.transit-detail-screen` to `overflow: hidden; height: 100%; display: flex; flex-direction: column;`.
+   - Extracted the header, bus metadata chip, back button, map switcher, directional travel pills (`🏫 ক্যাম্পাস ➔ শহর` / `🏙️ শহর ➔ ক্যাম্পাস`), and the telemetry banner into `.transit-detail-pinned-top` with `flex-shrink: 0`.
+   - Guaranteed zero app-level scrolling: the entire top control panel remains permanently anchored at the top of the viewport.
+2. **Isolated Stoppage Scroll Container (`.transit-timeline-scroll-container`)**:
+   - Wrapped the 28 milestone stops in an independent scrolling container (`overflow-y: auto; flex: 1;`).
+   - Hidden intrusive browser scrollbars via `scrollbar-width: none; -ms-overflow-style: none; ::-webkit-scrollbar { display: none; }`.
+3. **Upward Auto-Scroll on Screen Entry**:
+   - Implemented dynamic auto-scroll on mount and direction change:
+     ```typescript
+     const targetIndex = activeApproachingIndex;
+     if (targetIndex >= 0 && scrollContainerRef.current) {
+       const stopElement = stopRefs.current[targetIndex];
+       if (stopElement) {
+         const containerTop = scrollContainerRef.current.offsetTop;
+         const targetTop = stopElement.offsetTop - containerTop - 54; // 54px headroom for previous stop
+         scrollContainerRef.current.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+       }
+     }
+     ```
+   - Automatically positions the approaching bus stop in the upper quadrant with ~54px headroom showing the previous stop peeking above it.
+   - Detects manual touch/wheel scrolling: temporarily suspends auto-follow and surfaces a floating pill `[ 🎯 বাসের অবস্থানে ফিরুন ]`, returning smoothly to the active stop on click.
+4. **Laser-Straight Rail Column (`.transit-timeline-rail`)**:
+   - Replaced fragile manual margin/left offsets with a fixed 32px-wide rail container in every milestone row.
+   - Both milestone node circles (`.transit-timeline-node`) and vertical track segments (`.transit-timeline-line`) utilize `left: 50%; transform: translateX(-50%)`.
+   - Enforces 100% laser-straight vertical alignment down the entire 28-stop corridor on all mobile screens.
+5. **Direct Node-to-Node Trail System**:
+   - Completely eliminated `transit-timeline-live-bus-card-wrapper`.
+   - **Passed Stops**: Completed milestone circles with green checkmark fill and `.line-passed`.
+   - **Live Traveling Segment**: High-visibility glowing gradient trail line (`.line-live`: `linear-gradient(to bottom, #10b981, #38bdf8)`) connecting the last passed stop directly to the approaching stop.
+   - **Approaching Stop**: Pulsing animated bus icon (`<Bus size={13} />`) with a radial halo.
+   - **Upcoming Stops**: Clean numbered milestones (`১, ২, ৩...`) with cumulative road mileage and drive ETA.
+6. **Auto-Adjustable Real-Time Next Stop Distance**:
+   - The live distance (e.g. `০.১৭ কিমি`) and driving time to the upcoming stop are pinned at the top inside `.transit-detail-telemetry-banner` and auto-recalculate upon every incoming Socket.IO telemetry packet.
+
+### 183.3 Verification & Deployment
+* **Build Verification**: `npm --prefix web run build` succeeded with 0 errors.
+* **Production Deployment**: Pushed live to Vercel production at `https://classmatebd.vercel.app` (HTTP 200).
+* **Git Commit**: `2a67beb`: `feat(transit): pin constant header and next stop badge, isolate routes scroll, center timeline rail, and auto-scroll current stop upward` on `feature/live-bus-tracking`.
+
+---
+
+## 184. Stoppage Quick Action Bottom Sheet Elevation, Brand Theme Alignment, Map Header Normalization & Mobile FAB Docking
+
+### 184.1 Problem Diagnostics & User Requirements (Step 32289)
+Following deployment of the isolated timeline view, five UI/UX issues were identified during live physical device testing:
+1. **Bottom Sheet Clipping**: Tapping any bus stop in the route view opened the stoppage action modal ("Get Notified" and "Track in Map"), which was covered and trapped behind the Android app's native bottom navigation bar (`GlassBottomNavView`).
+2. **Theme Discordance**: The stoppage bottom sheet was rendered in a dark navy palette (`#0f172a`), clashing with ClassMate's clean white/slate design system.
+3. **Map Header Jump**: Switching from the transit list view to the map view caused the map header overlay to drop vertically, creating an unpolished jump.
+4. **Mandatory Satellite Default**: User explicitly requested the map to permanently open in Satellite view and retire the street view toggle.
+5. **Map FAB Docking Collision**: Map action buttons (zoom controls, location recenter) were partially obstructed by the Android bottom navigation bar.
+
+### 184.2 Implementation & Architectural Resolutions (Commit `6c2c31b`)
+* **1. Stoppage Quick Action Bottom Sheet Clearance (`transit.css`)**:
+  - In `.transit-modal-overlay`:
+    ```css
+    .transit-modal-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      background: rgba(15, 23, 42, 0.5) !important;
+      backdrop-filter: blur(5px) !important;
+      -webkit-backdrop-filter: blur(5px) !important;
+      display: flex !important;
+      align-items: flex-end !important;
+      justify-content: center !important;
+      z-index: 9999 !important;
+      /* Lift safely above the Android Bottom Navigation Bar (~70-80px) */
+      padding: 16px 16px calc(86px + env(safe-area-inset-bottom, 0px)) 16px !important;
+      box-sizing: border-box !important;
+    }
+    ```
+  - Guarantees the action sheet floats cleanly above the Android bottom navigation bar with full touch accessibility.
+* **2. Brand Theme Harmony & Aesthetic Overhaul**:
+  - Revamped `.transit-action-sheet` from dark slate to ClassMate's light palette:
+    - Card container: `#ffffff` background with subtle pink outline (`1px solid #f2cfdb`), 24px rounded corners, and soft drop shadow (`box-shadow: 0 -8px 36px rgba(183, 20, 84, 0.14)`).
+    - Drag pill: `#e2e8f0` smooth capsule.
+    - Stoppage sequence badge: `#fbeaf0` soft pink background with brand magenta text (`#b71454`).
+    - Stoppage title: `#0f172a` bold typography with `#64748b` English subtitle.
+    - Distance pill (`.transit-action-sheet-dist-row`): `#fdf2f5` surface, `#fce4ec` border, and `#b71454` bold distance text.
+    - Action buttons:
+      - "Get Notified" (`.transit-action-btn-alert`): `#ffffff` background with emerald armed state (`#ecfdf5` / `#065f46`).
+      - "Track in Map" (`.transit-action-btn-map`): Solid brand magenta gradient (`#b71454`), white text, and 14px shadow.
+* **3. Map Header Normalization (Zero Vertical Jump)**:
+  - Aligned `.transit-top-overlay` with `top: 12px !important; left: 14px !important; right: 14px !important; z-index: 25 !important;` (and `top: 12px; left: 10px; right: 10px;` on mobile).
+  - Matches `.transit-list-header` exactly, completely eliminating the vertical drop when jumping between list and map views.
+* **4. Canonical HD Satellite View & Streamlined Map Controls (`transit.tsx`)**:
+  - Permanently initialized `satelliteView` state to `true`:
+    ```typescript
+    const [satelliteView, setSatelliteView] = useState<boolean>(true);
+    ```
+  - Locked the Leaflet tile layer permanently to **Esri World Imagery (Maxar HD)**, removing street view fallbacks and retiring the redundant layers switcher FAB button.
+* **5. Map Controls & Peek Card Clearance (`transit.css`)**:
+  - Elevated `.transit-fab-controls` bottom docking in Android app mode:
+    - Default (no card): `bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;`
+    - With active bus card: `bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;`
+  - Positioned floating bus peek card (`.transit-map-bus-card`) at `bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;`.
+  - Ensures complete visibility and tap clearance above the Android bottom navigation bar.
+
+### 184.3 Verification & Deployment
+* **Next.js Production Build**: `npm --prefix web run build` compiled cleanly in 6.7s with 0 errors.
+* **Live Vercel Production**: Deployed and aliased at `https://classmatebd.vercel.app` (`READY`).
+* **Repository Commits**:
+  - `6c2c31b`: `feat(transit): theme stoppage action sheet, float above navigation bar, align map header top, always open in satellite view and elevate map controls`
+  - Branch: `feature/live-bus-tracking` (pushed to remote `origin/feature/live-bus-tracking`).
+
+---
+
+### Master Production Verification Matrix (Updated Master State)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Esri World Imagery (Maxar HD) Satellite Map** | Web Companion & APK | **PRODUCTION** | ArcGIS REST Maxar/Microsoft satellite imagery matching MBSTU Wheels (Commit `62b4083`) |
+| **Stationary Pinned Detail Header & Telemetry** | Web Companion & APK | **PRODUCTION** | `.transit-detail-pinned-top` zero app scroll with live auto-adjusting next stop distance (Commit `2a67beb`) |
+| **Isolated 28-Stop Timeline Scroll & Headroom** | Web Companion & APK | **PRODUCTION** | Independent scroll container with upward auto-scroll positioning approaching stop at top (Commit `2a67beb`) |
+| **Laser-Straight Milestone Rail Column** | Web Companion & APK | **PRODUCTION** | Dedicated 32px rail column eliminating horizontal zigzag line deflection (Commit `2a67beb`) |
+| **Direct Node-to-Node Trail System** | Web Companion & APK | **PRODUCTION** | Passed checks, active `.line-live` gradient segment, animated pulsing bus node (Commit `2a67beb`) |
+| **Stoppage Quick Action Sheet Clearance & Theme** | Web Companion & APK | **PRODUCTION** | 86px bottom clearance above Android nav bar + brand white/pink theme restyle (Commit `6c2c31b`) |
+| **Zero-Drop Map Header Normalization** | Web Companion & APK | **PRODUCTION** | Aligned `transit-top-overlay` top offset to 12px matching list view header (Commit `6c2c31b`) |
+| **Permanent Satellite Mode & Retired Toggle** | Web Companion & APK | **PRODUCTION** | Locked tile layer to Esri Maxar HD and retired layers toggle FAB (Commit `6c2c31b`) |
+| **Map FAB Controls Docking Elevation** | Web Companion & APK | **PRODUCTION** | 88px/236px dynamic bottom docking above Android bottom navigation bar (Commit `6c2c31b`) |
+| **Two-Stage Location Permission Pipeline** | Web Companion & APK | **PRODUCTION** | Educational modal + Android bridge runtime delegation (`ACCESS_FINE_LOCATION`) (Commit `588df50`) |
+| **Touch Gesture Isolation (No Tab Swipe)** | Android APK | **PRODUCTION** | ViewPager horizontal swipe disabled on `nav_transit`, 100% Leaflet pan isolation (Commit `588df50`) |
+| **Zero-Collision 4-Row Transit Feed** | Web Companion & APK | **PRODUCTION** | Asymmetric search padding + compact bus card with live status and CTA (Commit `588df50`) |
+| **Unified Android Tab Navigation Routing** | Android APK | **PRODUCTION** | `ClassMateAuthActivity` routes `nav_transit` to `academicScreens` WebView shell (Commit `2e6db6f`) |
