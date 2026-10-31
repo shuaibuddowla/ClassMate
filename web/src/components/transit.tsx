@@ -539,6 +539,20 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
     return "";
   });
+  // Dedicated Bus Tracking Loading State (waits for real telemetry before displaying live options)
+  const [busLocationLoading, setBusLocationLoading] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash || "";
+      const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+      const searchParams = new URLSearchParams(window.location.search);
+      const b = hashParams?.get("bus") || hashParams?.get("busId") || searchParams.get("bus") || searchParams.get("busId") || (window as any).__classmateInitialBusId;
+      if (b) return true;
+    }
+    return false;
+  });
+  const busLoadingTimeoutRef = useRef<any>(null);
+  const selectedBusIdRef = useRef<string>(selectedBusId);
+  selectedBusIdRef.current = selectedBusId;
   const [satelliteView, setSatelliteView] = useState<boolean>(true);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
@@ -1003,6 +1017,9 @@ export function Transit({ ctx }: { ctx?: any }) {
   // Active Bus (ONLY when explicitly selected/tapped by the user)
   const selectedBus = useMemo<MbstuBusData | null>(() => {
     if (!selectedBusId) return null;
+    // Suppress boilerplate live options while bus location is actively loading
+    if (busLocationLoading) return null;
+
     const found = displayFleet.find((b) => b.id === selectedBusId);
     if (found) return found;
     const rawFound = fleet.find((b) => b.id === selectedBusId);
@@ -1031,7 +1048,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       };
     }
     return null;
-  }, [displayFleet, fleet, selectedBusId, clockNow, busInfoMap, schedulesMap]);
+  }, [displayFleet, fleet, selectedBusId, clockNow, busInfoMap, schedulesMap, busLocationLoading]);
 
   // Detailed Bus for Detail View
   const detailBus = useMemo(
@@ -1232,20 +1249,51 @@ export function Transit({ ctx }: { ctx?: any }) {
 
   // Switch to Map with Smooth Auto-Focus
   const switchToMap = useCallback((busId?: string) => {
+    setActiveView("map");
     if (busId) {
       setSelectedBusId(busId);
       setDetailBusId(busId);
-    }
-    setActiveView("map");
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-        const target = (busId ? displayFleet.find((b) => b.id === busId) : selectedBus) || displayFleet[0];
-        if (target) {
-          mapRef.current.flyTo([target.lat, target.lon], 17, { animate: true, duration: 0.8 });
+      const isAlreadyLive = displayFleet.some((b) => b.id === busId && !b.isEstimated);
+      if (isAlreadyLive) {
+        setBusLocationLoading(false);
+        if (busLoadingTimeoutRef.current) {
+          clearTimeout(busLoadingTimeoutRef.current);
+          busLoadingTimeoutRef.current = null;
         }
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.invalidateSize();
+            const target = displayFleet.find((b) => b.id === busId);
+            if (target) {
+              mapRef.current.flyTo([target.lat, target.lon], 17, { animate: true, duration: 0.8 });
+            }
+          }
+        }, 150);
+      } else {
+        // Start loading state until live GPS data arrives or times out
+        setBusLocationLoading(true);
+        if (busLoadingTimeoutRef.current) clearTimeout(busLoadingTimeoutRef.current);
+        busLoadingTimeoutRef.current = setTimeout(() => {
+          setBusLocationLoading(false);
+          busLoadingTimeoutRef.current = null;
+        }, 3200);
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.invalidateSize();
+          }
+        }, 150);
       }
-    }, 150);
+    } else {
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+          const target = selectedBus || displayFleet[0];
+          if (target && !target.isEstimated) {
+            mapRef.current.flyTo([target.lat, target.lon], 17, { animate: true, duration: 0.8 });
+          }
+        }
+      }, 150);
+    }
   }, [displayFleet, selectedBus]);
 
   const toggleDemoMode = useCallback(() => {
@@ -1322,12 +1370,7 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     const handleSelect = (busId: string) => {
       if (!busId) return;
-      setSelectedBusId(busId);
-      setDetailBusId(busId);
-      setActiveView("map");
-      setTimeout(() => {
-        switchToMap(busId);
-      }, 100);
+      switchToMap(busId);
     };
 
     (window as any).__classmateSelectBus = handleSelect;
@@ -1352,14 +1395,43 @@ export function Transit({ ctx }: { ctx?: any }) {
     };
   }, [switchToMap]);
 
-  // Auto-center camera when a bus is newly selected
+  // Handle initial bus on mount
   useEffect(() => {
-    if (!selectedBus || !mapRef.current) return;
-    const timer = setTimeout(() => {
-      centerSelectedBus();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [selectedBus?.id, centerSelectedBus]);
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash || "";
+    const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+    const searchParams = new URLSearchParams(window.location.search);
+    const initialBus = hashParams?.get("bus") || hashParams?.get("busId") || searchParams.get("bus") || searchParams.get("busId") || (window as any).__classmateInitialBusId;
+    if (initialBus) {
+      switchToMap(initialBus);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Monitor displayFleet: As soon as the selected bus arrives in live fleet, dismiss loading
+  useEffect(() => {
+    if (busLocationLoading && selectedBusId) {
+      const foundLive = displayFleet.some((b) => b.id === selectedBusId && !b.isEstimated);
+      if (foundLive) {
+        setBusLocationLoading(false);
+        if (busLoadingTimeoutRef.current) {
+          clearTimeout(busLoadingTimeoutRef.current);
+          busLoadingTimeoutRef.current = null;
+        }
+      }
+    }
+  }, [displayFleet, busLocationLoading, selectedBusId]);
+
+  // Auto-center camera when a bus is newly selected and loaded
+  useEffect(() => {
+    if (busLocationLoading || !selectedBus || !mapRef.current) return;
+    if (!selectedBus.isEstimated) {
+      const timer = setTimeout(() => {
+        centerSelectedBus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedBus?.id, selectedBus?.lat, selectedBus?.lon, busLocationLoading, centerSelectedBus]);
 
   // Fly to campus
   const recenterCampus = useCallback(() => {
@@ -1909,6 +1981,26 @@ export function Transit({ ctx }: { ctx?: any }) {
                 });
 
                 if (valid.length > 0) {
+                  // If selected bus's live telemetry is received in this packet, finish loading immediately
+                  if (selectedBusIdRef.current) {
+                    const targetId = selectedBusIdRef.current;
+                    const curImeiMap = imeiMapRef.current;
+                    const inPayload = valid.some((raw: any) => {
+                      let rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
+                      const imei = String(raw.imei || "").trim();
+                      if (imei && curImeiMap[imei]) rawId = curImeiMap[imei];
+                      if (rawId === "SB5488") rawId = "SB5448";
+                      return rawId === targetId;
+                    });
+                    if (inPayload) {
+                      setBusLocationLoading(false);
+                      if (busLoadingTimeoutRef.current) {
+                        clearTimeout(busLoadingTimeoutRef.current);
+                        busLoadingTimeoutRef.current = null;
+                      }
+                    }
+                  }
+
                   setFleet((prevFleet) => {
                     const map = new Map<string, MbstuBusData>();
                     prevFleet.forEach((b) => map.set(b.id, b));
@@ -3263,7 +3355,7 @@ export function Transit({ ctx }: { ctx?: any }) {
           )}
 
           {/* Right-Side Floating Map Controls (z-20) */}
-          <div className={`transit-fab-controls ${selectedBus ? "has-card" : "no-card"}`}>
+          <div className={`transit-fab-controls ${selectedBus || busLocationLoading ? "has-card" : "no-card"}`}>
             <div className="transit-fab-group">
               <button
                 onClick={() => mapRef.current?.zoomIn()}
@@ -3284,7 +3376,7 @@ export function Transit({ ctx }: { ctx?: any }) {
               </button>
             </div>
 
-            {selectedBus && (
+            {selectedBus && !busLocationLoading && (
               <button
                 onClick={centerSelectedBus}
                 className={`transit-fab-btn ${!isBusOffscreen ? "active-track" : ""}`}
@@ -3317,8 +3409,93 @@ export function Transit({ ctx }: { ctx?: any }) {
             </button>
           </div>
 
-          {/* C. Modern Floating Bus Peek Card (Fixed height summary, no vertical expansion, click 'সম্পূর্ণ রুট' for timeline) */}
-          {selectedBus && (
+          {/* C1. Dedicated Bus Tracking Loading Card (Displays until live GPS telemetry is retrieved) */}
+          {busLocationLoading && selectedBusId && (() => {
+            const loadingBusInfo = busInfoMap[selectedBusId] || KNOWN_BUS_INFO[selectedBusId] || {
+              nameBn: "বাস",
+              nameEn: "Bus",
+              color: "#b71454",
+              defaultRoute: "ক্যাম্পাস - টাঙ্গাইল শহর"
+            };
+            return (
+              <div
+                className="transit-bus-loading-card"
+                style={{ "--bus-accent": loadingBusInfo.color } as any}
+                role="status"
+                aria-live="polite"
+              >
+                {/* Header */}
+                <div className="transit-blc-header">
+                  <div className="transit-blc-identity">
+                    <span
+                      className="transit-blc-dot"
+                      style={{ backgroundColor: loadingBusInfo.color }}
+                    />
+                    <h2 className="transit-blc-name">{loadingBusInfo.nameBn}</h2>
+                    <span
+                      className="transit-blc-id"
+                      style={{
+                        backgroundColor: `${loadingBusInfo.color}18`,
+                        color: loadingBusInfo.color,
+                        borderColor: `${loadingBusInfo.color}35`
+                      }}
+                    >
+                      {toBengaliDigits(formatBusShortId(selectedBusId))}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedBusId("");
+                      setBusLocationLoading(false);
+                      if (busLoadingTimeoutRef.current) {
+                        clearTimeout(busLoadingTimeoutRef.current);
+                        busLoadingTimeoutRef.current = null;
+                      }
+                    }}
+                    className="transit-mbc-close-btn"
+                    title="অনুসন্ধান বাতিল করুন"
+                    aria-label="Cancel bus tracking"
+                    type="button"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Radar Pulse & Loading Message */}
+                <div className="transit-blc-body">
+                  <div className="transit-blc-radar-wrapper">
+                    <div className="transit-blc-radar-ping" style={{ borderColor: loadingBusInfo.color }} />
+                    <div className="transit-blc-radar-core" style={{ backgroundColor: loadingBusInfo.color }}>
+                      <Radio size={16} color="#ffffff" className="transit-blc-radio-icon" />
+                    </div>
+                  </div>
+                  <div className="transit-blc-text-col">
+                    <div className="transit-blc-title">
+                      <span>লাইভ অবস্থান লোড হচ্ছে…</span>
+                    </div>
+                    <div className="transit-blc-subtitle">
+                      MBSTU Wheels স্যাটেলাইট টেলিমেট্রি সার্ভার থেকে জিপিএস সংকেত অনুসন্ধান করা হচ্ছে
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shimmer Progress bar */}
+                <div className="transit-blc-progress-track">
+                  <div
+                    className="transit-blc-progress-bar"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${loadingBusInfo.color}, transparent)`
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* C2. Modern Floating Bus Peek Card (Renders ONLY after bus location has loaded) */}
+          {selectedBus && !busLocationLoading && (
             <div
               className="transit-map-bus-card"
               style={{ "--bus-accent": selectedBus.color } as any}
@@ -3358,6 +3535,8 @@ export function Transit({ ctx }: { ctx?: any }) {
                         ? "GPS বিলম্বিত"
                         : selectedBus.speed > 0
                         ? `⚡ চলন্ত (${toBengaliDigits(Math.round(selectedBus.speed))} কিমি/ঘ)`
+                        : selectedBus.isEstimated
+                        ? "🅿️ জিপিএস স্ট্যান্ডবাই"
                         : "🅿️ ক্যাম্পাস স্ট্যান্ডবাই"}
                     </span>
                   </div>
@@ -3394,44 +3573,55 @@ export function Transit({ ctx }: { ctx?: any }) {
                 </div>
               )}
 
-              {/* Row 3: Next Approaching Stop Banner */}
-              {nextApproachingStopInfo && (
-                <div className="transit-mbc-stop-banner">
-                  <div className="transit-mbc-stop-info">
-                    <div className="transit-mbc-stop-title-line">
-                      <MapPin size={13} className="transit-mbc-stop-pin" />
-                      <span className="transit-mbc-stop-prefix">পরবর্তী স্টপ:</span>
-                      <strong className="transit-mbc-stop-name">{nextApproachingStopInfo.station.nameBn}</strong>
-                    </div>
-
-                    <div className="transit-mbc-telemetry-line">
-                      <span>দূরত্ব: <strong>{toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি</strong></span>
-                      <span className="transit-mbc-sep">•</span>
-                      <span>ড্রাইভ: <strong>~{toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি</strong></span>
-                      {userLocation && (
-                        <>
-                          <span className="transit-mbc-sep">•</span>
-                          <span className="transit-mbc-user-dist">
-                            আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}
-                          </span>
-                        </>
-                      )}
-                    </div>
+              {/* Row 3: Next Approaching Stop Banner OR Standby Notice */}
+              {selectedBus.isEstimated ? (
+                <div className="transit-mbc-standby-banner">
+                  <div className="transit-mbc-standby-row">
+                    <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0 }} />
+                    <span className="transit-mbc-standby-text">
+                      বাসটির লাইভ জিপিএস সংযোগ বর্তমানে সক্রিয় নেই। বাসটি ট্রিপ বিরতিতে অথবা ক্যাম্পাসে স্ট্যান্ডবাই রয়েছে।
+                    </span>
                   </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleStopAlert(nextApproachingStopInfo.station.id);
-                    }}
-                    className={`transit-mbc-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
-                    title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয় — বন্ধ করতে ট্যাপ করুন" : "স্টপে পৌঁছালে অ্যালার্ট পেতে ট্যাপ করুন"}
-                    type="button"
-                    aria-label="Toggle arrival notification"
-                  >
-                    <Bell size={15} />
-                  </button>
                 </div>
+              ) : (
+                nextApproachingStopInfo && (
+                  <div className="transit-mbc-stop-banner">
+                    <div className="transit-mbc-stop-info">
+                      <div className="transit-mbc-stop-title-line">
+                        <MapPin size={13} className="transit-mbc-stop-pin" />
+                        <span className="transit-mbc-stop-prefix">পরবর্তী স্টপ:</span>
+                        <strong className="transit-mbc-stop-name">{nextApproachingStopInfo.station.nameBn}</strong>
+                      </div>
+
+                      <div className="transit-mbc-telemetry-line">
+                        <span>দূরত্ব: <strong>{toBengaliDigits(nextApproachingStopInfo.distanceKm)} কিমি</strong></span>
+                        <span className="transit-mbc-sep">•</span>
+                        <span>ড্রাইভ: <strong>~{toBengaliDigits(nextApproachingStopInfo.etaMinutes)} মি</strong></span>
+                        {userLocation && (
+                          <>
+                            <span className="transit-mbc-sep">•</span>
+                            <span className="transit-mbc-user-dist">
+                              আপনার থেকে {formatDistanceUser(getDistanceMeters(userLocation.lat, userLocation.lon, selectedBus.lat, selectedBus.lon))}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStopAlert(nextApproachingStopInfo.station.id);
+                      }}
+                      className={`transit-mbc-bell-btn ${alertedStops[nextApproachingStopInfo.station.id] ? "armed" : ""}`}
+                      title={alertedStops[nextApproachingStopInfo.station.id] ? "অ্যালার্ট সক্রিয় — বন্ধ করতে ট্যাপ করুন" : "স্টপে পৌঁছালে অ্যালার্ট পেতে ট্যাপ করুন"}
+                      type="button"
+                      aria-label="Toggle arrival notification"
+                    >
+                      <Bell size={15} />
+                    </button>
+                  </div>
+                )
               )}
 
               {/* Row 4: Primary Action CTA */}

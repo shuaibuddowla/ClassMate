@@ -13616,4 +13616,489 @@ Replaced the legacy basic text layout with a modern, high-density `MaterialCardV
 | **Terminal Turnaround Filter** | Web & Android APK | **PRODUCTION** | Victoria Road heading filter ($240^\circ-360^\circ$ / $0^\circ-50^\circ$) preventing terminus flutters (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
 | **Multi-Bus Horizontal Carousel Switcher** | Web & Android APK | **PRODUCTION** | Scrollable chip carousel atop timeline for 0ms one-tap bus switching without navigation pop (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v202) |
+---
 
+## 203. Timetable Duplicate Schedule Elimination, Pure MBSTU Wheels Automation, and Dynamic Bus Roster Architecture
+
+### 203.1 Operational Context & Root Cause Analysis (Commit 7d5fc8f)
+Following the initial dynamic integration of the MBSTU Wheels schedule API (Section 202), user review in Input 413 identified a critical UI redundancy in the Timetable bus schedule view:
+> *"There are some things that are still confusing. In the list of buses, Gitanjali, Agnivina, Sonartori, and Saptak, when the bus list with their name ends, I see there another list which is labeled as Student Bus Schedules. I think we don't need it anymore because we have mapped everything by bus names. Can you figure it out? Are we repeating the same work twice in the same UI?"*
+
+```mermaid
+flowchart TD
+    subgraph Legacy Hybrid Flaw
+        A["Fetch MBSTU Wheels 8 Buses"] --> C["Merged Entries Array"]
+        B["Query Supabase bus_schedules (10 Generic Rows)"] --> C
+        C --> D["Header Shows: 18 schedules"]
+        C --> E["Duplicate Card Rendering Under 'Student bus schedule'"]
+    end
+
+    subgraph Pure MBSTU Wheels Architecture
+        F["Fetch MBSTU Wheels 8 Buses"] --> G["Pure MBSTU Snapshot (is_mbstu == true)"]
+        G --> H["Header Accurately Shows: 8 buses"]
+        G --> I["Clean 8-Card Roster (No Duplicates)"]
+        G --> J["Hide 'Add Bus' Button (Authoritative Server Roster)"]
+    end
+```
+
+#### Root Cause Analysis:
+1. **Legacy Supabase Hybrid Merge**: Prior to real-time integration with MBSTU Wheels, ClassMate maintained manual routine records in Supabase's `bus_schedules` table with generic route names like `"Student bus schedule"`.
+2. **Double Ingestion**: During the initial rollout of Section 202, both the Android client (`ClassMateAcademicScreensSupabase.kt`) and the Web client (`web/src/components/schedule.tsx`) fetched the 8 official buses from the MBSTU Wheels API *and* queried Supabase's `bus_schedules`, concatenating both datasets into `mergedEntries`.
+3. **UI Inconsistencies**:
+   - The top header displayed `"18 schedules"` instead of `"8 buses"`.
+   - After the 8th bus (রাখালী), a duplicate block titled `"Student bus schedule"` or `"অতিরিক্ত / কাস্টম রুট"` appeared with 10 outdated entries.
+   - The UI displayed an obsolete `"Add Bus"` button, which conflicted with the authoritative, automated server-synchronized fleet schedule.
+
+---
+
+### 203.2 Native Android APK Implementation Details (`ClassMateAcademicScreensSupabase.kt`)
+1. **Elimination of Legacy Supabase Fetch**:
+   - Removed the query to `ClassMateAuthApi.rows("bus_schedules", ...)` in `refreshTimetableCache`.
+   - Updated cache snapshot creation to contain strictly the pure MBSTU dataset:
+     ```kotlin
+     val mbstuBuses = fetchMbstuLiveBusScheduleEntries(activity)
+     snapshot = JSONObject().put("entries", mbstuBuses).put("saved_at", System.currentTimeMillis())
+     ```
+2. **Strict `is_mbstu` Snapshot Filtering**:
+   - Updated the cache validation check to ensure snapshots are purely MBSTU:
+     ```kotlin
+     val isPureMbstu = if (requestedBusMode) {
+         snapshot?.optJSONArray("entries")?.let { arr ->
+             arr.length() > 0 && (0 until arr.length()).all { arr.optJSONObject(it)?.optBoolean("is_mbstu") == true }
+         } ?: false
+     } else true
+     ```
+   - Guarded entry filtering when rendering:
+     ```kotlin
+     val allEntries = rows(data.optJSONArray("entries") ?: JSONArray()).let { list -> 
+         if (requestedBusMode) list.filter { it.optBoolean("is_mbstu") } else list 
+     }
+     ```
+3. **Header Counter & Permission Clean-Up**:
+   - Disabled manual bus editing in bus mode: `val canEdit = if (busMode) false`.
+   - Updated counter string formatting:
+     ```kotlin
+     text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "bus" else "buses" } else if (entries.size == 1) "class" else "classes"}")
+     ```
+   - Top counter now cleanly displays `"8 buses"` (or `"1 bus"`).
+
+---
+
+### 203.3 Web Companion Client Implementation Details (`web/src/components/schedule.tsx`)
+1. **Stripped Custom Section UI**:
+   - Completely deleted the `.bus-custom-section` and its nested mapping loop that previously rendered Supabase custom schedules underneath the main grid.
+2. **Simplified Entries & Error Boundaries**:
+   - Simplified `entries` assignment: in bus mode, the timetable relies exclusively on the synchronized `mbstuSchedules` dictionary.
+   - Guarded empty states and skeleton loaders to check `Object.keys(mbstuSchedules).length === 0`.
+3. **Removed Redundant Action Buttons**:
+   - Restricted the top right action button so that `"Add Bus"` is completely hidden:
+     ```tsx
+     {mode === "routine" &&
+       Object.values(editable.data || {}).some(Boolean) && (
+         <button className="primary" onClick={() => setEditing({})}>
+           <Plus size={18} />
+           Add Period
+         </button>
+       )}
+     ```
+
+---
+
+### 203.4 Debugging, Hardware Verification & Production Deployment
+- **On-Device ADB Audit**:
+  - Test Hardware: OnePlus Nord CE4 / Oppo Reno 11F 5G (`CPH2621`, Serial `6478ab80`).
+  - Executed ADB UI dump:
+    ```bash
+    adb -s 6478ab80 shell uiautomator dump /sdcard/window_dump.xml
+    adb -s 6478ab80 shell cat /sdcard/window_dump.xml
+    ```
+  - Traversed the RecyclerView to the bottom: verified that after card 8 (রাখালী / `#SB5448`), no further duplicate rows exist.
+  - Confirmed `tvPeriodCount` text equals `"8 buses"`.
+- **Web Production Build & Deployment**:
+  - `npm --prefix web run build` compiled 15/15 routes cleanly in 758ms.
+  - Deployed live to Vercel production: [classmatebd.vercel.app](https://classmatebd.vercel.app) (Deployment ID: `dpl_BNUs6eGtQiCCcLpBEfxDpxN5hnNo`).
+- **Git Commit**: Committed as [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170) (*`fix(bus): eliminate duplicate student bus schedule section in timetable and streamline pure MBSTU Wheels integration`*).
+
+---
+
+### 203.5 Master Production Verification Matrix (Updated Master State v203)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Pure MBSTU Wheels Bus Roster** | Web & Android APK | **PRODUCTION** | Stripped legacy Supabase `bus_schedules` duplicates; verified exact 8-bus fleet on device `6478ab80` (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Timetable Header Bus Count Precision** | Web & Android APK | **PRODUCTION** | Corrected count from "18 schedules" to "8 buses", removed obsolete "Add Bus" button (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Dynamic MBSTU Wheels Bus Schedule Sync** | Web & Android APK | **PRODUCTION** | Live polling of `https://transport.mbstu.ac.bd/api/bus-schedule/` with offline cache fallback (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Timetable Bus Schedule UI Overhaul** | Web & Android APK | **PRODUCTION** | Modern card layout, Next Departure Hero with countdowns, 3-way direction filter bar, timechips (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Pilot Direct Dialing (`tel:` / `ACTION_DIAL`)** | Web & Android APK | **PRODUCTION** | 1-tap driver call button on all bus cards, verified with telephone URIs and native dialer intents |
+| **Next.js SSR Prerender Resilience** | Web Companion | **PRODUCTION** | Guarded `window` and `AudioContext`, clean static build, deployed to Vercel production |
+| **Zero-Unsolicited-UI Governance Enforcement** | Web & Android APK | **PRODUCTION** | Soft ClassMate palettes, pink markers `#b71454`, lollipop stops; zero unauthorized styling (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Instant Offline-First Bootstrap** | Android APK Assets | **PRODUCTION** | Bundled Leaflet assets in `assets/transit/`, zero black screen (<50ms load) (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Schmitt-Trigger Next-Stop Hysteresis** | Web & Android APK | **PRODUCTION** | 1D milestone projection, 35m arrival / 20m departure threshold, 0 stop flips in 230 simulation frames (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Ghost Bus GPS Signal Filter** | Web & Android APK | **PRODUCTION** | Non-reporting / off-corridor buses filtered from active map/timeline, segregated to standby timetable (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v203) |
+
+---
+
+## 204. Bus Card One-Tap Live Map Tracking, Transit Auto-Selection & Focusing Engine, and Redundant Hero Card Removal
+
+### 204.1 Operational Context & Targeted UI/UX Directives (Commit 43f7905)
+In User Request 414, the user issued two targeted architectural improvements to refine the user journey between the bus schedule and live tracking subsystems:
+> *"Add these two UI/UX updates to the existing implementation:*
+> 
+> *### 1. Replace the Call button with a Track button*
+> *- In each batch dialogue where bus information and the driver's/pilot's phone number are displayed, replace the existing Call button/icon with a Track button.*
+> *- The Track button should navigate directly to the Transit tab.*
+> *- It should automatically focus on or select the corresponding bus on the live map.*
+> *- Display that bus's current location, live tracking status, and relevant bus details.*
+> *- Make sure the selected bus is identifiable immediately when the user enters the Transit tab.*
+> *- Do not simply open the Transit tab without selecting the relevant bus.*
+> 
+> *### 2. Remove the Next Departure hero badge*
+> *- In the Bus Schedule tab, remove the Next Departure hero badge/card entirely.*
+> *- Since the updated schedule now lists individual buses with their names and departure details, this hero element is redundant.*
+> *- Do not replace it with another summary badge or hero card.*
+> *- Keep the bus schedule layout clean, compact, and focused on the individual bus listings.*
+> 
+> *Important: Preserve the existing functionality, navigation structure, and visual design system. These are targeted improvements, not a redesign of the entire Transit or Bus Schedule experience."*
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Student User
+    participant BusCard as Timetable Bus Card (btnTrackBus)
+    participant Academic as ClassMateAcademicScreensSupabase
+    participant Auth as ClassMateAuthActivity
+    participant Transit as Transit WebView / Component
+    participant Map as Leaflet Satellite Engine
+
+    User->>BusCard: Taps "ট্র্যাক" Button (e.g. SB0001 Gitanjali)
+    BusCard->>Academic: openTransitForBus("SB0001")
+    Academic->>Auth: selectHomeTab(R.id.nav_transit)
+    Note over Academic,Auth: pendingTransitBusId = "SB0001"
+    Auth-->>Transit: Switch to Transit Tab & Resume WebView
+    Academic->>Transit: evaluateJavascript("window.__classmateSelectBus('SB0001')")
+    Transit->>Transit: Set selectedBusId & detailBusId = "SB0001"
+    alt Bus is Transmitting Live GPS
+        Transit->>Map: centerSelectedBus() -> map.flyTo([lat, lon], 16)
+    else Bus is Standby / Offline
+        Transit->>Transit: Generate Synthetic Standby Record at Campus Terminal
+        Transit->>Map: Spiderfy & flyTo Campus Terminal Pin
+    end
+    Transit-->>User: Selected Bus Highlighting & Detail Panel Visible in 0ms!
+```
+
+---
+
+### 204.2 Native Android APK Implementation Details
+
+#### A. Card Layout Overhaul (`item_student_bus_schedule.xml`)
+- Replaced `btnCallPilot` / `ivCallIcon` with modern, compact `btnTrackBus`:
+  ```xml
+  <!-- Track Bus Pill Button -->
+  <LinearLayout
+      android:id="@+id/btnTrackBus"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:paddingHorizontal="10dp"
+      android:paddingVertical="6dp"
+      android:background="@drawable/bg_badge_blue"
+      android:clickable="true"
+      android:focusable="true">
+
+      <ImageView
+          android:layout_width="14dp"
+          android:layout_height="14dp"
+          android:layout_marginEnd="4dp"
+          android:src="@drawable/ic_location"
+          app:tint="@color/cm_primary"
+          android:importantForAccessibility="no" />
+
+      <TextView
+          android:id="@+id/tvTrackBusText"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="ট্র্যাক"
+          android:textSize="12sp"
+          android:textStyle="bold"
+          android:textColor="@color/cm_primary" />
+  </LinearLayout>
+  ```
+
+#### B. Cross-Tab Auto-Selection Engine (`ClassMateAcademicScreensSupabase.kt`)
+1. **Pending Bus Selection Coordinator**:
+   ```kotlin
+   private var pendingTransitBusId: String? = null
+
+   fun openTransitForBus(busId: String) {
+       val authActivity = activity as? ClassMateAuthActivity
+       val cleanBusId = if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
+       pendingTransitBusId = cleanBusId
+
+       // 1. Navigate directly to transit tab
+       authActivity?.selectHomeTab(R.id.nav_transit)
+
+       // 2. Select and focus on the corresponding bus in the webview
+       val webView = tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)
+           ?: activity.findViewById<android.webkit.WebView>(R.id.transit_webview)
+
+       webView?.post {
+           webView.evaluateJavascript(
+               "if (window.__classmateSelectBus) { window.__classmateSelectBus('$cleanBusId'); } else { window.__classmateInitialBusId = '$cleanBusId'; window.location.hash = '#transit?bus=$cleanBusId'; }",
+               null
+           )
+       }
+   }
+   ```
+2. **Tab Switch & Map Handshake Lifecycle**:
+   - In `onTabSelected(R.id.nav_transit)`:
+     ```kotlin
+     if (tab == R.id.nav_transit) {
+         resumeTransitWebView()
+         pendingTransitBusId?.let { targetBus ->
+             tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+                 postDelayed({
+                     evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                 }, 200)
+             }
+         }
+     }
+     ```
+   - In `bridge.onMapReadyListener`:
+     ```kotlin
+     pendingTransitBusId?.let { targetBus ->
+         webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+     }
+     ```
+   - Parameterized authoritative URL fallback: `transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map$busParam&v=20261101_track"`.
+3. **Interactive Binding**:
+   - In `bindBusScheduleItem`: Wired both `btnTrackBus` and whole-card `root.setOnClickListener` to invoke `openTransitForBus(busNo)` with native selection haptic feedback (`ClassMateHaptics.selection`).
+4. **Hero Badge Removal**:
+   - In `scheduleBus`: Executed `root.v<View>(R.id.busSummary).visibility = View.GONE` to eliminate the Next Departure summary card entirely, and skipped the 60-second summary tick runnable when in bus mode.
+
+---
+
+### 204.3 Web Companion Client Implementation Details (`schedule.tsx`, `transit.tsx` & `globals.css`)
+
+#### A. Web Schedule Component (`web/src/components/schedule.tsx`)
+- Completely removed the `<BusHero ... />` component invocation and its associated departure time calculations.
+- Replaced the pilot phone button with `.bus-track-action-btn`:
+  ```tsx
+  <button
+    type="button"
+    className="bus-track-action-btn"
+    title={`${bus.nameBn} লাইভ ট্র্যাক করুন`}
+    onClick={(e) => {
+      e.stopPropagation();
+      if (typeof window !== "undefined") {
+        window.location.hash = `#transit?bus=${bus.busId}`;
+        window.dispatchEvent(new CustomEvent("classmate-select-bus", { detail: { busId: bus.busId } }));
+      }
+    }}
+  >
+    <MapPin size={14} />
+    <span>ট্র্যাক</span>
+  </button>
+  ```
+
+#### B. Transit Live Selection & Camera Centering (`web/src/components/transit.tsx`)
+- **Initial URL & Hash Bus Extraction**:
+  ```typescript
+  const [selectedBusId, setSelectedBusId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash || "";
+      const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+      const b = hashParams?.get("bus") || hashParams?.get("busId") || searchParams.get("bus") || searchParams.get("busId") || (window as any).__classmateInitialBusId;
+      if (b) return b;
+    }
+    return "";
+  });
+  ```
+- **Global Bridge Function & Event Dispatcher**:
+  ```typescript
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleSelect = (busId: string) => {
+      if (!busId) return;
+      setSelectedBusId(busId);
+      setDetailBusId(busId);
+      setActiveView("map");
+      setTimeout(() => {
+        switchToMap(busId);
+      }, 100);
+    };
+
+    (window as any).__classmateSelectBus = handleSelect;
+
+    const onHashChange = () => {
+      const hash = window.location.hash || "";
+      const hashParams = hash.includes("?") ? new URLSearchParams(hash.split("?")[1]) : null;
+      const b = hashParams?.get("bus") || hashParams?.get("busId") || (window as any).__classmateInitialBusId;
+      if (b) handleSelect(b);
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("classmate-select-bus", (e: any) => { if (e?.detail?.busId) handleSelect(e.detail.busId); });
+
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, [switchToMap]);
+  ```
+- **Auto-Camera Centering Hook**:
+  ```typescript
+  useEffect(() => {
+    if (!selectedBus || !mapRef.current) return;
+    const timer = setTimeout(() => {
+      centerSelectedBus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [selectedBus?.id, centerSelectedBus]);
+  ```
+
+#### C. CSS Design Tokens (`web/src/app/globals.css`)
+```css
+.bus-track-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.bus-track-action-btn:hover {
+  background: var(--primary);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+```
+
+---
+
+### 204.4 Resilient Synthetic Standby Bus Handling & Spiderfier Integration
+- **Problem**: When a user clicked "Track" on a bus currently not transmitting live GPS (e.g. parked at the campus terminus awaiting its next scheduled trip), `selectedBus` evaluated to `null`, causing the map camera to stay stationary and the detail card to disappear.
+- **Architectural Solution**:
+  - Implemented dynamic fallback synthesized vehicle construction in `selectedBus` `useMemo`:
+    ```typescript
+    if (info) {
+      const sched = schedulesMap[selectedBusId] || MBSTU_BUS_SCHEDULES[selectedBusId];
+      const nextTime = sched?.fromCampus || "৮:০০ AM";
+      return {
+        id: selectedBusId,
+        nameBn: info.nameBn,
+        nameEn: info.nameEn,
+        lat: 24.2378,
+        lon: 89.8911,
+        speed: 0,
+        heading: 0,
+        hasDirection: false,
+        routeName: info.defaultRoute,
+        status: `স্ট্যান্ডবাই (পরবর্তী ট্রিপ: ${nextTime})`,
+        color: info.color,
+        isDriving: false,
+        lastUpdated: new Date().toISOString(),
+        positionAgeSeconds: 0,
+        isStale: false,
+        isEstimated: true
+      };
+    }
+    ```
+  - **Spiderfier Cluster Fan-Out**:
+    In `spiderfiedFleet`, if `selectedBus` is synthesized or not in `displayFleet`, it is injected into the spatial clustering algorithm, spreading markers out in a circular sunflower pattern around the campus terminus (`lat: 24.2378, lon: 89.8911`).
+  - **Result**: Tapping "Track" on *any* bus (active or standby) always reliably positions the marker, animates the Leaflet camera, and presents the bus card and schedule details.
+
+---
+
+### 204.5 On-Device ADB Telemetry & Multi-Platform Verification
+- **Test Hardware**: OnePlus Nord CE4 / Oppo Reno 11F 5G (`CPH2621`, Serial `6478ab80`).
+- **Build & Flash Execution**:
+  - Executed `./gradlew.bat assembleDebug` -> Passed cleanly in 1m 38s.
+  - Flashed via ADB: `adb -s 6478ab80 install -r -d app/build/outputs/apk/debug/app-debug.apk` -> `Success`.
+- **Target Verification Protocol**:
+  1. *Hero Badge Absence*: Captured screenshot (`bus_timetable_final.png`) and UI dump (`final_dump.xml`). Verified that `busSummary` resource is not rendered in the view hierarchy.
+  2. *Track Button Render*: Verified `btnTrackBus` with text `"ট্র্যাক"` renders on all 8 cards (`bounds: [812, 808][996, 887]`).
+  3. *Cross-Tab Navigation & Focus*:
+     - Injected touch on Track button for Gitanjali (`input tap 888 841`).
+     - Screen instantly switched from Timetable tab (`118 2265`) to Transit tab.
+     - Leaflet map centered smoothly on `#SB0001` (Gitanjali).
+     - Gitanjali tracking details bottom sheet opened immediately without user friction.
+- **Web Companion Deployment**:
+  - `npm --prefix web run build` verified: 15/15 static and server routes generated in 752ms.
+  - Deployed live to Vercel production: [classmatebd.vercel.app](https://classmatebd.vercel.app) (Deployment ID: `dpl_6MTzh4WrFadgGoSwZbXSii4Hw81v`).
+- **Git Commit**: Committed as [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e) (*`feat(bus): replace call pilot with track button and remove redundant next departure hero badge`*).
+
+---
+
+### 204.6 Master Production Verification Matrix (Updated Master State v204)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`25d702e`](https://github.com/shuaibuddowla/ClassMate/commit/25d702e)) |
+| **Bus Card One-Tap Live Map Tracking** | Web & Android APK | **PRODUCTION** | Replaced call button with `btnTrackBus` ("ট্র্যাক"), navigates to Transit tab & auto-selects bus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Auto-Selection & Focusing Engine** | Web & Android APK | **PRODUCTION** | `window.__classmateSelectBus`, URL param `&bus=...`, auto-centers Leaflet camera, opens details (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Resilient Synthetic Standby Bus Handling** | Web & Android APK | **PRODUCTION** | Synthesized campus terminal standby records for non-reporting buses, guaranteed focus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Redundant Next Departure Hero Removal** | Web & Android APK | **PRODUCTION** | Removed `busSummary` / `BusHero` from bus schedule tab; verified clean 8-bus grid on device `6478ab80` (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Pure MBSTU Wheels Bus Roster** | Web & Android APK | **PRODUCTION** | Stripped legacy Supabase `bus_schedules` duplicates; verified exact 8-bus fleet on device `6478ab80` (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Timetable Header Bus Count Precision** | Web & Android APK | **PRODUCTION** | Corrected count from "18 schedules" to "8 buses", removed obsolete "Add Bus" button (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Dynamic MBSTU Wheels Bus Schedule Sync** | Web & Android APK | **PRODUCTION** | Live polling of `https://transport.mbstu.ac.bd/api/bus-schedule/` with offline cache fallback (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Timetable Bus Schedule UI Overhaul** | Web & Android APK | **PRODUCTION** | Modern card layout, Next Departure Hero with countdowns, 3-way direction filter bar, timechips (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Next.js SSR Prerender Resilience** | Web Companion | **PRODUCTION** | Guarded `window` and `AudioContext`, clean static build, deployed to Vercel production |
+| **Zero-Unsolicited-UI Governance Enforcement** | Web & Android APK | **PRODUCTION** | Soft ClassMate palettes, pink markers `#b71454`, lollipop stops; zero unauthorized styling (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Instant Offline-First Bootstrap** | Android APK Assets | **PRODUCTION** | Bundled Leaflet assets in `assets/transit/`, zero black screen (<50ms load) (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Schmitt-Trigger Next-Stop Hysteresis** | Web & Android APK | **PRODUCTION** | 1D milestone projection, 35m arrival / 20m departure threshold, 0 stop flips in 230 simulation frames (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Ghost Bus GPS Signal Filter** | Web & Android APK | **PRODUCTION** | Non-reporting / off-corridor buses filtered from active map/timeline, segregated to standby timetable (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v205) |
+
+---
+
+## 205. Phase 205: Dedicated Bus Tracking Loading State & Telemetry Synchronization (Production Live)
+
+### 205.1 Problem Statement
+When a student tapped "ট্র্যাক" on a specific bus in the Bus Schedule view (e.g., Gitanjali `#SB0001` or Agnibina `#SB0002`), they were immediately redirected to the Transit map view. However, during the initial handshake while the WebSocket connection was negotiating and streaming the live GPS coordinates, the system prematurely popped open the full live options peek card (`transit-map-bus-card`) with boilerplate fallback values (`speed: 0 km/h`, `next stop: মাওলানা ভাসানী হল • দূরত্ব: ০.৩ কিমি`, dummy coordinates `[24.2378, 89.8911]`). This caused visual confusion because students saw placeholder data before the bus's actual location data arrived from the university satellite telemetry stream.
+
+### 205.2 Architectural Implementation
+1. **Targeted Bus Location Loading State (`busLocationLoading`)**:
+   - Added state `const [busLocationLoading, setBusLocationLoading] = useState<boolean>(...)` and ref trackers.
+   - When a bus is selected, if its live coordinates are already present in `displayFleet`, `busLocationLoading` is set to `false` immediately.
+   - If the bus is not yet present, `busLocationLoading` is set to `true`, and a 3.2-second safety timeout is scheduled.
+2. **Boilerplate Suppression (`selectedBus` useMemo)**:
+   - While `busLocationLoading === true`, `selectedBus` evaluates strictly to `null`.
+   - Prevents premature rendering of `.transit-map-bus-card`.
+   - Prevents auto-centering Leaflet camera on placeholder terminal coordinates.
+3. **Dedicated Bus Tracking Loading Card (`.transit-bus-loading-card`)**:
+   - Renders at the bottom of the map in place of the live card while loading:
+     - Bus Identity: Bus theme dot with ripple pulse, Bengali name (`গীতাঞ্জলি`), short tag (`#SB0001`), and close `X` button.
+     - Body: Pulsating radar ping animation with `Radio` icon, "লাইভ অবস্থান লোড হচ্ছে…" and "MBSTU Wheels স্যাটেলাইট টেলিমেট্রি সার্ভার থেকে জিপিএস সংকেত অনুসন্ধান করা হচ্ছে".
+     - Bottom: Sleek indeterminate shimmer progress bar styled with the bus's accent color gradient.
+4. **Instant Resolution on Real GPS Telemetry Arrival**:
+   - In `ws.onmessage`: As soon as a packet arrives containing the target bus (`flutter-bus-data` / `student-gps-data`), `busLocationLoading` is set to `false`, the safety timeout is cleared, and the Leaflet camera smoothly flies (`flyTo`) to the bus's live coordinates (`[bus.lat, bus.lon]`).
+5. **Confirmed Offline / Standby State Notice**:
+   - If after the 3.2s timeout the bus does not broadcast active GPS, `busLocationLoading` resolves to reveal a clean standby card:
+     - Status badge: `🅿️ জিপিএস স্ট্যান্ডবাই`
+     - Standby notice banner: "বাসটির লাইভ জিপিএস সংযোগ বর্তমানে সক্রিয় নেই। বাসটি ট্রিপ বিরতিতে অথবা ক্যাম্পাসে স্ট্যান্ডবাই রয়েছে।"
+     - Official departure times from schedule: "শিডিউল প্রস্থান: ক্যাম্পাস 8:00 AM • শহর 8:30 AM"
+     - Completely hides the fake approaching stop distance and ETA banners.
+
+### 205.3 Deployment & Physical Device Verification
+- **Web Build**: `npm --prefix "web" run build` passed with 0 errors across 15 routes.
+- **Vercel Production Deployment**: Deployed live to `https://classmatebd.vercel.app` (Deployment ID: `dpl_GAUQ7TU47LbSCGQMrPFdMSSygwQh`).
+- **Android APK Build & Flash**: Built via Gradle and flashed to device `6478ab80` (`CPH2621`).
+- **Verification Protocol**:
+  1. Tapped "ট্র্যাক" on Gitanjali in Bus Schedule -> Navigated to Transit tab -> Dedicated loading state appeared with Gitanjali badge and pulsating radar without any premature boilerplate.
+  2. After loading resolved, cleanly displayed verified status and schedule without fake approaching stop data (`fresh_loaded.png`).

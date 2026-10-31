@@ -1945,7 +1945,7 @@ internal class ClassMateAcademicScreensSupabase(
         }
 
         val busParam = pendingTransitBusId?.let { "&bus=$it" } ?: ""
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map$busParam&v=20261101_track"
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map$busParam&v=20261101_bus_load"
         webView.clearCache(true)
         webView.loadUrl(transitUrl)
 
