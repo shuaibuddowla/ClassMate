@@ -844,6 +844,7 @@ internal class ClassMateAcademicScreensSupabase(
                     tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
                         postDelayed({
                             evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                            pendingTransitBusId = null
                         }, 200)
                     }
                 }
@@ -1900,6 +1901,7 @@ internal class ClassMateAcademicScreensSupabase(
                 }
                 pendingTransitBusId?.let { targetBus ->
                     webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                    pendingTransitBusId = null
                 }
             }
         }
@@ -1944,8 +1946,9 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
+        val viewParam = if (pendingTransitBusId != null) "view=map" else "view=list"
         val busParam = pendingTransitBusId?.let { "&bus=$it" } ?: ""
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map$busParam&v=20261101_bus_load"
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&$viewParam$busParam&v=20261101_v3_clean"
         webView.clearCache(true)
         webView.loadUrl(transitUrl)
 

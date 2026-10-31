@@ -14284,3 +14284,48 @@ const switchToMap = useCallback((busId?: string) => {
 | **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
 | **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v205) |
+
+---
+
+## 206. Transit Tab V3 UI/UX Ground-Up Redesign & Production Architecture (Master State v206)
+
+### 206.1 Core UX Problem Statements & User Architectural Directives
+1. **Initial View Flaw**: Previously, navigating to the Transit tab immediately forced the Map view first, loading heavy satellite map tiles even when a student merely wanted to review bus rosters or schedules.
+   - *Requirement*: Always open the **Bus List view first** by default. Only transition to Map view when the user taps on "ম্যাপ" (Map) or selects a specific bus to "ট্র্যাক" (Track).
+2. **FAB Overlap on Close Button**: Floating Action Buttons (Recenter on Bus, Locate User) were positioned at `bottom: 236px` on the right margin, directly covering the `[✕]` close button of `.transit-map-bus-card`.
+   - *Requirement*: Eliminate overlap completely. Map FAB buttons are relocated to top-right below the header (`top: 76px; right: 14px; bottom: auto;`), ensuring the peek card and its close button are 100% unobstructed.
+3. **Misleading Off-Road Blue Shortcut Line**: When tracking a bus, an artificial dashed cyan/blue line was drawn straight from the bus coordinates to the next stop, cutting across ponds, forests, and buildings.
+   - *Requirement*: Removed completely. The official street polyline remains the sole, authentic visual indicator of the transit route.
+4. **Scattered Bubble Capsule Clutter**: Search inputs had redundant double borders, filter chips were oversized rounded pills, and each card had 5 separate pastel capsule containers scattered haphazardly.
+   - *Requirement*: Replaced with a unified, Apple/Material 3-grade clean design system: single-outline search box, refined rectangular filter chips, left-accent bus cards with unified info panels.
+5. **Redundant Duplicate Schedule Table**: The list view repeated all 8 buses at the bottom under "Student Bus Schedules".
+   - *Requirement*: Removed duplicate table; all essential schedule departures are already surfaced in individual bus cards.
+
+### 206.2 Implementation Changes
+- **`web/src/components/transit.tsx`**:
+  - Initialized `activeView` to `"list"` by default (unless `view=map` or `bus=...` is explicitly passed).
+  - Cleaned up `approachingGlowRef` and `approachingPolylineRef` from drawing to the Leaflet map.
+  - Redesigned search bar with `onPointerDown` instant clear button.
+  - Rebuilt `transit-bus-card` with clean header, route row, moving progress track, consolidated info panel, and primary track CTA.
+  - Cleaned up redundant timetable grid at the bottom.
+- **`web/src/components/transit.css`**:
+  - Appended modern design system V3 rules.
+  - Repositioned `.transit-fab-controls` to `top: 76px; right: 14px; bottom: auto !important;`.
+  - Positioned `.transit-map-bus-card` at `bottom: calc(76px + env(safe-area-inset-bottom))`.
+  - Gave `.transit-mbc-close-btn` clean 32x32px circular tap target with soft hover effect.
+- **`app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt`**:
+  - Updated transit URL generation: `val viewParam = if (pendingTransitBusId != null) "view=map" else "view=list"`.
+  - Cleared `pendingTransitBusId = null` after execution.
+
+### 206.3 Hardware Verification on Physical Device (`6478ab80`)
+- **Device**: OnePlus Nord CE4 (`CPH2621`, Serial `6478ab80`).
+- **Verified Steps & Screenshots**:
+  1. Tapped Transit tab from bottom navigation bar -> Opened **Bus List view FIRST** by default (`screen_transit_new_default.png`).
+  2. Verified clean search bar and filter chips (`সকল বাস`, `চলন্ত বাস`, `স্ট্যান্ডবাই`, `ক্যাম্পাসমুখী`, `শহরমুখী`).
+  3. Verified bus cards with left color stripe, bold Bengali names, short ID badges, and clean info panels (`screen_transit_list_return.png`).
+  4. Tapped `[ 🗺️ ম্যাপ ]` on a bus -> Opened Map view focused on that bus (`screen_transit_map_tracked.png`).
+  5. Verified FAB controls at top-right with zero overlap on the card close button.
+  6. Verified off-road blue approaching line is completely removed.
+  7. Tapped `[✕]` close button -> Peek card dismissed cleanly (`screen_transit_card_closed.png`).
+  8. Verified search query filtering and instant clear button (`screen_transit_search_test.png`).
+- **Production URL**: Deployed to [classmatebd.vercel.app](https://classmatebd.vercel.app) (Deployment ID: `dpl_2mePUEAyhfCLnYhV6iXuRBs6LPVs`).
