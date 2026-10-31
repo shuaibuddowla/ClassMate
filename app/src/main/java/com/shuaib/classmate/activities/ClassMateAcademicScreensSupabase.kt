@@ -834,11 +834,13 @@ internal class ClassMateAcademicScreensSupabase(
 
             host.addView(root,LinearLayout.LayoutParams(-1,-1))
 
-
+            if (tab == R.id.nav_transit) {
+                resumeTransitWebView()
+            } else {
+                pauseTransitWebView()
+            }
 
             root.doOnAttach {
-
-
 
                 if (tab == R.id.nav_transit) {
                     resumeTransitWebView()
@@ -1917,9 +1919,11 @@ internal class ClassMateAcademicScreensSupabase(
                 super.onReceivedError(view, request, error)
 
                 if (request?.isForMainFrame == true) {
-
-                    view?.loadUrl("file:///android_asset/transit/index.html")
-
+                    val failingUrl = request.url?.toString() ?: ""
+                    android.util.Log.w("ClassMateTransit", "Transit load error: ${error?.errorCode} ${error?.description} for $failingUrl")
+                    if (!failingUrl.startsWith("file://") && view?.url?.startsWith("file://") != true) {
+                        view?.loadUrl("file:///android_asset/transit/index.html")
+                    }
                 }
 
             }
@@ -12404,6 +12408,12 @@ internal class ClassMateAcademicScreensSupabase(
         tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
             onResume()
             resumeTimers()
+            val currentUrl = url ?: ""
+            if (ClassMateAcademicCache.online(activity)) {
+                if (currentUrl.startsWith("file://") || currentUrl.isBlank() || !currentUrl.contains("classmatebd.vercel.app")) {
+                    loadUrl("https://classmatebd.vercel.app/transit-preview?app=android&view=map")
+                }
+            }
         }
     }
 
