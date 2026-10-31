@@ -129,57 +129,75 @@ export const CORRIDOR_STATIONS: CorridorStation[] = [
   { id: "pouro_uddan", name: "Pouro Uddan Bus Stop", nameBn: "পৌর উদ্যান বাস স্টপ", lat: 24.2517480, lon: 89.9145880, order: 28, isCampus: false }
 ];
 
-const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }> = {
+export const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; color: string; defaultRoute: string }> = {
   SB0001: { nameBn: "গীতাঞ্জলি", nameEn: "Gitanjali", color: "#6366f1", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
   SB0002: { nameBn: "অগ্নিবীণা", nameEn: "Agnibina", color: "#f97316", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
   SB0003: { nameBn: "সোনারতরী", nameEn: "Sonartori", color: "#0284c7", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
   SB0005: { nameBn: "সংশপ্তক", nameEn: "Shangshaptak", color: "#8b5cf6", defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর" },
   SB0007: { nameBn: "ধলেশ্বরী", nameEn: "Dhaleshwari", color: "#10b981", defaultRoute: "ক্যাম্পাস ⇄ টাঙ্গাইল পুরাতন বাসস্ট্যান্ড" },
   SB0009: { nameBn: "বনলতা", nameEn: "Banolata", color: "#059669", defaultRoute: "ক্যাম্পাস ⇄ কাগমারী ⇄ নিরালা" },
-  SB0010: { nameBn: "রক্তকরবী", nameEn: "Raktakarabi", color: "#ec4899", defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর" }
+  SB0010: { nameBn: "রক্তকরবী", nameEn: "Raktakarabi", color: "#ec4899", defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর" },
+  SB5442: { nameBn: "সঞ্চয়িতা", nameEn: "Sanchayita", color: "#0ea5e9", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
+  SB5448: { nameBn: "রাখালী", nameEn: "Rakhali", color: "#e11d48", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
+  SB5488: { nameBn: "রাখালী", nameEn: "Rakhali", color: "#e11d48", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" }
 };
 
-export const INITIAL_FLEET: MbstuBusData[] = [
-  {
-    id: "SB0003",
-    nameBn: "সোনারতরী",
-    nameEn: "Sonartori",
-    lat: 24.2348539,
-    lon: 89.8922845,
-    speed: 0,
-    heading: 181,
-    routeName: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)",
-    status: "ক্যাম্পাস স্ট্যান্ডবাই",
-    color: "#0284c7",
-    isDriving: false
-  },
-  {
-    id: "SB0002",
-    nameBn: "অগ্নিবীণা",
-    nameEn: "Agnibina",
-    lat: 24.2431396,
-    lon: 89.9096431,
-    speed: 18,
-    heading: 260,
-    routeName: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)",
-    status: "চলন্ত (১৮ কিমি/ঘ)",
-    color: "#f97316",
-    isDriving: true
-  },
-  {
-    id: "SB0010",
-    nameBn: "রক্তকরবী",
-    nameEn: "Raktakarabi",
-    lat: 24.2351628,
-    lon: 89.8903235,
-    speed: 0,
-    heading: 0,
-    routeName: "মাভাবিপ্রবি পরিবহন করিডোর",
-    status: "ক্যাম্পাস স্ট্যান্ডবাই",
-    color: "#ec4899",
-    isDriving: false
+export const GPS_IMEI_TO_BUS: Record<string, string> = {
+  "353701091171641": "SB0001",
+  "353701091171104": "SB0002",
+  "9175769656": "SB0003",
+  "7026087428": "SB0005",
+  "7026087352": "SB0009",
+  "353701091171799": "SB0010",
+  "B20": "SB5442",
+  "BUS21": "SB5448"
+};
+
+export interface MbstuBusSchedule {
+  busId: string;
+  nameBn: string;
+  fromCampus: string;
+  toCampus: string;
+  fromCampusMin: number;
+  toCampusMin: number;
+}
+
+export const MBSTU_BUS_SCHEDULES: Record<string, MbstuBusSchedule> = {
+  SB0001: { busId: "SB0001", nameBn: "গীতাঞ্জলি", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
+  SB0002: { busId: "SB0002", nameBn: "অগ্নিবীণা", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
+  SB0003: { busId: "SB0003", nameBn: "সোনারতরী", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
+  SB0005: { busId: "SB0005", nameBn: "সংশপ্তক", fromCampus: "8:00 AM", toCampus: "8:30 AM", fromCampusMin: 8 * 60, toCampusMin: 8 * 60 + 30 },
+  SB0009: { busId: "SB0009", nameBn: "বনলতা", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
+  SB0010: { busId: "SB0010", nameBn: "রক্তকরবী", fromCampus: "10:00 AM", toCampus: "10:30 AM", fromCampusMin: 10 * 60, toCampusMin: 10 * 60 + 30 },
+  SB5442: { busId: "SB5442", nameBn: "সঞ্চয়িতা", fromCampus: "4:10 PM", toCampus: "4:40 PM", fromCampusMin: 16 * 60 + 10, toCampusMin: 16 * 60 + 40 },
+  SB5448: { busId: "SB5448", nameBn: "রাখালী", fromCampus: "2:30 PM", toCampus: "3:00 PM", fromCampusMin: 14 * 60 + 30, toCampusMin: 15 * 60 },
+  SB5488: { busId: "SB5488", nameBn: "রাখালী", fromCampus: "2:30 PM", toCampus: "3:00 PM", fromCampusMin: 14 * 60 + 30, toCampusMin: 15 * 60 }
+};
+
+export function getScheduleRemaining(targetMin: number, nowMs: number): { text: string; isPast: boolean; diffMin: number } {
+  const d = new Date(nowMs + (6 * 3600 * 1000) + (new Date().getTimezoneOffset() * 60 * 1000));
+  const currentMin = d.getHours() * 60 + d.getMinutes();
+  let diffMin = targetMin - currentMin;
+  if (diffMin < -720) {
+    diffMin += 1440;
   }
-];
+  if (diffMin >= 0) {
+    const hours = Math.floor(diffMin / 60);
+    const mins = diffMin % 60;
+    if (hours > 0) {
+      return { text: `${toBengaliDigits(hours)}ঘণ্টা ${toBengaliDigits(mins)}মি বাকি`, isPast: false, diffMin };
+    }
+    return { text: `${toBengaliDigits(mins)}মি বাকি`, isPast: false, diffMin };
+  } else {
+    const pastMin = Math.abs(diffMin);
+    if (pastMin < 60) {
+      return { text: `${toBengaliDigits(pastMin)}মি আগে ছেড়েছে`, isPast: true, diffMin };
+    }
+    return { text: `${toBengaliDigits(Math.floor(pastMin / 60))}ঘণ্টা আগে ছেড়েছে`, isPast: true, diffMin };
+  }
+}
+
+export const INITIAL_FLEET: MbstuBusData[] = [];
 
 export function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3;
@@ -695,7 +713,16 @@ export function Transit({ ctx }: { ctx?: any }) {
   }, [locPermission]);
 
   const displayFleet = useMemo(
-    () => fleet.map((bus) => predictBusPosition(bus, clockNow)),
+    () =>
+      fleet
+        .map((bus) => predictBusPosition(bus, clockNow))
+        .filter((bus) => {
+          // Strictly filter out ghost buses without valid live GPS signal
+          if (!bus.lastUpdated) return false;
+          // Filter out stale buses where no GPS updates arrived in last 15 mins
+          if (typeof bus.positionAgeSeconds === "number" && bus.positionAgeSeconds > 900) return false;
+          return true;
+        }),
     [fleet, clockNow]
   );
   const freshFleetCount = displayFleet.filter((bus) => bus.positionAgeSeconds !== null && !bus.isStale).length;
@@ -1521,7 +1548,8 @@ export function Transit({ ctx }: { ctx?: any }) {
               // Note: We DO NOT process raw "student-gps-data" because it emits hardware IMEI trackers without bus identities
               if (
                 eventName === "flutter-bus-data" ||
-                eventName === "studentGpsData"
+                eventName === "studentGpsData" ||
+                eventName === "student-gps-data"
               ) {
                 const list = Array.isArray(rawData) ? rawData : [rawData];
                 const valid = list.filter((b: any) => {
@@ -1537,7 +1565,13 @@ export function Transit({ ctx }: { ctx?: any }) {
                     prevFleet.forEach((b) => map.set(b.id, b));
 
                     valid.forEach((raw: any) => {
-                      const rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
+                      let rawId = String(raw.id || raw.busId || raw.bus_id || "").toUpperCase().trim();
+                      const imei = String(raw.imei || "").trim();
+                      if (imei && GPS_IMEI_TO_BUS[imei]) {
+                        rawId = GPS_IMEI_TO_BUS[imei];
+                      }
+                      if (rawId === "SB5488") rawId = "SB5448";
+
                       const nameFromPacket = String(raw.busName || raw.nameBn || raw.name || "").trim();
 
                       // Resolve info against recognized official university fleet
@@ -1554,20 +1588,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                         }
                       }
 
-                      // STRICT ENFORCEMENT:
-                      // Must either start with official SB identifier (e.g. SB0001, SB0002) OR match a recognized bus name.
-                      // NEVER accept raw IMEI hardware trackers (like 353701091171104, 9175769656, 7826087352)!
-                      if (!info && (!resolvedId || !resolvedId.startsWith("SB"))) {
-                        return; // Discard phantom tracker packet!
-                      }
-
-                      if (!info) {
-                        info = {
-                          nameBn: nameFromPacket || `বাস (${resolvedId})`,
-                          nameEn: raw.nameEn || resolvedId,
-                          color: "#0284c7",
-                          defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর"
-                        };
+                      // Only accept recognized university buses
+                      if (!info || !resolvedId || !resolvedId.startsWith("SB")) {
+                        return;
                       }
 
                       const lat = typeof raw.lat === "number" ? raw.lat : raw.latitude;
@@ -1906,6 +1929,22 @@ export function Transit({ ctx }: { ctx?: any }) {
                   <span className="transit-card-next-km">({toBengaliDigits(nextInfo.distanceKm)} কিমি)</span>
                 </div>
 
+                {/* 4.1 Schedule Timetable Strip */}
+                {MBSTU_BUS_SCHEDULES[bus.id] && (
+                  <div className="transit-card-schedule-strip">
+                    <div className="transit-card-schedule-col">
+                      <Clock size={11} color="#b71454" />
+                      <span className="transit-card-sched-label">ক্যাম্পাস:</span>
+                      <strong className="transit-card-sched-time">{MBSTU_BUS_SCHEDULES[bus.id].fromCampus}</strong>
+                    </div>
+                    <div className="transit-card-sched-sep">•</div>
+                    <div className="transit-card-schedule-col">
+                      <span className="transit-card-sched-label">শহর:</span>
+                      <strong className="transit-card-sched-time">{MBSTU_BUS_SCHEDULES[bus.id].toCampus}</strong>
+                    </div>
+                  </div>
+                )}
+
                 {/* 5. Telemetry & Action Footer: Proximity + Freshness on left, Dedicated Map Button on right */}
                 <div className="transit-card-footer-row">
                   <div className="transit-card-telemetry-left">
@@ -1980,6 +2019,61 @@ export function Transit({ ctx }: { ctx?: any }) {
             </div>
           )}
         </div>
+
+        {/* Official MBSTU Bus Schedule Routine Table */}
+        <div className="transit-timetable-section">
+          <div className="transit-timetable-header">
+            <div className="transit-timetable-header-left">
+              <Clock size={15} color="#b71454" />
+              <span className="transit-timetable-title">বিশ্ববিদ্যালয় বাস সময়সূচী (অফিসিয়াল রুটিন)</span>
+            </div>
+            <span className="transit-timetable-count-pill">৮টি বাস</span>
+          </div>
+
+          <div className="transit-timetable-grid">
+            {Object.values(MBSTU_BUS_SCHEDULES).filter((s, idx, arr) => arr.findIndex(x => x.busId === s.busId) === idx).map((sched) => {
+              const liveBus = displayFleet.find((b) => b.id === sched.busId);
+              const isLive = Boolean(liveBus);
+              return (
+                <div key={sched.busId} className="transit-timetable-item">
+                  <div className="transit-timetable-item-top">
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span
+                        className="transit-chip-dot"
+                        style={{ backgroundColor: KNOWN_BUS_INFO[sched.busId]?.color || "#b71454" }}
+                      />
+                      <span className="transit-timetable-item-name">{sched.nameBn}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span className="transit-timetable-item-id">{toBengaliDigits(sched.busId.replace(/^SB0*/, ''))}</span>
+                      <span className={`transit-timetable-gps-status ${isLive ? "live" : "offline"}`}>
+                        {isLive ? "🟢 লাইভ GPS" : "⚪ GPS সংকেত নেই"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="transit-timetable-item-times">
+                    <div className="transit-timetable-time-box">
+                      <span className="transit-timetable-time-label">ক্যাম্পাস থেকে</span>
+                      <span className="transit-timetable-time-val">{sched.fromCampus}</span>
+                      <span style={{ fontSize: "9px", color: "#64748b" }}>
+                        ({getScheduleRemaining(sched.fromCampusMin, clockNow).text})
+                      </span>
+                    </div>
+                    <div className="transit-timetable-time-box">
+                      <span className="transit-timetable-time-label">শহর থেকে</span>
+                      <span className="transit-timetable-time-val">{sched.toCampus}</span>
+                      <span style={{ fontSize: "9px", color: "#64748b" }}>
+                        ({getScheduleRemaining(sched.toCampusMin, clockNow).text})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         </div>
       </div>
     );
@@ -1988,16 +2082,78 @@ export function Transit({ ctx }: { ctx?: any }) {
   // Direction-Aware Route & Station Sequence Calculations
   const detectedDirection = useMemo<"to_city" | "to_campus">(() => {
     if (!detailBus) return "to_city";
-    if (detailBus.speed > 0 && detailBus.hasDirection && typeof detailBus.heading === "number") {
-      const h = detailBus.heading;
-      if ((h >= 240 && h <= 360) || (h >= 0 && h <= 50)) return "to_campus";
-      if (h >= 70 && h <= 220) return "to_city";
+
+    // 1. Physical Milestone Position
+    const { milestoneKm } = projectToCorridorMilestone(
+      detailBus.lat,
+      detailBus.lon,
+      REAL_STREET_POLYLINE,
+      CORRIDOR_MILESTONES_KM
+    );
+    const hysteresis = busHysteresisState.get(detailBus.id);
+
+    // Terminal Ground-Truth Anchor:
+    // Near Campus (Milestone <= 1.0 km) -> Must be departing/heading to city
+    if (milestoneKm <= 1.0) {
+      if (hysteresis) hysteresis.tripDirection = "to_city";
+      return "to_city";
     }
-    const distCampus = getDistanceMeters(detailBus.lat, detailBus.lon, CORRIDOR_STATIONS[0].lat, CORRIDOR_STATIONS[0].lon);
-    const distCity = getDistanceMeters(detailBus.lat, detailBus.lon, CORRIDOR_STATIONS[CORRIDOR_STATIONS.length - 1].lat, CORRIDOR_STATIONS[CORRIDOR_STATIONS.length - 1].lon);
-    if (distCity < 1200 && distCampus > 2500) return "to_campus";
-    return "to_city";
-  }, [detailBus]);
+    // Near Tangail City (Milestone >= 6.8 km) -> Must be departing/heading to campus
+    if (milestoneKm >= 6.8) {
+      if (hysteresis) hysteresis.tripDirection = "to_campus";
+      return "to_campus";
+    }
+
+    // 2. Active Moving Heading Vector (when moving >= 4 km/h)
+    if (detailBus.speed >= 4 && detailBus.hasDirection && typeof detailBus.heading === "number") {
+      const h = detailBus.heading;
+      // Heading West/North-West towards University Campus
+      if ((h >= 240 && h <= 360) || (h >= 0 && h <= 50)) {
+        if (hysteresis) hysteresis.tripDirection = "to_campus";
+        return "to_campus";
+      }
+      // Heading East/South-East towards City Center
+      if (h >= 70 && h <= 220) {
+        if (hysteresis) hysteresis.tripDirection = "to_city";
+        return "to_city";
+      }
+    }
+
+    // 3. Schedule Time-Window Matching (when stopped or mid-corridor)
+    const schedule = MBSTU_BUS_SCHEDULES[detailBus.id];
+    if (schedule) {
+      const now = new Date(clockNow + (6 * 3600 * 1000) + (new Date().getTimezoneOffset() * 60 * 1000));
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+
+      let diffFromCampus = nowMin - schedule.fromCampusMin;
+      if (diffFromCampus < -720) diffFromCampus += 1440;
+      let diffToCampus = nowMin - schedule.toCampusMin;
+      if (diffToCampus < -720) diffToCampus += 1440;
+
+      // In window of campus departure
+      if (diffFromCampus >= -10 && diffFromCampus <= 45) {
+        if (hysteresis) hysteresis.tripDirection = "to_city";
+        return "to_city";
+      }
+      // In window of city departure back to campus
+      if (diffToCampus >= -10 && diffToCampus <= 45) {
+        if (hysteresis) hysteresis.tripDirection = "to_campus";
+        return "to_campus";
+      }
+
+      const elapsedFrom = diffFromCampus >= 0 ? diffFromCampus : diffFromCampus + 1440;
+      const elapsedTo = diffToCampus >= 0 ? diffToCampus : diffToCampus + 1440;
+      if (elapsedTo < elapsedFrom) {
+        if (hysteresis) hysteresis.tripDirection = "to_campus";
+        return "to_campus";
+      } else {
+        if (hysteresis) hysteresis.tripDirection = "to_city";
+        return "to_city";
+      }
+    }
+
+    return hysteresis ? hysteresis.tripDirection : "to_city";
+  }, [detailBus, clockNow]);
 
   const activeDirection = timelineDirectionOverride || detectedDirection;
   const isToCampus = activeDirection === "to_campus";
@@ -2148,6 +2304,33 @@ export function Transit({ ctx }: { ctx?: any }) {
               🏙️ শহর ➔ ক্যাম্পাস
             </button>
           </div>
+
+          {/* Schedule Departures Card matching official timetable */}
+          {MBSTU_BUS_SCHEDULES[detailBus.id] && (
+            <div className="transit-schedule-banner">
+              <div className="transit-schedule-banner-title">
+                <Clock size={12} color="#b71454" />
+                <span>পরবর্তী শিডিউল প্রস্থান (Next Departures)</span>
+              </div>
+              <div className="transit-schedule-row">
+                <div className={`transit-schedule-box ${!isToCampus ? "active-leg" : ""}`}>
+                  <span className="transit-schedule-tag">From Campus</span>
+                  <strong className="transit-schedule-time">{MBSTU_BUS_SCHEDULES[detailBus.id].fromCampus}</strong>
+                  <span className="transit-schedule-countdown">
+                    ({getScheduleRemaining(MBSTU_BUS_SCHEDULES[detailBus.id].fromCampusMin, clockNow).text})
+                  </span>
+                </div>
+                <div className="transit-schedule-arrow">➔</div>
+                <div className={`transit-schedule-box ${isToCampus ? "active-leg" : ""}`}>
+                  <span className="transit-schedule-tag">To Campus</span>
+                  <strong className="transit-schedule-time">{MBSTU_BUS_SCHEDULES[detailBus.id].toCampus}</strong>
+                  <span className="transit-schedule-countdown">
+                    ({getScheduleRemaining(MBSTU_BUS_SCHEDULES[detailBus.id].toCampusMin, clockNow).text})
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Pinned Next Stop Telemetry Banner (Auto-adjustable live distance) */}
           <div className="transit-detail-telemetry-banner" style={{ "--bus-accent": detailBus.color } as any}>
@@ -2798,6 +2981,17 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <Navigation size={12} className="transit-mbc-route-icon" />
                 <span className="transit-mbc-route-text">{selectedBus.routeName}</span>
               </div>
+
+              {/* Row 2.5: Official Bus Schedule Depatures */}
+              {MBSTU_BUS_SCHEDULES[selectedBus.id] && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 10px", background: "#f8fafc", borderRadius: 8, fontSize: 11, color: "#64748b", margin: "4px 0", border: "1px solid #f1f5f9" }}>
+                  <Clock size={11} color="#b71454" />
+                  <span>শিডিউল প্রস্থান:</span>
+                  <span style={{ color: "#b71454", fontWeight: 700 }}>
+                    ক্যাম্পাস {MBSTU_BUS_SCHEDULES[selectedBus.id].fromCampus} • শহর {MBSTU_BUS_SCHEDULES[selectedBus.id].toCampus}
+                  </span>
+                </div>
+              )}
 
               {/* Row 3: Next Approaching Stop Banner */}
               {nextApproachingStopInfo && (
