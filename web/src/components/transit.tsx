@@ -468,37 +468,14 @@ function predictBusPosition(bus: MbstuBusData, nowMs: number): MbstuBusData {
   const ageSeconds = Math.max(0, Math.floor((nowMs - lastMs) / 1000));
   const isStale = ageSeconds > 180;
 
-  if (bus.speed <= 2 || ageSeconds <= 3 || isStale) {
-    return { ...bus, positionAgeSeconds: ageSeconds, isStale, isEstimated: false };
-  }
-
-  const travelSeconds = Math.min(ageSeconds, 45);
-  const travelMeters = (bus.speed * 1000 / 3600) * travelSeconds;
-  const currentIdx = findClosestPolylineIndex([bus.lat, bus.lon], REAL_STREET_POLYLINE);
-  let accumulated = 0;
-  let nextIdx = currentIdx;
-  let guard = 0;
-
-  while (accumulated < travelMeters && guard < REAL_STREET_POLYLINE.length) {
-    const stepDist = getDistanceMeters(
-      REAL_STREET_POLYLINE[nextIdx][0],
-      REAL_STREET_POLYLINE[nextIdx][1],
-      REAL_STREET_POLYLINE[(nextIdx + 1) % REAL_STREET_POLYLINE.length][0],
-      REAL_STREET_POLYLINE[(nextIdx + 1) % REAL_STREET_POLYLINE.length][1]
-    );
-    accumulated += stepDist;
-    nextIdx = (nextIdx + 1) % REAL_STREET_POLYLINE.length;
-    guard++;
-  }
-
-  const [predLat, predLon] = REAL_STREET_POLYLINE[nextIdx];
+  // Preserve authentic GPS coordinates reported by hardware/socket.
+  // Never artificially advance latitude/longitude with speculative dead-reckoning,
+  // which causes the bus marker to oscillate forward and snap backward whenever updates arrive.
   return {
     ...bus,
-    lat: predLat,
-    lon: predLon,
     positionAgeSeconds: ageSeconds,
     isStale,
-    isEstimated: true
+    isEstimated: false
   };
 }
 
@@ -1729,15 +1706,21 @@ export function Transit({ ctx }: { ctx?: any }) {
     const result: Array<MbstuBusData & { displayLat: number; displayLon: number }> = [];
     const clusters: Array<MbstuBusData[]> = [];
 
-    // Group buses into spatial clusters if within 25 meters of each other (e.g. terminal parking)
+    // Group buses into spatial clusters if within 25 meters of each other (e.g. terminal parking).
+    // Moving buses (speed > 1 or isDriving) must NEVER be spiderfied or offset from their real GPS road position!
     baseList.forEach((bus) => {
-      const foundCluster = clusters.find((cluster) =>
-        cluster.some((cBus) => getDistanceMeters(cBus.lat, cBus.lon, bus.lat, bus.lon) < 25)
-      );
-      if (foundCluster) {
-        foundCluster.push(bus);
+      const isMoving = bus.speed > 1 || bus.isDriving;
+      if (isMoving) {
+        result.push({ ...bus, displayLat: bus.lat, displayLon: bus.lon });
       } else {
-        clusters.push([bus]);
+        const foundCluster = clusters.find((cluster) =>
+          cluster.some((cBus) => getDistanceMeters(cBus.lat, cBus.lon, bus.lat, bus.lon) < 25)
+        );
+        if (foundCluster) {
+          foundCluster.push(bus);
+        } else {
+          clusters.push([bus]);
+        }
       }
     });
 
@@ -2880,6 +2863,18 @@ export function Transit({ ctx }: { ctx?: any }) {
               displayEta = `~${toBengaliDigits(driveEta)} মি`;
             }
 
+            // Calculate live moving bus progress on the active segment
+            const nextIdx = activeNextStopInfo.nextIndex;
+            const isCurrentSegment = idx === nextIdx - 1;
+            let segmentProgress = 0.5;
+            if (isCurrentSegment && nextIdx > 0 && activeRouteStations[nextIdx - 1]) {
+              const prevSt = activeRouteStations[nextIdx - 1];
+              const nextSt = activeRouteStations[nextIdx];
+              const totalSegDistKm = Math.max(0.15, getDistanceMeters(prevSt.lat, prevSt.lon, nextSt.lat, nextSt.lon) / 1000);
+              const distToNextKm = Math.max(0, parseFloat(activeNextStopInfo.distanceKm) || 0);
+              segmentProgress = Math.min(0.88, Math.max(0.12, 1 - (distToNextKm / totalSegDistKm)));
+            }
+
             return (
               <div
                 key={station.id}
@@ -2894,18 +2889,41 @@ export function Transit({ ctx }: { ctx?: any }) {
                       className={`transit-timeline-rail-line ${
                         isPassed ? "line-passed" : isApproaching ? "line-live" : "line-upcoming"
                       }`}
-                    />
+                    >
+                      {/* Live Bus Moving along the segment rail towards next stop */}
+                      {isCurrentSegment && (
+                        <div
+                          className="transit-timeline-live-bus-rider"
+                          style={{
+                            top: `${Math.round(segmentProgress * 100)}%`,
+                            transition: "top 0.8s cubic-bezier(0.25, 1, 0.5, 1)"
+                          }}
+                          title={`${detailBus.nameBn} (${Math.round(detailBus.speed)} কিমি/ঘ)`}
+                        >
+                          <div
+                            className="transit-timeline-rider-badge"
+                            style={{ background: detailBus.color || "var(--transit-pink)" }}
+                          >
+                            <Bus size={11} color="#ffffff" />
+                            <div className="transit-rider-radar-glow" />
+                          </div>
+                          {detailBus.speed > 0 && (
+                            <span className="transit-timeline-rider-speed">
+                              {toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Node Milestone Circle */}
                   <div
                     className={`transit-timeline-node ${
-                      isApproaching ? "active-bus-node" : isPassed ? "passed-node" : "upcoming-node"
+                      isApproaching ? "active-target-node" : isPassed ? "passed-node" : "upcoming-node"
                     }`}
                   >
-                    {isApproaching ? (
-                      <Bus size={12} color="#ffffff" className="transit-approaching-bus-icon" />
-                    ) : isPassed ? (
+                    {isPassed ? (
                       <Check size={11} color="#94a3b8" />
                     ) : (
                       <span>{toBengaliDigits(station.activeOrder)}</span>
