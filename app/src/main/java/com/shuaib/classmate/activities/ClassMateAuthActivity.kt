@@ -3622,17 +3622,15 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
 
-            val visibleTabs = androidx.compose.runtime.remember(showBatch) {
+            val visibleTabs = androidx.compose.runtime.remember {
 
-                listOfNotNull(
+                listOf(
 
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
 
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
 
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
-
-                    if (showBatch) com.shuaib.classmate.ui.ClassMateTab.BATCH else null,
 
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
 

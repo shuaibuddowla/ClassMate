@@ -359,8 +359,14 @@ class ClassMatePublishActivity : AppCompatActivity() {
             text = "Class cancellation"
             setTextColor(getColor(R.color.cm_text_primary))
         }
+        val poll = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
+            id = View.generateViewId()
+            text = "Interactive poll"
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
         choices.addView(general)
         choices.addView(cancellation)
+        choices.addView(poll)
         form.panel.addView(choices)
 
         val title = form.field("Notice title")
@@ -377,28 +383,124 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
 
+        val pollContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        form.panel.addView(pollContainer)
+
+        val questionInput = form.field("Poll Question")
+        (questionInput.parent.parent as? View)?.let {
+            form.panel.removeView(it)
+            pollContainer.addView(it)
+        }
+
+        val pollOptionsLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pollContainer.addView(pollOptionsLayout)
+        val optionInputs = mutableListOf<android.widget.EditText>()
+        fun addOptionField(hintText: String) {
+            val optField = form.field(hintText)
+            (optField.parent.parent as? View)?.let {
+                form.panel.removeView(it)
+                pollOptionsLayout.addView(it)
+                optionInputs.add(optField)
+            }
+        }
+        addOptionField("Option 1")
+        addOptionField("Option 2")
+
+        val btnAddOpt = com.google.android.material.button.MaterialButton(this, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+            text = "+ Add option"
+            setTextColor(getColor(R.color.cm_primary))
+            setOnClickListener {
+                if (optionInputs.size < 10) {
+                    addOptionField("Option ${optionInputs.size + 1}")
+                }
+            }
+        }
+        pollContainer.addView(btnAddOpt)
+
+        val cbMulti = com.google.android.material.checkbox.MaterialCheckBox(this).apply {
+            text = "Allow multiple answers"
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        val cbAnon = com.google.android.material.checkbox.MaterialCheckBox(this).apply {
+            text = "Anonymous voting (hide voter names)"
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        pollContainer.addView(cbMulti)
+        pollContainer.addView(cbAnon)
+
+        val (durationBox, durationField) = createDropdown("Poll Duration", listOf("24 hours", "3 days (default)", "7 days", "No expiration"))
+        pollContainer.addView(durationBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+
         choices.setOnCheckedChangeListener { _, checked ->
             val cancelled = checked == cancellation.id
+            val isPoll = checked == poll.id
             if (cancelled) {
                 titleBox.visibility = View.GONE
                 messageBox.visibility = View.GONE
                 silentHint.visibility = View.GONE
                 courseBox.visibility = View.VISIBLE
                 dateBox.visibility = View.VISIBLE
+                pollContainer.visibility = View.GONE
+                submit.text = "Post cancellation"
+            } else if (isPoll) {
+                titleBox.visibility = View.GONE
+                messageBox.visibility = View.GONE
+                silentHint.visibility = View.GONE
+                courseBox.visibility = View.GONE
+                dateBox.visibility = View.GONE
+                pollContainer.visibility = View.VISIBLE
+                submit.text = "Publish poll"
             } else {
                 titleBox.visibility = if (title.text.isNullOrBlank()) View.GONE else View.VISIBLE
                 messageBox.visibility = View.VISIBLE
                 silentHint.visibility = View.VISIBLE
                 courseBox.visibility = if (teacher) View.VISIBLE else View.GONE
                 dateBox.visibility = View.GONE
+                pollContainer.visibility = View.GONE
+                submit.text = "Post notice"
             }
-            submit.text = "Post notice"
         }
         choices.check(general.id)
         submit.text = "Post notice"
         submit.isEnabled = true
 
         submit.setOnClickListener {
+            if (choices.checkedRadioButtonId == poll.id) {
+                val q = questionInput.text?.toString()?.trim().orEmpty()
+                if (q.length < 2) {
+                    questionInput.error = "Enter a question for the poll"
+                    return@setOnClickListener
+                }
+                val validOpts = optionInputs.map { it.text?.toString()?.trim().orEmpty() }.filter { it.isNotBlank() }
+                if (validOpts.size < 2) {
+                    Toast.makeText(this@ClassMatePublishActivity, "Please provide at least 2 options", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val durationText = durationField.text.toString()
+                val durationHours: Any = when (durationText) {
+                    "24 hours" -> 24
+                    "7 days" -> 168
+                    "No expiration" -> JSONObject.NULL
+                    else -> 72
+                }
+                perform {
+                    ClassMateAuthApi.rpc(
+                        "publish_batch_poll",
+                        JSONObject()
+                            .put("target_batch", batch)
+                            .put("poll_question", q)
+                            .put("poll_options", JSONArray(validOpts))
+                            .put("poll_description", "")
+                            .put("is_multiple_choice", cbMulti.isChecked)
+                            .put("is_anonymous", cbAnon.isChecked)
+                            .put("duration_hours", durationHours)
+                    )
+                }
+                return@setOnClickListener
+            }
             val cancelled = choices.checkedRadioButtonId == cancellation.id
             val selected = courses.firstOrNull { it.second == course.text.toString() }
 

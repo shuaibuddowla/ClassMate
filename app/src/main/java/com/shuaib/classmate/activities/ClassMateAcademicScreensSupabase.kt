@@ -395,6 +395,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private val noticeReaderPreviews = mutableMapOf<String, List<JSONObject>>()
+    private val noticePolls = mutableMapOf<String, JSONObject>()
 
 
 
@@ -2026,6 +2027,19 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+        }
+
+        root.findViewById<View>(R.id.btnHamburgerMenu)?.apply {
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                com.shuaib.classmate.ui.ClassMateHamburgerSheet.show(
+                    activity = activity,
+                    scope = scope,
+                    batchId = batchId,
+                    batchLabel = batchLabel,
+                    profile = profile
+                )
+            }
         }
 
 
@@ -4872,7 +4886,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                "select=id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id" +
+                "select=id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id,poll_id" +
 
 
 
@@ -4916,25 +4930,15 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val (engagement, authors, reads, previews) = if (visible.isEmpty())
+            val (engagement, authors, reads, previews, polls) = if (visible.isEmpty())
 
-
-
-                listOf(emptyList<JSONObject>(), emptyList(), emptyList(), emptyList())
-
-
+                listOf(emptyList<JSONObject>(), emptyList(), emptyList(), emptyList(), emptyList())
 
             else {
 
-
-
                 val details=ClassMateAuthApi.rpc("notice_feed_details",JSONObject().put("target_ids",JSONArray(visible.map { it.getString("id") })))
 
-
-
-                listOf("engagement","authors","reads","previews").map { key -> rows(details.optJSONArray(key) ?: JSONArray()) }
-
-
+                listOf("engagement","authors","reads","previews","polls").map { key -> rows(details.optJSONArray(key) ?: JSONArray()) }
 
             }
 
@@ -4946,11 +4950,9 @@ internal class ClassMateAcademicScreensSupabase(
 
             previews.groupBy { it.getString("notice_id") }.forEach { (id, readers) -> noticeReaderPreviews[id] = readers }
 
-
+            polls.forEach { noticePolls[it.getString("notice_id")] = it }
 
             engagement.forEach { noticeStates[it.getString("notice_id")] = it }
-
-
 
             authors.forEach { noticeAuthors[it.getString("notice_id")] = it }
 
@@ -5044,35 +5046,24 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val request=noticeRequest; val batch=batchId(); val cursor=noticeFeed.last()
-
-
+        val request=noticeRequest; val batch=batchId()
+        val cursor = noticeFeed.lastOrNull() ?: return
+        val rawTs = cursor.optString("published_at").ifBlank { cursor.optString("created_at") }.ifBlank { null } ?: return
+        val id = cursor.optString("id").ifBlank { return }
 
         noticeLoadingOlder=true; noticeOlderError=false; renderNoticeFeed(root)
 
-
-
         launch(root) {
-
-
 
             try {
 
-
-
                 val page=if(!online) noticeOfflineTail.take(noticePageSize) else {
 
-
-
-                    val timestamp=java.net.URLEncoder.encode(cursor.getString("published_at"),"UTF-8")
-
-
-
-                    val id=cursor.getString("id")
+                    val timestamp=java.net.URLEncoder.encode(rawTs,"UTF-8")
 
 
 
-                    rows(ClassMateAuthApi.rows("notices","select=id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id"+
+                    rows(ClassMateAuthApi.rows("notices","select=id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id,poll_id"+
 
 
 
@@ -5118,7 +5109,7 @@ internal class ClassMateAcademicScreensSupabase(
 
                     rows(details.optJSONArray("engagement") ?: JSONArray()).forEach { noticeStates[it.getString("notice_id")]=it }
 
-
+                    rows(details.optJSONArray("polls") ?: JSONArray()).forEach { noticePolls[it.getString("notice_id")]=it }
 
                     rows(details.optJSONArray("authors") ?: JSONArray()).forEach { noticeAuthors[it.getString("notice_id")]=it }
 
@@ -5204,7 +5195,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear()
+        noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear(); noticePolls.clear()
 
 
 
@@ -5330,10 +5321,9 @@ internal class ClassMateAcademicScreensSupabase(
 
         val list = root.v<RecyclerView>(R.id.rvNotices)
 
-        list.setHasFixedSize(true)
         list.setItemViewCacheSize(12)
 
-        if (list.layoutManager == null) list.layoutManager = LinearLayoutManager(activity)
+        if (list.layoutManager == null) list.layoutManager = com.shuaib.classmate.ui.SafeLinearLayoutManager(activity)
 
 
 
@@ -5374,10 +5364,10 @@ internal class ClassMateAcademicScreensSupabase(
 
 
                 val cancellation = !resourceNotice && (classChangeId != null || title.contains(noticeCancellationPattern))
-
-
+                val pollNotice = !resourceNotice && !cancellation && (item.optString("poll_id").isNotBlank() && item.optString("poll_id") != "null" || noticePolls.containsKey(noticeId))
 
                 val (background, icon, accent) = when {
+                    pollNotice -> Triple(R.drawable.bg_notice_premium_general, R.drawable.ic_notice_poll_art, R.color.cm_primary)
 
 
 
@@ -5861,6 +5851,134 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+                val pollContainer = card.findViewById<View>(R.id.pollContainer)
+                val pollData = noticePolls[noticeId]
+                if (pollData != null) {
+                    pollContainer?.visibility = View.VISIBLE
+                    val isMultiple = pollData.optBoolean("is_multiple_choice", false)
+                    val isAnon = pollData.optBoolean("is_anonymous", false)
+                    val isClosed = pollData.optBoolean("is_closed", false)
+                    val totalVotes = pollData.optInt("total_votes", 0)
+                    val totalVoters = pollData.optInt("total_voters", 0)
+
+                    card.findViewById<TextView>(R.id.tvPollSubtext)?.text =
+                        (if (isMultiple) "Multiple choice" else "Single choice") + " • " + (if (isAnon) "Anonymous" else "Public")
+
+                    card.findViewById<TextView>(R.id.tvPollTotalVotes)?.text =
+                        "$totalVoters " + (if (totalVoters == 1) "person voted" else "people voted") +
+                            (if (totalVotes > totalVoters) " ($totalVotes total votes)" else "")
+
+                    val tvStatus = card.findViewById<TextView>(R.id.tvPollStatus)
+                    val expiryStr = pollData.optString("expires_at")
+                    if (isClosed) {
+                        tvStatus?.text = "Final Results"
+                        tvStatus?.setTextColor(0xFFEF4444.toInt())
+                    } else if (expiryStr.isNotBlank() && expiryStr != "null") {
+                        val diff = runCatching { java.time.Instant.parse(expiryStr).toEpochMilli() - System.currentTimeMillis() }.getOrDefault(0L)
+                        if (diff <= 0) {
+                            tvStatus?.text = "Closed"
+                            tvStatus?.setTextColor(0xFFEF4444.toInt())
+                        } else {
+                            val h = diff / 3600000L
+                            tvStatus?.text = if (h < 24) "Closes in ${h}h" else "Closes in ${h / 24}d"
+                            tvStatus?.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                        }
+                    } else {
+                        tvStatus?.text = "Open"
+                        tvStatus?.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    }
+
+                    val optionsList = card.findViewById<LinearLayout>(R.id.pollOptionsList)
+                    optionsList?.removeAllViews()
+                    val optionsArr = pollData.optJSONArray("options") ?: JSONArray()
+                    for (i in 0 until optionsArr.length()) {
+                        val opt = optionsArr.getJSONObject(i)
+                        val optId = opt.getString("id")
+                        val optText = opt.optString("option_text")
+                        val optVotes = opt.optInt("votes_count", 0)
+                        val isMyVote = opt.optBoolean("is_my_vote", false)
+                        val pct = if (totalVotes > 0) ((optVotes * 100f) / totalVotes).toInt() else 0
+
+                        val optView = activity.layoutInflater.inflate(R.layout.item_poll_option_m3, optionsList, false)
+                        val cardOption = optView.findViewById<com.google.android.material.card.MaterialCardView>(R.id.cardPollOption)
+                        val track = optView.findViewById<View>(R.id.viewProgressTrack)
+                        val indicator = optView.findViewById<ImageView>(R.id.ivPollIndicator)
+                        val tvOptText = optView.findViewById<TextView>(R.id.tvOptionText)
+                        val tvPct = optView.findViewById<TextView>(R.id.tvOptionPercentage)
+                        val tvVotes = optView.findViewById<TextView>(R.id.tvOptionVotes)
+
+                        tvOptText.text = optText
+                        tvPct.text = "$pct%"
+                        tvVotes.text = "$optVotes " + (if (optVotes == 1) "vote" else "votes")
+
+                        if (isMultiple) {
+                            indicator.setImageResource(if (isMyVote) R.drawable.ic_poll_square_selected else R.drawable.ic_poll_square_unselected)
+                        } else {
+                            indicator.setImageResource(if (isMyVote) R.drawable.ic_poll_circle_selected else R.drawable.ic_poll_circle_unselected)
+                        }
+
+                        val density = activity.resources.displayMetrics.density
+                        if (isMyVote) {
+                            cardOption.strokeColor = 0xFF8B5CF6.toInt()
+                            cardOption.strokeWidth = (1.5f * density).toInt()
+                            tvOptText.setTextColor(0xFF7C3AED.toInt())
+                            tvPct.setTextColor(0xFF7C3AED.toInt())
+                            track.setBackgroundColor(0x358B5CF6.toInt())
+                        } else {
+                            cardOption.strokeColor = activity.getColor(R.color.cm_notice_premium_stroke)
+                            cardOption.strokeWidth = (1.2f * density).toInt()
+                            tvOptText.setTextColor(activity.getColor(R.color.cm_text_primary))
+                            tvPct.setTextColor(activity.getColor(R.color.cm_text_primary))
+                            track.setBackgroundColor(0x1F8B5CF6.toInt())
+                        }
+
+                        track.post {
+                            val totalW = cardOption.width
+                            if (totalW > 0) {
+                                val lp = track.layoutParams
+                                lp.width = (totalW * (pct / 100f)).toInt()
+                                track.layoutParams = lp
+                            }
+                        }
+
+                        if (!isClosed) {
+                            cardOption.setOnClickListener {
+                                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                                val pollId = pollData.getString("poll_id")
+                                launch(root) {
+                                    try {
+                                        val currentVotedIds = mutableListOf<String>()
+                                        for (j in 0 until optionsArr.length()) {
+                                            val o = optionsArr.getJSONObject(j)
+                                            if (o.optBoolean("is_my_vote")) currentVotedIds.add(o.getString("id"))
+                                        }
+                                        val selectedIds = if (isMultiple) {
+                                            if (currentVotedIds.contains(optId)) currentVotedIds.filter { it != optId }
+                                            else currentVotedIds + optId
+                                        } else listOf(optId)
+
+                                        if (selectedIds.isEmpty()) return@launch
+
+                                        val res = ClassMateAuthApi.rpc("cast_poll_vote", JSONObject()
+                                            .put("target_poll", pollId)
+                                            .put("selected_option_ids", JSONArray(selectedIds)))
+                                        noticePolls[noticeId] = res
+                                        renderNoticeFeed(root)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(activity, e.message ?: "Vote failed", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        } else {
+                            cardOption.isClickable = false
+                        }
+
+                        optionsList.addView(optView)
+                    }
+                } else {
+                    pollContainer?.visibility = View.GONE
+                }
+
                 card.findViewById<View>(R.id.imagePreviewContainer)?.visibility = View.GONE
 
 
@@ -6027,17 +6145,16 @@ internal class ClassMateAcademicScreensSupabase(
 
         val bindPaging:(View)->Unit = { footer ->
 
+            val shimmer = footer.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerOlderNotices)
 
-
-            val shimmer=footer.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerOlderNotices)
-
-
-
-            shimmer.visibility=if(noticeLoadingOlder) View.VISIBLE else View.GONE
-
-
-
-            if(noticeLoadingOlder) shimmer.startShimmer() else shimmer.stopShimmer()
+            if (shimmer != null) {
+                shimmer.visibility = if (noticeLoadingOlder) View.VISIBLE else View.GONE
+                if (noticeLoadingOlder && androidx.core.view.ViewCompat.isAttachedToWindow(shimmer)) {
+                    shimmer.startShimmer()
+                } else {
+                    shimmer.stopShimmer()
+                }
+            }
 
 
 
@@ -12149,7 +12266,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                    noticeFeed = emptyList(); noticeBatch = ""; noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear()
+                    noticeFeed = emptyList(); noticeBatch = ""; noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear(); noticePolls.clear()
 
 
 
