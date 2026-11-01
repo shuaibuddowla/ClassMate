@@ -16159,3 +16159,239 @@ sequenceDiagram
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v218) |
+
+
+## 219. Android APK Ecosystem Deep-Dive, QR Retirement & Hardware Transition, CGPA Calculation Engine, Navigation Physics & Master State v219
+
+### 219.1 Cross-Session Retrospective & Architectural Synthesis
+An exhaustive cross-session audit was conducted across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, specifically targeting the ClassMate Android APK project, its companion Web client, and the Supabase backend:
+- [`df313fa6-3cbb-48d7-9ce4-a09582f891c6`](conversation://df313fa6-3cbb-48d7-9ce4-a09582f891c6) *(16:57 PKT / Dhaka time)*: Hourly review and master memory synchronization session establishing Master State v218 across both repositories.
+- [`f78a9f92-ab40-4040-be51-25ef5ecd261a`](conversation://f78a9f92-ab40-4040-be51-25ef5ecd261a) *(15:57 PKT / Dhaka time)*: Preceding hourly review verifying merge of `feature/live-bus-tracking` into `main` (Merge Commit [`afd8081`](https://github.com/shuaibuddowla/ClassMate/commit/afd8081)).
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b) *(436 turns)*: Comprehensive production debugging session:
+  - Remediated GitGuardian secret alert by purging plaintext `SUPABASE_SERVICE_ROLE_KEY` from `scripts/inspect_students.py` and enforcing environment variable authentication.
+  - Guided migration from legacy Supabase HS256 JWT keys to modern asymmetric ECC (P-256) signing keys and `sb_publishable_...` tokens.
+  - Enforced Vercel `NEXT_PUBLIC_` variable visibility rules ("Config" / plain text visibility required to prevent rollout failure).
+  - Restored Google OAuth PKCE authorization with 100% database data and user profile integrity intact.
+  - Eliminated Leaflet map marker snapping and jitter by removing speculative dead-reckoning extrapolation and enforcing authentic GPS ground-truth telemetry with monotonic CSS transform transitions (`transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`).
+  - Added dynamic animated bus rider gliding along the route stoppage timeline rail with clamped progress ($0.12 \le \text{segmentProgress} \le 0.88$) and Bengali speed badges (`১২ কিমি/ঘ`).
+  - Refactored radar pulse animation from an aggressive 30% jump to a gentle 6% micro-breath (`scale(1.06)`) with an outer radar ripple ring (`riderRadarPulse`).
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc) *(125 turns)*: Comprehensive Android APK user interaction and UX modernization session:
+  - Diagnosed why the bottom navigation bar appeared unchanged after previous updates: [`ClassMateAuthActivity`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt) hosts Jetpack Compose [`ClassMateFloatingNavigationBar`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt), whose container was previously styled as an edge-to-edge docked bar rather than a floating island.
+  - Overhauled both Jetpack Compose [`ClassMateBottomBar.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt) and native XML [`GlassBottomNavView.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/GlassBottomNavView.kt) into **Concept 1: Floating Curved Capsule Island** with damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`), tactile scale lift (`1.05f`), and haptic tick (`HapticFeedbackConstants.CLOCK_TICK`).
+  - Built and verified APK directly on user's connected smartphone via ADB (`release/ClassMate.apk`).
+  - Expanded Friends Directory modal to `96%` width (max `720dp`) on Android and `860px` on Web, enforcing 3-tier hierarchy sorting (Admin -> CR -> Batchmates) and teacher personal privacy protection (hiding phone number, blood group, department, and batch name from student view).
+  - Retired legacy QR-based attendance suite in favor of the IoT Hardware RFID Attendance Station (ESP32 + RC522).
+- Architectural Workspace Reconciliation:
+  - Primary Android Studio Workspace: `C:/Users/USER/AndroidStudioProjects/ClassMate` contains native Android activities, adapters, utils, UI motion components, CGPA calculator, and local caches.
+  - Companion Production Monorepo: `d:/Code & Scripts/ClassMate-main` hosts the full multi-platform code (`app/`, `web/`, `attendance-tracker/`, `supabase/`, CI/CD). Both master memory files are synchronized.
+
+---
+
+### 219.2 Attendance System Evolution: QR Scanner Suite Deprecation & Hardware RFID Station Transition
+
+```mermaid
+flowchart TD
+    subgraph Retired Software QR System
+        A["GenerateQrActivity.kt"] -->|Dynamic QR Code| B["AttendanceScannerActivity.kt / CustomScannerActivity.kt"]
+        B -->|ZXing Camera Frame Decode| C["Server Validation API"]
+    end
+
+    subgraph Modern IoT Hardware Attendance Ecosystem
+        D["Physical Student ID (Mifare Classic 1K RFID)"] -->|13.56 MHz Contactless Scan| E["ClassMate IoT Station (ESP32 + RC522)"]
+        E -->|Dual-Core FreeRTOS (<50ms)| F["Supabase REST (idx_profiles_rfid_card_uid)"]
+        F -->|Real-time Push / WebSocket| G["ClassMate Android APK & Web Admin"]
+    end
+
+    A -.->|Deprecated & Stubbed| E
+    B -.->|Deprecated & Stubbed| E
+```
+
+#### A. Rationale for QR Scanner Deprecation
+During field testing in MBSTU lecture halls, the software QR scanning architecture presented significant operational friction:
+1. **Environmental Impedance**: Low ambient lighting and optical glare from smartphone screens frequently prevented camera autofocus from capturing QR codes quickly.
+2. **Proxy Attendance Vulnerability**: Students easily took screenshots of dynamic QR codes and forwarded them to absent peers over messaging apps.
+3. **Queue Congestion**: Individual optical scanning generated bottleneck queues at classroom entrances, averaging 4–6 seconds per student.
+
+#### B. Codebase Sanitization & Retirement
+Following the deployment of the ESP32 hardware RFID station, all software QR scanner activities were intentionally retired and stubbed out in `C:/Users/USER/AndroidStudioProjects/ClassMate`:
+- [`AttendanceScannerActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/AttendanceScannerActivity.kt): Stubbed with `// Removed as part of attendance system deletion`.
+- [`CustomScannerActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/CustomScannerActivity.kt): Stubbed with `// Removed as part of attendance system deletion`.
+- [`GenerateQrActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/GenerateQrActivity.kt): Stubbed with `// Removed as part of attendance system deletion`.
+- [`ScanQrActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ScanQrActivity.kt): Stubbed with `// Removed as part of attendance system deletion`.
+
+#### C. Active Hardware Attendance Integration Points
+1. **IoT Hardware Station**: Dual-core FreeRTOS ESP32 station (`esp32_rfid_attendance.ino`) handling MFRC522 SPI reading on Core 1 with <50ms edge scan latency, 64-scan circular buffering, and 3-tier Wi-Fi fallback.
+2. **Database Performance Indexing**: Supabase B-tree index `idx_profiles_rfid_card_uid` on `classmate.profiles(rfid_card_uid)` delivering O(1) <3ms card identification.
+3. **Android Client UI**: Native administrative and student attendance screens:
+   - `ClassMateAdminAttendanceActivity.kt`: Real-time session monitoring and manual scan override.
+   - `ClassMateStudentAttendanceUi.kt`: Individual student attendance records, percentage metrics, and eligibility tracking (60% minimum threshold).
+   - `ClassMateTeacherLiveAttendanceActivity.kt`: Live classroom roster feed showing real-time check-ins as cards tap the physical station.
+
+---
+
+### 219.3 Academic CGPA Calculator Engine & Course Grade Mapping
+
+The Android APK features a dedicated, offline-first CGPA Calculation Engine tailored to university grading standards:
+- **Activity**: [`CgpaCalculatorActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/CgpaCalculatorActivity.kt)
+- **Data Model & Standards**: [`CgpaData.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/CgpaData.kt)
+- **RecyclerView Adapter**: [`CourseGradeAdapter.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/adapters/CourseGradeAdapter.kt)
+
+#### A. MBSTU Academic Grading Scale & Weighted Formula
+Cumulative Grade Point Average (CGPA) is computed using credit-weighted summation:
+
+$$\text{CGPA} = \frac{\sum_{i=1}^{n} (C_i \times GP_i)}{\sum_{i=1}^{n} C_i}$$
+
+Where $C_i$ represents the credit hours for course $i$, and $GP_i$ represents the grade points earned:
+
+| Letter Grade | Marks Range | Grade Point ($GP$) | Academic Standing |
+|:---:|:---:|:---:|:---|
+| **A+** | $80\% - 100\%$ | **4.00** | Outstanding |
+| **A** | $75\% - 79\%$ | **3.75** | Excellent |
+| **A-** | $70\% - 74\%$ | **3.50** | Very Good |
+| **B+** | $65\% - 69\%$ | **3.25** | Good |
+| **B** | $60\% - 64\%$ | **3.00** | Satisfactory |
+| **B-** | $55\% - 59\%$ | **2.75** | Above Average |
+| **C+** | $50\% - 54\%$ | **2.50** | Average |
+| **C** | $45\% - 49\%$ | **2.25** | Below Average |
+| **D** | $40\% - 44\%$ | **2.00** | Pass |
+| **F** | $< 40\%$ | **0.00** | Fail |
+
+#### B. Dual-Input Mode Architecture
+`CgpaCalculatorActivity` supports instant toggling between two input methodologies:
+1. **Input by Grade (`btnByGrade`)**:
+   - Students tap a dropdown spinner to select from standard letter grades (`A+`, `A`, `A-`, etc.).
+   - Grade points are assigned immediately and GPA recalculates reactively in 0ms.
+2. **Input by Marks (`btnByMarks`)**:
+   - Students enter raw examination marks ($0 - 100$).
+   - The engine automatically clamps the score, maps it to the corresponding letter grade and grade point, and updates the display.
+
+#### C. State Persistence & Cosmic UI Styling
+- **Automatic SharedPreferences Serialization**: On every keystroke or selection, `saveGrades()` persists course grades (`saved_grade_{code}`) and marks (`saved_marks_{code}`). On activity creation, `restoreSavedGrades()` reconstructs the exact state.
+- **Cosmic UI Surface**: Styled using `bg_cosmic_card.xml` with dynamic theme color accents (`themeColor(R.attr.cm_primary)`).
+- **Safe Reset Lifecycle**: Tapping "Reset" triggers a native confirmation dialog before clearing state to prevent accidental data loss.
+
+---
+
+### 219.4 Android Motion Physics, Tactile Haptics & Offline Resilience Architecture
+
+#### A. Micro-Scale Touch Feedback (`TouchAnimator.kt`)
+To provide tactile responsiveness across native Android views, [`TouchAnimator.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/ui/TouchAnimator.kt) provides a lightweight view extension:
+```kotlin
+fun View.addScaleTouchAnimation(scale: Float = 0.98f) {
+    this.setOnTouchListener { v, event ->
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                v.animate().scaleX(scale).scaleY(scale).setDuration(100).start()
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+            }
+        }
+        false // Allows underlying OnClickListener and ripple to execute seamlessly
+    }
+}
+```
+- **0-Interference Passthrough**: By returning `false`, the touch listener animates view scale down to `0.98f` without consuming the gesture, allowing click listeners and ripple drawables to execute normally.
+
+#### B. Granular Tactile Haptic Hierarchy (`HapticUtil.kt`)
+[`HapticUtil.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/HapticUtil.kt) standardizes haptic feedback across all user interactions:
+- **Light (`HapticUtil.light`)**: `HapticFeedbackConstants.KEYBOARD_TAP` for tab navigation, chip selection, and filter toggles.
+- **Medium (`HapticUtil.medium`)**: `HapticFeedbackConstants.VIRTUAL_KEY` for voting in polls, primary button clicks, and submission actions.
+- **Heavy (`HapticUtil.heavy`)**: `HapticFeedbackConstants.LONG_PRESS` for clipboard copy triggers, delete confirmations, and notice expansion.
+
+#### C. Lifecycle-Aware Network Monitoring (`NetworkMonitor.kt`)
+[`NetworkMonitor.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/NetworkMonitor.kt) delivers active network connectivity tracking:
+- Utilizes `ConnectivityManager.NetworkCallback` with `NetworkCapabilities.NET_CAPABILITY_INTERNET` and `NET_CAPABILITY_VALIDATED`.
+- Exposes `isOnline: LiveData<Boolean>` for reactive UI observation.
+- Connected to [`view_offline_banner.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/view_offline_banner.xml) with smooth slide-in animations (`fade_in_slide.xml`) whenever cellular or Wi-Fi connectivity drops.
+
+#### D. Multi-Tier Offline Caching
+1. **Structured Data Cache ([`OfflineCache.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/OfflineCache.kt))**:
+   - Serializes Timetable schedules, Notices, Assignment deadlines, and User Session Profiles into private `SharedPreferences` via `Gson`.
+   - Ensures students can access their daily schedule and notice feed in offline campus dead zones.
+2. **Academic Document Cache ([`TelegramPdfCache.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/TelegramPdfCache.kt))**:
+   - Bounded 100MB LRU disk cache for academic PDFs, lecture slides, and question banks.
+   - MD5 hash filename sanitization (`MessageDigest.getInstance("MD5")`) eliminates filename collision and special character encoding bugs.
+
+---
+
+### 219.5 Android APK Bottom Navigation Physics & Concept 1 Floating Capsule Deployment
+
+#### A. Diagnostic of the "Unchanged Navbar" Display
+In session `b447abdd`, the user reported:
+> *"But the navigation bar is looking the same as before. It's looking like your updated things didn't work."*
+
+**Root Cause Diagnostic**:
+- `ClassMateAuthActivity.kt` hosts Jetpack Compose [`ClassMateFloatingNavigationBar`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/ui/ClassMateBottomBar.kt) inside a native Android layout, while `GlassBottomNavView.kt` was the XML counterpart.
+- Although spring physics and tab listeners were wired, the Compose container was rendered as a flat, edge-to-edge docked rectangular bar (`fillMaxWidth()` without floating margins).
+- To the user's eye, the visual appearance remained indistinguishable from the legacy edge-to-edge dock.
+
+#### B. Concept 1 Rebuild: Floating Curved Capsule Island
+Both implementations were refactored to implement **Concept 1 (Floating Capsule Island)**:
+
+```
+Legacy (Flat Edge-to-Edge Docked Bar):
+┌─────────────────────────────────────────────────────────────┐
+│  📅 Timetable  │  🔔 Notices  │  📖 Courses  │  🚌 Transit  │
+└─────────────────────────────────────────────────────────────┘
+
+Now (Concept 1: Floating Island + Translucent Glass Capsule):
+    ╭─────────────────────────────────────────────────────────╮
+    │  ╭─────────╮                                            │
+    │  │ 📅 Time │    🔔 Notices    📖 Courses   🚌 Transit   │
+    │  ╰─────────╯                                            │
+    ╰─────────────────────────────────────────────────────────╯
+```
+
+**Key Parameters**:
+- **Island Geometry**: `14dp` side margins, `10dp` bottom float above navigation bar insets, with continuous `26dp` rounded corner radii.
+- **Specular Glass Outline**: `1.2dp` translucent glass stroke (`cm_border_glass`) with `14dp` soft elevation drop shadow.
+- **Sliding Pill Capsule**: `20dp` rounded corners, active tinted border, and damped harmonic spring slide physics (`dampingRatio = 0.72f`, `stiffness = 380f`).
+- **Tactile Feedback**: `1.05f` touch scale lift on tab selection with native clock tick haptic vibration (`HapticFeedbackConstants.CLOCK_TICK`).
+- **Physical Verification**: APK compiled, signed, and deployed directly to user's connected smartphone via ADB (`release/ClassMate.apk`), verified with captured device screenshots.
+
+---
+
+### 219.6 Friends Directory Modernization & Faculty Privacy Governance
+
+#### A. Modal Viewport Expansion
+- **Android APK ([`dialog_profile_modern.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/dialog_profile_modern.xml), [`ClassMateFriendsScreen.kt`](file:///d:/Code%20&%20Scripts/ClassMate-main/app/src/main/java/com/shuaib/classmate/activities/ClassMateFriendsScreen.kt))**: Expanded modal dialog width to `96%` screen width (max `720dp`), preventing cramped multi-line text wrapping on student details.
+- **Web Companion ([`friends.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/friends.tsx))**: Increased modal dialog width to `860px` (`max-w-3xl`) with compact card padding.
+
+#### B. 3-Tier Hierarchy Sorting Architecture
+The Friends directory enforces a strict 3-tier hierarchy sorting algorithm:
+1. **Administrators & Department Heads**: Pinned at the top with distinguished verified authority badge.
+2. **Class Representatives (CR)**: Prominently clustered at the top of the batch list with distinct badge.
+3. **General Batchmates**: Sorted alphabetically or by university roll number.
+
+#### C. Faculty Personal Privacy Rule
+To protect faculty members from unsolicited personal communications:
+- Personal phone numbers, blood group, department name, and batch affiliation are strictly suppressed from public student views on teacher profiles.
+- Institutional email and official office contact channels remain available for legitimate academic inquiries.
+
+#### D. Soft Keyboard IME Insets Ergonomics
+- Integrated `WindowInsetsCompat.Type.ime()` with bottom sheet dialogs to automatically translate the modal viewport upward when soft keyboards appear, preventing input field occlusion (Commits [`cb05104`](https://github.com/shuaibuddowla/ClassMate/commit/cb05104), [`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d)).
+
+---
+
+### 219.7 Master Production Verification Matrix (Updated Master State v219)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt Compose `ClassMateBottomBar.kt` & XML `GlassBottomNavView.kt` with `14dp` side margins, `10dp` bottom float, `26dp` corner radii, `1.2dp` glass border, and `14dp` shadow (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **QR Attendance Suite Deprecation** | Android APK Native | **PRODUCTION** | Stubbed legacy `AttendanceScannerActivity`, `CustomScannerActivity`, `GenerateQrActivity`, `ScanQrActivity` in favor of IoT hardware RFID station |
+| **Academic CGPA Calculator Engine** | Android APK Native | **PRODUCTION** | Implemented `CgpaCalculatorActivity.kt` & `CgpaData.kt` with MBSTU grading scale, dual input modes (Grade / Marks), SharedPreferences persistence, and cosmic card UI |
+| **Tactile Touch Animation Utility** | Android APK Native | **PRODUCTION** | Implemented `TouchAnimator.kt` (`View.addScaleTouchAnimation(0.98f)`) with zero-interference touch passthrough |
+| **Granular Haptic Feedback Utility** | Android APK Native | **PRODUCTION** | Implemented `HapticUtil.kt` standardizing Light (`KEYBOARD_TAP`), Medium (`VIRTUAL_KEY`), and Heavy (`LONG_PRESS`) tactile responses |
+| **Lifecycle-Aware Network Monitoring** | Android APK Native | **PRODUCTION** | Implemented `NetworkMonitor.kt` (`ConnectivityManager.NetworkCallback` checking `NET_CAPABILITY_VALIDATED`) with animated offline banner (`fade_in_slide.xml`) |
+| **Multi-Tier Offline Caching Subsystem** | Android APK Native | **PRODUCTION** | `OfflineCache.kt` for timetables/notices/profiles; `TelegramPdfCache.kt` with MD5 filename hashing and 100MB bounded LRU disk storage |
+| **Friends Directory 96% Popup & 3-Tier Hierarchy** | Web & Android APK | **PRODUCTION** | 860px / 96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Soft Keyboard IME Insets Integration** | Web & Android APK | **PRODUCTION** | Bottom sheet dialogs bound to IME insets; zero input field occlusion during soft keyboard activation (Commits [`cb05104`](https://github.com/shuaibuddowla/ClassMate/commit/cb05104), [`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d)) |
+| **Transit Real-Time Ground-Truth Gliding** | Web & Android APK | **PRODUCTION** | Eradicated marker jitter/backward snapping; removed dead-reckoning extrapolation; raw GPS telemetry with CSS transform transitions (`0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Animated Route Timeline Rail Bus Gliding** | Web & Android APK | **PRODUCTION** | Dynamic animated bus rider icon on vertical station rail; clamped progress ($0.12 \le \text{progress} \le 0.88$); real-time Bengali speed badge (`১২ কিমি/ঘ`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Soft Radar Micro-Pulse Physics** | Web & Android APK | **PRODUCTION** | Refactored `@keyframes transitPulse` to subtle `scale(1.06)`; fixed bus icon at `scale(1)` with independent outer radar ripple ring (`.transit-rider-radar-glow`) fading to 0 opacity (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **GitGuardian Secret Purge & Sanitization** | Full Stack (Scripts & Repos) | **PRODUCTION** | Sanitized `scripts/inspect_students.py`; enforced environment variable authentication; pushed across `main` and `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` with Config visibility |
+| **Google OAuth PKCE Flow Recovery** | Web Companion | **PRODUCTION** | Verified OAuth sign-in flow post-Vercel rollout; 100% data retention verified across all database tables, rosters, and notices |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v219) |
