@@ -14570,3 +14570,142 @@ The Notice subsystem architecture (Sections 1–14) is codified as follows:
 | **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v209) |
+
+
+---
+
+## 210. Unified Transit & Timetable Navigation Engine, Boilerplate Loading Guard & Master State v210
+
+### 210.1 Directives & Cross-Session Transcripts Audit
+A comprehensive audit of recent Antigravity transcripts under `C:/Users/USER/.gemini/antigravity/brain` was conducted, reviewing sessions [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b), [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc), [`17cff0da-e667-4140-9a8c-322d14a9b5bd`](conversation://17cff0da-e667-4140-9a8c-322d14a9b5bd), [`30aa1e65-7fa7-4c56-9c32-a46a93311998`](conversation://30aa1e65-7fa7-4c56-9c32-a46a93311998), and [`7bf9b1c9-a2d1-40c9-a995-c810deb70c60`](conversation://7bf9b1c9-a2d1-40c9-a995-c810deb70c60).
+
+Key evolutionary milestones synthesized across these sessions include:
+1. **Transit Camera Earthquake Shaking & Viewport Jitter Elimination (Commit `888393f`)**:
+   - Eradicated violent camera fly animations on 1-second extrapolated clock updates by decoupling map centering via `lastCenteredBusIdRef`.
+   - Preserved fluid vehicle marker animations without fighting Leaflet camera gestures or user touch interactions.
+   - Introduced the floating `[ 🧭 বাসে ফোকাস ]` re-center action button when users pan or zoom away from the tracked vehicle.
+2. **Dynamic Route Station Slicing (`getStationsForBus`, Commit `888393f`)**:
+   - Eliminated 8 phantom stations on Nirala More routes (cutting down from 24 to 16 stops) and 6 phantom stations on Puraton routes (18 stops).
+   - Replaced static corridor array with route-aware station filtering and milestone progress clamping.
+3. **Boilerplate Telemetry Suppression & Dedicated Loading State (Commit `5b7a7b0`)**:
+   - Eliminated confusing premature presentation of placeholder telemetry ("0 km/h", blank ETA, unmapped stop names) while GPS coordinates resolve.
+   - Built a sleek loading card (`.transit-detail-loading-card`) featuring radar pulse and shimmer indicator.
+4. **Timetable to Transit Deep Linking & Clutter Elimination (Commits `64e242d`, `7d5fc8f`, `43f7905`)**:
+   - Integrated live MBSTU Wheels bus schedule API directly into the Routine/Timetable tab.
+   - Eliminated redundant "Call Pilot" button, replacing it with a direct "Track" action button (`btnTrackBus`) that auto-navigates to Transit and focuses the bus on the map in one tap.
+   - Completely eradicated the redundant "Next Departure" hero badge and duplicate "Student Bus Schedules" section.
+5. **Transit UI Ground-Up Redesign V3 (Commit `42c089e`)**:
+   - Bus List view opens first by default, optimizing initial render overhead and user scanning.
+   - Relocated map floating action buttons (FABs) to top-right (`.transit-fab-cluster`), preventing close button collision on the bus detail card.
+   - Stripped the misleading straight blue vector line connecting bus to next stop that bypassed road geometry.
+6. **Floating Curved Capsule Island Navigation (Commits `9d4c229`, `c085357`)**:
+   - Converted docked navigation bar into a floating curved capsule island (`32.dp` rounded corners, `14.dp` horizontal margins, `10.dp` bottom elevation, acrylic frosted glass).
+   - Powered by damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with tactile scale lift (`1.05f`) and haptic clock tick feedback.
+
+---
+
+### 210.2 Debugging Experiences & Architectural Solutions Deep Dive
+
+#### A. Map Camera Earthquake Shaking & Leaflet FlyTo Decoupling
+* **Root Cause Diagnosis**:
+  In `web/src/components/transit.tsx`, the tracking engine runs a 1-second tick loop (`clockNow = Date.now()`) to smoothly extrapolate bus positions along road polylines. Previously, the auto-centering `useEffect` included `[selectedBus?.lat, selectedBus?.lon]` in its dependency array. Every 1000ms, as coordinates nudged, it triggered `mapRef.current.flyTo([lat, lon], zoom, { duration: 0.8 })`. Because an 800ms animation was continually interrupted by a new animation 200ms later, Leaflet's render pipeline stuttered violently ("earthquake jitter"), causing map tile flicker, tearing, and impossible touch panning.
+* **Architectural Resolution**:
+  - Implemented `lastCenteredBusIdRef = useRef<string | null>(null)`:
+    - Centering executes **strictly once** when a bus is initially selected or switched (`lastCenteredBusIdRef.current !== selectedBus.id`).
+    - Once centered, subsequent 1-second coordinate updates interpolate the marker smoothly across the canvas without forcing the camera viewport to re-fly.
+  - Added Floating Recovery Button (`[ 🧭 বাসে ফোকাস ]`):
+    - Monitored via Leaflet `movestart` / `dragstart` events. When a user manually interacts with the map, an in-viewport state flag displays the recovery button at the bottom-right.
+    - Tapping this button resets `lastCenteredBusIdRef.current = null` and smoothly glides the camera back to the bus at zoom 16.
+
+#### B. Dynamic Route Stoppage Filtering (`getStationsForBus`)
+* **Problem**:
+  The MBSTU transit corridor was originally modeled as a static 24-station array ending at Tangail District Headquarters. However, buses designated for "Nirala More" (e.g., Sonartori, Agnivina) terminate at stop 16 and reverse direction. Riders were confused by 8 phantom stops (Puraton Bus Stand, Baby Stand, District Gate, etc.) appearing after Nirala More, causing the progress stepper to misrepresent milestone completion.
+* **Architectural Resolution**:
+  - Created `getStationsForBus(bus: BusMetadata): Station[]`:
+    - Nirala Routes: Clamped strictly to 16 stations.
+    - Puraton Bus Stand Routes: Clamped to 18 stations.
+    - District / Highway Routes: Full 24 stations.
+  - Direction Reversal:
+    - When the user toggles direction (`Campus -> City` vs. `City -> Campus`), `getStationsForBus` instantly reverses station ordering while preserving milestone progression logic.
+  - Stepper Optimization:
+    - High-contrast Bengali typography (`অতিক্রম করেছে`, `আসছে`, `পরবর্তী`).
+    - Passed stops display subtle checkmark nodes (`✓`).
+    - Visible stops increased from ~1.5 to 6–8 simultaneously by removing bulky header cards.
+
+#### C. Dedicated Bus Telemetry Loading State & Boilerplate Suppression
+* **Problem**:
+  When transitioning from the Timetable tab or tapping a bus from the list, fetching fresh GPS telemetry from the MBSTU Wheels endpoint takes 400ms–1500ms depending on cellular latency. Previously, the detail bottom sheet opened immediately with default boilerplate states: displaying `0 km/h`, uncalculated ETA (`-- min`), empty driver badges, and missing stop names. This led users to believe tracking was broken or the bus was offline.
+* **Architectural Resolution**:
+  - Built `.transit-detail-loading-card`:
+    - When a bus selection occurs, if `bus.lat == null` or coordinates are stale (>60s), the UI displays a dedicated loading card with a pulsating radar animation, shimmering skeleton bar, and text `"বাসের লাইভ লোকেশন লোড হচ্ছে..."` (`Loading bus live location...`).
+    - The full telemetry sheet and ETA stepper only mount once valid coordinates are parsed, eliminating jarring layout shifts and false zero-speed readouts.
+
+#### D. Timetable to Transit Deep Linking & Clutter Eradication
+* **Problem**:
+  In earlier iterations, the Routine/Timetable screen had:
+  1. A bulky "Next Departure" hero card that consumed 160dp of vertical space while repeating information already visible in the list.
+  2. A "Call Pilot" button that proved unhelpful during class changes.
+  3. A duplicate "Student Bus Schedules" section listing the same buses twice.
+* **Architectural Resolution**:
+  - Replaced Call Pilot with Track Button:
+    - Added `btnTrackBus` (`[ 🧭 ট্র্যাক করুন ]` in Bengali / `Track` in English).
+    - In Android APK (`ClassMateAcademicScreensSupabase.kt`), clicking `btnTrackBus` executes:
+      ```kotlin
+      mainActivity.binding.bottomNav.selectedItemId = R.id.nav_transit
+      transitFragment.selectBusById(busId, autoFocus = true)
+      ```
+    - In Web Client (`schedule.tsx`), navigating triggers router push to `/transit?bus=${busId}&focus=true`.
+  - Removed Hero Badge & Duplicate Section:
+    - Stripped `heroNextDeparture` layout entirely.
+    - Removed redundant manual schedule array in favor of the single-source `MBSTU_WHEELS_SCHEDULE_MAP` dictionary.
+
+---
+
+### 210.3 Floating Curved Capsule Island Navigation Engine (Android APK)
+
+#### A. Geometric Architecture & Glass Surface
+- **Layout Specification**:
+  - Corner radius: `32.dp` continuous curvature.
+  - Horizontal margins: `14.dp` inset from display edges, ensuring complete floating separation from screen borders.
+  - Bottom elevation: `10.dp` above navigation gesture bar.
+  - Elevation shadow: `14.dp` soft ambient blur.
+- **Acrylic Frosted Glass Shader**:
+  - Light Mode: `#F8FAFC` at 92% opacity with `1.dp` `cm_border_glass` perimeter stroke.
+  - Dark Mode: `#0F172A` at 92% opacity with `1.dp` `#334155` perimeter stroke.
+
+#### B. Damped Harmonic Spring Physics
+- **Fluid Morphing Indicator Pill**:
+  - Replaced rigid translation interpolators with physics-based spring animation:
+    ```kotlin
+    val pillOffset by animateDpAsState(
+        targetValue = targetX,
+        animationSpec = spring(
+            dampingRatio = 0.72f, // Subtly underdamped: silky smooth overshoot without oscillation
+            stiffness = 380f      // Snappy, ultra-responsive tab tracking
+        )
+    )
+    ```
+- **Active Tab Scale Lift & Tactile Haptics**:
+  - Active icon scales up to `1.05f` smoothly upon selection.
+  - Dispatches `HapticFeedbackConstants.CLOCK_TICK` on tab switch, giving physical tactile confirmation to user taps.
+
+---
+
+### 210.4 Master Production Verification Matrix (Updated Master State v210)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Up Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | `32.dp` rounded capsule, `14.dp` horizontal margins, `10.dp` bottom elevation, frosted acrylic glass, spring physics (`0.72f` damping, `380f` stiffness) (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর \| 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v210) |
