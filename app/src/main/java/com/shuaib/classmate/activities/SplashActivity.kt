@@ -29,6 +29,17 @@ class SplashActivity : AppCompatActivity() {
         // Keep system splash screen visible until routing is determined
         splashScreen.setKeepOnScreenCondition { !isReady }
 
+        val uri = intent.data
+        if (uri != null && (uri.path?.startsWith("/c/") == true || uri.path?.startsWith("/card/") == true)) {
+            val nfcIntent = Intent(this, com.shuaib.classmate.nfc.NfcCardDispatcherActivity::class.java).apply {
+                data = uri
+                intent.extras?.let { putExtras(it) }
+            }
+            startActivity(nfcIntent)
+            finish()
+            return
+        }
+
         AppContextManager.init(this)
         checkUserStatus()
     }

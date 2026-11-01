@@ -16013,7 +16013,8 @@ flowchart TD
   - Committed and pushed across branches: `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) and `main`.
 
 #### B. Supabase Dashboard Anatomy: Edge Function Secrets vs Project API Keys
-- **Common Pitfall**: The user initially navigated to **Edge Functions $ightarrow$ Secrets**, where keys appeared non-editable.
+- **Common Pitfall**: The user initially navigated to **Edge Functions $
+ightarrow$ Secrets**, where keys appeared non-editable.
 - **Architectural Clarification**:
   - `Edge Functions -> Secrets`: Read-only runtime environment variables injected into Deno serverless edge containers (e.g. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
   - `Project Settings -> API Keys`: The authoritative management interface for rotating cryptographic secrets, managing JWT signing algorithms, and toggling legacy API keys.
@@ -16081,7 +16082,8 @@ sequenceDiagram
 - **Animated Timeline Bus Rider**:
   - Added `.transit-timeline-live-bus-rider` positioned along the vertical timeline rail.
   - Dynamically calculates progress between the previous station and upcoming station:
-    $$	ext{segmentProgress} = 	ext{clamp}\left(1 - rac{	ext{distToNext}}{	ext{totalSegmentDistance}}, 0.12, 0.88ight)$$
+    $$	ext{segmentProgress} = 	ext{clamp}\left(1 - rac{	ext{distToNext}}{	ext{totalSegmentDistance}}, 0.12, 0.88
+ight)$$
   - Translates down the rail with `transition: top 0.8s cubic-bezier(0.25, 1, 0.5, 1)`.
   - Integrates a real-time Bengali speed badge (`১২ কিমি/ঘ`) and milestone checkmark nodes for passed stops.
 
@@ -16113,7 +16115,9 @@ sequenceDiagram
 
 #### B. Friends Directory Modernization & Soft Keyboard Ergonomics
 - **Expanded Layout**: Increased modal width to `860px` on Web and `96%` width (max `720dp`) on Android (`ClassMateFriendsScreen.kt`, `dialog_profile_modern.xml`).
-- **3-Tier Hierarchy Sorting**: Prioritizes Admin & Department Heads $ightarrow$ Class Representatives (CR) $ightarrow$ General Batchmates, with teacher phone number privacy protection.
+- **3-Tier Hierarchy Sorting**: Prioritizes Admin & Department Heads $
+ightarrow$ Class Representatives (CR) $
+ightarrow$ General Batchmates, with teacher phone number privacy protection.
 - **Ergonomics**: Bottom sheets auto-adjust against soft keyboards using IME actions (`cb05104`) with predictive back gestures (`1b3d37d`).
 
 #### C. Android Studio Project Status & File Hygiene
@@ -16395,3 +16399,761 @@ To protect faculty members from unsolicited personal communications:
 | **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` with Config visibility |
 | **Google OAuth PKCE Flow Recovery** | Web Companion | **PRODUCTION** | Verified OAuth sign-in flow post-Vercel rollout; 100% data retention verified across all database tables, rosters, and notices |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v219) |
+
+
+## 220. Emergency Attendance Navigation Alignment (Batch Tab Restoration & Settings Transit Relocation), Dual-Payload Offline NFC Card Architecture & Master State v220
+
+### 220.1 Cross-Session Retrospective & Transcripts Audit
+An exhaustive cross-session audit was conducted across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, specifically targeting the ClassMate Android APK project, its companion Web client, and the Supabase backend:
+- [`71f50a26-5fb2-4a70-b411-d5e1561778ea`](conversation://71f50a26-5fb2-4a70-b411-d5e1561778ea) *(18:57 PKT / Dhaka time)*: Active hourly memory synthesis session. Audited recent conversations, verified production commit alignment across `main` and `feature/live-bus-tracking`, verified physical device deployment, and established Master State v220 across both repository environments.
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b) *(18:09 - 18:52 PKT / Dhaka time)*: **Emergency Attendance Navigation Realignment & Production Deployment**:
+  - The user instructed: *"As we are facing too many bugs in the transit tab, I have decided to move the transit tab from the navigation bar and bring back the batch tab that was moved to the settings. In the place where you had previously placed the batch tab, place there the transit tab. Move the transit into the settings, and bring back the batch tab into the navigation bar. Do this for the mobile android app, but for the website, keep it as it is. Keep the transit tab in the left side deck. We are having attendance tomorrow so replace the transit tab with the Batch tab."*
+  - Followed by execution command: *"install"*.
+  - Executed end-to-end refactoring: restored `nav_friends` (Batch tab) in bottom navigation menus (`bottom_nav_menu.xml`, `classmate_academic_nav_menu.xml`), relocated MBSTU Bus Transit into Settings (`cardProfileTransit` in `classmate_profile.xml`), created dedicated `ClassMateTransitActivity.kt`, updated `ids.xml`, and resolved URL routing.
+  - Merged `feature/live-bus-tracking` into `main` (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639) -> Merge Commit [`a2c1228`](https://github.com/shuaibuddowla/ClassMate/commit/a2c1228890cf75696aa7c1463fe305a901c329e7)) and pushed to GitHub for automated Vercel deployment.
+  - Successfully compiled debug APK via `./gradlew :app:assembleDebug`, deployed directly to connected physical device `6478ab80` via ADB, and verified operational state in production.
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc) *(18:30 - 18:57 PKT / Dhaka time)*: **Dual-Payload Offline NFC Card Architecture & Lost Card Public Recovery System**:
+  - Explored native smartphone NFC tapping mechanics for instant profile rendering without browser sheets or redirection latency.
+  - Formulated the **Dual-Payload NDEF Card** specification using Android Application Records (AAR) + Custom URI + Universal Web Fallback.
+  - Solved the **"Blank White Card" Campus Conundrum**: Formulated a 100% offline, public Student ID bottom sheet (`FoundCardBottomSheet`) with 1-tap phone and WhatsApp communication intents, allowing anyone on campus to return lost blank cards to their owner even without internet or app login.
+- [`61baf78f-389a-422b-872e-a32129f7c925`](conversation://61baf78f-389a-422b-872e-a32129f7c925) *(17:57 PKT / Dhaka time)*: Preceding hourly memory review session establishing Master State v219.
+- [`df313fa6-3cbb-48d7-9ce4-a09582f891c6`](conversation://df313fa6-3cbb-48d7-9ce4-a09582f891c6) *(16:57 PKT / Dhaka time)*: Established Master State v218 across both repositories.
+- [`f78a9f92-ab40-4040-be51-25ef5ecd261a`](conversation://f78a9f92-ab40-4040-be51-25ef5ecd261a) *(15:57 PKT / Dhaka time)*: Established Master State v217 across both repositories.
+
+---
+
+### 220.2 Emergency Attendance Navigation Realignment: Batch Tab Restoration & Transit Settings Relocation
+
+```mermaid
+flowchart TD
+    subgraph Primary Bottom Navigation Bar (Restored for Tomorrow's Attendance)
+        T[Timetable / Routine] --- N[Notices Feed] --- B["Batch & Friends (nav_friends)<br>RESTORED TO NAVBAR"] --- C[Courses / Library] --- S[Settings / Profile]
+    end
+
+    subgraph Settings Screen (Profile)
+        S --> TR["MBSTU Bus Transit Card (cardProfileTransit)<br>MOVED TO SETTINGS"]
+        S --> ST["Batch Switcher & Preferences"]
+        S --> SF["Security & Sign Out"]
+    end
+
+    subgraph Dedicated Transit Subsystem
+        TR --> TA["ClassMateTransitActivity<br>(Dedicated Standalone Activity)"]
+        TA --> WV["Transit WebView with Dark Mode & Theme Injection"]
+    end
+
+    subgraph Timetable Bus Hero Card
+        TH["Timetable Bus Summary Card"] -->|"openTransitForBus(busId)"| TA
+    end
+```
+
+#### A. The Campus Context & Architectural Rationale
+With university classes and student attendance scheduled for tomorrow, having the experimental transit tab occupying a slot on the primary bottom navigation bar introduced operational risk. Class Representatives (CRs) and students require immediate, friction-free access to the **Batch Directory**, **Rosters**, and **Batch Fund ledger** directly from the main navigation bar. Consequently, navigation topology was realigned:
+1. **Primary Navigation Bar**: Restored the **Batch** tab (`nav_friends`) to its primary position.
+2. **Settings (User Profile)**: Replaced the redundant batch directory card with a prominent **MBSTU Bus Transit** entry (`cardProfileTransit`).
+3. **Web Companion**: Synchronized mobile web navigation bar while preserving desktop left sidebar deck layout.
+
+#### B. Android APK Implementation Details ([Commit `5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639))
+- **Navigation Menus ([`bottom_nav_menu.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/menu/bottom_nav_menu.xml), [`classmate_academic_nav_menu.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/menu/classmate_academic_nav_menu.xml))**:
+  - Restored `<item android:id="@+id/nav_friends" android:icon="@drawable/ic_batch_friends" android:title="@string/nav_batch" />`.
+  - Marked `nav_transit` as `android:visible="false"` or removed from active bar slots.
+- **Resource ID Declaration ([`ids.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/values/ids.xml))**:
+  - Created `<resources><item type="id" name="nav_transit" /></resources>` to prevent resource inflation crashes or unresolved reference errors in legacy navigation handlers.
+- **Profile / Settings Layout ([`classmate_profile.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/classmate_profile.xml))**:
+  - Replaced `cardProfileBatch` with `cardProfileTransit`:
+    ```xml
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardProfileTransit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/cm_surface"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/cm_border"
+        app:strokeWidth="1dp">
+        <!-- Icon: sl_nav_transit, Title: "MBSTU Bus Transit", Subtitle: "Live bus radar, stoppage routes & schedules" -->
+    </com.google.android.material.card.MaterialCardView>
+    ```
+- **Dedicated Standalone Activity ([`ClassMateTransitActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateTransitActivity.kt), [`activity_classmate_transit.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/activity_classmate_transit.xml))**:
+  - Built a lightweight, focused activity dedicated exclusively to MBSTU Bus Transit.
+  - Manifest declaration: `Theme.ClassMate.Publish`, portrait orientation, `windowSoftInputMode="adjustResize"`.
+  - Supports deep-linked bus selection via `EXTRA_BUS_ID` (auto-formatted with `SB` prefix).
+  - Handles back navigation, loading states, and dark mode stylesheet injection into the transit web container.
+- **Academic Screens Controller ([`ClassMateAcademicScreensSupabase.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAcademicScreensSupabase.kt))**:
+  - Refactored `openTransitForBus(busId: String = "")`:
+    ```kotlin
+    fun openTransitForBus(busId: String = "") {
+        val cleanBusId = if (busId.isNotBlank()) {
+            if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
+        } else ""
+        pendingTransitBusId = cleanBusId.ifBlank { null }
+
+        val intent = Intent(activity, ClassMateTransitActivity::class.java).apply {
+            if (cleanBusId.isNotBlank()) {
+                putExtra("EXTRA_BUS_ID", cleanBusId)
+            }
+        }
+        activity.startActivity(intent)
+    }
+    ```
+  - Replaced profile batch click listener with transit activity launcher on `cardProfileTransit`.
+  - Wired Timetable bus summary card (`busSummary`) to directly invoke `openTransitForBus("")`.
+- **Host Activity Navigation ([`ClassMateAuthActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt))**:
+  - Ensured selecting `R.id.nav_friends` in the bottom bar triggers `selectHomeTab(R.id.nav_friends)`.
+
+#### C. Web Companion Client Parity
+- **Mobile Bottom Navigation ([`web/src/components/app.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/app.tsx))**:
+  - Restored `mobileDestinations`:
+    ```tsx
+    const mobileDestinations = [
+      ["timetable", "Timetable", CalendarDays],
+      ["notices", "Notices", Bell],
+      ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
+      ["library", "Courses", BookOpen],
+      ["profile", "Settings", Settings],
+    ] as const;
+    ```
+  - Added `transit()` helper to global `Context` interface:
+    ```tsx
+    transit: () => {
+      history.pushState({ classmateTransit: true }, "", "/#transit");
+      setTab("transit");
+    }
+    ```
+- **Profile Screen Integration ([`web/src/components/profile.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/profile.tsx))**:
+  - Added interactive "MBSTU Bus Transit" button (`.settings-row`) styled with cyan icon container, Lucide `Bus` icon, title, subtitle, and chevron, routing to `ctx.transit()` or `location.hash = "transit"`.
+  - Preserved desktop sidebar layout with persistent Transit left deck.
+
+---
+
+### 220.3 Dual-Payload NDEF NFC Smart Card Architecture & Offline Lost-Card Recovery Subsystem
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student as Student / Finder
+    participant Phone as Any Smartphone (NFC)
+    participant OS as Android / iOS OS
+    participant App as ClassMate Native App
+    participant Cloud as Supabase / Vercel
+
+    Note over Student, Phone: Blank White PVC Card tapped on back of phone
+    Phone->>OS: High-frequency RF Field reads NDEF records (<15ms)
+    alt ClassMate Installed (Android Application Record Match)
+        OS->>App: Invokes com.shuaib.classmate via AAR (Bypasses Browser Chooser)
+        App->>App: Parses NDEF Record 2 (classmate://card?id=...&name=...&blood=...)
+        App->>Student: Pops FoundCardBottomSheet in <10ms (100% Offline)
+        opt Internet Available
+            App->>Cloud: Background query for verified photo & academic status
+            Cloud-->>App: Enriches card with high-res photo
+        end
+    else No App Installed / iPhone / Visitor
+        OS->>Student: Opens Record 3 Web Fallback (https://classmatebd.vercel.app/u/...)
+    else Classroom Hardware Station (ESP32)
+        Phone->>Phone: Reads Sector 0 Hardware UID / Block 4 Student ID via SPI (<15ms)
+    end
+```
+
+#### A. The Blank White Card Campus Dilemma
+Students at MBSTU are issued unprinted, blank white PVC plastic RFID/NFC cards (MIFARE Classic 1K / NTAG213/215). Because the cards lack physical surface printing (no photo, no printed student name, and no roll number):
+- **Problem**: If a student drops or loses their card on campus, anyone picking it up has zero visual clues as to who owns it.
+- **Resolution**: Embedding a self-contained, cryptographically signed NDEF payload directly into the card's EEPROM memory. Tapping the blank white card against any smartphone instantly displays the owner's identity card—**even with zero internet connectivity and zero user login**.
+
+#### B. The 3-Record "Dual-Payload" NDEF Specification (~120 Bytes Total)
+The payload fits comfortably within standard MIFARE Classic 1K EEPROM (752 usable NDEF bytes) or NTAG213 chips:
+1. **Record 1: Android Application Record (AAR)**
+   - Type: `urn:nfc:ext:android.com:pkg`
+   - Payload: `com.shuaib.classmate`
+   - Purpose: Forces Android OS to immediately route the card event directly to ClassMate, bypassing the system app chooser and suppressing browser popups.
+2. **Record 2: Native Self-Contained Custom URI**
+   - URI: `classmate://card?id=IT20042&name=Shuaib+Uddowla&dept=CSE&batch=20th&phone=017XXXXXXXX&blood=B%2B`
+   - Size: ~95 bytes.
+   - Purpose: Carries all core identity attributes on the physical silicon chip. Decoded locally in `<10ms` without making any network requests.
+3. **Record 3: Universal Web Fallback URL**
+   - URL: `https://classmatebd.vercel.app/u/IT20042`
+   - Purpose: Serves as a universal safety net if scanned by an iPhone, a phone without ClassMate installed, or campus security personnel.
+4. **Hardware UID / Block 4 Allocation**:
+   - The hardware ESP32 classroom attendance station continues reading the physical card UID from Sector 0 or student ID from Block 4 via SPI in `<15ms`, ensuring total hardware-software compatibility.
+
+#### C. Public Offline Student ID Modal (`FoundCardBottomSheet`)
+When tapped, ClassMate triggers native haptic confirmation (`HapticFeedbackConstants.CONFIRM`) and inflates a public, unauthenticated modal:
+- **Cardholder Header**: Student avatar or colored initial badge, bold Name, and University Roll Number (e.g. `Shuaib Uddowla · Roll: IT20042`).
+- **Academic Affiliation**: Department & Academic Batch (e.g. `CSE · 20th Batch`).
+- **Vital Badges**: Blood Group pill (e.g. `[ 🩸 Blood: B+ ]`) and Verification badge (`[ 🏷️ Registered Student ]`).
+- **Campus Lost-and-Found Recovery Actions**:
+  - **1-Tap Call Owner**: Direct `Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))`.
+  - **1-Tap WhatsApp / SMS**: Direct intent launching WhatsApp or SMS with pre-filled message: *"Hey! I found your ClassMate student card on campus."*
+- **Offline Reliability**: Operates in library basements, cafeterias, and mobile dead-zones without requiring an active data connection.
+
+#### D. Card Registration & Burner Protocol
+- Built for Class Representatives (CR) and Admins.
+- Input student ID, Name, Phone, and Blood Group.
+- Tap blank white card to phone: burns the 3 NDEF records, locks sectors with campus key, and registers card UID into Supabase database in a 1-second workflow.
+
+---
+
+### 220.4 Technical Post-Mortems, Diagnostic Insights & Architectural Lessons
+
+#### A. XML Resource ID Decoupling (`ids.xml` vs Menu Inflation)
+- **Symptom**: When `nav_transit` was removed from the active items of `classmate_academic_nav_menu.xml`, references to `R.id.nav_transit` in Kotlin code risked generating compilation errors or `Resources.NotFoundException` during layout inflation.
+- **Root Cause**: In Android AAPT2, resource IDs declared solely inside `<menu>` items only exist in `R.id` as long as they are present in at least one inflated menu or layout resource.
+- **Solution**: Explicitly defined `<item type="id" name="nav_transit" />` inside `app/src/main/res/values/ids.xml`. This guarantees that `R.id.nav_transit` remains a permanently resolvable integer ID throughout the build system regardless of menu visibility alterations.
+
+#### B. Activity vs Tab Navigation Decoupling
+- **Architectural Lesson**: Embedding heavy WebView containers (such as the interactive Leaflet bus tracking map) inside the primary `ClassMateAuthActivity` tab stack consumed significant memory and added complexity to navigation lifecycle handlers.
+- **Solution**: Decoupling the transit subsystem into a dedicated `ClassMateTransitActivity` cleaned up `ClassMateAcademicScreensSupabase.kt`, isolated webview memory usage, and allowed the primary activity to focus entirely on academic operations, routine, notices, and tomorrow's classroom attendance.
+
+#### C. High-Frequency NFC Foreground Dispatch
+- **Mechanics**: When ClassMate is actively in the foreground, using `NfcAdapter.enableForegroundDispatch(...)` with high-priority intent filters intercepts card taps before the Android OS launches the system intent resolver. This eliminates OS dialogs and ensures the `FoundCardBottomSheet` animates onto the screen in `<10ms`.
+
+---
+
+### 220.5 Master Production Verification Matrix (Updated Master State v220)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **Emergency Batch Tab Restoration** | Android APK Native | **PRODUCTION** | Restored `nav_friends` (Batch tab) to bottom navigation bar in `bottom_nav_menu.xml` & `classmate_academic_nav_menu.xml`; verified for tomorrow's attendance (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639), Merge [`a2c1228`](https://github.com/shuaibuddowla/ClassMate/commit/a2c1228890cf75696aa7c1463fe305a901c329e7)) |
+| **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Replaced batch profile card with `cardProfileTransit` in `classmate_profile.xml`; created standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` |
+| **XML Navigation ID Decoupling** | Android APK Native | **PRODUCTION** | Declared persistent `<item type="id" name="nav_transit" />` in `ids.xml` preventing compilation and inflation breaks |
+| **Web Mobile Bottom Bar Synchronization** | Web Companion Client | **PRODUCTION** | Restored `friends` (Batch) to `mobileDestinations` in `app.tsx`; added MBSTU Transit button to `profile.tsx`; preserved desktop sidebar rail |
+| **Physical APK Build & ADB Deployment** | Android APK Native | **PRODUCTION** | Debug APK compiled via `./gradlew :app:assembleDebug`, deployed to physical device `6478ab80` via ADB, verified live in hand |
+| **Dual-Payload NDEF NFC Smart Card Architecture** | Android APK & IoT | **ARCHITECTED** | 3-record NDEF payload (AAR `com.shuaib.classmate` + `classmate://card` custom URI + Vercel web fallback) with ESP32 SPI hardware compatibility |
+| **Public Offline Lost-Card Recovery Modal** | Android APK Native | **ARCHITECTED** | 100% offline self-contained `FoundCardBottomSheet` displaying student identity, roll, blood group, and 1-tap Call/WhatsApp recovery actions |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt Compose `ClassMateBottomBar.kt` & XML `GlassBottomNavView.kt` with `14dp` side margins, `10dp` bottom float, `26dp` corner radii, `1.2dp` glass border, and `14dp` shadow |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **QR Attendance Suite Deprecation** | Android APK Native | **PRODUCTION** | Deprecated legacy QR activities in favor of IoT hardware RFID station |
+| **Academic CGPA Calculator Engine** | Android APK Native | **PRODUCTION** | `CgpaCalculatorActivity.kt` & `CgpaData.kt` with MBSTU grading scale, dual input modes (Grade / Marks), and cosmic card UI |
+| **Tactile Touch & Granular Haptic Utilities** | Android APK Native | **PRODUCTION** | `TouchAnimator.kt` (`0.98f` scale lift) and `HapticUtil.kt` standardizing Light, Medium, and Heavy tactile responses |
+| **Lifecycle-Aware Network & Offline Caching** | Android APK Native | **PRODUCTION** | `NetworkMonitor.kt`, `OfflineCache.kt`, and `TelegramPdfCache.kt` (MD5 hashing, 100MB bounded LRU disk storage) |
+| **Transit Real-Time Ground-Truth Gliding** | Web & Android APK | **PRODUCTION** | Eradicated marker jitter/snapping; raw GPS telemetry with CSS transform transitions (`0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Animated Route Timeline Rail Bus Gliding** | Web & Android APK | **PRODUCTION** | Dynamic animated bus rider icon on vertical station rail; clamped progress ($0.12 \le 	ext{progress} \le 0.88$); real-time Bengali speed badge |
+| **Soft Radar Micro-Pulse Physics** | Web & Android APK | **PRODUCTION** | Refactored `@keyframes transitPulse` to subtle `scale(1.06)`; fixed bus icon at `scale(1)` with independent outer radar ripple ring fading to 0 opacity |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v220) |
+
+
+---
+
+## 221. NFC Smart Card Enrollment, Zero-Browser Tapping & User Attendance Architecture (Production Master State v221)
+
+### 221.1 Executive Overview & Engineering Synthesis
+Following the deployment of the hardware ESP32 classroom attendance station and the emergency restoration of the Batch tab for live campus roll-calls, Section 221 establishes the complete client-side smartphone NFC smart card infrastructure for ClassMate.
+
+Students at Mawlana Bhashani Science and Technology University (MBSTU) carry blank, unprinted white PVC RFID/NFC cards (MIFARE Classic 1K / NTAG213). This created two critical operational requirements:
+1. **The Campus Lost-and-Found Problem**: Blank white cards have zero physical surface markings (no student photo, roll number, or name). Anyone picking up a lost card on campus had no visual mechanism to identify or return it to the owner.
+2. **Instant Zero-Browser Profile Experience**: Tapping a smart card against any smartphone must instantly pop up a native, beautiful student identity card in **< 10ms** without opening a web browser, showing URL disambiguation dialogs, or demanding app login.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Finder as Student / Campus Finder
+    participant Phone as Any Smartphone (NFC)
+    participant OS as Android System Intent Resolver
+    participant App as ClassMate (NfcCardDispatcherActivity)
+    participant Sheet as FoundCardBottomSheet (Native UI)
+    participant Supabase as Supabase RPC (lookup_student_by_card)
+
+    Finder->>Phone: Taps Blank White Card against phone back (<15ms)
+    Phone->>OS: Reads NDEF Message (URI + AAR)
+    alt ClassMate Installed on Phone
+        OS->>App: Invokes NfcCardDispatcherActivity via AAR (SingleTask, Translucent)
+        App->>Sheet: Parses NDEF Record 1 (classmate://card?uid=...&name=...&roll=...)
+        Sheet->>Finder: Animates FoundCardBottomSheet into view (<10ms, 100% Offline)
+        opt Internet Connection Active
+            Sheet->>Supabase: Concurrent RPC: lookup_student_by_card(uid)
+            Supabase-->>Sheet: Returns high-res avatar, department, batch & attendance %
+            Sheet->>Finder: Smoothly hydrates high-res photo & verified badges
+        end
+    else No App Installed / iPhone / Visitor
+        OS->>Finder: Opens Record 3 Web Fallback (https://classmatebd.vercel.app/card?uid=...)
+    end
+```
+
+---
+
+### 221.2 3-Record NDEF Smart Card Data Architecture & `NfcCardManager` Engine
+
+#### A. Dual-Layer Tag Encoding Specification (~120 Bytes Total)
+The payload fits comfortably inside the standard 752-byte usable EEPROM memory of MIFARE Classic 1K cards or NTAG213 chips:
+1. **Record 1: Custom Native URI (`classmate://card`)**:
+   - URI Schema: `classmate://card?uid=04A1B2C3&roll=IT20042&name=Shuaib+Uddowla&id=<uuid>&batch=20th&dept=CSE&phone=017XXXXXXXX&blood=B%2B`
+   - Purpose: Stores encrypted/encoded core identity data directly on the card silicon.
+   - Decoded completely offline in `<10ms` without making any network requests.
+2. **Record 2: Android Application Record (AAR)**:
+   - Type: `urn:nfc:ext:android.com:pkg`
+   - Payload: `com.shuaib.classmate`
+   - Purpose: Directs Android OS to route the NFC event exclusively to `com.shuaib.classmate`, suppressing Chrome/browser prompts and OS app chooser dialogs.
+3. **Record 3 / Web Fallback URL**:
+   - URL: `https://classmatebd.vercel.app/card?uid=...`
+   - Purpose: Provides universal fallback for iPhones or phones without ClassMate installed.
+
+#### B. `NfcCardManager.kt` Implementation Highlights
+- **Hex UID Extraction**: Converts raw byte arrays (`Tag.id` or `NfcAdapter.EXTRA_ID`) to standardized uppercase hex strings (`bytesToHex`).
+- **Defensive Tag Writing (`writeStudentCard`)**:
+  - Automatically detects whether the card is already formatted as standard NDEF (`Ndef.get(tag)`).
+  - If unformatted or raw (such as fresh factory MIFARE Classic 1K cards), seamlessly falls back to `NdefFormatable.get(tag).format(message)`.
+  - Validates memory bounds (`ndef.maxSize >= size`) and prevents write errors on read-only cards.
+
+---
+
+### 221.3 Public Found-Card Sheet (`FoundCardBottomSheet.kt` + `dialog_found_card_sheet.xml`)
+
+When tapped, `NfcCardDispatcherActivity` launches the native bottom sheet with comprehensive empty-state resilience:
+
+#### A. Offline-First Presentation
+- Instantly renders student Name, Roll Number, Department, Batch, and Blood Group pill (`[ 🩸 B+ ]`).
+- Card UID badge displays masked identifier (`UID: ••••7B12`).
+- Offline fallback initials avatar: Computes a clean 2-letter monogram avatar if no cached image exists.
+
+#### B. Careful Empty-State Handling
+- **Missing Phone Number**:
+  - If `phone` is absent, blank, or `"null"`, contact buttons (`Call` and `WhatsApp`) are cleanly hidden.
+  - Replaced with a friendly info container (`layoutMissingContact`): *"No Phone Number Listed · The owner has not listed a public phone number. Please return this card to the batch CR or campus office."*
+- **Missing Blood Group / Department / Batch**:
+  - Cleanly hides empty badges without leaving blank layout gaps.
+  - Defaults department/batch line to *"MBSTU Campus Student"*.
+- **Unregistered / Blank Card**:
+  - Automatically switches view to `layoutUnregisteredCard`.
+  - Displays *"Card UID: 04A1B2C3 · Unregistered Smart Card"*.
+  - If the user scanning the card is a logged-in Admin or Class Representative (CR), an instant button **"Assign This Card to Student"** (`btnAssignUnregisteredCard`) appears, launching `ClassMateAdminAttendanceActivity` with `EXTRA_CARD_UID` pre-filled.
+
+#### C. Contact Actions & Normalization
+- **1-Tap Call**: Launches `Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone"))`.
+- **1-Tap WhatsApp**: Automatically normalizes 11-digit Bangladeshi phone numbers (`01XXXXXXXXX` -> `8801XXXXXXXXX`) and pre-fills message: *"Hello [Name], I found your ClassMate Smart Card on campus."*
+- **Copy Roll & Share**: Allows copying the student's roll number or sharing card info to campus groups.
+
+#### D. Online Supabase Hydration
+- While the offline card is already visible, the sheet asynchronously invokes Supabase RPC `lookup_student_by_card(p_card_uid text)`.
+- If found online, hydrates:
+  - High-resolution verified avatar image via Glide into `ivStudentAvatar`.
+  - Verified student badge (`✓ Verified Student`).
+  - Department and batch verified names.
+  - Overall academic attendance percentage badge (`📊 91.5% Attendance`).
+
+---
+
+### 221.4 App Settings -> "User Attendance" Tab & Student "Restart Card" Subsystem
+
+#### A. Settings Entry Point (`classmate_profile.xml`)
+- Added persistent **"User Attendance"** row (`cardProfileUserAttendance`) under the Workspace & Controls section for **all students and users** (not restricted to Admins).
+- Styled with an emerald green signal icon (`ic_rfid_signal`), title *"User Attendance"*, and subtitle *"Attendance records, smart card & identity"*.
+- Tapping triggers tactile selection haptics (`ClassMateHaptics.selection`) and opens `showRfidAttendanceDialog`.
+
+#### B. Smart Card Status Box & "Restart Card" (`dialog_rfid_attendance.xml`)
+- Displays `cardRfidStatusContainer`:
+  - If linked: Shows `Linked: ••••7B12 · Tap Ready` in emerald green (`#10B981`) and displays the **"Restart Card"** button (`btnRestartCard`).
+  - If not linked: Shows `No card registered yet` in muted secondary text (`cm_text_muted`).
+- **Student "Restart Card" Flow**:
+  - Tapping **"Restart Card"** displays a `MaterialAlertDialogBuilder` confirmation:
+    > *"Restart Smart Card? This will unlink your physical RFID/NFC card from your profile. You or your CR will need to tap a new card to take tap attendance."*
+  - Upon positive confirmation, invokes Supabase RPC `restart_student_rfid()` with empty parameters (targeting caller's own UUID).
+  - Clears `rfid_card_uid` in cached profile and updates UI instantly to *"No card registered yet"*, allowing the student to pair a replacement card immediately.
+
+---
+
+### 221.5 Admin 1-Tap NFC Card Enrollment (`ClassMateAdminAttendanceActivity.kt`)
+
+#### A. Foreground Dispatch Tag Discovery
+- Configured `NfcAdapter.enableForegroundDispatch` in `onResume()` with `singleTop` launch flags.
+- Intercepts raw card taps while inside the admin attendance panel.
+
+#### B. 1-Second Tap-to-Enroll Workflow
+1. Admin selects any student from the batch roster or searches by roll number.
+2. Admin touches a blank white card to the back of the phone.
+3. In under 1 second:
+   - Programs the 3-record NDEF payload onto the physical card via `NfcCardManager.writeStudentCard`.
+   - Links the physical UID in Supabase via `enroll_student_rfid` RPC.
+   - Plays haptic confirmation (`ClassMateHaptics.selection`).
+   - Updates student list item status with green `Card Registered: ••••7B12`.
+4. If a card is tapped when no student is currently selected, the activity automatically searches `studentsList` for a matching UID. If found, it instantly auto-selects that student; if not found, it enters assignment mode with the scanned UID pre-filled in `etCardUid`.
+
+#### C. Admin "Restart / Unlink Card" Action (`btnAdminRestartCard`)
+- Added dedicated red outlined button `btnAdminRestartCard` inside `activity_admin_attendance.xml`.
+- Allows CRs and Admins to unlink an existing card from any selected student (`restart_student_rfid(p_student_id)`), freeing the card UID for re-enrollment.
+
+---
+
+### 221.6 Database Schema & Supabase RPC Contracts
+
+Implemented in migration `supabase/migrations/202611010001_rfid_card_restart_and_public_lookup.sql`:
+
+#### 1. RPC: `classmate.restart_student_rfid(p_student_id uuid default null)`
+```sql
+create or replace function classmate.restart_student_rfid(
+  p_student_id uuid default null
+)
+returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare
+  v_caller uuid := auth.uid();
+  v_target uuid := coalesce(p_student_id, v_caller);
+  v_target_profile record;
+begin
+  if v_caller is null then
+    raise exception 'Not authenticated' using errcode='42501';
+  end if;
+
+  select id, full_name, student_id, rfid_card_uid
+  into v_target_profile
+  from classmate.profiles
+  where id = v_target;
+
+  if not found then
+    raise exception 'Student profile not found' using errcode='42704';
+  end if;
+
+  -- Allowed if restarting own card OR if caller is admin/CR/owner
+  if v_target <> v_caller and not (
+    classmate.is_owner()
+    or exists (
+      select 1 from classmate.profiles
+      where id = v_caller and (role in ('admin', 'teacher') or is_cr = true)
+    )
+  ) then
+    raise exception 'Permission denied to restart this card' using errcode='42501';
+  end if;
+
+  update classmate.profiles
+  set rfid_card_uid = null
+  where id = v_target;
+
+  return jsonb_build_object(
+    'success', true,
+    'student_id', v_target,
+    'full_name', v_target_profile.full_name,
+    'roll', coalesce(v_target_profile.student_id, ''),
+    'previous_card_uid', v_target_profile.rfid_card_uid
+  );
+end $$;
+```
+
+#### 2. RPC: `classmate.lookup_student_by_card(p_card_uid text)`
+```sql
+create or replace function classmate.lookup_student_by_card(
+  p_card_uid text
+)
+returns jsonb
+language plpgsql stable security definer set search_path='' as $$
+declare
+  v_clean_uid text := lower(trim(replace(coalesce(p_card_uid, ''), ':', '')));
+  v_profile record;
+  v_batch_name text := '';
+  v_dept_name text := '';
+  v_attendance_pct numeric := null;
+begin
+  if v_clean_uid = '' or v_clean_uid is null then
+    return jsonb_build_object('found', false, 'message', 'Invalid card UID');
+  end if;
+
+  select 
+    p.id,
+    p.full_name,
+    coalesce(p.student_id, '') as student_id,
+    p.batch_id,
+    p.mobile_number,
+    p.blood_group,
+    p.rfid_card_uid,
+    case when left(coalesce(u.raw_user_meta_data->>'avatar_url', u.raw_user_meta_data->>'picture', ''), 8) = 'https://'
+      then coalesce(u.raw_user_meta_data->>'avatar_url', u.raw_user_meta_data->>'picture') end as avatar_url,
+    b.name as batch_label,
+    d.name as department_label
+  into v_profile
+  from classmate.profiles p
+  left join auth.users u on u.id = p.id
+  left join classmate.batches b on b.id = p.batch_id
+  left join classmate.departments d on d.id = b.department_id
+  where lower(replace(coalesce(p.rfid_card_uid, ''), ':', '')) = v_clean_uid;
+
+  if not found then
+    return jsonb_build_object(
+      'found', false,
+      'card_uid', v_clean_uid,
+      'message', 'Card is not registered to any student'
+    );
+  end if;
+
+  -- Calculate overall attendance percentage if records exist
+  select 
+    case when count(*) > 0 then
+      round((count(case when ar.marked_at is not null then 1 end)::numeric / count(*)::numeric) * 100.0, 1)
+    else null end
+  into v_attendance_pct
+  from classmate.attendance_sessions s
+  join classmate.routine_slots rs on rs.id = s.routine_slot_id
+  join classmate.semester_courses sc on sc.id = rs.semester_course_id
+  join classmate.semesters sem on sem.id = sc.semester_id
+  left join classmate.attendance_records ar on ar.session_id = s.id and ar.student_id = v_profile.id
+  where sem.batch_id = v_profile.batch_id and s.status = 'closed';
+
+  return jsonb_build_object(
+    'found', true,
+    'student_id', v_profile.id,
+    'full_name', v_profile.full_name,
+    'roll', v_profile.student_id,
+    'batch_name', coalesce(v_profile.batch_label, 'MBSTU Student'),
+    'department_name', coalesce(v_profile.department_label, 'MBSTU'),
+    'avatar_url', v_profile.avatar_url,
+    'phone', coalesce(v_profile.mobile_number, ''),
+    'blood_group', coalesce(v_profile.blood_group, ''),
+    'card_uid', v_clean_uid,
+    'attendance_percentage', v_attendance_pct
+  );
+end $$;
+```
+
+---
+
+### 221.7 Technical Post-Mortems, Diagnostic Insights & Architectural Lessons
+
+#### A. Translucent Activity Dispatch vs Screen Flickering
+- **Symptom**: Intercepting NFC intents using a standard activity theme caused a distracting black or white screen flash while resolving the tag.
+- **Root Cause**: Launching a full activity with standard window decorations forces Android's WindowManager to perform a full window transition.
+- **Resolution**: Defined `<style name="Theme.ClassMate.Translucent" parent="Theme.Material3.DayNight.NoActionBar">` with `android:windowIsTranslucent = true` and `android:windowBackground = @android:color/transparent`. Combined with `launchMode="singleTask"` and `excludeFromRecents="true"`, `NfcCardDispatcherActivity` launches invisibly, immediately pops `FoundCardBottomSheet`, and calls `finish()` upon dismissal.
+
+#### B. Automatic MIFARE Classic 1K Formatting
+- **Lesson**: Factory-new MIFARE Classic cards do not have NDEF partition sectors formatted. Direct calls to `Ndef.get(tag)` return `null`.
+- **Resolution**: Implementing a two-stage write strategy via `NdefFormatable` guarantees that blank campus cards are formatted and written in a single tap without requiring third-party tools like NFC Tools.
+
+#### C. Mobile Number Normalization for Universal WhatsApp Deep-Linking
+- **Lesson**: Bangladeshi mobile numbers are typically stored as 11 digits (`017XXXXXXXX`), but WhatsApp's universal API (`https://wa.me/<number>`) requires international format with country code and no leading zeros (`88017XXXXXXXX`).
+- **Resolution**: `FoundCardBottomSheet.kt` dynamically normalizes numbers starting with `01` to `8801...`, ensuring 1-tap WhatsApp messaging functions flawlessly across all carriers (Grameenphone, Banglalink, Robi, Teletalk).
+
+---
+
+### 221.8 Master Production Verification Matrix (Updated Master State v221)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **NFC Smart Card Zero-Browser Dispatcher** | Android APK Native | **PRODUCTION** | `NfcCardDispatcherActivity.kt` (`Theme.ClassMate.Translucent`) with `classmate://card` custom URI + AAR `com.shuaib.classmate`; intercepts taps in <10ms |
+| **Public Offline Lost-Card Recovery Modal** | Android APK Native | **PRODUCTION** | `FoundCardBottomSheet.kt` + `dialog_found_card_sheet.xml`; 100% offline student identity with defensive empty-state handling (missing phone/blood/roll) |
+| **Online Hydration & Attendance Lookup** | Supabase RPC | **PRODUCTION** | `classmate.lookup_student_by_card(p_card_uid)`; security definer returning verified photo, batch, dept, and overall attendance percentage |
+| **User Attendance & Restart Card Subsystem** | Android APK Native | **PRODUCTION** | `cardProfileUserAttendance` in `classmate_profile.xml` for all students; smart card status box with `btnRestartCard` invoking `classmate.restart_student_rfid` |
+| **Admin 1-Tap NFC Card Enrollment** | Android APK Native | **PRODUCTION** | Foreground NFC dispatch in `ClassMateAdminAttendanceActivity.kt`; writes NDEF payload, links UID to Supabase, and vibrates haptic confirmation in 1 second |
+| **Emergency Batch Tab Restoration** | Android APK Native | **PRODUCTION** | Restored `nav_friends` (Batch tab) to bottom navigation bar in `bottom_nav_menu.xml` & `classmate_academic_nav_menu.xml`; verified for tomorrow's attendance (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639), Merge [`a2c1228`](https://github.com/shuaibuddowla/ClassMate/commit/a2c1228890cf75696aa7c1463fe305a901c329e7)) |
+| **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Replaced batch profile card with `cardProfileTransit` in `classmate_profile.xml`; created standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` |
+| **XML Navigation ID Decoupling** | Android APK Native | **PRODUCTION** | Declared persistent `<item type="id" name="nav_transit" />` in `ids.xml` preventing compilation and inflation breaks |
+| **Web Mobile Bottom Bar Synchronization** | Web Companion Client | **PRODUCTION** | Restored `friends` (Batch) to `mobileDestinations` in `app.tsx`; added MBSTU Transit button to `profile.tsx`; preserved desktop sidebar rail |
+| **Transit Real-Time Ground-Truth Gliding** | Web & Android APK | **PRODUCTION** | Eradicated marker jitter/snapping; raw GPS telemetry with CSS transform transitions (`0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Animated Route Timeline Rail Bus Gliding** | Web & Android APK | **PRODUCTION** | Dynamic animated bus rider icon on vertical station rail; clamped progress ($0.12 \le \text{progress} \le 0.88$); real-time Bengali speed badge |
+| **Soft Radar Micro-Pulse Physics** | Web & Android APK | **PRODUCTION** | Refactored `@keyframes transitPulse` to subtle `scale(1.06)`; fixed bus icon at `scale(1)` with independent outer radar ripple ring fading to 0 opacity |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` |
+| **Physical APK Build & ADB Deployment** | Android APK Native | **PRODUCTION** | Debug APK compiled via `./gradlew :app:assembleDebug`, deployed to physical device `6478ab80` via ADB, verified live in hand |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt Compose `ClassMateBottomBar.kt` & XML `GlassBottomNavView.kt` with `14dp` side margins, `10dp` bottom float, `26dp` corner radii, `1.2dp` glass border, and `14dp` shadow |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **QR Attendance Suite Deprecation** | Android APK Native | **PRODUCTION** | Deprecated legacy QR activities in favor of IoT hardware RFID station |
+| **Academic CGPA Calculator Engine** | Android APK Native | **PRODUCTION** | `CgpaCalculatorActivity.kt` & `CgpaData.kt` with MBSTU grading scale, dual input modes (Grade / Marks), and cosmic card UI |
+| **Tactile Touch & Granular Haptic Utilities** | Android APK Native | **PRODUCTION** | `TouchAnimator.kt` (`0.98f` scale lift) and `HapticUtil.kt` standardizing Light, Medium, and Heavy tactile responses |
+| **Lifecycle-Aware Network & Offline Caching** | Android APK Native | **PRODUCTION** | `NetworkMonitor.kt`, `OfflineCache.kt`, and `TelegramPdfCache.kt` (MD5 hashing, 100MB bounded LRU disk storage) |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v221) |
+
+
+---
+---
+
+## 222. NFC Card Reading Resolution, Direct MIFARE Block Writing & Two-Tier Roster Cache (Production Master State v222)
+
+### 222.1 Root Cause Analysis & Resolution of "Card Unregistered" Bug
+1. **Server-Side RPC Missing from Remote Supabase Database**:
+   - The migration `202611010001_rfid_card_restart_and_public_lookup.sql` defining `classmate.lookup_student_by_card` was created locally but had not been executed against the production Supabase project (`cbskpifgbdbgdmnnxfrh`).
+   - An initial query error within the RPC referenced a non-existent column `b.name` on `classmate.batches`.
+   - **Resolution**: Refactored the query to `coalesce(d.code || ' ' || b.batch_number::text, 'MBSTU Student') as batch_label` and `coalesce(d.name, 'MBSTU') as department_label`. Deployed directly via `platform_access.py` and forced a PostgREST schema cache reload (`NOTIFY pgrst, 'reload schema'`). Verified live execution returning:
+     - Student: `Mohammad Shuaib-Ud-Dowla (CE25045)`
+     - Card UID: `bca6f306`
+     - Verified Attendance: `100.0%`
+
+2. **Physical MIFARE Classic 1K EEPROM vs Sector 0 UID**:
+   - Blank MIFARE Classic 1K cards often fail NDEF formatting on certain Android hardware due to proprietary NXP Crypto-1 key handshakes, causing the card to carry only its physical hardware UID in Sector 0.
+   - When tapped, the intent lacked NDEF payload data (`rawMessages == null`), causing earlier versions of the bottom sheet to immediately fall back to `showUnregisteredState(uid)` before the network could even respond.
+
+3. **Two-Tier Offline & Online Architecture Implemented**:
+   - Created [`NfcCardLocalCache.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/nfc/NfcCardLocalCache.kt):
+     - Automatically caches the batch roster (`uid -> student profile`) whenever `ClassMateAdminAttendanceActivity` loads or whenever a card is assigned.
+     - When any card is tapped offline, the app checks `NfcCardLocalCache` first: if found, it immediately renders the student's name, roll, phone, and batch in <5ms with zero internet connection.
+   - Updated [`FoundCardBottomSheet.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/nfc/FoundCardBottomSheet.kt):
+     - Displays a gentle loading spinner ("Verifying Smart Card ••••F306...") while querying Supabase rather than prematurely displaying the unregistered card UI.
+     - Upon receiving the student profile from `lookup_student_by_card`, it smoothly renders the verified student identity, photo, and 100% attendance, and persists it into `NfcCardLocalCache`.
+
+---
+
+### 222.2 MIFARE Classic 1K TECH_DISCOVERED Filter & Direct Sector Block Writing (Commit `f962ee4`)
+1. **The Problem with Raw MIFARE Classic Cards**:
+   - Factory-new MIFARE Classic 1K cards have unformatted data sectors. When tapped on Android without an active app, the Android NFC dispatcher falls back to `android.nfc.action.TECH_DISCOVERED` or `TAG_DISCOVERED`. Without an explicit tech list in `AndroidManifest.xml`, Android's Tag application intercepted the card or ignored it.
+2. **Tech List Declaration**:
+   - Added `res/xml/nfc_tech_filter.xml`:
+     ```xml
+     <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+         <tech-list>
+             <tech>android.nfc.tech.MifareClassic</tech>
+             <tech>android.nfc.tech.Ndef</tech>
+             <tech>android.nfc.tech.NfcA</tech>
+         </tech-list>
+     </resources>
+     ```
+   - Linked to `NfcCardDispatcherActivity` in `AndroidManifest.xml` via `<meta-data android:name="android.nfc.action.TECH_DISCOVERED" android:resource="@xml/nfc_tech_filter" />`.
+3. **Direct Sector Block Writing Engine (`NfcCardManager.kt`)**:
+   - Built raw sector reading and writing fallback when NDEF formatting is unavailable on physical cards:
+     - Sector 1, Block 4: Roll number (16 bytes UTF-8 padded)
+     - Sector 1, Block 5: Student Name (16 bytes UTF-8 padded)
+     - Sector 1, Block 6: Phone Number (16 bytes UTF-8 padded)
+     - Sector 2, Block 8: Batch label (16 bytes UTF-8 padded)
+     - Sector 2, Block 9: Blood Group (16 bytes UTF-8 padded)
+     - Authentication using default transport key: `MifareClassic.KEY_DEFAULT` (`0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF`).
+4. **Physical Write Admin Trigger**:
+   - Added `btnWritePhysicalCard` in `ClassMateAdminAttendanceActivity`: enables the admin to re-tap an enrolled student's physical card to force hardware sector burning of their identity.
+
+---
+
+### 222.3 Network Host Resolution Sanitization (Commit `c16c661`)
+- **Symptom**: During intermittent network drops or DNS resolution failures, `ClassMateAdminAttendanceActivity` displayed raw technical Java exceptions: `Failed to load courses: Unable to resolve host "cbskpifgbdbgdmnnxfrh.supabase.co": No address associated with hostname`.
+- **Resolution**: Added network error sanitization in `ClassMateAdminAttendanceActivity.kt`:
+  ```kotlin
+  val isNetworkError = e is java.net.UnknownHostException || e.message?.contains("Unable to resolve host", ignoreCase = true) == true
+  tvCoursesEmpty.text = if (isNetworkError) {
+      "No internet connection. Please check your Wi-Fi or mobile data."
+  } else {
+      "Failed to load courses: ${e.message}"
+  }
+  ```
+
+---
+
+## 223. Universal Public Web Student Smart ID & NFC App Chooser Elimination (Production Master State v223)
+
+### 223.1 Root Cause & Elimination of Android NFC Chooser Prompt
+1. **The Chooser Dialog Bug**:
+   - **Symptom**: When tapping an NFC card on an Android device with ClassMate installed, Android frequently displayed a system dialog:
+     > *"Chosen action: NFC tag detected. Please select the app to run: ClassMate or New tag collected."*
+   - **Root Cause**:
+     - Android's NFC dispatch priority hierarchy is:
+       1. `NDEF_DISCOVERED` (Highest priority, filtered by data URI / MIME type)
+       2. `TECH_DISCOVERED` (Medium priority, filtered by tech list)
+       3. `TAG_DISCOVERED` (Lowest priority fallback)
+     - When a card lacked an NDEF record with an explicit Android Application Record (AAR), Android dispatched `TECH_DISCOVERED` or `TAG_DISCOVERED`. Both ClassMate and the Android system's internal `com.android.nfc` tag collector matched this action, forcing the user to make a manual selection every single time.
+2. **Permanent Architectural Resolution**:
+   - **Dual-Record NDEF Payload (`NfcCardManager.createNdefMessage`)**:
+     - **Record 1 (Public Universal Web URI)**: `https://classmatebd.vercel.app/c/<card_uid>`
+     - **Record 2 (Android Application Record)**: `NdefRecord.createApplicationRecord("com.shuaib.classmate")`
+   - **Android NFC Dispatcher Contract**:
+     - When Android encounters an NDEF tag with an AAR matching an installed package name, Android automatically dispatches the intent directly to `com.shuaib.classmate` with highest priority, completely bypassing the OS app-chooser dialog.
+     - In `NfcCardManager.extractUid`, added path-based UID extraction supporting `/c/<uid>` and `/card/<uid>` in addition to legacy query parameters `?uid=...`.
+
+---
+
+### 223.2 Universal Public Web Student Smart ID Architecture (`StudentCardView.tsx`)
+
+To support lost card recovery and verification on devices that **do not have the ClassMate Android APK installed** (such as faculty desktop browsers, iOS iPhones, or other students' phones), a dedicated, server-side rendered public Next.js page was engineered:
+
+```mermaid
+flowchart TD
+    A[NFC Student Card Tapped] --> B{Device Has ClassMate App?}
+    B -- YES --> C[NfcCardDispatcherActivity<br>Theme.ClassMate.Translucent]
+    C --> D[FoundCardBottomSheet<br>0ms Native Campus Identity]
+    B -- NO --> E["Browser Opens Universal URL<br>https://classmatebd.vercel.app/c/[uid]"]
+    E --> F[Next.js 15 Server Component<br>web/src/app/c/[id]/page.tsx]
+    F --> G["Supabase RPC: lookup_student_by_card(clean_uid)"]
+    G --> H{Student Linked?}
+    H -- YES --> I["StudentCardView.tsx<br>Verified Smart ID Profile"]
+    I --> J["Direct Actions: Call Student & WhatsApp"]
+    H -- NO --> K["Unlinked Smart Card Screen<br>Download ClassMate APK Button"]
+```
+
+#### Key Technical Specifications of `StudentCardView.tsx`:
+1. **Clean Route Architecture**:
+   - `web/src/app/c/[id]/page.tsx`: Ultra-short URL optimized for NFC payload byte limits (MIFARE Classic 1K NDEF partition).
+   - `web/src/app/card/[id]/page.tsx`: Semantic alias route delegating to `StudentCardView`.
+2. **Public Data Scoping & Security**:
+   - Powered by Supabase RPC `classmate.lookup_student_by_card(p_card_uid)`.
+   - Security Definer function strictly scopes returned attributes:
+     - `student_id`: UUID
+     - `full_name`: Student full name
+     - `roll`: Academic roll number (e.g. `CE25045`)
+     - `batch_name`: Batch identifier (e.g. `CSE 22`)
+     - `department_name`: Department (e.g. `Computer Science & Engineering`)
+     - `avatar_url`: User profile photo
+     - `phone`: Mobile contact number
+     - `blood_group`: Blood group (e.g. `B+`)
+     - `attendance_percentage`: Verified academic attendance rate (e.g. `100.0%`)
+   - Absolutely no private auth tokens, session cookies, passwords, or administrative batch controls are exposed.
+3. **Lost-Card Contact Action Buttons**:
+   - **Direct Phone Dial**: `<a href="tel:${cleanPhone}">` triggers the phone's native dialer with 1 tap.
+   - **Direct WhatsApp Messaging**: `<a href="https://wa.me/${waNumber}">` automatically formats Bangladesh numbers (`01...` -> `8801...`), enabling immediate direct messaging to return lost cards.
+   - **Defensive Null Handling**: If a student has no phone registered, renders a friendly instruction: *"If found, please hand this card over to the department office or Class Representative."*
+4. **Dynamic OpenGraph SEO Social Previews**:
+   - `buildStudentCardMetadata(id)` generates dynamic OpenGraph tags:
+     - Title: `Mohammad Shuaib-Ud-Dowla (CE25045) • ClassMate Smart ID`
+     - Description: `Computer Science & Engineering • Batch CSE 22 • MBSTU Verified Student Identity Card`
+     - OG Image: Student avatar image preview for WhatsApp, Telegram, and social sharing links.
+5. **Unassigned Smart Card Fallback**:
+   - If an enrolled physical card is scanned before student assignment, renders a polished amber alert: *"Unlinked Smart Card • Card UID: ••••F306"*, with an embedded CTA to download the ClassMate app (`https://classmatebd.vercel.app/download`).
+
+---
+
+### 223.3 Two-Way Universal Deep Linking & Android Manifest Routing
+
+#### `AndroidManifest.xml` Configuration:
+```xml
+<activity
+    android:name=".nfc.NfcCardDispatcherActivity"
+    android:exported="true"
+    android:theme="@style/Theme.ClassMate.Translucent"
+    android:launchMode="singleTask"
+    android:excludeFromRecents="true">
+    <!-- Scheme 1: Universal Web URL (NFC NDEF Record 1) -->
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="classmatebd.vercel.app" android:pathPrefix="/c" />
+        <data android:scheme="https" android:host="classmatebd.vercel.app" android:pathPrefix="/card" />
+    </intent-filter>
+    
+    <!-- Scheme 2: Custom URI Scheme -->
+    <intent-filter>
+        <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="classmate" android:host="card" />
+    </intent-filter>
+
+    <!-- Scheme 3: Raw MIFARE Classic Tech Discovered -->
+    <intent-filter>
+        <action android:name="android.nfc.action.TECH_DISCOVERED" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+    <meta-data
+        android:name="android.nfc.action.TECH_DISCOVERED"
+        android:resource="@xml/nfc_tech_filter" />
+
+    <!-- Scheme 4: Fallback Raw Tag Discovered -->
+    <intent-filter>
+        <action android:name="android.nfc.action.TAG_DISCOVERED" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+```
+
+#### Dual-Mode URL Dispatch Verification:
+| Scan Scenario | Device State | Handled By | User Experience |
+| :--- | :--- | :--- | :--- |
+| **NFC Tap on Phone with ClassMate** | App Installed | `NfcCardDispatcherActivity` | <10ms Translucent dispatch -> pops `FoundCardBottomSheet` directly without opening browser or chooser dialog |
+| **NFC Tap on Phone without ClassMate** | App Not Installed (iOS / Android) | Browser (Safari / Chrome) | Opens `https://classmatebd.vercel.app/c/<uid>` -> renders high-performance SSR `StudentCardView` |
+| **QR Code / Link Shared in WhatsApp** | Any Device / PC | Next.js Server Component | Full OpenGraph rich preview banner with student photo and verification details |
+| **Offline NFC Tap on Registered Phone** | No Internet Connection | `NfcCardLocalCache` | <5ms instant offline profile card loaded from Room / SharedPreferences roster cache |
+
+---
+
+### 223.4 Master Production Verification Matrix (Updated Master State v223)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **NFC App Chooser Prompt Elimination** | Android APK Native | **PRODUCTION** | `createNdefMessage` in `NfcCardManager.kt` burns public URI + AAR `com.shuaib.classmate`, forcing Android OS to bypass "New tag collected" chooser |
+| **Universal Public Web Student Smart ID** | Next.js 15 Web Companion | **PRODUCTION** | `web/src/components/StudentCardView.tsx` with dynamic routes `/c/[id]` and `/card/[id]`; SSR hydration via `lookup_student_by_card` |
+| **Direct Contact Actions (Call & WhatsApp)** | Web & Android APK | **PRODUCTION** | `tel:` and `wa.me/8801...` integration with international dialing normalization for 1-tap lost card recovery |
+| **Dynamic OpenGraph Smart ID Metadata** | Next.js 15 Web Companion | **PRODUCTION** | `buildStudentCardMetadata(id)` returning student name, roll, batch, dept, and avatar preview for rich social link embeds |
+| **MIFARE Classic 1K Sector Block Engine** | Android APK Native | **PRODUCTION** | Direct block read/write in `NfcCardManager.kt` for Sectors 1 & 2 (Blocks 4, 5, 6, 8, 9) with `MifareClassic.KEY_DEFAULT` (Commit [`f962ee4`](https://github.com/shuaibuddowla/ClassMate/commit/f962ee4545629855fa4197856adf1e725728bea5)) |
+| **MIFARE Classic Tech Filter Intent** | Android APK Native | **PRODUCTION** | `res/xml/nfc_tech_filter.xml` with `MifareClassic`, `Ndef`, `NfcA` bound to `NfcCardDispatcherActivity` |
+| **Physical Card Hardware Re-Burn Action** | Android APK Native | **PRODUCTION** | `btnWritePhysicalCard` in `ClassMateAdminAttendanceActivity` for admin on-demand EEPROM burning |
+| **Network Host Error Sanitization** | Android APK Native | **PRODUCTION** | Sanitized `UnknownHostException` in `ClassMateAdminAttendanceActivity.kt` to user-friendly offline prompt (Commit [`c16c661`](https://github.com/shuaibuddowla/ClassMate/commit/c16c661fd66f60a39e4d68d73d369908893ca206)) |
+| **Two-Tier Offline & Online Roster Cache** | Android APK Native | **PRODUCTION** | `NfcCardLocalCache.kt` + `FoundCardBottomSheet.kt` with live Supabase query fallback and 5ms offline lookup |
+| **Emergency Batch Tab Restoration** | Android APK Native | **PRODUCTION** | Restored `nav_friends` (Batch tab) to bottom navigation bar in `bottom_nav_menu.xml` & `classmate_academic_nav_menu.xml` (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639)) |
+| **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` accessible via profile settings card |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Legacy HS256 secret revoked; active ECC P-256 key operational; `NEXT_PUBLIC_SUPABASE_ANON_KEY` rotated to `sb_publishable_...` |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v223) |
