@@ -27,6 +27,7 @@ import {
   Palmtree,
   CalendarDays,
   Share2,
+  BarChart2,
 } from "lucide-react";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
@@ -136,7 +137,7 @@ export function Notices({
         .schema("classmate")
         .from("notices")
         .select(
-          "id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id",
+          "id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id,poll_id",
         )
         .eq("batch_id", ctx.batch)
         .order("published_at", { ascending: false })
@@ -285,6 +286,32 @@ export function Notices({
     });
     await refresh();
   }
+  const handleVote = async (pollId: string, optionId: string) => {
+    try {
+      const allPolls = feed.data?.pages.flatMap((p) => (p.details as any)?.polls || []) || [];
+      const targetPoll = allPolls.find((p: Row) => p.poll_id === pollId || p.id === pollId);
+      let selectedIds: string[] = [optionId];
+      if (targetPoll?.is_multiple_choice) {
+        const currentVotes = (targetPoll.options || [])
+          .filter((opt: Row) => opt.is_my_vote)
+          .map((opt: Row) => opt.id);
+        if (currentVotes.includes(optionId)) {
+          selectedIds = currentVotes.filter((id: string) => id !== optionId);
+        } else {
+          selectedIds = [...currentVotes, optionId];
+        }
+        if (selectedIds.length === 0) return;
+      }
+      await rpc("cast_poll_vote", {
+        target_poll: pollId,
+        selected_option_ids: selectedIds,
+      });
+      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "notices"] });
+    } catch (err: any) {
+      alert(err?.message || "Failed to submit vote");
+    }
+  };
+
   return (
     <div className="notices-screen">
       <div className="page-heading transparent">
@@ -349,6 +376,8 @@ export function Notices({
               ctx={ctx}
               batch={ctx.batch}
               search={search}
+              poll={details.polls?.find((x: Row) => x.notice_id === n.id)}
+              onVote={handleVote}
               state={
                 details.engagement?.find((x: Row) => x.notice_id === n.id) || {}
               }
@@ -559,7 +588,7 @@ function NoticeComposer({
   allowed?: Row;
   done: (created?: Row) => Promise<void>;
 }) {
-  const [type, setType] = useState<"general" | "cancelled" | "vacation">("general");
+  const [type, setType] = useState<"general" | "cancelled" | "vacation" | "poll">("general");
 
   // Image attachment state matching Android PostNoticeActivity
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -619,8 +648,22 @@ function NoticeComposer({
         >
           <Palmtree size={14} style={{ display: "inline", marginRight: "4px" }} /> Vacation
         </button>
+        <button
+          type="button"
+          className={type === "poll" ? "selected" : ""}
+          onClick={() => setType("poll")}
+        >
+          <BarChart2 size={14} style={{ display: "inline", marginRight: "4px" }} /> Poll
+        </button>
       </div>
 
+      {type === "poll" ? (
+        <PollComposeForm
+          ctx={ctx}
+          onCancel={() => done()}
+          onCreated={(created) => done(created)}
+        />
+      ) : (
           <Form
             key={type}
             label={type === "vacation" ? "Publish vacation notice" : type === "cancelled" ? "Post cancellation" : "Post notice"}
@@ -899,6 +942,7 @@ function NoticeComposer({
               await done(created || undefined);
             }}
           />
+      )}
     </>
   );
 }
@@ -1099,6 +1143,8 @@ function NoticeCard({
   read,
   previews,
   attachment,
+  poll,
+  onVote,
   editable,
   search,
   onLike,
@@ -1117,6 +1163,8 @@ function NoticeCard({
   read: Row;
   previews: Row[];
   attachment?: { id: string; url: string; fileName: string; sizeBytes: number };
+  poll?: Row;
+  onVote?: (pollId: string, optionId: string) => Promise<void>;
   editable: boolean;
   search: string;
   onLike: (liked: boolean) => Promise<void>;
@@ -1184,11 +1232,13 @@ function NoticeCard({
     }, 15000);
     return () => clearInterval(timer);
   }, [state.reminder_at]);
-  const kind = n.resource_id
-    ? "resource"
-    : n.class_change_id
-      ? "cancelled"
-      : "general";
+  const kind = poll
+    ? "poll"
+    : n.resource_id
+      ? "resource"
+      : n.class_change_id
+        ? "cancelled"
+        : "general";
   const body = String((showTranslation ? translated?.body : n.body) || "");
   const rawLines = body.split("\n");
   const hasLineOverflow = rawLines.length > 5;
@@ -1300,6 +1350,12 @@ function NoticeCard({
           >
             {expanded ? "see less" : "… see more"}
           </button>
+        )}
+        {poll && (
+          <M3PollView
+            poll={poll}
+            onVote={(optId) => onVote?.(poll.poll_id || poll.id, optId)}
+          />
         )}
         {attachment?.url && (
           <div
@@ -2007,5 +2063,293 @@ export function NoticeDetailModal({
         />
       )}
     </Modal>
+  );
+}
+
+
+/* ==========================================================================
+   Material 3 Expressive Poll Component & Composer
+   ========================================================================== */
+
+function M3PollView({
+  poll,
+  onVote,
+}: {
+  poll: Row;
+  onVote: (optionId: string) => void;
+}) {
+  const [voting, setVoting] = useState(false);
+  const totalVotes = Number(poll.total_votes || 0);
+  const totalVoters = Number(poll.total_voters || 0);
+  const isClosed = Boolean(poll.is_closed);
+  const isMultiple = Boolean(poll.is_multiple_choice);
+  const isAnonymous = Boolean(poll.is_anonymous);
+
+  const handleOptionClick = async (optionId: string) => {
+    if (voting || isClosed) return;
+    setVoting(true);
+    try {
+      await onVote(optionId);
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const formatCountdown = (expiresAtStr?: string) => {
+    if (!expiresAtStr) return "";
+    const diff = new Date(expiresAtStr).getTime() - Date.now();
+    if (diff <= 0) return "Closed";
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 24) return `Closes in ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `Closes in ${days}d`;
+  };
+
+  return (
+    <div className="m3-poll-container">
+      <div className="m3-poll-badge-row">
+        <span className="m3-poll-chip">
+          <BarChart2 size={12} /> POLL
+        </span>
+        <span className="m3-poll-subtext">
+          {isMultiple ? "Multiple choice" : "Single choice"} • {isAnonymous ? "Anonymous" : "Public"}
+        </span>
+      </div>
+
+      <div className="m3-poll-options">
+        {(poll.options || []).map((opt: Row) => {
+          const votesCount = Number(opt.votes_count || 0);
+          const pct = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+          const isSelected = Boolean(opt.is_my_vote);
+
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              className={`m3-poll-option-btn ${isSelected ? "selected" : ""}`}
+              disabled={voting || isClosed}
+              onClick={() => handleOptionClick(opt.id)}
+            >
+              <div className="m3-poll-track" style={{ width: `${pct}%` }} />
+              <div className="m3-poll-content-inner">
+                <div className={`m3-poll-indicator ${isMultiple ? "square" : ""}`}>
+                  {isMultiple ? (
+                    isSelected ? <Check size={13} strokeWidth={3} /> : null
+                  ) : (
+                    isSelected ? <div className="m3-poll-dot" /> : null
+                  )}
+                </div>
+                <span className="m3-poll-text">{opt.option_text}</span>
+                <div className="m3-poll-stat">
+                  <span className="m3-poll-percentage">{pct}%</span>
+                  <span className="m3-poll-count">
+                    {votesCount} {votesCount === 1 ? "vote" : "votes"}
+                  </span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="m3-poll-footer-row">
+        <div className="m3-poll-voter-summary">
+          <span>
+            {totalVoters} {totalVoters === 1 ? "person voted" : "people voted"}
+          </span>
+          {totalVotes > totalVoters && (
+            <span>({totalVotes} total votes)</span>
+          )}
+        </div>
+        <div>
+          {isClosed ? (
+            <span className="m3-poll-closed-chip">Final Results</span>
+          ) : poll.expires_at ? (
+            <span>{formatCountdown(poll.expires_at)}</span>
+          ) : (
+            <span>Open</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PollComposeForm({
+  ctx,
+  onCancel,
+  onCreated,
+}: {
+  ctx: Context;
+  onCancel: () => void;
+  onCreated: (created?: Row) => void;
+}) {
+  const [question, setQuestion] = useState("");
+  const [description, setDescription] = useState("");
+  const [options, setOptions] = useState<string[]>(["", ""]);
+  const [isMultipleChoice, setIsMultipleChoice] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [durationHours, setDurationHours] = useState(72);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOptionChange = (index: number, val: string) => {
+    const next = [...options];
+    next[index] = val;
+    setOptions(next);
+  };
+
+  const addOption = () => {
+    if (options.length < 10) {
+      setOptions([...options, ""]);
+    }
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    const cleanQ = question.trim();
+    if (cleanQ.length < 2) {
+      setError("Please enter a question for the poll.");
+      return;
+    }
+    const cleanOpts = options.map((o) => o.trim()).filter(Boolean);
+    if (cleanOpts.length < 2) {
+      setError("Please provide at least 2 options.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await rpc<Row>("publish_batch_poll", {
+        target_batch: ctx.batch,
+        poll_question: cleanQ,
+        poll_options: cleanOpts,
+        poll_description: description.trim(),
+        is_multiple_choice: isMultipleChoice,
+        is_anonymous: isAnonymous,
+        duration_hours: durationHours > 0 ? durationHours : null,
+      });
+      onCreated(res || undefined);
+    } catch (err: any) {
+      setError(err?.message || "Failed to publish poll.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
+      <label>
+        Poll Question
+        <input
+          type="text"
+          required
+          placeholder="e.g. Which date works best for our makeup lab class?"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          maxLength={300}
+        />
+      </label>
+
+      <label>
+        Additional Guidelines / Description (Optional)
+        <textarea
+          placeholder="Add context, instructions, or notes about this poll..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          maxLength={2000}
+        />
+      </label>
+
+      <div>
+        <label style={{ marginBottom: "6px", display: "block" }}>Options</label>
+        <div className="poll-compose-options-list">
+          {options.map((opt, idx) => (
+            <div key={idx} className="poll-compose-option-row">
+              <input
+                type="text"
+                placeholder={`Option ${idx + 1}`}
+                value={opt}
+                required
+                onChange={(e) => handleOptionChange(idx, e.target.value)}
+                maxLength={200}
+              />
+              {options.length > 2 && (
+                <button
+                  type="button"
+                  className="icon"
+                  title="Remove option"
+                  onClick={() => removeOption(idx)}
+                  style={{ padding: "6px" }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {options.length < 10 && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={addOption}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", padding: "6px 12px", borderRadius: "10px" }}
+          >
+            <Plus size={14} /> Add option
+          </button>
+        )}
+      </div>
+
+      <div className="poll-compose-switches">
+        <label className="poll-switch-label">
+          <span>Allow multiple answers</span>
+          <input
+            type="checkbox"
+            checked={isMultipleChoice}
+            onChange={(e) => setIsMultipleChoice(e.target.checked)}
+          />
+        </label>
+        <label className="poll-switch-label">
+          <span>Anonymous voting (hide voter names)</span>
+          <input
+            type="checkbox"
+            checked={isAnonymous}
+            onChange={(e) => setIsAnonymous(e.target.checked)}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "13px" }}>
+          <span>Duration</span>
+          <select
+            value={durationHours}
+            onChange={(e) => setDurationHours(Number(e.target.value))}
+            style={{ width: "auto", minWidth: "140px" }}
+          >
+            <option value={24}>24 hours</option>
+            <option value={72}>3 days (default)</option>
+            <option value={168}>7 days (1 week)</option>
+            <option value={0}>No expiration</option>
+          </select>
+        </label>
+      </div>
+
+      {error && <div style={{ color: "var(--danger, #ef4444)", fontSize: "12px" }}>{error}</div>}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+        <button type="button" className="secondary" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? "Publishing poll…" : "Publish Poll"}
+        </button>
+      </div>
+    </form>
   );
 }
