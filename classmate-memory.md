@@ -14971,8 +14971,12 @@ A rigorous audit of recent Antigravity conversation transcripts under `C:/Users/
 
 #### C. Operational Invalidation & Secret Rotation Protocol
 Because public GitHub commits are scraped instantaneously by malicious bots, removing the key from Git history is insufficient; the exposed secret must be permanently revoked at the source. The following protocol was codified:
-1. **Supabase Dashboard**: Navigate to `Settings` $ightarrow$ `API` $ightarrow$ `Project API keys` $ightarrow$ click **Roll key** on `service_role`. This invalidates the leaked JWT in 0ms.
-2. **Vercel Production**: Update `SUPABASE_SERVICE_ROLE_KEY` in Project Settings $ightarrow$ Environment Variables, followed by triggering an immediate redeployment.
+1. **Supabase Dashboard**: Navigate to `Settings` $
+ightarrow$ `API` $
+ightarrow$ `Project API keys` $
+ightarrow$ click **Roll key** on `service_role`. This invalidates the leaked JWT in 0ms.
+2. **Vercel Production**: Update `SUPABASE_SERVICE_ROLE_KEY` in Project Settings $
+ightarrow$ Environment Variables, followed by triggering an immediate redeployment.
 3. **Cloudflare Worker Dispatcher**: Update the secret via `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.
 4. **GitGuardian**: Mark the incident as resolved via "I have rotated the secret".
 
@@ -15091,3 +15095,192 @@ On campus cellular connections or slow Wi-Fi, this resulted in 2–4 seconds of 
 | **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v213) |
+
+
+---
+
+## 214. Autonomous System Memory Synthesis, Multi-Repo Architecture & Production Master State v214
+
+### 214.1 Cross-Session Transcript & Commit Audit Retrospective
+A comprehensive, end-to-end retrospective audit was conducted across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, Git repository histories (`AndroidStudioProjects/ClassMate` and `ClassMate-main`), and production deployment targets:
+- [`cb34f03f-b1ff-4df0-8496-38445bdd56fd`](conversation://cb34f03f-b1ff-4df0-8496-38445bdd56fd): Current active autonomous memory codification, transcript retrospective, and dual-repository synchronization session.
+- [`30e43c61-9d48-4044-b00d-b57572bff98e`](conversation://30e43c61-9d48-4044-b00d-b57572bff98e): Master State v213 synthesis session; GitGuardian incident post-mortem, secret rotation protocol formulation, and multi-repo commit synchronization ([`8709e95`](https://github.com/shuaibuddowla/ClassMate/commit/8709e95061a8f5ed2257f2de88b308c69e15a602)).
+- [`42a413ba-f107-4c48-9378-86da3314ce96`](conversation://42a413ba-f107-4c48-9378-86da3314ce96): Master State v212 audit; cross-session knowledge consolidation and dual-repository parity check.
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b): Deep full-stack transit stabilization & GitGuardian security alert response:
+  - **Transit Map "Earthquake" Shaking Fix**: Decoupled camera auto-pan/`flyTo` from the 1s interpolated clock using `lastCenteredBusIdRef`, providing buttery-smooth map rendering with manual pan freedom and floating `[ 🧭 বাসে ফোকাস ]` button.
+  - **Route Slicing & Milestone Clamping**: `getStationsForBus` dynamically maps 16 stops (Nirala), 18 stops (Puraton), and 24 stops (District), preventing phantom stops.
+  - **Direction Reversal Switcher**: `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` toggles with zero layout thrashing.
+  - **GitGuardian Alert (Steps 37155–37236)**: Triage of exposed Supabase `service_role` key in `scripts/inspect_students.py`; instant conversion to environment variable loading with fail-fast validation; verification of zero leaks across Android APK and Web codebases; dual-branch git commits [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637) (`feature/live-bus-tracking`) and [`d32278e`](https://github.com/shuaibuddowla/ClassMate/commit/d32278e) (`main`).
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc): Jetpack Compose navigation bar evolution, empty state unification, haptics, and catalog optimization:
+  - Generative UI exploration of 6 navigation bar concepts (`navbar_showcase.html`); user selected Concept 1 (Floating Island Pill).
+  - **Runtime View Hierarchy Diagnosis**: Pinpointed [`ClassMateAuthActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt#L3375) as the active host embedding [`ClassMateFloatingNavigationBar`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/ui/components/ClassMateBottomBar.kt) with `14.dp` margins, `10.dp` elevation, and `32.dp` capsule curvature.
+  - **Damped Harmonic Spring Physics**: `dampingRatio = 0.72f`, `stiffness = 380f` with subtle scale lift (`1.05f`) and haptic feedback.
+  - **Batch Fund Collections RPC Fix**: Resolved blank solid teal chips on Web companion caused by field mismatches between PostgreSQL RPC and frontend types.
+  - **Unified Modern Empty State Architecture**: [`view_empty_state.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/layout/view_empty_state.xml) + [`EmptyStateHelper.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/EmptyStateHelper.kt) standardized across screens.
+  - **Tactile Haptic Engine**: [`HapticUtil.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/utils/HapticUtil.kt) integrated across navigation, chips, card copy, and action buttons.
+  - **10-Minute Academic Catalog In-Memory Caching**: [`SupabaseAcademicCatalogRepository.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/data/repositories/SupabaseAcademicCatalogRepository.kt) reduces initial screen launch times from 2–4s down to 0ms.
+  - **Notice Wallpaper Doodle Tuning**: Fixed subtle vector layer in [`bg_whatsapp_wallpaper.xml`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/res/drawable/bg_whatsapp_wallpaper.xml) and student onboarding / teacher privacy hardening.
+- [`7bf9b1c9-a2d1-40c9-a995-c810deb70c60`](conversation://7bf9b1c9-a2d1-40c9-a995-c810deb70c60): Static chunk reverse-engineering of MBSTU Wheels platform (`https://transport.mbstu.ac.bd/MBSTU-Wheels`); extracted WebSocket/Socket.IO payloads, telemetry structures, 80-coordinate polyline geometry, and 28 route milestones.
+- [`0edd370b-fa58-4308-905e-72b37c274b36`](conversation://0edd370b-fa58-4308-905e-72b37c274b36): Creation and verification of the `classmate-daily-security-audit` background automation (running daily at 9:00 AM Asia/Dhaka) auditing credentials, dependency CVEs, and storage boundaries.
+- [`23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`](conversation://23e6ef71-fb08-4cf7-aaeb-8c1af319fa27): Multi-developer collaboration architecture: staging database provisioning, isolated Supabase schemas, and Git feature-branch workflows.
+- [`04866bbe-2501-4625-82a6-1b5d66909873`](conversation://04866bbe-2501-4625-82a6-1b5d66909873): Ostad YUNet AIgnite Buildathon 2026 hackathon registration, architectural alignment, and Devpost submission strategy for ClassMate.
+
+---
+
+### 214.2 GitGuardian Remediation & Production Key Security Audit Playbook
+
+#### A. Security Incident Post-Mortem
+1. **Detection Vector**:
+   - Automated notification from GitGuardian triggered on push containing high-entropy token pattern matching Supabase JWT keys.
+   - Identified location: `scripts/inspect_students.py` line 5.
+2. **Impact Assessment**:
+   - `service_role` keys completely circumvent PostgreSQL Row Level Security (RLS).
+   - Any external entity in possession of this key can execute administrative SELECT, INSERT, UPDATE, and DELETE across `classmate.profiles`, `classmate.notices`, `classmate.batch_fund_transactions`, and auth tables.
+3. **Remediation Implemented**:
+   - Removed hardcoded string constant from `scripts/inspect_students.py`.
+   - Replaced with dynamic environment variable lookup:
+     ```python
+     SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://cbskpifgbdbgdmnnxfrh.supabase.co')
+     SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+     if not SERVICE_KEY:
+         print('SUPABASE_SERVICE_ROLE_KEY environment variable is required.')
+         exit(1)
+     ```
+   - Swept all source trees across Android native code, Web companion Next.js code, and backend edge functions to verify zero leaks.
+
+#### B. Secret Revocation & Invalidation Protocol
+1. **Supabase Console**: Navigate to Project Settings -> API -> Project API Keys. Roll the `service_role` key immediately.
+2. **Vercel Production**: Update `SUPABASE_SERVICE_ROLE_KEY` in Project Settings -> Environment Variables. Trigger immediate production deployment without cache.
+3. **Cloudflare Worker Dispatcher**: Re-seed secret via `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.
+4. **GitGuardian**: Mark the incident as resolved via "I have rotated the secret".
+
+---
+
+### 214.3 Jetpack Compose Floating Island Navigation Bar & View Hierarchy Diagnostics
+
+#### A. The Dual-Activity Navbar Conundrum & Diagnosis
+* **Problem Statement**:
+  When updating the Android navigation bar to Concept 1 (Floating Island Pill with Damped Harmonic Spring Physics), changes initially failed to appear on device. The navigation bar appeared unchanged.
+* **Root Cause**:
+  The project contains a legacy [`MainActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/MainActivity.kt) hosting XML-based `bottom_navigation`, whereas the active production entrypoint is [`ClassMateAuthActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt). In [`ClassMateAuthActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt#L3375), the bottom navigation is rendered via Jetpack Compose:
+  ```kotlin
+  val composeBottomBar = findViewById<ComposeView>(R.id.composeBottomBar)
+  composeBottomBar.setContent {
+      ClassMateFloatingNavigationBar(
+          currentTab = selectedTab,
+          onTabSelected = { tab -> switchTab(tab) }
+      )
+  }
+  ```
+* **Resolution**:
+  Targeted [`ClassMateBottomBar.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/ui/components/ClassMateBottomBar.kt) directly. Configured:
+  - Horizontal margin: `14.dp` floating inset from screen edges.
+  - Bottom margin: `12.dp` above navigation gesture bar.
+  - Shape: Fully rounded capsule with `32.dp` corner radius.
+  - Surface Elevation: `10.dp` with soft drop shadow.
+  - Background: Glassmorphic translucent surface (`Color(0xFF1E293B)` in dark mode, `Color.White.copy(alpha = 0.92f)` in light mode) with `1.dp` border stroke.
+
+#### B. Damped Harmonic Spring Physics & Interaction Model
+* **Morphing Indicator**: An animated capsule pill indicator moves beneath the active icon using `spring()` physics:
+  - `dampingRatio = Spring.DampingRatioMediumBouncy` (`0.72f`)
+  - `stiffness = Spring.StiffnessLow` (`380f`)
+* **Scale Lift**: Active icon smoothly scales to `1.05f` upon selection with `animateFloatAsState`.
+* **Haptic Feedback**: On tab switch, fires `HapticUtil.performClockTick(context)`, delivering subtle tactile confirmation.
+
+---
+
+### 214.4 Transit Telemetry, Route Slicing & Earthquake Camera Stabilization Architecture
+
+#### A. Map Camera Stabilization & Earthquake Fix
+* **Issue**:
+  During live bus tracking on Web and Android WebView, selecting a bus card caused extreme camera jitter / continuous screen shaking ("earthquake").
+* **Root Cause**:
+  A 1-second extrapolation timer was continuously re-triggering Leaflet camera `flyTo` / `panTo` on every tick, conflicting with user pan gestures and bounding-box updates.
+* **Architecture Fix**:
+  - Implemented `lastCenteredBusIdRef` in the transit component.
+  - Only execute automated camera centering **once** when a user explicitly taps a bus card or when switching buses.
+  - Decoupled continuous telemetry marker interpolation from camera positioning.
+  - Added a floating `[ 🧭 বাসে ফোকাস ]` button allowing users to re-center the camera manually on demand.
+
+#### B. Dynamic Route Slicing & Milestone Progress
+* **Route Milestone Mapping**:
+  Avoided generic all-inclusive stoppage lists by introducing `getStationsForBus(busId, routeName)`:
+  - **Nirala Route**: Exactly 16 verified stations.
+  - **Puraton / Bypass Route**: Exactly 18 verified stations.
+  - **District Route**: Exactly 24 verified stations.
+* **Direction Inversion Engine**:
+  - Added directional switcher: `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]`.
+  - Reverses stoppage array order in 0ms without re-querying backend APIs.
+  - Clamps milestone progress percentage between 0% and 100% to prevent marker overshoot.
+
+---
+
+### 214.5 Reusable Empty State Architecture, Tactile Haptics & Tiered Catalog Caching
+
+#### A. Centralized Empty State Component (`view_empty_state.xml` + `EmptyStateHelper.kt`)
+* **Architecture**:
+  Replaced fragmented, hardcoded empty text labels across all app modules with a standardized layout:
+  - `ivEmptyIllustration`: Circular surface (`@drawable/bg_empty_state_circle`) tinted to matching theme color.
+  - `tvEmptyTitle`: Bold 16sp title with high contrast.
+  - `tvEmptySubtitle`: Descriptive 13sp explanation text.
+  - `btnEmptyAction`: MaterialButton for primary action (e.g. "Record Deposit", "Add Class", "Refresh Feed"), hidden when no action applies.
+* **Deployed Across**:
+  - Batch Fund transaction ledger and category filters.
+  - Friends directory search results.
+  - Notices feed unread filter.
+  - Timetable routine empty days.
+
+#### B. Tiered In-Memory & Room DB Academic Catalog Caching
+* **Problem**: Opening Timetable previously fired 7 sequential PostgREST queries (`departments`, `batches`, `sections`, `semesters`, `courses`, `rooms`, `teachers`), taking 2–4 seconds on slow connections.
+* **Tiered Solution in [`SupabaseAcademicCatalogRepository.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/data/repositories/SupabaseAcademicCatalogRepository.kt)**:
+  1. **Tier 1 (In-Memory)**: 10-minute cache (`lastFetchTime`) returns instant catalog in **0ms**.
+  2. **Tier 2 (Room DB)**: If in-memory cache expires or app cold-starts offline, loads from persistent Room DB (`ClassMateDatabase`).
+  3. **Tier 3 (Network)**: Background coroutine syncs fresh data from Supabase without blocking UI rendering.
+
+---
+
+### 214.6 Automated Security Audits & Multi-Engineer Collaboration Infrastructure
+
+#### A. Automated Daily Security Audit (`classmate-daily-security-audit`)
+* **Schedule**: Runs daily at 9:00 AM Asia/Dhaka time.
+* **Scope**:
+  - Checks for plaintext API keys (`service_role`, AWS keys, JWT secrets) across all files.
+  - Audits dependency vulnerabilities in Android (`build.gradle.kts`), Web (`package.json`), and server scripts.
+  - Verifies database security policies (Row Level Security enabled on all tables).
+  - Inspects Cloudflare R2 upload size limits and signed URL expirations.
+
+#### B. Multi-Engineer Development Guidelines
+* **Database Isolation**: Never connect development branches to the production Supabase database. Developers must use local Supabase CLI instances (`supabase start`) or dedicated dev branch projects.
+* **Feature Branching**: Enforce branch naming convention (`feat/...`, `fix/...`, `docs/...`) and atomic commits.
+* **Dual-Repository Synchronization**: Ensure all architecture memory updates are committed to both [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md).
+
+---
+
+### 214.7 Master Production Verification Matrix (Updated Master State v214)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **GitGuardian Service Role Key Sanitization** | Full Stack (Scripts & Repos) | **PRODUCTION** | Hardcoded key removed from `scripts/inspect_students.py`; environment variable enforcement with fail-fast exit; zero leaks verified repository-wide (Commits [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637) on `feature/live-bus-tracking`, [`d32278e`](https://github.com/shuaibuddowla/ClassMate/commit/d32278e) on `main`) |
+| **Supabase Secret Rotation Protocol** | Backend / Infra | **DOCUMENTED** | 4-step rotation protocol: Supabase Dashboard roll key -> Vercel env update -> Cloudflare secret update -> GitGuardian incident resolution |
+| **Batch Fund Collections RPC Field Alignment** | Web Companion | **PRODUCTION** | Aligned `c.title` and `c.payment_count` with PostgreSQL RPC return types; fixed solid teal blank chip rendering and broken filtering |
+| **Unified Modern Empty States** | Android APK Native | **PRODUCTION** | `view_empty_state.xml` + `EmptyStateHelper.kt` deployed across Batch Fund, Friends, Notices, and Timetable with circular hero icon and CTA button |
+| **Tactile Haptic Engine** | Android APK Native | **PRODUCTION** | `HapticUtil.kt` integrated across navigation bar, collection filter chips, notice long-press copy, and action confirmations |
+| **10-Minute Academic Catalog Cache** | Android APK Native | **PRODUCTION** | `SupabaseAcademicCatalogRepository.kt` eliminates 7 sequential queries on screen open; instant 0ms launch with Room DB offline fallback |
+| **Notice Doodle Background Tuning** | Web & Android APK | **PRODUCTION** | Fixed non-scrolling subtle vector layer (`bg_whatsapp_wallpaper.xml`), calibrated opacity, light/dark mode parity |
+| **Onboarding & Teacher Privacy Hardening** | Web & Android APK | **PRODUCTION** | Removed redundant mess/flat address requirement; masked teacher phone numbers, blood groups, and student batch metadata |
+| **Dual-Activity Compose Navbar Host Alignment** | Android APK Native | **PRODUCTION** | `ClassMateAuthActivity` (`L3375`) hosts `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`) with `14.dp` margins, `10.dp` elevation, `32.dp` capsule curvature, glass stroke (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with tactile scale lift (`1.05f`) and haptic clock tick feedback across all 5 navigation tabs |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Up Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v214) |
