@@ -33,8 +33,10 @@ internal object ClassMateHamburgerSheet {
         dialog.window?.let { window ->
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
             window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setDimAmount(0f)
             window.navigationBarColor = Color.TRANSPARENT
-            window.statusBarColor = Color.TRANSPARENT
+            window.statusBarColor = Color.parseColor("#E8EDF5")
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 window.isNavigationBarContrastEnforced = false
             }
@@ -46,11 +48,14 @@ internal object ClassMateHamburgerSheet {
         // Full screen expansion
         dialog.setOnShowListener {
             dialog.window?.let { win ->
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.setDimAmount(0f)
+                win.statusBarColor = Color.parseColor("#E8EDF5")
                 androidx.core.view.WindowCompat.getInsetsController(win, win.decorView).isAppearanceLightStatusBars = true
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    @Suppress("DEPRECATION")
-                    win.decorView.systemUiVisibility = win.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                }
+                @Suppress("DEPRECATION")
+                win.decorView.systemUiVisibility = win.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
             }
             val bottomSheet = dialog.findViewById<android.widget.FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)
             if (bottomSheet != null) {

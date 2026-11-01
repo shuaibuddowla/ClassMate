@@ -174,6 +174,7 @@
         <item name="bottomSheetStyle">@style/ClassMate.BottomSheet</item>
         <item name="enableEdgeToEdge">true</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/cm_background</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
