@@ -19,7 +19,11 @@
                     android:layout_weight="1" android:layout_marginStart="10dp" android:layout_marginEnd="8dp"
                     android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
                     android:maxLines="3" android:ellipsize="end" android:textColor="@color/cm_text_primary"
-                    android:textSize="18sp" android:textStyle="bold" />
+                    android:textSize="18sp" android:textStyle="bold"
+                    app:autoSizeTextType="uniform"
+                    app:autoSizeMinTextSize="12sp"
+                    app:autoSizeMaxTextSize="18sp"
+                    app:autoSizeStepGranularity="1sp" />
                 <ImageView android:id="@+id/ivNoticeIllustration" android:layout_width="36dp"
                     android:layout_height="36dp" android:alpha="0.95" android:importantForAccessibility="no"
                     android:scaleType="fitCenter" android:src="@drawable/ic_notice_megaphone_art" />

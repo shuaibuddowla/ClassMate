@@ -282,70 +282,6 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- MBSTU Bus Transit & Radar -->
-                <View
-                    android:id="@+id/dividerProfileTransit"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp" />
-
-                <LinearLayout
-                    android:id="@+id/cardProfileTransit"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="8dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#200284C7"
-                        android:src="@drawable/ic_bus_filled"
-                        app:tint="#0284C7"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:id="@+id/tvTransitTitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="MBSTU Bus Transit"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvTransitSub"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Live bus radar, stoppage routes &amp; campus schedules"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
-                </LinearLayout>
-
                 <!-- Batch Administration (CR/Admin/Teacher) -->
                 <View
                     android:id="@+id/dividerProfileManage"
@@ -1261,7 +1197,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="Designed &amp; built by Shuaib Uddowla · MBSTU"
+                            android:text="Designed &amp; built by Mohammad Shuaib-Ud-Dowla · MBSTU"
                             android:textColor="@color/cm_text_secondary"
                             android:textSize="11.5sp" />
                     </LinearLayout>

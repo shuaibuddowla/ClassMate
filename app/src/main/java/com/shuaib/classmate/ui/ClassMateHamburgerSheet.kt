@@ -29,12 +29,60 @@ internal object ClassMateHamburgerSheet {
         val view = LayoutInflater.from(activity).inflate(R.layout.dialog_classmate_hamburger_drawer, null, false)
         dialog.setContentView(view)
 
-        // Expand fully on open
-        val parent = view.parent as? View
-        parent?.let {
-            val behavior = BottomSheetBehavior.from(it)
-            behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            behavior.skipCollapsed = true
+        // Make window edge-to-edge with crisp dark status icons
+        dialog.window?.let { window ->
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            window.navigationBarColor = Color.TRANSPARENT
+            window.statusBarColor = Color.TRANSPARENT
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+            }
+            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = true
+            }
+        }
+
+        // Full screen expansion
+        dialog.setOnShowListener {
+            dialog.window?.let { win ->
+                androidx.core.view.WindowCompat.getInsetsController(win, win.decorView).isAppearanceLightStatusBars = true
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    @Suppress("DEPRECATION")
+                    win.decorView.systemUiVisibility = win.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                }
+            }
+            val bottomSheet = dialog.findViewById<android.widget.FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)
+            if (bottomSheet != null) {
+                val behavior = BottomSheetBehavior.from(bottomSheet)
+                behavior.isFitToContents = false
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                behavior.skipCollapsed = true
+                behavior.isDraggable = true
+                bottomSheet.layoutParams.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                bottomSheet.setBackgroundResource(R.drawable.bg_bottom_sheet)
+                bottomSheet.setPadding(0, 0, 0, 0)
+                bottomSheet.fitsSystemWindows = false
+                bottomSheet.requestLayout()
+            }
+        }
+
+        val spacer = view.findViewById<View>(R.id.drawerStatusBarSpacer)
+        val content = view.findViewById<android.widget.LinearLayout>(R.id.layoutDrawerContent)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(view) { _, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            view.setPadding(0, 0, 0, 0)
+            spacer?.layoutParams?.height = statusBars.top
+            spacer?.requestLayout()
+            val d = activity.resources.displayMetrics.density
+            content?.setPadding(
+                (20 * d).toInt(),
+                (4 * d).toInt(),
+                (20 * d).toInt(),
+                navBars.bottom + (32 * d).toInt()
+            )
+            insets
         }
 
         val p = profile()

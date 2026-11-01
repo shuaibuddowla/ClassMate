@@ -109,7 +109,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             }
             titleRow.addView(btnBackNav)
         }
-        titleRow.addView(text(if(teacher()) "Students" else "Batch",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
+        titleRow.addView(text(if(teacher()) "Students" else "Batchmates",24f,true).apply { setTypeface(null,1) },LinearLayout.LayoutParams(0,-2,1f))
 
         val btnSearch = ImageView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
@@ -245,10 +245,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         toggleContainer.addView(btnToggleBatchmates)
         toggleContainer.addView(btnToggleBatchFund)
 
-        if (!teacher()) {
-            header.addView(toggleContainer)
-            updateBatchFundBalance()
-        }
+        // Batch Fund moved to hamburger drawer separately; no toggle needed here
 
         val status=text("Loading your batch…",12f).apply { setPadding(0,dp(10),0,dp(4)); accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE }
         header.addView(status)
