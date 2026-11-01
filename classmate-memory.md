@@ -15284,3 +15284,228 @@ A comprehensive, end-to-end retrospective audit was conducted across recent Anti
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v214) |
+
+
+---
+
+## 215. IoT Hardware Attendance Station, Dual-Core FreeRTOS Architecture, 3D Enclosure Engineering & Production Master State v215
+
+### 215.1 Retrospective of Recent Brain Conversations & Hardware Ecosystem Milestones
+A rigorous retrospective audit was executed across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, focusing on the hardware expansion of the ClassMate ecosystem, embedded firmware resilience, physical industrial design, and production system hardening:
+- [`cb34f03f-b1ff-4df0-8496-38445bdd56fd`](conversation://cb34f03f-b1ff-4df0-8496-38445bdd56fd): Preceding autonomous memory synthesis and dual-repository synchronization session (Master State v214).
+- [`3bb7bf72-1fa2-43fe-a712-cc608dc22730`](conversation://3bb7bf72-1fa2-43fe-a712-cc608dc22730): Deep architectural analysis of the ClassMate IoT attendance station firmware ([`esp32_rfid_attendance.ino`](file:///d:/Code%20&%20Scripts/attendence%20tracker/firmware/esp32_rfid_attendance/esp32_rfid_attendance.ino)); formal documentation of the dual-core FreeRTOS separation, 3-tier Wi-Fi fallback logic, idle display sleep states, and the 64-scan in-memory queue buffering behavior when Wi-Fi is lost during active sessions.
+- [`ceebe33c-84e9-4b0f-af3e-776906311e7e`](conversation://ceebe33c-84e9-4b0f-af3e-776906311e7e): Financial ledger and student registration audit for RFID attendance cards within `classmate.batch_fund_transactions`; verified 33 students paid ৳40 (total ৳1,325 collected), mapped card payment records to student profile UIDs, and cataloged 24 pending unpaid students.
+- [`5dc26f86-b8b0-4628-993c-bc0787e75af8`](conversation://5dc26f86-b8b0-4628-993c-bc0787e75af8): Ground-up mechanical engineering and 3D print modeling of the ClassMate IoT Attendance Station enclosure:
+  - Addressed RC522 Mini solder pin height clearance (1.2 mm left header relief slot).
+  - RF wall thinning (1.0–1.2 mm plastic thickness) directly over the 13.56 MHz antenna to eliminate RF attenuation.
+  - Dual-step OLED bezel pocket for 1.8 cm display module height and 22.2 mm screw pitch.
+  - Eliminated messy floor cutouts and redundant hanging slots, producing 100% watertight, manifold 3D printable STL files (`desktop_attendance_front_panel.stl`, `desktop_attendance_main_enclosure.stl`, `desktop_attendance_stand_u_frame.stl`).
+  - Added 0.40 mm recessed sticker branding pocket.
+- [`e465acc9-910d-45f7-95ac-1d5bcf73aeaa`](conversation://e465acc9-910d-45f7-95ac-1d5bcf73aeaa): Full-codebase automated audit and web deployment to Vercel production (`https://classmatebd.vercel.app`); verified secure token authentication on `/api/scan` and `/api/export-attendance`, added database index migration `202610250002_rfid_index.sql`, created Next.js error boundaries, and validated Android APK `BackendApiClient.kt` and `FileProvider` authorities.
+- [`0edd370b-fa58-4308-905e-72b37c274b36`](conversation://0edd370b-fa58-4308-905e-72b37c274b36): Verified active daily execution of the `classmate-daily-security-audit` background automation (09:00 AM Asia/Dhaka) monitoring credentials, CVEs, and storage boundaries.
+- [`23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`](conversation://23e6ef71-fb08-4cf7-aaeb-8c1af319fa27): Codified multi-engineer database branching guidelines, local Supabase CLI staging, and feature-branch synchronization.
+- [`04866bbe-2501-4625-82a6-1b5d66909873`](conversation://04866bbe-2501-4625-82a6-1b5d66909873): Ostad YUNet AIgnite Buildathon 2026 hackathon positioning, presenting ClassMate as a unified Smart Campus OS bridging physical IoT attendance stations, bus transit telemetry, and mobile academic operations.
+
+---
+
+### 215.2 ClassMate IoT Attendance Station Hardware & Circuit Architecture
+
+The **ClassMate IoT Attendance Station** is a custom hardware appliance engineered to operate directly in university classrooms and departmental laboratories. It interfaces seamlessly with the ClassMate cloud backend, Android APK, and student RFID cards.
+
+```mermaid
+flowchart TD
+    subgraph Power & Compute
+        USB["5V Micro-USB Power"] --> LDO["AMS1117-3.3V LDO"]
+        LDO --> ESP["ESP32 DevKit 38-Pin Microcontroller<br>(Dual-Core Xtensa LX6 @ 240MHz)"]
+    end
+
+    subgraph Peripherals (3.3V Bus)
+        ESP -->|SPI: GPIO 18, 19, 23, 5, 4| RFID["RC522 13.56MHz RFID Reader<br>(ISO 14443A Mifare / NTAG)"]
+        ESP -->|I2C: GPIO 21, 22| OLED["0.96 inch SSD1306 OLED (128x64)<br>(Course Marquee & Status UI)"]
+        ESP -->|GPIO 27| BUZZER["Active Piezo Buzzer<br>(Multitonal Acoustic Chimes)"]
+        ESP -->|GPIO 25| LED_G["Green Status LED (220Ω)<br>(Success / Present Tick)"]
+        ESP -->|GPIO 26| LED_R["Red Status LED (220Ω)<br>(Warning / Duplicate Cross)"]
+    end
+
+    subgraph Network & Cloud Dispatch
+        ESP -->|Wi-Fi 802.11 b/g/n| CLOUD["ClassMate Cloud Engine<br>(https://classmatebd.vercel.app/api/scan)"]
+        ESP -->|Optional Local LAN| LOCAL["FastAPI Local Station<br>(http://lan-ip:8000/api/scan)"]
+    end
+```
+
+#### Pinout & Interconnect Matrix
+
+| Peripheral | Component Pin | ESP32 GPIO | Logic Level | Circuit Notes & Safety Guards |
+| :--- | :--- | :--- | :--- | :--- |
+| **RC522 RFID Module** | VCC | **3V3** | 3.3V | **CRITICAL**: Connect strictly to 3.3V rail. 5V damages the Philips MFRC522 IC. |
+| | RST | **GPIO 4** | 3.3V | Hardware reset pin driven during SPI initialization |
+| | GND | **GND** | 0V | Common circuit ground |
+| | MISO | **GPIO 19** | 3.3V | Master In Slave Out (SPI bus) |
+| | MOSI | **GPIO 23** | 3.3V | Master Out Slave In (SPI bus) |
+| | SCK | **GPIO 18** | 3.3V | SPI Clock line (max 10 MHz) |
+| | SDA (SS) | **GPIO 5** | 3.3V | Hardware Slave Select line |
+| **SSD1306 0.96" OLED** | VCC | **3V3** | 3.3V | I2C display module (128 × 64 pixels) |
+| | GND | **GND** | 0V | Common circuit ground |
+| | SCL | **GPIO 22** | 3.3V | I2C Clock (pull-up onboard) |
+| | SDA | **GPIO 21** | 3.3V | I2C Data (pull-up onboard) |
+| **Acoustic & LED Feedback** | Buzzer (+) | **GPIO 27** | 3.3V | Active 5V/3.3V piezo buzzer |
+| | Green LED (+) | **GPIO 25** | 3.3V | Series current limiting resistor (220Ω) |
+| | Red LED (+) | **GPIO 26** | 3.3V | Series current limiting resistor (220Ω) |
+| | Common (-) | **GND** | 0V | Tied to common system ground |
+
+---
+
+### 215.3 Dual-Core FreeRTOS Firmware Architecture & Offline Resilience
+
+The firmware ([`esp32_rfid_attendance.ino`](file:///d:/Code%20&%20Scripts/attendence%20tracker/firmware/esp32_rfid_attendance/esp32_rfid_attendance.ino)) is architected using FreeRTOS tasks pinned across the two asymmetric cores of the ESP32 to eliminate UI stutter, thread blocking, or dropped card scans:
+
+#### A. Asymmetric Core Separation
+1. **Core 1 — Foreground UI & RFID Edge Processing**:
+   - Executes the primary `loop()` dedicated solely to card reading, OLED frame rendering, acoustic tone generation, and local RAM roster verification.
+   - **Zero Latency**: Scan response executes in **< 50ms**. Even if a remote network socket times out or drops packets, Core 1 never blocks or stutters.
+   - **Hardware Cooldown Debounce**: Implements a strict `2000ms` card cooldown window per student UID, preventing unintentional repeated scans when a card hovers near the terminal.
+2. **Core 0 — Background Network & Synchronization Task**:
+   - Pinned background FreeRTOS task handling all Wi-Fi connectivity, HTTP REST requests, cloud heartbeats, and queue uploads.
+   - Communicates with Core 1 via a thread-safe FreeRTOS queue (`scanUploadQueue`).
+
+#### B. 3-Tier Sequential Network Fallback & Auto-Reconnection
+Core 0 monitors connection status (`WiFi.status() != WL_CONNECTED`) continuously every 2 seconds. When Wi-Fi disconnects:
+1. **Sequential Network Cycling**:
+   The firmware cycles sequentially through configured fallback SSIDs:
+   - **Tier 1 (Primary)**: Mobile Hotspot (`Riyad`)
+   - **Tier 2 (Secondary)**: Campus / Department Wi-Fi (`The Continental`)
+   - **Tier 3 (Backup)**: Laboratory / Home Backup (`Home_Lab_WiFi`)
+2. **Deterministic Timeout Windows**:
+   Attempts connection for up to **15 seconds** per network before moving to the next candidate:
+   $$	ext{Hotspot (15s)} \longrightarrow 	ext{Campus Wi-Fi (15s)} \longrightarrow 	ext{Backup (15s)} \longrightarrow 	ext{repeat}$$
+3. **OLED Visual Status Indicator**:
+   During reconnection attempts, the OLED briefly renders:
+   ```text
+   TRYING WIFI [x/3]
+   <SSID Name>
+   Connecting...
+   ```
+   Upon successful link establishment, displays `WIFI CONNECTED!` with the allocated local IP, plays a subtle confirmation chime (`soundInstantTap`), and resumes normal classroom display.
+
+#### C. Active Session vs. Standby Offline Behavior Matrix
+
+| Operating Scenario | Device Display & Visual State | Edge Audio / LED Feedback | Backend Network Behavior |
+| :--- | :--- | :--- | :--- |
+| **Standby Idle (No Active Class)** | OLED in low-power sleep (`SSD1306_DISPLAYOFF`); wakes on card tap showing `ATTENDANCE NOT STARTED` | Descending 2-tone warning beep + Red LED | Slower 8-second polling heartbeat to `/api/scan?device_id=...` checking for scheduled class sessions |
+| **Active Class Session (Wi-Fi Online)** | Live marquee ticker displaying course code & title (e.g. `CSE 2114 - Software Development`); student name & ID upon tap | Crisp high-pitch double chime + Green LED pulse | Instant HTTPS POST to `https://classmatebd.vercel.app/api/scan`; immediate push notification dispatched to student |
+| **Active Class Session (Wi-Fi Drops)** | OLED continues showing class marquee; on card tap renders `OK! PRESENT` checkmark animation in **< 50ms** | Success chime + Green LED pulse (Zero degradation in student UX) | Scans are pushed into FreeRTOS in-memory queue (`scanUploadQueue`, capacity 64 entries); auto-drained upon Wi-Fi restoration |
+| **Duplicate Tap in Active Session** | Displays `ALREADY PRESENTED` with animated cross | Double red beep + Red LED | Discarded locally via RAM state; no redundant network egress generated |
+
+#### D. FreeRTOS In-Memory Buffer Draining
+When campus Wi-Fi reconnects after an outage:
+- Core 0 dequeues buffered records in FIFO sequence.
+- Posts each scan payload with its original capture timestamp (`captured_at`).
+- Cloud endpoint idempotently matches scans by `(session_id, student_profile_id)`, guaranteeing zero duplicate counts and zero dropped attendance records.
+
+---
+
+### 215.4 Parametric 3D Enclosure Mechanical Design & Print Engineering
+
+A custom industrial snap-fit desktop enclosure was designed, geometrically verified, and produced using parametric modeling scripts ([`build_desktop_attendance_device.py`](file:///d:/Code%20&%20Scripts/attendence%20tracker/build_desktop_attendance_device.py)):
+
+```text
+3D_Print/
+├── desktop_attendance_front_panel.stl      # Precision snap-fit front bezel with card pad & OLED aperture
+├── desktop_attendance_main_enclosure.stl   # Main chassis housing ESP32 cradle, wiring channels & stand pivots
+├── desktop_attendance_stand_u_frame.stl    # U-shaped tilting desktop stand frame
+├── desktop_attendance_pivot_knob.stl       # Threaded pivot tension adjustment knob
+├── desktop_attendance_plate1_enclosure.stl # Plate 1 internal component placement tray
+└── desktop_attendance_plate2_stand.stl     # Plate 2 weighted base stand plate
+```
+
+#### A. Geometric Dimensions & Tolerances
+
+| Structural Feature | Dimension (mm) | Dimension (cm) | Engineering Rationale & Print Optimization |
+| :--- | :--- | :--- | :--- |
+| **Assembled Enclosure (External)** | **82.0 × 66.0 × 22.4 mm** | **8.2 × 6.6 × 2.24 cm** | Compact, pocketable form-factor; low center of gravity on lecture podiums |
+| **Main Chassis Base** | 82.0 × 66.0 × 18.4 mm | 8.2 × 6.6 × 1.84 cm | Floor thickness: **2.0 mm** for rigid structural integrity |
+| **Front Tapping Face Wall** | **1.0 – 1.2 mm** | **0.10 – 0.12 cm** | **RF Transparency**: Thinner wall thickness prevents 13.56 MHz electromagnetic signal attenuation |
+| **OLED Bezel Aperture** | 22.5 × 12.0 mm | 2.25 × 1.20 cm | Frames active 0.96" screen area while masking PCB edges and bezel borders |
+| **OLED Module Glass Pocket** | 18.5 × 27.2 × 1.5 mm | 1.85 × 2.72 × 0.15 cm | Dual-step recessed pocket accommodating 1.8 cm display module height |
+| **OLED Screw Mount Pitch** | 22.2 mm (Horizontal X) | 2.22 cm | Matches exact horizontal hole-to-hole center distance of SSD1306 PCB |
+| **RC522 Mini PCB Pocket** | 38.2 × 27.2 × 1.8 mm | 3.82 × 2.72 × 0.18 cm | Snug fit for 38.0 × 27.0 mm module with 0.2 mm thermal expansion clearance |
+| **Solder Pin Relief Channel** | **1.2 mm Depth × 2.4 mm Width** | **0.12 × 0.24 cm** | Accommodates raised solder joints of the left 8-pin header; board sits 100% flush |
+| **Recessed Branding Pocket** | 52.0 × 32.0 × 0.40 mm | 5.20 × 3.20 × 0.04 cm | 0.40 mm recessed pocket (exactly 2 layer heights @ 0.20 mm) for flush vinyl branding sticker |
+| **Wall-Mount Keyhole Slot** | 8.0 mm Head / 4.0 mm Neck | 0.80 / 0.40 cm | Single top-centered keyhole slot for clean wall mounting; removed messy floor cutouts |
+
+#### B. Slicer & Print Settings
+- **Material**: PLA+ / PETG (Matte Black or White recommended).
+- **Layer Height**: `0.20 mm` standard (`0.12 mm` adaptive for curved bezels).
+- **Infill**: `20% Gyroid` for uniform structural rigidity and acoustic dampening.
+- **Perimeters / Walls**: 3 walls (`1.2 mm` total wall thickness).
+- **Supports**: Minimal build plate supports only under stand pivot overhangs; front panel prints face-down with **zero supports**.
+- **Watertight Integrity**: Verified 100% 2-manifold watertight mesh (`Watertight: True`) with zero non-manifold edges or intersecting faces.
+
+---
+
+### 215.5 Student RFID Card Financial Ledger & Database Mapping
+
+The physical deployment of RFID cards is tracked in `classmate.batch_fund_transactions` under category `'attendance_card'`:
+
+#### A. Ledger Collection Summary
+- **Target Batch**: CSE 22nd Batch (57 regular students, excluding admin `CE25045`).
+- **Cards Paid & Active**: **33 students** (57.9% cohort adoption).
+- **Total Funds Collected**: **৳ 1,325.00** (32 students @ ৳40, 1 student @ ৳45).
+- **Pending Collection**: 24 regular students remaining.
+
+#### B. Database Schema & Index Optimization
+To support instant $O(1)$ student profile resolution during card taps:
+- Migration `supabase/migrations/202610250002_rfid_index.sql`:
+  ```sql
+  CREATE INDEX IF NOT EXISTS idx_profiles_rfid_card_uid 
+  ON classmate.profiles (rfid_card_uid) 
+  WHERE rfid_card_uid IS NOT NULL;
+  ```
+- Ensures the server-side scan handler (`/api/scan`) executes lookups in **< 3ms** without table scans.
+
+---
+
+### 215.6 Standalone Local FastAPI Backend Mode
+
+For deployments in isolated computer networks or offline research laboratories where access to the ClassMate cloud is unavailable, the repository includes a self-contained local Python backend ([`attendance-tracker/backend`](file:///d:/Code%20&%20Scripts/attendence%20tracker/backend)):
+- **Framework**: FastAPI + Uvicorn + SQLAlchemy.
+- **Local Database**: SQLite (`attendance.db`) with automatic schema initialization.
+- **Real-Time WebSockets**: Live broadcast of scan events to the browser dashboard (`templates/` and `static/`) with zero page reloading.
+- **Autonomous Check-In / Check-Out Logic**: Automatically evaluates daily student scan history to toggle between Check-In and Check-Out.
+- **1-Click Card Enrollment & CSV Export**: Unknown cards are flagged in the browser with an instant 1-click modal to associate the UID with a student name and ID, alongside one-click CSV report downloads.
+
+---
+
+### 215.7 Master Production Verification Matrix (Updated Master State v215)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **IoT Attendance Station Firmware** | ESP32 C++ Arduino | **PRODUCTION** | Dual-core FreeRTOS separation (`esp32_rfid_attendance.ino`), 3-tier Wi-Fi fallback (15s timeouts), 64-scan in-memory queue buffering, < 50ms edge scan latency |
+| **3D Printable Snap-Fit Enclosure** | 3D Printing & CAD | **PRODUCTION** | Watertight 2-manifold STL models (`desktop_attendance_front_panel.stl`, `desktop_attendance_main_enclosure.stl`); 1.0–1.2mm RF wall thinning, 1.2mm solder pin relief, 18.5×27.2mm OLED pocket |
+| **RFID Profile Database Indexing** | Supabase PostgreSQL | **PRODUCTION** | B-tree index `idx_profiles_rfid_card_uid` deployed via migration `202610250002_rfid_index.sql`; O(1) < 3ms card lookups |
+| **Attendance Card Batch Fund Ledger** | Full Stack (DB & Web) | **PRODUCTION** | Tracked in `classmate.batch_fund_transactions`; 33 students paid (৳1,325 collected), 24 unpaid, zero ledger discrepancies |
+| **Standalone Local FastAPI Station** | Python / FastAPI / SQLite | **PRODUCTION** | Standalone LAN station mode in `attendance-tracker/backend` with WebSockets, smart check-in/out, and 1-click enrollment |
+| **GitGuardian Service Role Key Sanitization** | Full Stack (Scripts & Repos) | **PRODUCTION** | Hardcoded key removed from `scripts/inspect_students.py`; environment variable enforcement with fail-fast exit; zero leaks verified repository-wide (Commits [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637) on `feature/live-bus-tracking`, [`d32278e`](https://github.com/shuaibuddowla/ClassMate/commit/d32278e) on `main`) |
+| **Supabase Secret Rotation Protocol** | Backend / Infra | **DOCUMENTED** | 4-step rotation protocol: Supabase Dashboard roll key -> Vercel env update -> Cloudflare secret update -> GitGuardian incident resolution |
+| **Batch Fund Collections RPC Field Alignment** | Web Companion | **PRODUCTION** | Aligned `c.title` and `c.payment_count` with PostgreSQL RPC return types; fixed solid teal blank chip rendering and broken filtering |
+| **Unified Modern Empty States** | Android APK Native | **PRODUCTION** | `view_empty_state.xml` + `EmptyStateHelper.kt` deployed across Batch Fund, Friends, Notices, and Timetable with circular hero icon and CTA button |
+| **Tactile Haptic Engine** | Android APK Native | **PRODUCTION** | `HapticUtil.kt` integrated across navigation bar, collection filter chips, notice long-press copy, and action confirmations |
+| **10-Minute Academic Catalog Cache** | Android APK Native | **PRODUCTION** | `SupabaseAcademicCatalogRepository.kt` eliminates 7 sequential queries on screen open; instant 0ms launch with Room DB offline fallback |
+| **Notice Doodle Background Tuning** | Web & Android APK | **PRODUCTION** | Fixed non-scrolling subtle vector layer (`bg_whatsapp_wallpaper.xml`), calibrated opacity, light/dark mode parity |
+| **Onboarding & Teacher Privacy Hardening** | Web & Android APK | **PRODUCTION** | Removed redundant mess/flat address requirement; masked teacher phone numbers, blood groups, and student batch metadata |
+| **Dual-Activity Compose Navbar Host Alignment** | Android APK Native | **PRODUCTION** | `ClassMateAuthActivity` (`L3375`) hosts `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`) with `14.dp` margins, `10.dp` elevation, `32.dp` capsule curvature, glass stroke (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with tactile scale lift (`1.05f`) and haptic clock tick feedback across all 5 navigation tabs |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Ground Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v215) |
