@@ -1,21 +1,241 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp" android:layout_marginVertical="5dp" android:clickable="true" android:focusable="true"
-    android:foreground="?attr/selectableItemBackground" app:cardCornerRadius="22dp" app:cardElevation="1dp"
-    app:cardBackgroundColor="@color/cm_surface" app:strokeWidth="1dp" app:strokeColor="@color/cm_border_glass">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-        <TextView android:id="@+id/tvBusScheduleName" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:textSize="12sp" android:textColor="@color/cm_text_disabled" android:layout_marginBottom="8dp" android:visibility="gone" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical">
-            <ImageView android:layout_width="30dp" android:layout_height="30dp" android:layout_marginEnd="12dp" android:padding="5dp" android:background="@drawable/bg_toggle_container" android:src="@drawable/ic_bus" app:tint="@color/cm_primary" android:importantForAccessibility="no" />
-            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:paddingEnd="8dp">
-                <TextView android:id="@+id/tvCampusDepartureLabel" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Campus → City" android:textSize="11sp" android:textColor="@color/cm_text_disabled" />
-                <TextView android:id="@+id/tvCampusDeparture" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="19sp" android:textStyle="bold" android:textColor="@color/cm_primary" app:autoSizeTextType="uniform" app:autoSizeMinTextSize="13sp" app:autoSizeMaxTextSize="19sp" app:autoSizeStepGranularity="1sp" android:maxLines="1" />
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardCornerRadius="22dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/cm_surface"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/cm_border_glass">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Top Header: Bus Icon + Name + Tag + Call Pilot Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <ImageView
+                android:id="@+id/ivBusIcon"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="12dp"
+                android:padding="8dp"
+                android:background="@drawable/bg_toggle_container"
+                android:src="@drawable/ic_bus"
+                app:tint="@color/cm_primary"
+                android:importantForAccessibility="no" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvBusScheduleName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/cm_text_primary"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:id="@+id/tvBusTag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:paddingHorizontal="7dp"
+                        android:paddingVertical="2dp"
+                        android:background="@drawable/bg_badge_blue"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvBusSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/cm_text_disabled"
+                    android:maxLines="1"
+                    android:visibility="gone" />
             </LinearLayout>
-            <LinearLayout android:id="@+id/cityDepartureColumn" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="12dp">
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="City → Campus" android:textSize="11sp" android:textColor="@color/cm_text_disabled" />
-                <TextView android:id="@+id/tvCityDeparture" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="19sp" android:textStyle="bold" android:textColor="@color/cm_text_primary" app:autoSizeTextType="uniform" app:autoSizeMinTextSize="13sp" app:autoSizeMaxTextSize="19sp" app:autoSizeStepGranularity="1sp" android:maxLines="1" />
+
+            <!-- Track Bus Pill Button -->
+            <LinearLayout
+                android:id="@+id/btnTrackBus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp"
+                android:background="@drawable/bg_badge_blue"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginEnd="4dp"
+                    android:src="@drawable/ic_location"
+                    app:tint="@color/cm_primary"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/tvTrackBusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ট্র্যাক"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_primary" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Route Strip -->
+        <TextView
+            android:id="@+id/tvRouteName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:background="@drawable/bg_toggle_container"
+            android:text="মাভাবিপ্রবি ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)"
+            android:textSize="11sp"
+            android:textColor="@color/cm_text_secondary"
+            android:visibility="gone" />
+
+        <!-- Divider line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/cm_border_glass" />
+
+        <!-- Departures Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <!-- Campus to City Column -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:id="@+id/tvCampusDepartureLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="ক্যাম্পাস ➔ শহর"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_text_disabled" />
+
+                <TextView
+                    android:id="@+id/tvCampusDeparture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_primary"
+                    app:autoSizeTextType="uniform"
+                    app:autoSizeMinTextSize="13sp"
+                    app:autoSizeMaxTextSize="18sp"
+                    app:autoSizeStepGranularity="1sp"
+                    android:maxLines="1" />
+
+                <TextView
+                    android:id="@+id/tvCampusDepartureList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/cm_text_secondary"
+                    android:lineSpacingExtra="2dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Vertical Middle Divider -->
+            <View
+                android:id="@+id/departureDivider"
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="@color/cm_border_glass" />
+
+            <!-- City to Campus Column -->
+            <LinearLayout
+                android:id="@+id/cityDepartureColumn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:id="@+id/tvCityDepartureLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="শহর ➔ ক্যাম্পাস"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_text_disabled" />
+
+                <TextView
+                    android:id="@+id/tvCityDeparture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_text_primary"
+                    app:autoSizeTextType="uniform"
+                    app:autoSizeMinTextSize="13sp"
+                    app:autoSizeMaxTextSize="18sp"
+                    app:autoSizeStepGranularity="1sp"
+                    android:maxLines="1" />
+
+                <TextView
+                    android:id="@+id/tvCityDepartureList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/cm_text_secondary"
+                    android:lineSpacingExtra="2dp"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

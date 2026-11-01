@@ -518,13 +518,14 @@ class MainActivity : AppCompatActivity() {
             val selected = tabId == selectedTabId
             itemView.animate().cancel()
             
-            val targetScale = if (selected) 1.05f else 1f
-            val targetTranslation = if (selected) -dp(3).toFloat() else 0f
-            val duration = if (selected) 250L else 180L
+            // Concept 1 Physics: Elastic fluid spring with scale compression & gentle elevation lift
+            val targetScale = if (selected) 1.08f else 1f
+            val targetTranslation = if (selected) -dp(4).toFloat() else 0f
+            val duration = if (selected) 320L else 200L
             val interpolator = if (selected) {
-                android.view.animation.OvershootInterpolator(1.4f)
+                android.view.animation.OvershootInterpolator(1.85f)
             } else {
-                android.view.animation.DecelerateInterpolator()
+                android.view.animation.DecelerateInterpolator(1.5f)
             }
             
             itemView.animate()

@@ -123,6 +123,10 @@ import com.shuaib.classmate.R
 
 
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 
 
@@ -836,6 +840,14 @@ internal class ClassMateAcademicScreensSupabase(
 
             if (tab == R.id.nav_transit) {
                 resumeTransitWebView()
+                pendingTransitBusId?.let { targetBus ->
+                    tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)?.apply {
+                        postDelayed({
+                            evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                            pendingTransitBusId = null
+                        }, 200)
+                    }
+                }
             } else {
                 pauseTransitWebView()
             }
@@ -1781,6 +1793,28 @@ internal class ClassMateAcademicScreensSupabase(
 
     @android.annotation.SuppressLint("SetJavaScriptEnabled")
 
+    private var pendingTransitBusId: String? = null
+
+    fun openTransitForBus(busId: String) {
+        val authActivity = activity as? ClassMateAuthActivity
+        val cleanBusId = if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
+        pendingTransitBusId = cleanBusId
+
+        // 1. Navigate directly to transit tab
+        authActivity?.selectHomeTab(R.id.nav_transit)
+
+        // 2. Select and focus on the corresponding bus in the webview
+        val webView = tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)
+            ?: activity.findViewById<android.webkit.WebView>(R.id.transit_webview)
+
+        webView?.post {
+            webView.evaluateJavascript(
+                "if (window.__classmateSelectBus) { window.__classmateSelectBus('$cleanBusId'); } else { window.__classmateInitialBusId = '$cleanBusId'; window.location.hash = '#transit?bus=$cleanBusId'; }",
+                null
+            )
+        }
+    }
+
     private fun setupTransit(root: View) {
 
         val webView = root.findViewById<android.webkit.WebView>(R.id.transit_webview) ?: return
@@ -1865,6 +1899,10 @@ internal class ClassMateAcademicScreensSupabase(
                         loadingView?.visibility = View.GONE
                     }?.start()
                 }
+                pendingTransitBusId?.let { targetBus ->
+                    webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                    pendingTransitBusId = null
+                }
             }
         }
 
@@ -1908,7 +1946,10 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
-        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&view=map"
+        val viewParam = if (pendingTransitBusId != null) "view=map" else "view=list"
+        val busParam = pendingTransitBusId?.let { "&bus=$it" } ?: ""
+        val transitUrl = "https://classmatebd.vercel.app/transit-preview?app=android&$viewParam$busParam&v=20261101_v3_clean"
+        webView.clearCache(true)
         webView.loadUrl(transitUrl)
 
     }
@@ -2207,7 +2248,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                val canEdit = if (busMode) canEditBus()
+                val canEdit = if (busMode) false
 
 
 
@@ -2559,6 +2600,153 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+
+    private fun parse12hToLocalTime(timeStr: String): LocalTime? {
+        val m = Regex("""^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$""", RegexOption.IGNORE_CASE).matchEntire(timeStr.trim()) ?: return null
+        var h = m.groupValues[1].toInt()
+        val min = m.groupValues[2].toInt()
+        val isPm = m.groupValues[3].equals("PM", ignoreCase = true)
+        if (isPm && h < 12) h += 12
+        if (!isPm && h == 12) h = 0
+        return runCatching { LocalTime.of(h, min) }.getOrNull()
+    }
+
+    private fun format12hTo24hSql(tStr: String): String {
+        val m = Regex("""^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$""", RegexOption.IGNORE_CASE).matchEntire(tStr.trim()) ?: return "08:00:00"
+        var h = m.groupValues[1].toInt()
+        val min = m.groupValues[2].toInt()
+        val isPm = m.groupValues[3].equals("PM", ignoreCase = true)
+        if (isPm && h < 12) h += 12
+        if (!isPm && h == 12) h = 0
+        return String.format(java.util.Locale.US, "%02d:%02d:00", h, min)
+    }
+
+    private fun fetchMbstuLiveBusScheduleEntries(context: Context): JSONArray {
+        val cacheFile = java.io.File(context.cacheDir, "mbstu_live_bus_schedules.json")
+        var rawJson: String? = null
+
+        if (ClassMateAcademicCache.online(context)) {
+            runCatching {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+                val request = Request.Builder()
+                    .url("https://transport.mbstu.ac.bd/api/bus-schedule/")
+                    .post("{\"status\":\"success\"}".toRequestBody(jsonMediaType))
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            rawJson = body
+                            cacheFile.writeText(body)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (rawJson == null && cacheFile.exists()) {
+            runCatching { rawJson = cacheFile.readText() }
+        }
+
+        val knownBusEn = mapOf(
+            "SB0001" to "Gitanjali",
+            "SB0002" to "Agnibina",
+            "SB0003" to "Sonartori",
+            "SB0005" to "Shangshaptak",
+            "SB0007" to "Dhaleshwari",
+            "SB0009" to "Banolata",
+            "SB0010" to "Raktakarabi",
+            "SB5442" to "Sanchayita",
+            "SB5448" to "Rakhali",
+            "SB5488" to "Rakhali"
+        )
+
+        val result = JSONArray()
+        val dataArray = runCatching {
+            if (rawJson != null) JSONObject(rawJson).optJSONArray("data") else null
+        }.getOrNull()
+
+        if (dataArray != null && dataArray.length() > 0) {
+            for (i in 0 until dataArray.length()) {
+                val b = dataArray.getJSONObject(i)
+                val busNo = b.optString("busNo").trim()
+                if (busNo.isBlank()) continue
+                val busNameBn = b.optString("busName").trim().ifBlank { busNo }
+                val campusToDistrict = b.optJSONArray("campusToDistrict") ?: JSONArray()
+                val districtToCampus = b.optJSONArray("districtToCampus") ?: JSONArray()
+                val pilotContact = b.optString("pilotContact").trim()
+
+                val firstCampus = if (campusToDistrict.length() > 0) campusToDistrict.optString(0) else "08:00 AM"
+                val firstCity = if (districtToCampus.length() > 0) districtToCampus.optString(0) else "08:30 AM"
+
+                val busObj = JSONObject().apply {
+                    put("id", busNo)
+                    put("bus_no", busNo)
+                    put("bus_name_bn", busNameBn)
+                    put("bus_name_en", knownBusEn[busNo] ?: busNo)
+                    put("route_name", "মাভাবিপ্রবি ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)")
+                    put("origin", "Campus")
+                    put("destination", "Nirala (City)")
+                    put("pilot_contact", pilotContact)
+                    put("campus_departures", campusToDistrict)
+                    put("city_departures", districtToCampus)
+                    put("departure_time", format12hTo24hSql(firstCampus))
+                    put("city_departure_time", format12hTo24hSql(firstCity))
+                    put("schedule_kind", "office_open")
+                    put("active", true)
+                    put("is_mbstu", true)
+                }
+                result.put(busObj)
+            }
+        } else {
+            val seedFleet = listOf(
+                Triple("SB0001", "গীতাঞ্জলি", listOf("8:00 AM", "9:00 AM", "1:10 PM", "2:30 PM") to listOf("8:30 AM", "9:30 AM", "1:40 PM", "3:00 PM")),
+                Triple("SB0002", "অগ্নিবীণা", listOf("8:00 AM", "9:00 AM", "10:00 AM", "1:10 PM", "2:30 PM") to listOf("8:30 AM", "9:30 AM", "10:30 AM", "1:40 PM", "3:00 PM")),
+                Triple("SB0003", "সোনারতরী", listOf("4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM") to listOf("4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM")),
+                Triple("SB0005", "সংশপ্তক", listOf("8:00 AM", "9:00 AM", "1:10 PM", "2:30 PM") to listOf("8:30 AM", "9:30 AM", "1:40 PM", "3:00 PM")),
+                Triple("SB0009", "বনলতা", listOf("4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM") to listOf("4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM")),
+                Triple("SB0010", "রক্তকরবী", listOf("10:00 AM", "4:10 PM") to listOf("10:30 AM", "4:40 PM")),
+                Triple("SB5442", "সঞ্চয়িতা", listOf("4:10 PM", "5:15 PM", "6:20 PM", "8:10 PM") to listOf("4:40 PM", "5:45 PM", "7:00 PM", "8:50 PM")),
+                Triple("SB5448", "রাখালী", listOf("2:30 PM", "4:10 PM", "5:15 PM", "6:20 PM") to listOf("3:00 PM", "4:40 PM", "5:45 PM", "7:00 PM"))
+            )
+            val seedPilots = mapOf(
+                "SB0002" to "01721162819",
+                "SB0003" to "01716658738",
+                "SB0005" to "01799148449",
+                "SB0009" to "01719221530",
+                "SB0010" to "01688686781",
+                "SB5442" to "01710802028",
+                "SB5448" to "01710802028"
+            )
+            for ((no, bn, trips) in seedFleet) {
+                val campusJson = JSONArray(trips.first)
+                val cityJson = JSONArray(trips.second)
+                result.put(JSONObject().apply {
+                    put("id", no)
+                    put("bus_no", no)
+                    put("bus_name_bn", bn)
+                    put("bus_name_en", knownBusEn[no] ?: no)
+                    put("route_name", "মাভাবিপ্রবি ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)")
+                    put("origin", "Campus")
+                    put("destination", "Nirala (City)")
+                    put("pilot_contact", seedPilots[no] ?: "")
+                    put("campus_departures", campusJson)
+                    put("city_departures", cityJson)
+                    put("departure_time", format12hTo24hSql(trips.first.first()))
+                    put("city_departure_time", format12hTo24hSql(trips.second.first()))
+                    put("schedule_kind", "office_open")
+                    put("active", true)
+                    put("is_mbstu", true)
+                })
+            }
+        }
+        return result
+    }
+
     private fun updateBusSummary(root: View, entries: List<JSONObject>, date: LocalDate, kind: String) {
 
 
@@ -2567,7 +2755,20 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        fun times(key: String) = entries.mapNotNull { runCatching { LocalTime.parse(it.optString(key).take(8)) }.getOrNull() }
+        fun times(key: String): List<LocalTime> {
+            val list = mutableListOf<LocalTime>()
+            entries.forEach { item ->
+                val arr = item.optJSONArray(if (key == "departure_time") "campus_departures" else "city_departures")
+                if (arr != null && arr.length() > 0) {
+                    for (i in 0 until arr.length()) {
+                        parse12hToLocalTime(arr.optString(i))?.let { list.add(it) }
+                    }
+                } else {
+                    runCatching { LocalTime.parse(item.optString(key).take(8)) }.getOrNull()?.let { list.add(it) }
+                }
+            }
+            return list.distinct().sorted()
+        }
 
 
 
@@ -2611,6 +2812,10 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+        root.v<View>(R.id.busSummary).setOnClickListener {
+            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+            (activity as? ClassMateAuthActivity)?.selectHomeTab(R.id.nav_transit)
+        }
         text(root, R.id.tvBusSummaryTitle, when { past -> "Past schedule"; finished -> "Service has ended"; empty -> "No departures listed"; date==today -> "Next departures"; else -> "First departures · ${date.format(DateTimeFormatter.ofPattern("d MMM"))}" })
 
 
@@ -2963,7 +3168,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            if (snapshot == null || (force && ClassMateAcademicCache.online(activity))) {
+            val isPureMbstu = if (requestedBusMode) {
+                snapshot?.optJSONArray("entries")?.let { arr ->
+                    arr.length() > 0 && (0 until arr.length()).all { arr.optJSONObject(it)?.optBoolean("is_mbstu") == true }
+                } ?: false
+            } else true
+
+            if (snapshot == null || (!isPureMbstu && ClassMateAcademicCache.online(activity)) || (force && ClassMateAcademicCache.online(activity))) {
 
 
 
@@ -2971,11 +3182,8 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                    val buses = ClassMateAuthApi.rows("bus_schedules", "select=id,route_name,departure_time,city_departure_time,schedule_kind,origin,destination,weekdays,notes,active&active=eq.true&order=departure_time")
-
-
-
-                    snapshot = JSONObject().put("entries", buses).put("saved_at", System.currentTimeMillis())
+                    val mbstuBuses = fetchMbstuLiveBusScheduleEntries(activity)
+                    snapshot = JSONObject().put("entries", mbstuBuses).put("saved_at", System.currentTimeMillis())
 
 
 
@@ -3179,34 +3387,20 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val allEntries = rows(data.optJSONArray("entries") ?: JSONArray())
+            val allEntries = rows(data.optJSONArray("entries") ?: JSONArray()).let { list -> if (requestedBusMode) list.filter { it.optBoolean("is_mbstu") } else list }
 
 
 
             val entries = allEntries.filter { item -> if (requestedBusMode) {
-
-
-
-                val kind=item.optString("schedule_kind")
-
-
-
-                if(kind in setOf("office_open","closed")) kind==requestedBusKind else {
-
-
-
-                    val weekdays=item.optJSONArray("weekdays")
-
-
-
-                    weekdays==null || (0 until weekdays.length()).any { weekdays.optInt(it)==day }
-
-
-
+                if (item.optBoolean("is_mbstu")) {
+                    true
+                } else {
+                    val kind = item.optString("schedule_kind")
+                    if (kind in setOf("office_open", "closed")) kind == requestedBusKind else {
+                        val weekdays = item.optJSONArray("weekdays")
+                        weekdays == null || (0 until weekdays.length()).any { weekdays.optInt(it) == day }
+                    }
                 }
-
-
-
             } else item.optInt("day_of_week") == day }
 
 
@@ -3275,7 +3469,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "schedule" else "schedules" } else if (entries.size == 1) "class" else "classes"}")
+            text(root, R.id.tvPeriodCount, "${entries.size} ${if (requestedBusMode) { if (entries.size == 1) "bus" else "buses" } else if (entries.size == 1) "class" else "classes"}")
 
 
 
@@ -3283,65 +3477,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val summaryEntries = entries.filter { it.optString("schedule_kind") in setOf("office_open", "closed") && !it.isNull("city_departure_time") }
-
-
-
-            root.v<View>(R.id.busSummary).visibility = if (requestedBusMode && summaryEntries.isNotEmpty()) View.VISIBLE else View.GONE
-
-
-
-            if (requestedBusMode && summaryEntries.isNotEmpty()) {
-
-
-
-                updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
-
-
-
-                if (effectiveDate == LocalDate.now()) {
-
-
-
-                    val tick = object : Runnable {
-
-
-
-                        override fun run() {
-
-
-
-                            if (!active(root) || request != timetableRequest || !busMode || calendarMode) return
-
-
-
-                            if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) updateBusSummary(root, summaryEntries, effectiveDate, requestedBusKind)
-
-
-
-                            root.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000)
-
-
-
-                        }
-
-
-
-                    }
-
-
-
-                    root.postDelayed(tick, 60_000 - System.currentTimeMillis() % 60_000)
-
-
-
-                }
-
-
-
-            }
-
-
+            root.v<View>(R.id.busSummary).visibility = View.GONE
 
             val empty = entries.isEmpty()
 
@@ -3404,57 +3540,88 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, entries) { card, item ->
+                val isMbstu = item.optBoolean("is_mbstu", false) || item.has("campus_departures")
+                val busNo = item.optString("bus_no", item.optString("id"))
+                val busNameBn = item.optString("bus_name_bn", item.optString("route_name"))
+                val busNameEn = item.optString("bus_name_en", "")
+                val pilotContact = item.optString("pilot_contact", "")
+                val campusArr = item.optJSONArray("campus_departures")
+                val cityArr = item.optJSONArray("city_departures")
 
+                card.v<View>(R.id.tvBusScheduleName).visibility = View.VISIBLE
+                text(card, R.id.tvBusScheduleName, if (isMbstu) busNameBn else item.optString("route_name"))
 
-
-                val paired=item.optString("schedule_kind") in setOf("office_open","closed") && !item.isNull("city_departure_time")
-
-
-
-                card.v<View>(R.id.tvBusScheduleName).visibility = if (paired) View.GONE else View.VISIBLE
-
-
-
-                text(card,R.id.tvBusScheduleName,item.optString("route_name"))
-
-
-
-                text(card,R.id.tvCampusDepartureLabel,if(paired) "Campus → City" else "${item.optString("origin")} → ${item.optString("destination")}")
-
-
-
-                text(card,R.id.tvCampusDeparture,hour(item.optString("departure_time")))
-
-
-
-                card.v<View>(R.id.cityDepartureColumn).visibility=if(paired) View.VISIBLE else View.GONE
-
-
-
-                if(paired) text(card,R.id.tvCityDeparture,hour(item.optString("city_departure_time")))
-
-
-
-                if (canEditBus()) {
-
-
-
-                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddBus(item,requestedBusKind) }
-
-
-
-                    card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddBus(item,requestedBusKind); true }
-
-
-
-                    card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
-
-
-
+                val tvBusTag = card.v<TextView>(R.id.tvBusTag)
+                if (isMbstu && busNo.isNotBlank()) {
+                    tvBusTag.visibility = View.VISIBLE
+                    tvBusTag.text = "#$busNo"
+                } else {
+                    tvBusTag.visibility = View.GONE
                 }
 
+                val tvBusSubtitle = card.v<TextView>(R.id.tvBusSubtitle)
+                if (isMbstu && busNameEn.isNotBlank()) {
+                    tvBusSubtitle.visibility = View.VISIBLE
+                    tvBusSubtitle.text = busNameEn
+                } else {
+                    tvBusSubtitle.visibility = View.GONE
+                }
 
+                val btnTrackBus = card.findViewById<View>(R.id.btnTrackBus)
+                btnTrackBus?.apply {
+                    visibility = View.VISIBLE
+                    setOnClickListener {
+                        com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                        openTransitForBus(busNo)
+                    }
+                }
 
+                val tvRouteName = card.v<TextView>(R.id.tvRouteName)
+                if (isMbstu) {
+                    tvRouteName.visibility = View.VISIBLE
+                    tvRouteName.text = item.optString("route_name", "মাভাবিপ্রবি ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)")
+                } else {
+                    tvRouteName.visibility = View.GONE
+                }
+
+                val campusList = if (campusArr != null) (0 until campusArr.length()).map { campusArr.optString(it) } else emptyList()
+                val cityList = if (cityArr != null) (0 until cityArr.length()).map { cityArr.optString(it) } else emptyList()
+
+                text(card, R.id.tvCampusDepartureLabel, "ক্যাম্পাস ➔ শহর")
+                text(card, R.id.tvCampusDeparture, if (campusList.isNotEmpty()) campusList.first() else hour(item.optString("departure_time")))
+
+                val tvCampusDepartureList = card.v<TextView>(R.id.tvCampusDepartureList)
+                if (campusList.size > 1) {
+                    tvCampusDepartureList.visibility = View.VISIBLE
+                    tvCampusDepartureList.text = campusList.joinToString("  •  ")
+                } else {
+                    tvCampusDepartureList.visibility = View.GONE
+                }
+
+                card.v<View>(R.id.cityDepartureColumn).visibility = View.VISIBLE
+                text(card, R.id.tvCityDepartureLabel, "শহর ➔ ক্যাম্পাস")
+                text(card, R.id.tvCityDeparture, if (cityList.isNotEmpty()) cityList.first() else hour(item.optString("city_departure_time")))
+
+                val tvCityDepartureList = card.v<TextView>(R.id.tvCityDepartureList)
+                if (cityList.size > 1) {
+                    tvCityDepartureList.visibility = View.VISIBLE
+                    tvCityDepartureList.text = cityList.joinToString("  •  ")
+                } else {
+                    tvCityDepartureList.visibility = View.GONE
+                }
+
+                if (!isMbstu && canEditBus()) {
+                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddBus(item, requestedBusKind) }
+                    card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddBus(item, requestedBusKind); true }
+                    card.contentDescription = "${item.optString("route_name")}. Tap to edit bus schedule"
+                } else {
+                    card.setOnClickListener {
+                        com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                        if (isMbstu && busNo.isNotBlank()) {
+                            openTransitForBus(busNo)
+                        }
+                    }
+                }
             } else recycler(root, R.id.rvPeriods, R.layout.item_period, entries) { card, item ->
 
 

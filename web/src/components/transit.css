@@ -270,9 +270,9 @@
 }
 
 @keyframes transitPulse {
-  0% { transform: scale(0.9); opacity: 0.8; }
-  50% { transform: scale(1.3); opacity: 1; }
-  100% { transform: scale(0.9); opacity: 0.8; }
+  0%, 100% { transform: scale(0.96); opacity: 0.85; }
+  50% { transform: scale(1.06); opacity: 1; }
+
 }
 
 .transit-header-sub {
@@ -2855,41 +2855,90 @@
   flex-shrink: 0;
 }
 
-/* Compact Live Telemetry Banner (80px replacement for bulky hero card) */
-.transit-detail-telemetry-banner {
-  background: linear-gradient(145deg, #fff5f8, #ffffff);
-  border: 1px solid #f2cfdb;
-  border-radius: 18px;
-  padding: 12px 14px;
-  box-shadow: 0 4px 16px rgba(100, 20, 50, 0.06);
+/* Sleek Segmented Control for Direction */
+.transit-detail-segmented-control {
+  display: flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 12px;
+  gap: 3px;
+}
+
+.transit-detail-seg-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.transit-detail-seg-btn.active {
+  background: #ffffff;
+  color: #b71454;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Unified Live Status & Schedule Card */
+.transit-detail-live-card {
+  background: #ffffff;
+  border: 1px solid #fce7f3;
+  border-left: 4px solid var(--bus-accent, #b71454);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.transit-telemetry-top {
+.transit-detail-live-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.transit-telemetry-approaching {
-  display: inline-flex;
+.transit-detail-live-stop {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
 
-.transit-telemetry-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--transit-pink, #b71454);
-  white-space: nowrap;
+.transit-detail-stop-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #fdf2f8;
+  color: #b71454;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
 }
 
-.transit-telemetry-stop-name {
+.transit-detail-stop-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.transit-detail-stop-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transit-detail-stop-name {
   font-size: 13.5px;
   font-weight: 800;
   color: #0f172a;
@@ -2898,57 +2947,163 @@
   text-overflow: ellipsis;
 }
 
-.transit-telemetry-user-dist {
-  display: inline-flex;
+.transit-detail-live-eta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.transit-detail-eta-badge {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transit-detail-dist-sub {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.transit-detail-live-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #f1f5f9;
+  font-size: 11px;
+}
+
+.transit-detail-sched-info {
+  display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2.5px 8px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
-  font-size: 10.5px;
+  color: #475569;
+  min-width: 0;
+}
+
+.transit-detail-clock-icon {
+  color: #b71454;
+  flex-shrink: 0;
+}
+
+.transit-detail-sched-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.transit-detail-sched-val {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.transit-detail-sched-countdown {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.transit-detail-user-dist {
+  color: #059669;
   font-weight: 700;
+  font-size: 10.5px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.transit-telemetry-pills-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #fce7f3;
-  border-radius: 12px;
-  padding: 6px 8px;
+.transit-detail-loc-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
 }
 
-.transit-telemetry-pill {
+/* Corridor Section Header */
+.transit-detail-section-bar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 1px;
-}
-
-.transit-telemetry-pill.status {
-  flex-direction: row;
-  gap: 4px;
-}
-
-.transit-pill-key {
-  font-size: 9px;
-  font-weight: 600;
+  justify-content: space-between;
+  padding: 2px 2px 0;
   color: #64748b;
-  text-transform: uppercase;
 }
 
-.transit-pill-val {
+.transit-detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.transit-detail-section-hint {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* Call Button in Header */
+.transit-detail-call-btn {
+  background: #fdf2f8;
+  color: #b71454;
+  border: 1px solid #fbcfe8;
+  border-radius: 999px;
+  padding: 5px 10px;
   font-size: 11.5px;
-  font-weight: 800;
-  color: #0f172a;
-  white-space: nowrap;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.transit-detail-call-btn:hover {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* Status Badge in Header */
+.transit-detail-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.transit-detail-status-badge.moving {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.transit-detail-status-badge.standby {
+  background: #fefce8;
+  color: #ca8a04;
+}
+
+.transit-detail-status-badge.offline {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+/* Active stop pill in list */
+.transit-active-stop-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fce7f3;
+  color: #b71454;
+  margin-left: 6px;
 }
 
 /* Hero Live Tracking Card */
@@ -4019,7 +4174,8 @@
 /* ==========================================================================
    Modern Floating Bus Peek Card (Map View: Fixed Summary, Zero Clutter)
    ========================================================================== */
-.transit-map-bus-card {
+.transit-map-bus-card,
+.transit-bus-loading-card {
   position: absolute;
   left: 12px;
   right: 12px;
@@ -4042,13 +4198,192 @@
 }
 
 @media (min-width: 769px) {
-  .transit-map-bus-card {
+  .transit-map-bus-card,
+  .transit-bus-loading-card {
     left: 20px;
     right: auto;
     bottom: 20px;
     width: 430px;
     padding: 14px 18px 14px;
   }
+}
+
+/* Bus Live Tracking Loading Card Specifics */
+.transit-bus-loading-card {
+  gap: 10px;
+  overflow: hidden;
+}
+
+.transit-blc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.transit-blc-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transit-blc-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  animation: transitPulse 1.6s infinite;
+}
+
+.transit-blc-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.transit-blc-id {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.transit-blc-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 2px;
+}
+
+.transit-blc-radar-wrapper {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.transit-blc-radar-ping {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid;
+  opacity: 0.7;
+  animation: radarPing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes radarPing {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  80%, 100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.transit-blc-radar-core {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.transit-blc-radio-icon {
+  animation: radioPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes radioPulse {
+  from { opacity: 0.7; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1.1); }
+}
+
+.transit-blc-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.transit-blc-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.transit-blc-subtitle {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.transit-blc-progress-track {
+  width: 100%;
+  height: 3px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  margin-top: 2px;
+}
+
+.transit-blc-progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border-radius: 999px;
+  animation: shimmerFlow 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmerFlow {
+  0% {
+    left: -50%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Standby / Offline Banner in Bus Peek Card */
+.transit-mbc-standby-banner {
+  display: flex;
+  align-items: center;
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 2px 0;
+}
+
+.transit-mbc-standby-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transit-mbc-standby-text {
+  font-size: 11.5px;
+  color: #92400e;
+  line-height: 1.35;
+  font-weight: 500;
 }
 
 @keyframes slideUpFade {
@@ -4874,7 +5209,8 @@
 /* =========================================================================
    Native Android App Shell Overrides (Accommodate Floating Bottom Bar)
    ========================================================================= */
-body.is-android-app .transit-map-bus-card {
+body.is-android-app .transit-map-bus-card,
+body.is-android-app .transit-bus-loading-card {
   bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
@@ -5403,6 +5739,68 @@ body.is-android-app .transit-detail-screen {
   animation: transitPulse 1.8s infinite;
 }
 
+.transit-timeline-node.active-target-node {
+  background: #ffffff !important;
+  border: 2.5px solid var(--transit-pink, #b71454) !important;
+  color: var(--transit-pink, #b71454) !important;
+  box-shadow: 0 0 12px rgba(183, 20, 84, 0.3) !important;
+  font-weight: 800 !important;
+}
+
+/* Moving Bus Rider on the Timeline Rail */
+.transit-timeline-live-bus-rider {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.transit-timeline-rider-badge {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  border: 2px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.transit-rider-radar-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  opacity: 0.6;
+  animation: riderRadarPulse 2s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes riderRadarPulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  60% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+.transit-timeline-rider-speed {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(4px);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  border: 0.5px solid rgba(56, 189, 248, 0.35);
+}
+
 .transit-timeline-node.passed-node {
   background: #f1f5f9;
   border-color: #cbd5e1;
@@ -5627,48 +6025,101 @@ body.is-android-app .transit-timeline-scroll-container {
 
 /* =========================================================================
    Map Controls & Bus Card: Float Cleanly Above Android Bottom Navigation Bar
+   Zero Collision Between FAB Controls (Top-Right) and Bus Peek Card (Bottom)
    ========================================================================= */
 .transit-fab-controls,
 .transit-fab-controls.no-card,
-.transit-fab-controls.no-sheet {
-  bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
-  right: 14px !important;
-  z-index: 25 !important;
-}
-
+.transit-fab-controls.no-sheet,
 .transit-fab-controls.has-card,
 .transit-fab-controls.sheet-collapsed {
-  bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;
+  position: absolute !important;
+  top: calc(76px + env(safe-area-inset-top, 0px)) !important;
   right: 14px !important;
+  bottom: auto !important;
   z-index: 25 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
 }
 
-.transit-map-bus-card {
+.transit-fab-btn {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+  transition: all 0.18s ease !important;
+}
+
+.transit-fab-btn:hover {
+  background: #f8fafc !important;
+  transform: scale(1.05) !important;
+}
+
+.transit-fab-btn.active-track {
+  background: #fdf2f8 !important;
+  border-color: #fbcfe8 !important;
+  color: #b71454 !important;
+}
+
+.transit-map-bus-card,
+.transit-bus-loading-card {
   position: absolute !important;
   left: 12px !important;
   right: 12px !important;
-  bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
   z-index: 22 !important;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14) !important;
+  padding: 14px 16px !important;
+  box-sizing: border-box !important;
+}
+
+.transit-mbc-close-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.transit-mbc-close-btn:hover {
+  background: #fee2e2 !important;
+  color: #ef4444 !important;
+  border-color: #fca5a5 !important;
 }
 
 @media (max-width: 640px) {
   .transit-fab-controls,
   .transit-fab-controls.no-card,
-  .transit-fab-controls.no-sheet {
-    bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
-    right: 10px !important;
-  }
-
+  .transit-fab-controls.no-sheet,
   .transit-fab-controls.has-card,
   .transit-fab-controls.sheet-collapsed {
-    bottom: calc(236px + env(safe-area-inset-bottom, 0px)) !important;
+    top: calc(72px + env(safe-area-inset-top, 0px)) !important;
     right: 10px !important;
+    bottom: auto !important;
   }
 
-  .transit-map-bus-card {
+  .transit-map-bus-card,
+  .transit-bus-loading-card {
     left: 8px !important;
     right: 8px !important;
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -6163,4 +6614,414 @@ body.is-android-app .transit-timeline-scroll-container {
 
 .transit-timetable-gps-status.offline {
   color: #94a3b8;
+}
+
+.transit-timetable-pilot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0284c7;
+  text-decoration: none;
+  background: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 6px;
+  width: fit-content;
+  margin-top: 2px;
+  transition: all 0.2s ease;
+}
+
+.transit-timetable-pilot-link:hover {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.transit-schedule-pilot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #047857;
+  text-decoration: none;
+  background: #ecfdf5;
+  border: 1px solid #d1fae5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: auto;
+  transition: all 0.2s ease;
+}
+
+.transit-schedule-pilot-btn:hover {
+  background: #d1fae5;
+}
+
+/* =========================================================================
+   MODERN PRODUCTION-GRADE TRANSIT REDESIGN (V3)
+   Clean, unfragmented hierarchy, zero bubble capsule clutter
+   ========================================================================= */
+
+/* 1. Sleek Search & Filter Bar */
+.transit-search-section {
+  width: 100%;
+  padding: 8px 14px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.transit-search-input-box {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.transit-search-icon {
+  position: absolute !important;
+  left: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  pointer-events: none !important;
+  color: #94a3b8 !important;
+  z-index: 2 !important;
+}
+
+.transit-search-input {
+  width: 100% !important;
+  padding: 10px 42px 10px 40px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #e2e8f0 !important;
+  font-size: 13.5px !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+.transit-search-input:focus {
+  background: #ffffff !important;
+  border-color: #b71454 !important;
+  box-shadow: 0 0 0 3px rgba(183, 20, 84, 0.08) !important;
+}
+
+.transit-search-clear-btn {
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  background: #f1f5f9 !important;
+  border: none !important;
+  color: #64748b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 2 !important;
+}
+
+/* Modern Filter Chips */
+.transit-filter-chips-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  padding: 2px 2px 4px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.transit-filter-chips-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+.transit-filter-chip {
+  flex: 0 0 auto !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.18s ease !important;
+}
+
+.transit-filter-chip.active {
+  background: #b71454 !important;
+  border-color: #b71454 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(183, 20, 84, 0.25) !important;
+}
+
+.transit-filter-chip:hover:not(.active) {
+  border-color: #cbd5e1 !important;
+  background: #f8fafc !important;
+}
+
+.transit-filter-chip-reset {
+  flex: 0 0 auto !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #b71454 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.18s ease !important;
+}
+
+.transit-filter-chip-reset:hover {
+  background: #fdf2f8 !important;
+  border-color: #fbcfe8 !important;
+}
+
+/* 2. Sleek Modern Bus Cards */
+.transit-bus-card {
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-left: 4px solid var(--bus-accent, #b71454) !important;
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.06) !important;
+  padding: 14px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.transit-bus-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.1) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.transit-card-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.transit-card-identity {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.transit-card-bus-dot {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+}
+
+.transit-card-bus-name {
+  font-size: 16.5px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+
+.transit-card-code-badge {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.transit-card-status {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.transit-status-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+}
+
+.transit-status-badge.moving {
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.transit-status-badge.standby {
+  background: #fffbeb !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a !important;
+}
+
+.transit-card-route-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12.5px !important;
+  color: #475569 !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+}
+
+.transit-card-route-icon {
+  color: #94a3b8 !important;
+  flex-shrink: 0 !important;
+}
+
+.transit-card-route-text {
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+/* Unified Clean Info Panel */
+.transit-card-info-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  background: #f8fafc !important;
+  border: 1px solid #f1f5f9 !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+}
+
+.transit-card-info-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  color: #334155 !important;
+  line-height: 1.35 !important;
+  flex-wrap: wrap !important;
+}
+
+.transit-card-pin-icon,
+.transit-card-clock-icon {
+  color: #b71454 !important;
+  flex-shrink: 0 !important;
+}
+
+.transit-card-info-label {
+  color: #64748b !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+}
+
+.transit-card-info-val {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.transit-card-info-sub {
+  color: #64748b !important;
+  font-size: 11px !important;
+}
+
+.transit-card-sched-val {
+  color: #475569 !important;
+  font-size: 11.5px !important;
+}
+
+.transit-card-sched-val strong {
+  color: #b71454 !important;
+  font-weight: 700 !important;
+}
+
+/* Card Footer */
+.transit-card-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding-top: 2px !important;
+}
+
+.transit-card-footer-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+.transit-card-meta-dist {
+  color: #0284c7 !important;
+  font-weight: 600 !important;
+}
+
+.transit-card-loc-prompt {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #b71454 !important;
+  background: #fdf2f8 !important;
+  border: 1px solid #fce7f3 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+}
+
+.transit-card-meta-dot {
+  color: #cbd5e1 !important;
+}
+
+.transit-card-meta-age {
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+}
+
+.transit-card-track-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: #b71454 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 6px 14px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 4px rgba(183, 20, 84, 0.25) !important;
+  transition: all 0.18s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.transit-card-track-btn:hover {
+  background: #9d0f47 !important;
+  box-shadow: 0 2px 8px rgba(183, 20, 84, 0.35) !important;
+  transform: translateY(-1px) !important;
 }

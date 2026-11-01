@@ -12,7 +12,20 @@ import {
   Trash2,
   Clock3,
   Building2,
+  Phone,
+  MapPin,
+  Navigation,
 } from "lucide-react";
+import {
+  KNOWN_BUS_INFO,
+  MBSTU_BUS_SCHEDULES,
+  type MbstuBusSchedule,
+  computeNextDeparture,
+  getTangailMinutes,
+  getScheduleRemaining,
+  parseScheduleTimeToMinutes,
+  toBengaliDigits,
+} from "@/lib/transit-data";
 import { supabase, rpc, rows, type Row } from "@/lib/api";
 import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import StudentAttendanceDashboard from "./student-attendance";
@@ -247,6 +260,17 @@ export function Schedule({ ctx }: { ctx: Context }) {
     [date, setDate] = useState(dhakaToday()),
     [month, setMonth] = useState(() => parseDate(dhakaToday())),
     [currentTime, setCurrentTime] = useState(dhakaNowTime),
+    [busFilter, setBusFilter] = useState<"all" | "campus" | "city">("all"),
+    [mbstuSchedules, setMbstuSchedules] = useState<Record<string, MbstuBusSchedule>>(() => {
+      if (typeof window !== "undefined") {
+        try {
+          const cached = localStorage.getItem("classmate_mbstu_bus_schedules");
+          if (cached) return JSON.parse(cached);
+        } catch (_) {}
+      }
+      return MBSTU_BUS_SCHEDULES;
+    }),
+    [mbstuLiveSynced, setMbstuLiveSynced] = useState<boolean>(false),
     [editing, setEditing] = useState<Row | null>(null),
     [event, setEvent] = useState<Row | null>(null),
     [deleting, setDeleting] = useState<Row | null>(null),
@@ -315,6 +339,62 @@ export function Schedule({ ctx }: { ctx: Context }) {
     },
     refetchInterval: 3_000,
   });
+
+  useEffect(() => {
+    if (mode !== "bus") return;
+    let active = true;
+
+    const syncMbstuLive = async () => {
+      try {
+        const res = await fetch("https://transport.mbstu.ac.bd/api/bus-schedule/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "success" }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === "success" && Array.isArray(json.data) && active) {
+            const currentMin = getTangailMinutes();
+            const updated: Record<string, MbstuBusSchedule> = { ...MBSTU_BUS_SCHEDULES };
+
+            json.data.forEach((b: any) => {
+              const busNo = String(b.busNo || "").trim();
+              if (!busNo) return;
+              const nextFrom = computeNextDeparture(b.campusToDistrict, currentMin);
+              const nextTo = computeNextDeparture(b.districtToCampus, currentMin);
+
+              updated[busNo] = {
+                busId: busNo,
+                nameBn: String(b.busName || "").trim() || updated[busNo]?.nameBn || busNo,
+                fromCampus: nextFrom.str,
+                toCampus: nextTo.str,
+                fromCampusMin: nextFrom.min,
+                toCampusMin: nextTo.min,
+                campusToDistrict: Array.isArray(b.campusToDistrict) ? b.campusToDistrict : [],
+                districtToCampus: Array.isArray(b.districtToCampus) ? b.districtToCampus : [],
+                pilotContact: String(b.pilotContact || "").trim(),
+              };
+            });
+
+            setMbstuSchedules(updated);
+            setMbstuLiveSynced(true);
+            try {
+              localStorage.setItem("classmate_mbstu_bus_schedules", JSON.stringify(updated));
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.warn("MBSTU bus-schedule sync fallback:", err);
+      }
+    };
+
+    syncMbstuLive();
+    const interval = setInterval(syncMbstuLive, 60_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [mode]);
 
   useEffect(() => {
     const channel = supabase()
@@ -479,14 +559,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     ? rawRoutineEntries.filter((s) => Boolean(editable.data?.[s.semester_course_id]))
     : rawRoutineEntries;
 
-  const entries =
-    mode === "bus"
-      ? (buses.data || []).filter((s) =>
-          ["closed", "office_open"].includes(s.schedule_kind)
-            ? s.schedule_kind === kind
-            : s.weekdays?.includes(day),
-        )
-      : teacherAssignedEntries;
+  const entries = teacherAssignedEntries;
 
   const isSlotLive = (s: Row) => {
     if (mode !== "routine" || date !== dhakaToday() || closed) return false;
@@ -524,25 +597,23 @@ export function Schedule({ ctx }: { ctx: Context }) {
             {mode === "calendar" ? (
               <span className="eyebrow">YOUR UNIVERSITY, MONTH BY MONTH</span>
             ) : mode === "bus" ? (
-              <span className="eyebrow">STUDENT TRANSPORT</span>
+              <span className="eyebrow">MBSTU WHEELS · LIVE SYNC</span>
             ) : null}
             {mode === "calendar" ? (
               <h1>Academic calendar</h1>
             ) : mode === "bus" ? (
-              <h1>Campus buses</h1>
+              <h1>বিশ্ববিদ্যালয় বাস শিডিউল</h1>
             ) : (
               <h1 className="schedule-brand-title">
                 classmate<span className="brand-dot">.</span>
               </h1>
             )}
           </div>
-          {mode !== "calendar" &&
-            (mode === "bus"
-              ? busPermission.data
-              : Object.values(editable.data || {}).some(Boolean)) && (
+          {mode === "routine" &&
+            Object.values(editable.data || {}).some(Boolean) && (
               <button className="primary" onClick={() => setEditing({})}>
                 <Plus size={18} />
-                {mode === "bus" ? "Add Bus" : "Add Period"}
+                Add Period
               </button>
             )}
         </div>
@@ -721,11 +792,11 @@ export function Schedule({ ctx }: { ctx: Context }) {
               </span>
             </h3>
             <span>
-              {sortedEntries.length}{" "}
               {mode === "bus" ? (
-                "departures"
+                `${Object.keys(mbstuSchedules).length}টি সক্রিয় বাস · রুটিন`
               ) : (
                 <>
+                  {sortedEntries.length}{" "}
                   <span className="desktop-schedule-label">periods</span>
                   <span className="mobile-schedule-label">classes</span>
                 </>
@@ -768,17 +839,17 @@ export function Schedule({ ctx }: { ctx: Context }) {
           ) : (
             <>
               <ErrorBox
-                error={mode === "bus" ? buses.error : routine.error}
+                error={mode === "bus" ? null : routine.error}
                 retry={() =>
-                  mode === "bus" ? buses.refetch() : routine.refetch()
+                  mode === "bus" ? null : routine.refetch()
                 }
               />
-              {(mode === "bus" ? buses.isPending : routine.isPending) ? (
+              {(mode === "bus" ? false : routine.isPending) ? (
                 <>
                   <Skeleton />
                   <Skeleton />
                 </>
-              ) : sortedEntries.length === 0 ? (
+              ) : (mode === "bus" ? Object.keys(mbstuSchedules).length === 0 : sortedEntries.length === 0) ? (
                 (() => {
                   const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
                   const anim =
@@ -827,9 +898,189 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 })()
               ) : (
                 <>
-                  {mode === "bus" && (
-                    <BusHero entries={sortedEntries} date={date} kind={kind} />
-                  )}
+                  {mode === "bus" ? (
+                    <div className="bus-schedule-view">
+                      <div className="bus-filter-bar">
+                        <button
+                          type="button"
+                          className={busFilter === "all" ? "selected" : ""}
+                          onClick={() => setBusFilter("all")}
+                        >
+                          <Bus size={15} /> সব বাস ({Object.keys(mbstuSchedules).length}টি)
+                        </button>
+                        <button
+                          type="button"
+                          className={busFilter === "campus" ? "selected" : ""}
+                          onClick={() => setBusFilter("campus")}
+                        >
+                          🏛️ ক্যাম্পাস ➔ শহর
+                        </button>
+                        <button
+                          type="button"
+                          className={busFilter === "city" ? "selected" : ""}
+                          onClick={() => setBusFilter("city")}
+                        >
+                          🏙️ শহর ➔ ক্যাম্পাস
+                        </button>
+                      </div>
+
+                      <div className="bus-fleet-grid">
+                        {(() => {
+                          const defaultOrder = ["SB0001", "SB0002", "SB0003", "SB0005", "SB0009", "SB0010", "SB5442", "SB5448"];
+                          const fleetList = Object.values(mbstuSchedules).sort((a, b) => {
+                            const ia = defaultOrder.indexOf(a.busId);
+                            const ib = defaultOrder.indexOf(b.busId);
+                            if (ia !== -1 && ib !== -1) return ia - ib;
+                            if (ia !== -1) return -1;
+                            if (ib !== -1) return 1;
+                            return a.busId.localeCompare(b.busId);
+                          });
+                          const currentMin = getTangailMinutes();
+
+                          return fleetList.map((bus) => {
+                            const info = KNOWN_BUS_INFO[bus.busId] || {
+                              nameBn: bus.nameBn,
+                              nameEn: bus.busId,
+                              color: "#6366f1",
+                              defaultRoute: "মাভাবিপ্রবি পরিবহন করিডোর",
+                            };
+                            const campusTimes = bus.campusToDistrict || [];
+                            const cityTimes = bus.districtToCampus || [];
+
+                            return (
+                              <div className="bus-fleet-card" key={bus.busId}>
+                                <div className="bus-card-top">
+                                  <div className="bus-card-title-group">
+                                    <div
+                                      className="bus-badge-avatar"
+                                      style={{
+                                        backgroundColor: `${info.color}1a`,
+                                        color: info.color,
+                                      }}
+                                    >
+                                      <Bus size={20} />
+                                    </div>
+                                    <div>
+                                      <div className="bus-card-name-row">
+                                        <strong className="bus-name-bn">
+                                          {bus.nameBn || info.nameBn}
+                                        </strong>
+                                        <span
+                                          className="bus-id-tag"
+                                          style={{
+                                            color: info.color,
+                                            borderColor: `${info.color}40`,
+                                            backgroundColor: `${info.color}15`,
+                                          }}
+                                        >
+                                          #{bus.busId}
+                                        </span>
+                                      </div>
+                                      <span className="bus-name-en">{info.nameEn}</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="bus-track-action-btn"
+                                    title={`${info.nameBn} লাইভ ম্যাপে ট্র্যাক করুন`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (typeof window !== "undefined") {
+                                        (window as any).__classmateInitialBusId = bus.busId;
+                                        if ((window as any).__classmateSelectBus) {
+                                          (window as any).__classmateSelectBus(bus.busId);
+                                        }
+                                        window.location.hash = `#transit?bus=${encodeURIComponent(bus.busId)}`;
+                                        window.dispatchEvent(
+                                          new CustomEvent("classmate-select-bus", {
+                                            detail: { busId: bus.busId }
+                                          })
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <Navigation size={13} />
+                                    <span>ট্র্যাক</span>
+                                  </button>
+                                </div>
+
+                                <div className="bus-route-strip">
+                                  <MapPin size={13} />
+                                  <span>{info.defaultRoute}</span>
+                                </div>
+
+                                <div className="bus-card-timings">
+                                  {(busFilter === "all" || busFilter === "campus") && (
+                                    <div className="bus-timing-column">
+                                      <div className="bus-timing-heading">
+                                        <span>🏛️ ক্যাম্পাস হতে প্রস্থান</span>
+                                        {bus.fromCampus && bus.fromCampus !== "--:--" && (
+                                          <span className="bus-timing-next-hint">
+                                            পরবর্তী: {bus.fromCampus}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="bus-chip-list">
+                                        {campusTimes.length ? (
+                                          campusTimes.map((time) => {
+                                            const isNext = time === bus.fromCampus;
+                                            const isPast = isDeparturePast(time, currentMin);
+                                            return (
+                                              <span
+                                                key={time}
+                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast && !isNext ? "is-past" : ""}`}
+                                              >
+                                                {time}
+                                                {isNext && <span className="chip-badge">পরবর্তী</span>}
+                                              </span>
+                                            );
+                                          })
+                                        ) : (
+                                          <span className="bus-no-timing">কোনো সময়সূচি নেই</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {(busFilter === "all" || busFilter === "city") && (
+                                    <div className="bus-timing-column">
+                                      <div className="bus-timing-heading">
+                                        <span>🏙️ শহর হতে প্রস্থান</span>
+                                        {bus.toCampus && bus.toCampus !== "--:--" && (
+                                          <span className="bus-timing-next-hint">
+                                            পরবর্তী: {bus.toCampus}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="bus-chip-list">
+                                        {cityTimes.length ? (
+                                          cityTimes.map((time) => {
+                                            const isNext = time === bus.toCampus;
+                                            const isPast = isDeparturePast(time, currentMin);
+                                            return (
+                                              <span
+                                                key={time}
+                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast && !isNext ? "is-past" : ""}`}
+                                              >
+                                                {time}
+                                                {isNext && <span className="chip-badge">পরবর্তী</span>}
+                                              </span>
+                                            );
+                                          })
+                                        ) : (
+                                          <span className="bus-no-timing">কোনো সময়সূচি নেই</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
                   <div className="schedule-list">
                     {sortedEntries.map((s) => {
                       const detail = details.data?.find(
@@ -856,30 +1107,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             : sessionCounts.data?.[slotSession.id] || 0)
                         : 0;
 
-                      if (mode === "bus") {
-                        return (
-                          <button
-                            className="card schedule-row bus-row"
-                            disabled={!canEdit}
-                            key={s.id}
-                            onClick={() => setEditing(s)}
-                          >
-                            <span className="bus-icon">
-                              <Bus />
-                            </span>
-                            <div>
-                              <small>Campus → City</small>
-                              <strong>{formatTime(s.departure_time)}</strong>
-                            </div>
-                            <div>
-                              <small>City → Campus</small>
-                              <strong>
-                                {formatTime(s.city_departure_time)}
-                              </strong>
-                            </div>
-                          </button>
-                        );
-                      }
+
 
                       return (
                         <div
@@ -965,6 +1193,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                       );
                     })}
                   </div>
+                  )}
                 </>
               )}
             </>
@@ -1329,48 +1558,119 @@ function CalendarPanel({
     </section>
   );
 }
+
+function getOverallNextDeparture(
+  schedules: Record<string, MbstuBusSchedule>,
+  direction: "campus" | "city",
+  currentMin: number,
+): { timeStr: string; busName: string; busId: string; diffMin: number; remainingText: string } | null {
+  const allDepartures: Array<{ timeStr: string; min: number; busName: string; busId: string }> = [];
+  Object.values(schedules).forEach((bus) => {
+    const times = direction === "campus" ? bus.campusToDistrict : bus.districtToCampus;
+    (times || []).forEach((t) => {
+      const min = parseScheduleTimeToMinutes(t);
+      if (min !== null) {
+        allDepartures.push({
+          timeStr: t,
+          min,
+          busName: bus.nameBn || bus.busId,
+          busId: bus.busId,
+        });
+      }
+    });
+  });
+  if (allDepartures.length === 0) return null;
+  allDepartures.sort((a, b) => a.min - b.min);
+  const upcoming = allDepartures.find((d) => d.min >= currentMin) || allDepartures[0];
+  const rem = getScheduleRemaining(upcoming.min, Date.now());
+  return {
+    timeStr: upcoming.timeStr,
+    busName: upcoming.busName,
+    busId: upcoming.busId,
+    diffMin: rem.diffMin,
+    remainingText: rem.text,
+  };
+}
+
+function isDeparturePast(timeStr: string, currentMin: number): boolean {
+  const m = parseScheduleTimeToMinutes(timeStr);
+  if (m === null) return false;
+  return m < currentMin;
+}
+
 function BusHero({
-  entries,
+  mbstuSchedules,
   date,
   kind,
+  liveSynced,
 }: {
-  entries: Row[];
+  mbstuSchedules: Record<string, MbstuBusSchedule>;
   date: string;
   kind: string;
+  liveSynced: boolean;
 }) {
-  const now = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Dhaka",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
   const isToday = date === dhakaToday();
-  const next = (field: string) =>
-    date < dhakaToday()
-      ? null
-      : entries.find((s) => s[field] && (!isToday || s[field] >= now));
-  const a = next("departure_time"),
-    b = next("city_departure_time");
+  const currentMin = getTangailMinutes();
+
+  const nextCampus = getOverallNextDeparture(mbstuSchedules, "campus", currentMin);
+  const nextCity = getOverallNextDeparture(mbstuSchedules, "city", currentMin);
+
   return (
     <div className="bus-hero">
-      <span className="eyebrow">
-        {isToday ? "NEXT DEPARTURES" : "SELECTED DAY"} ·{" "}
-        {kind === "closed" ? "HOLIDAY SERVICE" : "REGULAR SERVICE"}
-      </span>
-      {!a && !b ? (
-        <h2>Service finished for this day</h2>
-      ) : (
-        <div>
-          <section>
-            <small>From campus</small>
-            <h2>{a ? formatTime(a.departure_time) : "Finished"}</h2>
-          </section>
-          <section>
-            <small>From city</small>
-            <h2>{b ? formatTime(b.city_departure_time) : "Finished"}</h2>
-          </section>
+      <div className="bus-hero-top-row">
+        <span className="bus-hero-sync-pill">
+          <span className="pulse-dot" />
+          {liveSynced ? "MBSTU Wheels লাইভ সিঙ্কড" : "MBSTU Wheels অটো-রুটিন"} · ৮টি বাস
+        </span>
+        <button
+          type="button"
+          className="bus-hero-radar-btn"
+          onClick={() => {
+            window.location.hash = "transit";
+          }}
+        >
+          <Navigation size={14} />
+          <span>লাইভ জিপিএস ট্র্যাকার</span>
+        </button>
+      </div>
+
+      <div className="bus-hero-main-title">
+        <h2>মাভাবিপ্রবি সেন্ট্রাল বাস সার্ভিস</h2>
+        <p className="bus-hero-sub">
+          {kind === "closed"
+            ? "ছুটির দিনের বিশেষ পরিবহন সেবা"
+            : "বিশ্ববিদ্যালয় পরিবহন পুলের নিয়মিত দৈনিক বাস সময়সূচি"}
+        </p>
+      </div>
+
+      <div className="bus-hero-next-grid">
+        <div className="bus-hero-stat-card">
+          <small>🏛️ ক্যাম্পাস হতে পরবর্তী প্রস্থান</small>
+          <h3>{nextCampus?.timeStr || "সেবা শেষ"}</h3>
+          {nextCampus && (
+            <div className="bus-hero-stat-meta">
+              <span className="bus-hero-bus-tag">{nextCampus.busName}</span>
+              <span className="bus-hero-remaining">
+                {isToday ? nextCampus.remainingText : "রুটিন সময়"}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="bus-hero-stat-card">
+          <small>🏙️ শহর (নিরালা) হতে পরবর্তী প্রস্থান</small>
+          <h3>{nextCity?.timeStr || "সেবা শেষ"}</h3>
+          {nextCity && (
+            <div className="bus-hero-stat-meta">
+              <span className="bus-hero-bus-tag">{nextCity.busName}</span>
+              <span className="bus-hero-remaining">
+                {isToday ? nextCity.remainingText : "রুটিন সময়"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <Bus className="hero-bus" aria-hidden="true" />
     </div>
   );

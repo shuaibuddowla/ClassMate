@@ -115,7 +115,8 @@ fun ClassMateFloatingNavigationBar(
     val inactiveColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
     val glassBg = if (isDark) Color(0xF50B1220) else Color(0xF8FFFFFF)
     val glassBorder = if (isDark) Color(0x33475569) else Color(0x1F0F172A)
-    val indicatorColor = if (isDark) Color(0x333B82F6) else Color(0x1F1D4ED8)
+    val indicatorColor = if (isDark) Color(0x3D3B82F6) else Color(0x241D4ED8)
+    val activeScale = 1.05f
 
     // Quick actions sheet state
     var quickActionTab by remember { mutableStateOf<ClassMateTab?>(null) }
@@ -137,29 +138,27 @@ fun ClassMateFloatingNavigationBar(
         ),
         modifier = modifier
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = glassBg,
-            shadowElevation = 8.dp
+        // Concept 1: Floating Island Architecture (14dp margins, 26dp rounded glass capsule)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
+                    .clip(RoundedCornerShape(26.dp))
+                    .border(1.2.dp, glassBorder, RoundedCornerShape(26.dp)),
+                color = glassBg,
+                shape = RoundedCornerShape(26.dp),
+                shadowElevation = 14.dp
             ) {
-                // Top border separator line for crisp edge-to-edge finish
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(glassBorder)
-                )
-
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(58.dp)
-                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                        .height(64.dp)
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     val tabCount = visibleTabs.size.coerceAtLeast(1)
@@ -167,22 +166,26 @@ fun ClassMateFloatingNavigationBar(
                     val selectedIndex = visibleTabs.indexOf(selectedTab).coerceAtLeast(0)
                     val targetOffset = tabWidth * selectedIndex
 
-                    // Snappy, buttery-smooth 200ms indicator slide
+                    // Dynamic Morphing Fluid Pill with Damped Spring Physics (Concept 1)
                     val animatedIndicatorOffset by animateDpAsState(
                         targetValue = targetOffset,
-                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = 0.72f,
+                            stiffness = 380f
+                        ),
                         label = "indicatorOffset"
                     )
 
-                    // Continuous Sliding Indicator Pill
+                    // Continuous Sliding Indicator Pill (Concept 1: Fluid Morphing Capsule)
                     Box(
                         modifier = Modifier
                             .offset(x = animatedIndicatorOffset)
                             .width(tabWidth)
                             .fillMaxHeight()
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(20.dp))
                             .background(indicatorColor)
+                            .border(1.dp, if (isDark) Color(0x403B82F6) else Color(0x331D4ED8), RoundedCornerShape(20.dp))
                     )
 
                     // Tab Items Row - Equal Horizontal Distribution
