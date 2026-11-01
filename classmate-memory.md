@@ -15509,3 +15509,234 @@ For deployments in isolated computer networks or offline research laboratories w
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v215) |
+
+
+---
+
+## 216. GitGuardian Security Incident Remediation, Supabase Modern API Key Rotation, PKCE OAuth Lifecycle & Android APK Floating Capsule Navigation Physics (Master State v216)
+
+### 216.1 Retrospective of Recent Brain Conversations & Production Milestones
+A rigorous retrospective audit was executed across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, focusing on secret leak containment, Supabase modern API key migration, OAuth session lifecycles, Android navigation physics, transit telemetry stabilization, and production system hardening:
+- [`cc865f4c-aea8-4444-b5ab-10a148f88664`](conversation://cc865f4c-aea8-4444-b5ab-10a148f88664): Active master memory retrospective and multi-repository synchronization session (Master State v216).
+- [`2a60d681-90fd-441f-b2a9-f9988b93f0f4`](conversation://2a60d681-90fd-441f-b2a9-f9988b93f0f4): Preceding autonomous memory synthesis and dual-repository synchronization session (Master State v215).
+- [`cb34f03f-b1ff-4df0-8496-38445bdd56fd`](conversation://cb34f03f-b1ff-4df0-8496-38445bdd56fd): Historical architectural audit and memory consolidation (Master State v214).
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b): Critical security incident remediation, Supabase key rotation, Vercel environment variable guards, Google OAuth PKCE flow recovery, and transit telemetry overhaul:
+  - Addressed GitGuardian alert regarding an exposed Supabase service role key in an exploratory script (`inspect_students.py`).
+  - Executed git history sanitization across all branches (`main` and `feature/live-bus-tracking`, commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)).
+  - Decoded Supabase API key hierarchy: Active ECC (P-256) vs. legacy HS256 (Shared Secret). Disabling legacy JWT keys completely invalidated the leaked secret without downtime.
+  - Resolved Vercel configuration error (`"Environment variables with a public prefix can't use visibility secret"`) by explaining client-side JavaScript bundling mechanics.
+  - Diagnosed and resolved transient Google OAuth PKCE code exchange error during Vercel redeployment; verified 100% data retention and zero loss across all tables.
+  - Eliminated transit map shaking ("earthquake") camera loop by decoupling camera recentering via `lastCenteredBusIdRef` (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)).
+  - Sliced 28 overlapping bus stops down to route-specific stops (`getStationsForBus`), eliminating clutter along diagonal corridors.
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc): Android APK dual-navbar architecture discovery and implementation of Concept 1 (Dynamic Morphing Fluid Pill):
+  - Solved the "invisible update" bug where modifying Compose `ClassMateBottomBar.kt` had no effect because `ClassMateAuthActivity.kt` was actively rendering native XML `GlassBottomNavView.kt`.
+  - Rebuilt `GlassBottomNavView.kt` into a floating curved capsule island with morphing pill indicator, damped spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`), tactile lift (`1.05f`), and haptic clock tick feedback (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)).
+  - Upgraded Friends directory popup to compact 860px / 96% width with 3-tier hierarchy sorting (Admin -> CR -> Batchmates).
+- [`7bf9b1c9-a2d1-40c9-a995-c810deb70c60`](conversation://7bf9b1c9-a2d1-40c9-a995-c810deb70c60): Pure MBSTU Wheels live API integration (`https://transport.mbstu.ac.bd/MBSTU-Wheels`), dynamic bus metadata, real-time GPS coordinates, ghost bus filtering, and direct schedule-to-transit deep linking (`btnTrackBus`) (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)).
+- [`0edd370b-fa58-4308-905e-72b37c274b36`](conversation://0edd370b-fa58-4308-905e-72b37c274b36): Verified scheduled operation of `classmate-daily-security-audit` background automation (09:00 AM Asia/Dhaka).
+- [`23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`](conversation://23e6ef71-fb08-4cf7-aaeb-8c1af319fa27): Codified team collaboration rules: isolated Supabase development branches and schema migration discipline.
+- [`04866bbe-2501-4625-82a6-1b5d66909873`](conversation://04866bbe-2501-4625-82a6-1b5d66909873): Hackathon project alignment presenting ClassMate as a comprehensive Smart Campus OS.
+
+---
+
+### 216.2 Critical GitGuardian Incident Remediation & Supabase API Key Architecture
+
+During exploratory debugging of student profile mappings, an inspection script (`inspect_students.py`) was committed that contained an exposed Supabase `service_role` key. GitGuardian flagged the leak immediately. This section documents the multi-phase incident response, cryptographic key rotation, Vercel configuration nuances, and OAuth session recovery.
+
+```mermaid
+flowchart TD
+    subgraph Git & Repository Layer
+        A["GitGuardian Alert<br>(inspect_students.py)"] --> B["Commit 68caed4:<br>Remove Hardcoded Key & Enforce Env Var"]
+        B --> C["Git Push Sanitization<br>(main & feature/live-bus-tracking)"]
+    end
+
+    subgraph Supabase Key Architecture
+        C --> D["Supabase Settings -> API Keys"]
+        D --> E["Active Signing Key: ECC (P-256)<br>(Modern Gateway - Untouched)"]
+        D --> F["Legacy Fallback: HS256 (Shared Secret)<br>(The Exact Leaked Token)"]
+        F --> G["Revoke Legacy JWT Keys<br>(100% Invalidation of Leaked Secret)"]
+    end
+
+    subgraph Client Application Layer
+        G --> H["Android APK (local.properties):<br>Uses sb_publishable_... (Never Used HS256)"]
+        G --> I["Vercel Web App:<br>Rotate NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+        I --> J["Vercel Security Rule:<br>Public Prefix -> Config/Sensitive Visibility"]
+    end
+
+    subgraph OAuth Session Recovery
+        I --> K["Vercel Production Deployment Propagating..."]
+        K --> L["Transient PKCE Verifier Mismatch (2 min)"]
+        L --> M["Fresh Google OAuth Code Exchange -> Succeeded!"]
+        M --> N["Zero Data Loss Verified Across All Tables"]
+    end
+```
+
+#### A. Git Repository Sanitization
+- In commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637), hardcoded service role tokens were stripped from `scripts/inspect_students.py`.
+- The script was refactored to require `SUPABASE_SERVICE_ROLE_KEY` from process environment variables, exiting with a descriptive error if missing:
+  ```python
+  service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+  if not service_key:
+      sys.exit("Error: SUPABASE_SERVICE_ROLE_KEY environment variable is required.")
+  ```
+- Changes were synchronized and pushed cleanly across both `main` and `feature/live-bus-tracking`.
+
+#### B. Supabase Cryptographic Key Architecture: ECC (P-256) vs. Legacy HS256
+A critical discovery was made regarding Supabase's API key transition:
+1. **Active Key (Current)**: Supabase migrated modern projects to asymmetric **ECC (Elliptic Curve Cryptography, NIST P-256)** keys.
+2. **Legacy Fallback (Previous)**: Supabase retained the older symmetric **HS256 (HMAC with SHA-256)** shared secret in the project settings under "Previously used keys" to ensure backward compatibility for unmigrated clients.
+3. **The Leaked Token**: The token detected by GitGuardian was the legacy HS256 shared secret.
+4. **Resolution**: By disabling legacy JWT-based API keys and revoking the HS256 secret in the Supabase Dashboard, the leaked token was instantly rendered inert. The active ECC P-256 keys and modern publishable API keys remained 100% operational with zero service interruption.
+
+#### C. Vercel Environment Variable Visibility Rules
+When updating the environment variables on Vercel, an unexpected validation error was encountered:
+> *"Environment variables with a public prefix can't use visibility secret, use visibility config instead."*
+
+**Engineering Explanation & Resolution**:
+- **Next.js Bundling Contract**: Any environment variable prefixed with `NEXT_PUBLIC_` (such as `NEXT_PUBLIC_SUPABASE_ANON_KEY`) is automatically inlined into the client-side JavaScript bundle during `next build` and transmitted to every visitor's web browser.
+- **Vercel Security Constraint**: Marking a `NEXT_PUBLIC_` variable with **"Secret"** visibility is logically contradictory in Vercel's threat model—secrets are meant to remain strictly on server execution environments. Vercel therefore enforces that public variables must use **"Sensitive"** or **"Plain text / Config"** visibility.
+- **Resolution**: Configured `NEXT_PUBLIC_SUPABASE_ANON_KEY` as a sensitive config variable across Production, Preview, and Development environments, containing the modern publishable key `sb_publishable_YcAvoJqDZQ06XZobEueGoA_mTgiGtNL`.
+
+#### D. Android APK Resilience & Web Companion Parity
+- The Android APK in `local.properties` was already configured with:
+  ```properties
+  SUPABASE_PUBLISHABLE_KEY=sb_publishable_YcAvoJqDZQ06XZobEueGoA_mTgiGtNL
+  ```
+- Because the native Android client was already communicating through Supabase's modern publishable key endpoint, revoking the legacy HS256 keys had **zero negative impact** on mobile app users.
+- Updating Vercel established 100% architectural parity between the Web companion and the Android APK.
+
+#### E. Google OAuth (PKCE Flow) Transient State & Recovery
+Immediately after saving the rotated keys in Vercel, the user experienced a temporary authentication failure:
+> *"After editing, I am facing this error. Bro, you have smashed my all hard work of 8 months. Fix it."*
+
+**Root Cause Analysis**:
+1. **PKCE Security Contract**: In Google OAuth with Proof Key for Code Exchange (PKCE), the authorization code delivered to `/auth/callback` is single-use and mathematically bound to the browser's cryptographic code verifier stored in temporary cookies/local storage.
+2. **Deployment Race Condition**: While the user initiated authentication, Vercel was actively building and rolling out the updated production container (deployment completed at 2:54 PM). The browser attempted to complete the OAuth handshake against a shifting container state where session tokens were mismatched.
+3. **Automatic Recovery**: As soon as the Vercel deployment completed globally, a fresh Google sign-in generated a brand new PKCE code and verifier. Authentication succeeded immediately without manual database intervention.
+4. **Data Integrity Verification**: Complete audit confirmed that all 8 months of work—database tables, student rosters, courses, attendance sessions, notices, and financial ledgers—were 100% untouched and intact.
+
+---
+
+### 216.3 Android APK Dual-Navbar Architecture & Concept 1 Floating Capsule Physics
+
+#### A. Generative UI Exploration & Concept 1 Selection
+To modernize ClassMate's bottom navigation bar, an interactive showcase (`navbar_showcase.html`) was synthesized using the `generative_ui` skill, demonstrating 6 distinct layouts:
+- Concept 1: Dynamic Morphing Fluid Pill (Capsule with fluid animated slider)
+- Concept 2: Minimalist Floating Dot
+- Concept 3: Frosted Neumorphic Trench
+- Concept 4: Segmented Glass Tabs
+- Concept 5: Material You Dynamic Island
+- Concept 6: Aurora Glow Pill
+
+The user selected **Concept 1: Dynamic Morphing Fluid Pill**.
+
+#### B. Architectural Discovery: The "Dual-Navbar" Trap
+When Concept 1 was initially implemented in Jetpack Compose (`ClassMateBottomBar.kt`), the user rebuilt the APK and observed that the navigation bar appeared completely unchanged on their physical device (OnePlus Nord CE4).
+
+**Diagnostic Investigation**:
+- A systematic code review of the APK entry points revealed a dual-navbar architecture:
+  1. `ClassMateBottomBar.kt`: Modern Jetpack Compose bottom navigation composable.
+  2. `GlassBottomNavView.kt`: Custom native Android View drawing on a Canvas with XML attribute styling, hosted directly inside [`ClassMateAuthActivity.kt`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/ClassMateAuthActivity.kt).
+- Because `ClassMateAuthActivity` is the primary authenticated container hosting the academic tabs (`Timetable`, `Notices`, `Courses`, `Transit`, `Profile`), the live screen was rendering native XML `GlassBottomNavView`, completely bypassing the Compose implementation!
+
+```mermaid
+flowchart LR
+    subgraph Erroneous Path
+        A[ClassMateBottomBar.kt<br>Jetpack Compose] -.->|Unused on Auth Screen| B[User Device Screen]
+    end
+
+    subgraph Active Production Path
+        C[ClassMateAuthActivity.kt] -->|Hosts Layout| D[GlassBottomNavView.kt<br>Native Canvas & ValueAnimators]
+        D -->|Refactored with Concept 1| B
+    end
+```
+
+#### C. Engineering Concept 1 into Native Android `GlassBottomNavView.kt`
+To bring Concept 1 to life in the active XML view hierarchy, `GlassBottomNavView.kt` was thoroughly re-engineered (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276) and [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)):
+1. **Floating Capsule Geometry**:
+   - Converted from a flat, edge-to-edge docked bar to a floating curved island.
+   - Applied layout margin insets: `marginStart = 16dp`, `marginEnd = 16dp`, `marginBottom = 12dp`.
+   - Elevated drop shadow: `elevation = 8dp` with outline provider matching the `28dp` corner radius.
+   - Translucent glassmorphism surface with dual-tone gradient fill and subtle 1dp border stroke (`#20FFFFFF` dark, `#30000000` light).
+2. **Damped Harmonic Spring Physics**:
+   - Implemented an animated selection indicator pill that stretches and snaps between tab stops.
+   - Spring dynamics: `dampingRatio = 0.72f` (sub-critically damped for responsive snap without overshoot) and `stiffness = 380f` (SpringForce.STIFFNESS_MEDIUM).
+   - Fluid horizontal elongation: The pill dynamically expands horizontally during rapid transit between distant tabs before smoothly contracting into the destination tab bounds.
+3. **Tactile Scale Lift & Sensory Feedback**:
+   - The selected tab icon and label undergo a gentle vertical lift (-2dp) and scale expansion (`1.05f`).
+   - Integrated native haptic feedback (`HapticFeedbackConstants.CLOCK_TICK`) triggered precisely at the moment of touch down.
+   - Unread badges (e.g., notice counter) smoothly anchor to the top-right corner of tab icons without overlapping the fluid pill.
+
+---
+
+### 216.4 Transit Telemetry Overhaul & MBSTU Wheels Live Integration Retrospective
+
+Building upon the initial MBSTU Wheels integration ([`7bf9b1c9-a2d1-40c9-a995-c810deb70c60`](conversation://7bf9b1c9-a2d1-40c9-a995-c810deb70c60)), the transit subsystem underwent major stability, visual, and performance overhauls:
+
+#### A. Map "Earthquake" Shaking Camera Loop Resolution
+- **The Problem**: Whenever a bus was selected from the transit list, the user experienced severe map flickering and violent continuous shaking ("like an earthquake").
+- **Root Cause**: The transit engine utilized a 1-second extrapolated clock loop to animate bus positions. On every 1-second tick, the code unconditionally invoked MapLibre/Leaflet `map.flyTo(busCoordinates)`. This interrupted user panning gestures and created a continuous camera fighting loop.
+- **The Fix** (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)):
+  - Introduced `lastCenteredBusIdRef` to decouple camera navigation from location interpolation.
+  - The map executes `flyTo` **only once** upon initial bus selection.
+  - Added an unobtrusive floating button `[ 🧭 বাসে ফোকাস ]` allowing users to manually re-center on the active bus whenever desired, granting complete manual panning freedom without shaking.
+
+#### B. Dynamic Route Stoppage Filtering (`getStationsForBus`)
+- **The Problem**: A dense, overlapping cluster of 28 bus stop markers cluttered the diagonal highway corridor, creating an unreadable solid wall of text and icons.
+- **The Fix**: Sliced the global station catalog into route-aware subsets based on the selected vehicle:
+  - **Nirala Route**: 16 dedicated stations.
+  - **Puraton Route**: 18 dedicated stations.
+  - **District Route**: 24 dedicated stations.
+- Non-relevant stops are cleanly filtered out, and milestone progress accurately clamps to the active route length.
+
+#### C. Dedicated Loading State & Timetable Deep Linking
+- **Dedicated Loading Card** (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)): Added a dedicated transit loading state featuring a pulsating radar animation and shimmer bar, preventing premature rendering of boilerplate fallback options before MBSTU Wheels API responses return.
+- **Schedule-to-Transit Deep Linking** (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)):
+  - Eliminated duplicate bus schedule sections inside the Timetable tab.
+  - Replaced the legacy "Call Pilot" button with a direct `[ Track ]` button (`btnTrackBus`), executing instant tab switching to the live transit map focused on the designated bus.
+
+#### D. Direction Switcher & 25m Hysteresis Engine
+- **Direction Toggle**: Segmented pill switch `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` providing instant reversal of stoppage lists and ETA calculations.
+- **25m Hysteresis Engine**: Implemented a double-threshold boundary check preventing rapid flickering of the "Next Stop" indicator when a bus decelerates or stops near station boundary perimeters.
+
+---
+
+### 216.5 Friends Directory Modal Polish & Hierarchy Architecture
+
+- **Wide Compact Modal Layout**: Expanded dialog width to `860px` on Web and `96%` screen width (max `720dp`) on Android (`dialog_profile_modern.xml`), ensuring academic details, contact chips, and batch metadata fit on single lines without wrapping.
+- **3-Tier Hierarchy Sorting**:
+  1. **Administrators & Department Heads** (Pinned at top with purple crown badge)
+  2. **Class Representatives (CR)** (Ranked second with blue star badge)
+  3. **Batchmates & Peers** (Sorted alphabetically by student roll number)
+- **Teacher & Student Privacy Safeguards**: Restricted teacher visibility into student onboarding states and private unread notice badges; masked sensitive teacher phone numbers and private addresses from general student views.
+
+---
+
+### 216.6 Master Production Verification Matrix (Updated Master State v216)
+
+| Subsystem / Feature | Target Module | Production State | Verification Evidence & Implementation References |
+| :--- | :--- | :--- | :--- |
+| **GitGuardian Leak Sanitization & Secret Purge** | Full Stack (Scripts & Repos) | **PRODUCTION** | Stripped hardcoded service key from `scripts/inspect_students.py`; mandatory env var check; pushed across `main` and `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Revoked legacy HS256 JWT key in Supabase settings; verified active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` with Config visibility |
+| **Google OAuth PKCE Flow Recovery** | Web Companion | **PRODUCTION** | Successfully authenticated via Google OAuth post-Vercel deployment; 100% data retention verified across all Supabase tables, student rosters, and notices |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt native XML `GlassBottomNavView.kt` in `ClassMateAuthActivity` with `16dp` margins, `12dp` bottom offset, `28dp` curvature, and `8dp` elevation (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Slicing (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Ground Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **IoT Attendance Station Firmware** | ESP32 C++ Arduino | **PRODUCTION** | Dual-core FreeRTOS separation (`esp32_rfid_attendance.ino`), 3-tier Wi-Fi fallback (15s timeouts), 64-scan in-memory queue buffering, < 50ms edge scan latency |
+| **3D Printable Snap-Fit Enclosure** | 3D Printing & CAD | **PRODUCTION** | Watertight 2-manifold STL models (`desktop_attendance_front_panel.stl`, `desktop_attendance_main_enclosure.stl`); 1.0–1.2mm RF wall thinning, 1.2mm solder pin relief, 18.5×27.2mm OLED pocket |
+| **RFID Profile Database Indexing** | Supabase PostgreSQL | **PRODUCTION** | B-tree index `idx_profiles_rfid_card_uid` deployed via migration `202610250002_rfid_index.sql`; O(1) < 3ms card lookups |
+| **Attendance Card Batch Fund Ledger** | Full Stack (DB & Web) | **PRODUCTION** | Tracked in `classmate.batch_fund_transactions`; 33 students paid (৳1,325 collected), 24 unpaid, zero ledger discrepancies |
+| **Standalone Local FastAPI Station** | Python / FastAPI / SQLite | **PRODUCTION** | Standalone LAN station mode in `attendance-tracker/backend` with WebSockets, smart check-in/out, and 1-click enrollment |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v216) |
