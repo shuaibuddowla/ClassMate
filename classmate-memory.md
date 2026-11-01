@@ -14354,18 +14354,22 @@ const switchToMap = useCallback((busId?: string) => {
 ### 208.1 Core UX Problem Statements & User Architectural Directives
 1. **Map Camera Jitter / "Earthquake" Effect**:
    - User report: *"When a bus is selected and its dialog is open, the whole map is like it's earthquake."*
-   - Whenever telemetry packets arrived while a bus was tracked on the map, the entire map viewport shook uncontrollably, making the interface unusable and frustrating user gestures.
+   - Whenever telemetry packets arrived or the internal clock ticked while a bus was tracked on the map, the entire map viewport violently shook, blinked, and jittered uncontrollably, fighting against user touch gestures and making map navigation frustrating.
 2. **Route Detail Stoppage Overload**:
    - User report: *"Also, in the detail list of the bus, it shows all the routes. This page has many problems... There is too much information that maybe it's not needed. Try to fix it."*
-   - Bus details and timeline displayed all 24 corridor stations (up to District Bus Stand) even for campus buses that terminate at Nirala More (16 stations) or Puraton Bus Stand (18 stations).
+   - Bus details and timeline statically displayed all 24 corridor stations (up to District Bus Stand) even for campus student buses terminating at Nirala More (16 stations) or Puraton Bus Stand (18 stations).
+3. **Viewport Vertical Crowding**:
+   - The top-pinned hero cards, telemetry boxes, and action buttons consumed over 65% of screen height, leaving only ~1.5 stoppage items visible at the bottom.
+4. **Triple Redundancy**:
+   - Arrival times, next stops, and countdowns were duplicated across the hero card, the 4-pill telemetry box, and the stoppage stepper.
 
 ### 208.2 Root Cause Analysis & Technical Resolutions
 
 #### 1. Camera Earthquake Resolution (`lastCenteredBusIdRef`):
 - **Root Cause**:
-  In `web/src/components/transit.tsx`, the camera auto-center effect had `[selectedBus?.id, selectedBus?.lat, selectedBus?.lon, busLocationLoading, centerSelectedBus]` in its dependency array. Every time a WebSocket telemetry packet arrived (every 1–2 seconds), `selectedBus.lat` and `selectedBus.lon` shifted slightly. The effect continuously re-triggered `centerSelectedBus()` (`flyTo` / `setView`), fighting against Leaflet's render loop and user touch panning.
+  In `web/src/components/transit.tsx`, the camera auto-center effect had `[selectedBus?.id, selectedBus?.lat, selectedBus?.lon, busLocationLoading, centerSelectedBus]` in its dependency array. The active clock (`clockNow`) updates every `1000ms`, and bus positions are continuously extrapolated via `predictBusPosition(bus, clockNow)`. Every 1000ms, `selectedBus.lat` and `selectedBus.lon` shifted slightly, triggering `centerSelectedBus()` (`flyTo(..., { animate: true, duration: 0.8 })`). Because the 800ms camera animation barely finished before the next one began, the camera fought Leaflet's render loop and user touch panning, causing violent jitter and tile blinking.
 - **Architectural Fix**:
-  Introduced `lastCenteredBusIdRef = useRef<string | null>(null)` to ensure the camera only auto-centers **once** when a bus is first selected or its initial telemetry resolves:
+  Introduced `lastCenteredBusIdRef = useRef<string | null>(null)` to ensure the camera only auto-centers **strictly once** when a bus is first selected or its initial telemetry resolves:
   ```typescript
   useEffect(() => {
     if (busLocationLoading || !selectedBus || !mapRef.current) return;
@@ -14378,7 +14382,7 @@ const switchToMap = useCallback((busId?: string) => {
     }
   }, [selectedBus?.id, selectedBus?.isEstimated, busLocationLoading, centerSelectedBus]);
   ```
-  Subsequent incoming GPS coordinates update the vehicle marker icon position smoothly via Leaflet marker interpolation without touching the map camera viewport.
+  Subsequent incoming GPS coordinates update the vehicle marker icon position smoothly via Leaflet marker interpolation without touching the map camera viewport. A floating manual re-center button `[ 🧭 বাসে ফোকাস ]` (`.transit-offscreen-pill`) allows users to snap back to the bus at will.
 
 #### 2. Dynamic Route Stoppage Filtering (`getStationsForBus`):
 - **Root Cause**:
@@ -14407,14 +14411,49 @@ const switchToMap = useCallback((busId?: string) => {
   ```
   Clamped milestone progress and arrival hysteresis (`maxStationIdx = Math.max(0, busStations.length - 1)`), guaranteeing exact ETA calculation and clean, concise timeline rendering.
 
+#### 3. Unified Live Status & Departure Card:
+- Replaced the bulky duplicate hero card and the 4-pill telemetry box with a single, ultra-clean ~80px card (`.transit-detail-live-card`):
+  - Next Stop name and live driving ETA (`~১ মি ড্রাইভ • ০.১৪ কিমি`).
+  - Next scheduled departure for the active direction with live countdown (`.transit-detail-sched-val`).
+  - Direct pilot call link (`[ 📞 কল ]`) and user proximity distance.
+  - Left accent stripe dynamically matching the bus theme color (`var(--bus-accent)`).
+
+#### 4. Sleek Segmented Direction Switcher:
+- Replaced bulky toggle buttons with a modern segmented pill control (`.transit-detail-segmented-control`):
+  - Options: `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]`.
+  - Toggling direction updates departure countdowns and smoothly reverses the stoppage list in the active direction of travel.
+
+#### 5. Compact, High-Contrast Stoppage Stepper & Viewport Optimization:
+- Removed English subtitles to focus on clean, high-contrast Bengali typography.
+- Passed stops are displayed with subtle checkmark nodes (`✓`) and muted status (`অতিক্রম করেছে`).
+- Approaching stop is highlighted with a pulsing bus badge (`🚍`).
+- Viewport optimization: Increased visible stops from ~1.5 stops to 6–8 stops simultaneously with touch-friendly scrolling by eliminating the top section clutter (which previously consumed >65% of the viewport).
+
 ---
 
-### 208.3 Master Production Verification Matrix (Updated Master State v208)
+### 208.3 Physical Hardware Verification & Production Deployment
+- **Physical Device**: OnePlus Nord CE4 (`CPH2621`, Serial `6478ab80`).
+- **Verified Behaviors**:
+  1. Map camera remains completely steady when tracking a bus, with zero earthquake jitter or tile blinking.
+  2. Floating `[ 🧭 বাসে ফোকাস ]` button appears when panning away and smoothly re-centers when tapped.
+  3. Bus detail view displays 16 relevant stops cleanly for Nirala routes, eliminating 8 phantom stops.
+  4. Segmented direction switcher flips direction and reverses the stoppage list instantly.
+  5. 6 to 8 stoppage items are visible on screen simultaneously with smooth, touch-friendly scrolling.
+- **TypeScript Build**: Passed with 0 errors via `npm --prefix web run build`.
+- **Production Deployment**: Live on [classmatebd.vercel.app](https://classmatebd.vercel.app) (Deployment ID: `dpl_6kSzH4qAz7cRhVNe7CvFSRQDAF3q`).
+- **Git Commit**: Committed as [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680) (*`fix(transit): eliminate map shaking camera loop and streamline bus detail route view`*).
+
+---
+
+### 208.4 Master Production Verification Matrix (Updated Master State v208)
 
 | Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
 | :--- | :--- | :--- | :--- |
-| **Map Camera Earthquake & Jitter Elimination** | Web & Android APK | **PRODUCTION** | `lastCenteredBusIdRef` one-shot camera centering, smooth marker interpolation without viewport jitter |
-| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Truncates to 16 stops (Nirala) or 18 stops (Puraton) dynamically, eliminating 8 phantom stops |
+| **Map Camera Earthquake & Jitter Elimination** | Web & Android APK | **PRODUCTION** | `lastCenteredBusIdRef` one-shot camera centering, smooth marker interpolation without viewport jitter (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Truncates to 16 stops (Nirala) or 18 stops (Puraton) dynamically, eliminating 8 phantom stops (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Unified Live Status & Departure Card** | Web & Android APK | **PRODUCTION** | Compact ~80px card replacing bulky hero and 4-pill box; live ETA, departure countdown, pilot call link (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
 | **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | `32.dp` rounded capsule, `20.dp` margin, `10.dp` elevation, frosted acrylic glass, spring physics (`0.72f` damping, `380f` stiffness) (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
 | **Transit Tab V3 UI/UX Ground-Up Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
 | **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
