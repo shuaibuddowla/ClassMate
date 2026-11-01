@@ -6,6 +6,7 @@ import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.nfc.tech.MifareClassic
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import java.nio.charset.StandardCharsets
@@ -13,7 +14,7 @@ import java.util.Locale
 
 /**
  * Robust NFC reading and writing engine for ClassMate MIFARE Classic 1K & standard NFC tags.
- * Supports NDEF URI encoding with zero-browser deep-linking + offline payload caching.
+ * Supports NDEF URI encoding with zero-browser deep-linking + raw MIFARE Classic sector writing.
  */
 object NfcCardManager {
 
@@ -53,19 +54,16 @@ object NfcCardManager {
      * Extracts physical card UID from either the intent extras or Tag object.
      */
     fun extractUid(intent: Intent): String {
-        // 1. Check direct EXTRA_ID
         val idBytes = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID)
         if (idBytes != null && idBytes.isNotEmpty()) {
             return bytesToHex(idBytes)
         }
 
-        // 2. Check EXTRA_TAG parcelable
         val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
         if (tag != null) {
             return bytesToHex(tag.id)
         }
 
-        // 3. Fallback: check query parameter from URI if dispatched via deep link
         val uri = intent.data
         if (uri != null) {
             val qUid = uri.getQueryParameter("uid")?.trim()
@@ -77,7 +75,7 @@ object NfcCardManager {
 
     /**
      * Parses the card payload from an NFC Intent or Deep Link URI.
-     * Decodes offline student information stored on the card.
+     * Decodes offline student information stored on the card (NDEF or MIFARE Classic sectors).
      */
     fun parseCardPayload(intent: Intent): StudentCardPayload {
         val uid = extractUid(intent)
@@ -104,7 +102,16 @@ object NfcCardManager {
             }
         }
 
-        // 3. Return payload with UID only (unregistered or blank card)
+        // 3. Try reading directly from MIFARE Classic blocks (Sector 1 & 2)
+        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+        if (tag != null) {
+            val fromMifare = readFromMifareClassic(tag, uid)
+            if (fromMifare != null && fromMifare.hasStudentInfo) {
+                return fromMifare
+            }
+        }
+
+        // 4. Return payload with UID only (unregistered or blank card)
         return StudentCardPayload(uid = uid)
     }
 
@@ -122,6 +129,50 @@ object NfcCardManager {
             phone = uri.getQueryParameter("phone")?.trim().orEmpty(),
             blood = uri.getQueryParameter("blood")?.trim().orEmpty()
         )
+    }
+
+    /**
+     * Reads student details directly from MIFARE Classic 1K data blocks.
+     */
+    fun readFromMifareClassic(tag: Tag, uid: String): StudentCardPayload? {
+        val mifare = MifareClassic.get(tag) ?: return null
+        return try {
+            mifare.connect()
+            val key = MifareClassic.KEY_DEFAULT
+            val auth1 = mifare.authenticateSectorWithKeyA(1, key) || mifare.authenticateSectorWithKeyB(1, key)
+            if (auth1) {
+                val rollBytes = mifare.readBlock(4)
+                val nameBytes = mifare.readBlock(5)
+                val phoneBytes = mifare.readBlock(6)
+
+                val roll = String(rollBytes, StandardCharsets.UTF_8).trim('\u0000', ' ')
+                val name = String(nameBytes, StandardCharsets.UTF_8).trim('\u0000', ' ')
+                val phone = String(phoneBytes, StandardCharsets.UTF_8).trim('\u0000', ' ')
+
+                var batch = ""
+                var blood = ""
+                val auth2 = mifare.authenticateSectorWithKeyA(2, key) || mifare.authenticateSectorWithKeyB(2, key)
+                if (auth2) {
+                    batch = String(mifare.readBlock(8), StandardCharsets.UTF_8).trim('\u0000', ' ')
+                    blood = String(mifare.readBlock(9), StandardCharsets.UTF_8).trim('\u0000', ' ')
+                }
+
+                if (roll.isNotBlank() || name.isNotBlank()) {
+                    StudentCardPayload(
+                        uid = uid,
+                        name = name,
+                        roll = roll,
+                        phone = phone,
+                        batch = batch,
+                        blood = blood
+                    )
+                } else null
+            } else null
+        } catch (_: Exception) {
+            null
+        } finally {
+            try { mifare.close() } catch (_: Exception) {}
+        }
     }
 
     /**
@@ -151,46 +202,80 @@ object NfcCardManager {
 
     /**
      * Writes student data directly onto the physical MIFARE / NFC card.
-     * Works with both formatted NDEF tags and blank unformatted tags (via NdefFormatable).
+     * Tries 3 methods:
+     * 1. Standard NDEF write
+     * 2. NDEF formatting via NdefFormatable
+     * 3. Direct MIFARE Classic 1K sector write (Sectors 1 & 2)
      */
     fun writeStudentCard(tag: Tag, payload: StudentCardPayload): Result<Unit> {
         val message = createNdefMessage(payload)
         val size = message.toByteArray().size
 
-        // 1. Attempt standard NDEF write
+        // Method 1: Standard NDEF write
         val ndef = Ndef.get(tag)
         if (ndef != null) {
-            return try {
+            try {
                 ndef.connect()
-                if (!ndef.isWritable) {
-                    Result.failure(IllegalStateException("Card is marked read-only"))
-                } else if (ndef.maxSize < size) {
-                    Result.failure(IllegalStateException("Card memory too small: ${ndef.maxSize} bytes available, $size required"))
-                } else {
+                if (ndef.isWritable && ndef.maxSize >= size) {
                     ndef.writeNdefMessage(message)
-                    Result.success(Unit)
+                    return Result.success(Unit)
                 }
-            } catch (e: Exception) {
-                Result.failure(e)
+            } catch (_: Exception) {
             } finally {
                 try { ndef.close() } catch (_: Exception) {}
             }
         }
 
-        // 2. Attempt formatting with NDEF (for blank MIFARE Classic 1K cards)
+        // Method 2: NDEF Formatable
         val formatable = NdefFormatable.get(tag)
         if (formatable != null) {
-            return try {
+            try {
                 formatable.connect()
                 formatable.format(message)
-                Result.success(Unit)
-            } catch (e: Exception) {
-                Result.failure(e)
+                return Result.success(Unit)
+            } catch (_: Exception) {
             } finally {
                 try { formatable.close() } catch (_: Exception) {}
             }
         }
 
-        return Result.failure(UnsupportedOperationException("Card does not support standard NDEF formatting"))
+        // Method 3: Direct MIFARE Classic 1K block writing (Sector 1 & 2)
+        val mifare = MifareClassic.get(tag)
+        if (mifare != null) {
+            try {
+                mifare.connect()
+                val key = MifareClassic.KEY_DEFAULT
+                if (mifare.authenticateSectorWithKeyA(1, key) || mifare.authenticateSectorWithKeyB(1, key)) {
+                    // Block 4: roll (padded to 16 bytes)
+                    val rollBytes = payload.roll.toByteArray(StandardCharsets.UTF_8).copyOf(16)
+                    mifare.writeBlock(4, rollBytes)
+
+                    // Block 5: name (padded to 16 bytes)
+                    val nameBytes = payload.name.toByteArray(StandardCharsets.UTF_8).copyOf(16)
+                    mifare.writeBlock(5, nameBytes)
+
+                    // Block 6: phone (padded to 16 bytes)
+                    val phoneBytes = payload.phone.toByteArray(StandardCharsets.UTF_8).copyOf(16)
+                    mifare.writeBlock(6, phoneBytes)
+
+                    // Sector 2: batch & blood
+                    if (mifare.authenticateSectorWithKeyA(2, key) || mifare.authenticateSectorWithKeyB(2, key)) {
+                        val batchBytes = payload.batch.toByteArray(StandardCharsets.UTF_8).copyOf(16)
+                        mifare.writeBlock(8, batchBytes)
+
+                        val bloodBytes = payload.blood.toByteArray(StandardCharsets.UTF_8).copyOf(16)
+                        mifare.writeBlock(9, bloodBytes)
+                    }
+
+                    return Result.success(Unit)
+                }
+            } catch (e: Exception) {
+                return Result.failure(e)
+            } finally {
+                try { mifare.close() } catch (_: Exception) {}
+            }
+        }
+
+        return Result.failure(UnsupportedOperationException("Card does not support standard NFC or MIFARE Classic writing"))
     }
 }

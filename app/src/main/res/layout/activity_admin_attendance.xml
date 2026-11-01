@@ -443,6 +443,26 @@
                                 tools:text="Current Card: ••••7B12" />
 
                             <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnWritePhysicalCard"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:layout_marginTop="6dp"
+                                android:text="Write to Physical Card"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="11.5sp"
+                                android:textStyle="bold"
+                                android:paddingHorizontal="10dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:visibility="gone"
+                                app:icon="@drawable/ic_rfid_signal"
+                                app:iconSize="13dp"
+                                app:iconTint="@color/cm_primary"
+                                app:cornerRadius="8dp"
+                                app:strokeColor="@color/cm_primary" />
+
+                            <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnAdminRestartCard"
                                 style="?attr/materialButtonOutlinedStyle"
                                 android:layout_width="wrap_content"

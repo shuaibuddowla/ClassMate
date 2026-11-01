@@ -901,6 +901,13 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
         val uid = student.optString("rfid_card_uid").trim()
         val btnAdminRestartCard = findViewById<MaterialButton>(R.id.btnAdminRestartCard)
+        val btnWritePhysicalCard = findViewById<MaterialButton>(R.id.btnWritePhysicalCard)
+        btnWritePhysicalCard?.visibility = if (uid.isNotEmpty() && uid != "null") View.VISIBLE else View.GONE
+        btnWritePhysicalCard?.setOnClickListener {
+            ClassMateHaptics.selection(it)
+            Toast.makeText(this, "Ready: Touch card to the back of phone to write.", Toast.LENGTH_LONG).show()
+        }
+
         if (uid.isNotEmpty() && uid != "null") {
             tvSelectedStudentCardStatus.text = "Card Registered: ••••${uid.takeLast(4).uppercase()}"
             tvSelectedStudentCardStatus.setTextColor(Color.parseColor("#10B981"))
@@ -938,7 +945,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveStudentCard() {
+    private fun saveStudentCard(writtenToHardware: Boolean = false) {
         val student = selectedStudentObj
         if (student == null) {
             Toast.makeText(this, "Please select a student first", Toast.LENGTH_SHORT).show()
@@ -975,9 +982,10 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     }
                 }
 
+                val hwNote = if (writtenToHardware) " & written to card memory" else ""
                 Toast.makeText(
                     this@ClassMateAdminAttendanceActivity,
-                    "Card $cleanUid assigned to ${student.optString("roll")}!",
+                    "Card $cleanUid assigned to ${student.optString("roll")}$hwNote!",
                     Toast.LENGTH_LONG
                 ).show()
 
@@ -1104,11 +1112,15 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                         name = student.optString("full_name"),
                         roll = student.optString("roll"),
                         batch = batchLabel,
-                        dept = "MBSTU"
+                        dept = "MBSTU",
+                        phone = student.optString("phone", student.optString("mobile_number", "")),
+                        blood = student.optString("blood_group", "")
                     )
-                    NfcCardManager.writeStudentCard(tag, payload)
+                    val writeRes = NfcCardManager.writeStudentCard(tag, payload)
+                    saveStudentCard(writeRes.isSuccess)
+                } else {
+                    saveStudentCard(false)
                 }
-                saveStudentCard()
             } else {
                 val matched = studentsList.firstOrNull {
                     it.optString("rfid_card_uid").equals(scannedUid, ignoreCase = true)
