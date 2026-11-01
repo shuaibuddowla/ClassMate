@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet"
+    android:paddingTop="12dp">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_bottom_sheet_handle" />
+
+    <!-- Top Header -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="20dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/layoutHeaderActions">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:text="Teachers Directory"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/tvTeachersSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="12sp"
+                tools:text="Faculty contacts &amp; assigned courses" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutHeaderActions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddTeacher"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="＋ Add"
+                android:textAllCaps="false"
+                android:textSize="12sp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                app:cornerRadius="10dp" />
+
+            <ImageView
+                android:id="@+id/btnCloseTeachers"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="6dp"
+                android:src="@drawable/ic_close"
+                app:tint="@color/cm_text_secondary"
+                android:contentDescription="Close" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Search input -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_search_input">
+
+        <EditText
+            android:id="@+id/etSearchTeachers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@null"
+            android:hint="Search teachers or course..."
+            android:textColorHint="@color/cm_text_muted"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="13.5sp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:singleLine="true"
+            android:imeOptions="actionSearch" />
+    </FrameLayout>
+
+    <!-- Content: Recycler or Empty State -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingHorizontal="20dp">
+
+        <ProgressBar
+            android:id="@+id/pbLoadingTeachers"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/cm_primary" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTeachers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="24dp"
+            tools:listitem="@layout/item_teacher_card" />
+
+        <LinearLayout
+            android:id="@+id/layoutEmptyTeachers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="24dp">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_academic_cap"
+                app:tint="@color/cm_text_muted" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="No Teachers Found"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:textSize="16sp"
+                android:textColor="@color/cm_text_primary" />
+
+            <TextView
+                android:id="@+id/tvEmptyTeachersHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="No faculty members assigned to this batch's courses yet."
+                android:textSize="12.5sp"
+                android:gravity="center"
+                android:textColor="@color/cm_text_secondary" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

@@ -607,26 +607,6 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             bottomMargin = dp(2)
         })
 
-        // Supporting text below the card
-        val supportingText = TextView(activity).apply {
-            text = "Students: use university email.\nTeachers: use your approved Google account."
-            textSize = if (screenWdp < 375) 12f else 12.8f
-            setTextColor(Color.parseColor("#536583"))
-            gravity = Gravity.CENTER
-            setLineSpacing(dp(3).toFloat(), 1f)
-            setPadding(dp(16), 0, dp(16), 0)
-        }
-        scrollContent.addView(supportingText, LinearLayout.LayoutParams(
-            if (dm.widthPixels > maxCardW) maxCardW else LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            leftMargin = sideMargin
-            rightMargin = sideMargin
-            topMargin = dp(16)
-            bottomMargin = dp(4)
-        })
-        animated.add(supportingText)
 
         // Status text for errors/notifications
         val statusText = TextView(activity).apply {

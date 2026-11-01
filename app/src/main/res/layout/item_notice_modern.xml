@@ -52,6 +52,45 @@
                     android:clickable="true" android:focusable="true"
                     android:paddingHorizontal="6dp" android:paddingVertical="3dp" />
             </LinearLayout>
+
+            <!-- Interactive Material 3 Expressive Poll Container -->
+            <LinearLayout android:id="@+id/pollContainer"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:layout_marginTop="2dp"
+                android:layout_marginBottom="6dp" android:visibility="gone">
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center_vertical" android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+                    <TextView android:id="@+id/tvPollChip"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="POLL" android:textSize="10.5sp" android:textStyle="bold"
+                        android:textColor="#7C3AED" android:background="@drawable/bg_poll_chip"
+                        android:paddingHorizontal="8dp" android:paddingVertical="2dp" />
+                    <TextView android:id="@+id/tvPollSubtext"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_marginStart="8dp"
+                        android:textColor="@color/cm_text_secondary" android:textSize="11.5sp"
+                        android:maxLines="1" android:ellipsize="end" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/pollOptionsList"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center_vertical" android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+                    <TextView android:id="@+id/tvPollTotalVotes"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:textColor="@color/cm_text_secondary"
+                        android:textSize="11sp" />
+                    <TextView android:id="@+id/tvPollStatus"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:textColor="@color/cm_text_secondary" android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
             <FrameLayout android:id="@+id/imagePreviewContainer"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="10dp" android:visibility="gone">
