@@ -1477,12 +1477,14 @@ function NoticeCard({
             Open resource <ExternalLink size={14} />
           </button>
         )}
-        <img
-          className="notice-illustration"
-          src={`/notice-${kind}.svg`}
-          alt=""
-          aria-hidden="true"
-        />
+        {!poll && (
+          <img
+            className="notice-illustration"
+            src={`/notice-${kind}.svg`}
+            alt=""
+            aria-hidden="true"
+          />
+        )}
       </div>
       {reminderDue && <p className="reminder-due">Reminder due</p>}
       <footer>

@@ -5404,11 +5404,14 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).setImageResource(icon)
-
-
-
-                card.v<android.widget.ImageView>(R.id.ivNoticeIllustration).imageTintList = null
+                val ivIllustration = card.v<android.widget.ImageView>(R.id.ivNoticeIllustration)
+                if (pollNotice) {
+                    ivIllustration.visibility = View.GONE
+                } else {
+                    ivIllustration.visibility = View.VISIBLE
+                    ivIllustration.setImageResource(icon)
+                    ivIllustration.imageTintList = null
+                }
 
 
 
