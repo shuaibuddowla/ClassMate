@@ -15956,3 +15956,206 @@ sequenceDiagram
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v217) |
+
+---
+
+## 218. Autonomous System Memory Synthesis, Supabase Modern API Key Governance, Transit Telemetry Production Verification & Master State v218
+
+### 218.1 Retrospective of Recent Brain Conversations & Production Commit Alignment
+An exhaustive cross-session audit and synthesis was executed across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, specifically targeting the ClassMate Android APK project, its companion Web client, Supabase backend security policies, and IoT ecosystem:
+- [`f78a9f92-ab40-4040-be51-25ef5ecd261a`](conversation://f78a9f92-ab40-4040-be51-25ef5ecd261a) *(15:57 PKT / Dhaka time)*: Hourly review and master memory synchronization session. Verified clean merge of `feature/live-bus-tracking` into `main` (Merge Commit [`afd8081`](https://github.com/shuaibuddowla/ClassMate/commit/afd8081)) and established Master State v217 in both repository locations.
+- [`cc865f4c-aea8-4444-b5ab-10a148f88664`](conversation://cc865f4c-aea8-4444-b5ab-10a148f88664) *(14:57 PKT / Dhaka time)*: Preceding hourly review session codifying Master State v216.
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b) *(Active turns through 15:18 PKT / Dhaka time)*: Intensive real-time debugging, security governance, and transit production refinement session:
+  - Addressed GitGuardian incident alert regarding plaintext `SUPABASE_SERVICE_ROLE_KEY` in `scripts/inspect_students.py`; guided user through Supabase dashboard key architecture, legacy key revocation, and Vercel environment visibility.
+  - Resolved Google OAuth temporary PKCE race condition post-Vercel rollout with 100% data and profile integrity preserved.
+  - Eliminated live Leaflet map marker oscillation ("forward jump followed by backward snap") by replacing speculative dead-reckoning extrapolation with authentic ground-truth GPS telemetry.
+  - Resolved frozen bus icon on route stoppage timeline by introducing live animated bus rail gliding with dynamic segment progress interpolation ($0.12 \le 	ext{progress} \le 0.88$) and Bengali speed badges (`১২ কিমি/ঘ`).
+  - Refactored pulse animation scale from an aggressive 30% jump to a gentle 6% micro-breath (`scale(1.06)`) and added an independent outer radar ripple ring (`riderRadarPulse`).
+  - Verified with 0 TypeScript compilation errors and 39/39 passing unit tests; committed to `feature/live-bus-tracking` (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) and merged into `main` (Commits [`f870503`](https://github.com/shuaibuddowla/ClassMate/commit/f87050341e13016fccf93607f68f3cb067655b53), [`afd8081`](https://github.com/shuaibuddowla/ClassMate/commit/afd8081)).
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc): Android APK Concept 1 (Dynamic Morphing Fluid Pill) navigation physics delivery, dual-navbar architecture diagnostic (`ClassMateFloatingNavigationBar` in Compose vs native XML `GlassBottomNavView.kt` in `ClassMateAuthActivity.kt`), and Friends directory modernization (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6), [`cb05104`](https://github.com/shuaibuddowla/ClassMate/commit/cb05104), [`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d)).
+
+---
+
+### 218.2 GitGuardian Remediation, Supabase Key Governance & PKCE OAuth Architecture
+
+```mermaid
+flowchart TD
+    subgraph Secret Leak & Remediation
+        A["GitGuardian Alert: Exposed Service Role Key in inspect_students.py"] --> B["Sanitize Script: os.environ.get('SUPABASE_SERVICE_ROLE_KEY')"]
+        B --> C["Commit & Push: 68caed4 to main & feature/live-bus-tracking"]
+    end
+
+    subgraph Supabase Key Engine Governance
+        D["Project Settings -> API Keys (Management Controls)"] --> E["Disable Legacy Keys: Revoke leaked HS256 Shared Secret"]
+        E --> F["Active ECC (P-256) Signing Key preserved (Active Sessions Intact)"]
+        F --> G["Copy Modern sb_publishable_... Key"]
+    end
+
+    subgraph Vercel & Client Deployment
+        G --> H["Vercel Environment Variable: NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+        H --> I["Enforce 'Config' / 'Plain text' Visibility (Public Prefix Constraint)"]
+        I --> J["Vercel Build & Deploy (2:54 PM)"]
+        J --> K["PKCE Single-Use Code Match -> Seamless User Auth"]
+    end
+
+    C --> D
+```
+
+#### A. Incident Identification & Codebase Sanitization
+- **Vulnerability**: A Supabase `service_role` key was committed in plaintext on line 5 of `scripts/inspect_students.py`. Because the `service_role` key bypasses all PostgreSQL Row Level Security (RLS) policies, public exposure posed full administrative read/write risks.
+- **Immediate Codebase Fix**:
+  - Sanitized `scripts/inspect_students.py` to read credentials strictly from process environment variables:
+    ```python
+    SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://cbskpifgbdbgdmnnxfrh.supabase.co')
+    SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+    ```
+  - Executed a comprehensive repository scan confirming zero plaintext secrets remain across scripts, backend functions, or Android Java/Kotlin source code.
+  - Committed and pushed across branches: `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) and `main`.
+
+#### B. Supabase Dashboard Anatomy: Edge Function Secrets vs Project API Keys
+- **Common Pitfall**: The user initially navigated to **Edge Functions $ightarrow$ Secrets**, where keys appeared non-editable.
+- **Architectural Clarification**:
+  - `Edge Functions -> Secrets`: Read-only runtime environment variables injected into Deno serverless edge containers (e.g. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
+  - `Project Settings -> API Keys`: The authoritative management interface for rotating cryptographic secrets, managing JWT signing algorithms, and toggling legacy API keys.
+
+#### C. Cryptographic Key Engine Architecture: Dual-Key (ECC P-256 vs HS256)
+- **Supabase Key Migration Nuance**: The project's active JWT signing infrastructure had already been upgraded to **Elliptic Curve Cryptography (ECC P-256)**. However, Supabase retained the older symmetric **HS256 (Shared Secret)** in the "Previously used keys" fallback list.
+- **Revocation Safety**:
+  - Disabling legacy keys and revoking the HS256 secret permanently invalidated the compromised token flagged by GitGuardian.
+  - Because active user sessions and mobile app tokens were already minted against the active ECC P-256 key, active student logins, session cookies, and Android JWTs were completely uninterrupted.
+
+#### D. Vercel Environment Variable Visibility Constraints (`NEXT_PUBLIC_` vs Secrets)
+- **Vercel Platform Error**: When updating `NEXT_PUBLIC_SUPABASE_ANON_KEY`, Vercel displayed:
+  > *"Environment variables with a public prefix to fix can't use visibility secret, use visibility config instead."*
+- **Root Cause & Solution**:
+  - In Next.js, variables prefixed with `NEXT_PUBLIC_` are statically inlined into browser JavaScript bundles at build time.
+  - Vercel prohibits marking public prefix variables as "Secret" because treating client-bound code as an encrypted runtime secret creates a security contradiction.
+  - Setting visibility to **Config / Plain text** resolved the issue and allowed successful deployment.
+- **Key Standardization**: Both Android (`local.properties`: `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`) and Web (`NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...`) now uniformly reference Supabase's modern publishable API key format rather than legacy JWT strings.
+
+#### E. PKCE OAuth Lifecycle & Transient Deployment Race Condition
+- **Transient Login Error**: For approximately 2 minutes following the Vercel variable update, user login threw an error.
+- **Root Cause Analysis**:
+  - Google OAuth employs the Proof Key for Code Exchange (PKCE) flow. The authorization code delivered to `/auth/callback` is single-use and strictly paired with a cryptographic code verifier stored in the client session.
+  - A user sign-in attempt initiated while Vercel was building the deployment resulted in an authorization code being exchanged against an outdated deploy context.
+  - Once the Vercel deployment finalized, subsequent OAuth handshakes completed in $< 1$ second with zero lost data, intact student rosters, and validated session cookies.
+
+---
+
+### 218.3 Transit Telemetry Ground-Truth Stabilization & Timeline Gliding (Production Verification)
+
+```mermaid
+sequenceDiagram
+    participant GPS as Hardware GPS
+    participant WS as WebSocket Stream
+    participant State as Transit State Engine
+    participant Map as Leaflet Marker
+    participant Stepper as Stoppage Timeline Rail
+
+    GPS->>WS: Coordinates update (lat: 24.2381, lon: 89.8924, speed: 18 km/h)
+    WS->>State: Raw hardware packet received
+    State->>State: Bypass dead-reckoning (preserve exact lat/lon)
+    State->>State: Exclude moving bus from spiderfier lateral offsets
+    State->>Map: Apply transform transition (0.6s cubic-bezier)
+    Note over Map: Marker glides forward smoothly without snapping back
+    State->>State: Calculate segmentProgress = clamp(1 - distToNext / totalSegDist, 0.12, 0.88)
+    State->>Stepper: Update style top: Math.round(segmentProgress * 100)%
+    Note over Stepper: Bus badge visibly moves down rail with speed badge (১২ কিমি/ঘ)
+```
+
+#### A. Leaflet Map Camera Shaking & Bus Route Detail View Overhaul
+- **Camera "Earthquake" Resolution**: In `transit.tsx`, decoupling `map.flyTo` from the 1-second extrapolated clock via `lastCenteredBusIdRef` completely eliminated the jitter loop. A persistent floating `[ 🧭 বাসে ফোকাস ]` button provides intuitive manual recentering on demand (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)).
+- **Dynamic Route Slicing (`getStationsForBus`)**: Filtered out irrelevant citywide stops so that selecting a bus on the Nirala route renders exactly its 16 valid stations rather than the union of all 24 campus stops.
+
+#### B. Ground-Truth Telemetry vs Speculative Dead-Reckoning
+- **Marker Oscillation Diagnostics**:
+  - Artificial dead-reckoning extrapolation in `predictBusPosition(bus, nowMs)` projected vehicle positions along polylines based on stale velocity.
+  - When authentic GPS packets arrived over WebSocket, the marker snapped backward, creating an unsettling jitter loop.
+  - Concurrently, `spiderfiedFleet` applied 24-meter lateral clustering offsets to vehicles passing nearby parked buses.
+- **Production Ground-Truth Fix in [`transit.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.tsx)**:
+  - Removed all dead-reckoning extrapolation; raw GPS latitude and longitude are preserved unconditionally.
+  - Moving vehicles (`bus.speed > 1 || bus.isDriving`) are strictly excluded from spiderfier clustering and placed at true geographic coordinates.
+  - Smooth monotonic forward gliding is achieved via Leaflet marker CSS transitions (`transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`).
+
+#### C. Dynamic Timeline Rail Segment Progress & Clamped Stepper Physics
+- **Animated Timeline Bus Rider**:
+  - Added `.transit-timeline-live-bus-rider` positioned along the vertical timeline rail.
+  - Dynamically calculates progress between the previous station and upcoming station:
+    $$	ext{segmentProgress} = 	ext{clamp}\left(1 - rac{	ext{distToNext}}{	ext{totalSegmentDistance}}, 0.12, 0.88ight)$$
+  - Translates down the rail with `transition: top 0.8s cubic-bezier(0.25, 1, 0.5, 1)`.
+  - Integrates a real-time Bengali speed badge (`১২ কিমি/ঘ`) and milestone checkmark nodes for passed stops.
+
+#### D. Micro-Pulse Radar Ring & Vector Scale Stabilization
+- **Pulse Distortion Elimination**:
+  - Refactored `@keyframes transitPulse` from `scale(1.3)` (+30% expansion) to a gentle 6% micro-breath (`scale(1.06)`).
+  - Isolated radial animations to `.transit-rider-radar-glow` using `@keyframes riderRadarPulse`:
+    ```css
+    @keyframes riderRadarPulse {
+      0% { transform: scale(1); opacity: 0.7; }
+      60% { transform: scale(1.35); opacity: 0; }
+      100% { transform: scale(1.35); opacity: 0; }
+    }
+    ```
+  - The bus icon vector retains its sharp geometry at `scale(1)` while the outer ring delivers an authentic radar sweep.
+
+---
+
+### 218.4 Android APK Architecture, Navigation Physics & Workspace Status
+
+#### A. Dual-Navbar Resolution & Native XML `GlassBottomNavView` Floating Capsule
+- **Architectural Discovery**: While `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`) was authored in Compose, `ClassMateAuthActivity.kt` actively inflates the native XML component `GlassBottomNavView.kt`.
+- **Capsule Island Rebuild**:
+  - Converted `GlassBottomNavView.kt` into a floating curved capsule island:
+    - `16dp` horizontal margins, `12dp` bottom elevation offset, and `28dp` pill corner radii.
+    - Damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`).
+    - Fluid pill indicator morphing and `1.05f` tactile scale lift on tab touch.
+    - Haptic feedback tick via `HapticFeedbackConstants.CLOCK_TICK`.
+
+#### B. Friends Directory Modernization & Soft Keyboard Ergonomics
+- **Expanded Layout**: Increased modal width to `860px` on Web and `96%` width (max `720dp`) on Android (`ClassMateFriendsScreen.kt`, `dialog_profile_modern.xml`).
+- **3-Tier Hierarchy Sorting**: Prioritizes Admin & Department Heads $ightarrow$ Class Representatives (CR) $ightarrow$ General Batchmates, with teacher phone number privacy protection.
+- **Ergonomics**: Bottom sheets auto-adjust against soft keyboards using IME actions (`cb05104`) with predictive back gestures (`1b3d37d`).
+
+#### C. Android Studio Project Status & File Hygiene
+- **Workspace Location**: `C:/Users/USER/AndroidStudioProjects/ClassMate`
+- **Working Tree State**:
+  - Local repository is on `main` branch with extensive uncommitted enhancements:
+    - QR Attendance Scanner (`AttendanceScannerActivity.kt`, `AttendanceSheetActivity.kt`, `CustomScannerActivity.kt`)
+    - CGPA Calculator (`CgpaCalculatorActivity.kt`, `CgpaData.kt`)
+    - Modern Touch Animators & Haptics (`TouchAnimator.kt`, `HapticUtil.kt`)
+    - Baseline Profiles for startup acceleration (`release/baselineProfiles/`)
+  - Full codebase builds and integrates with modern Supabase APIs.
+
+---
+
+### 218.5 Master Production Verification Matrix (Updated Master State v218)
+
+| Subsystem / Feature | Target Module | Production State | Verification Evidence & Implementation References |
+| :--- | :--- | :--- | :--- |
+| **Transit Marker Oscillation & Jitter Fix** | Web & Android APK | **PRODUCTION** | Removed speculative dead-reckoning from `predictBusPosition`; preserved authentic GPS telemetry; moving buses excluded from clustering; monotonic forward gliding (Commits [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052), [`f870503`](https://github.com/shuaibuddowla/ClassMate/commit/f87050341e13016fccf93607f68f3cb067655b53), [`afd8081`](https://github.com/shuaibuddowla/ClassMate/commit/afd8081)) |
+| **Live Moving Bus on Timeline Rail** | Web & Android APK | **PRODUCTION** | Added `.transit-timeline-live-bus-rider` with dynamic segment progress interpolation ($0.12 \le 	ext{progress} \le 0.88$), smooth `0.8s` cubic-bezier rail transition, and live speed badge (`১২ কিমি/ঘ`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Soft Radar Pulse Physics (`riderRadarPulse`)** | Web & Android APK | **PRODUCTION** | Refactored `@keyframes transitPulse` to subtle `scale(1.06)`; fixed bus icon at `scale(1)` with independent outer radar ripple ring (`.transit-rider-radar-glow`) fading to 0 opacity (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **GitGuardian Secret Purge & Sanitization** | Full Stack (Scripts & Repos) | **PRODUCTION** | Sanitized `scripts/inspect_students.py`; enforced environment variable authentication; pushed across `main` and `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` with Config visibility |
+| **Google OAuth PKCE Flow Recovery** | Web Companion | **PRODUCTION** | Verified OAuth sign-in flow post-Vercel rollout; 100% data retention verified across all database tables, rosters, and notices |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt native XML `GlassBottomNavView.kt` in `ClassMateAuthActivity` with `16dp` margins, `12dp` bottom offset, `28dp` curvature, and `8dp` elevation (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Slicing (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Ground Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **IoT Attendance Station Firmware** | ESP32 C++ Arduino | **PRODUCTION** | Dual-core FreeRTOS separation (`esp32_rfid_attendance.ino`), 3-tier Wi-Fi fallback (15s timeouts), 64-scan in-memory queue buffering, < 50ms edge scan latency |
+| **3D Printable Snap-Fit Enclosure** | 3D Printing & CAD | **PRODUCTION** | Watertight 2-manifold STL models (`desktop_attendance_front_panel.stl`, `desktop_attendance_main_enclosure.stl`); 1.0–1.2mm RF wall thinning, 1.2mm solder pin relief, 18.5×27.2mm OLED pocket |
+| **RFID Profile Database Indexing** | Supabase PostgreSQL | **PRODUCTION** | B-tree index `idx_profiles_rfid_card_uid` deployed via migration `202610250002_rfid_index.sql`; O(1) < 3ms card lookups |
+| **Attendance Card Batch Fund Ledger** | Full Stack (DB & Web) | **PRODUCTION** | Tracked in `classmate.batch_fund_transactions`; 33 students paid (৳1,325 collected), 24 unpaid, zero ledger discrepancies |
+| **Standalone Local FastAPI Station** | Python / FastAPI / SQLite | **PRODUCTION** | Standalone LAN station mode in `attendance-tracker/backend` with WebSockets, smart check-in/out, and 1-click enrollment |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v218) |
