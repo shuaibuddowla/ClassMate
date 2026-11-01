@@ -96,13 +96,17 @@ class FoundCardBottomSheet(
             dialog.dismiss()
         }
 
-        // 1. Resolve offline payload (from NDEF or local cache)
-        resolveOfflineData()
+        val uid = activePayload.uid.uppercase(Locale.US)
+        tvCardUidBadge.text = if (uid.isNotBlank()) "UID: ••••${uid.takeLast(4)}" else "NFC Tag"
 
-        // 2. Render resolved offline state
-        renderOfflineState()
+        // Online-only presentation (skip offline per user request)
+        layoutRegisteredStudent.visibility = View.GONE
+        layoutUnregisteredCard.visibility = View.GONE
+        progressLoadingStudent.visibility = View.VISIBLE
+        tvSheetHeaderSubtitle.text = "Verifying Smart Card ••••${uid.takeLast(4)}..."
+        setupButtons()
 
-        // 3. Online Hydration (Supabase)
+        // Hydrate from Supabase live
         hydrateOnlineData()
 
         dialog.show()
@@ -376,10 +380,7 @@ class FoundCardBottomSheet(
                     activePayload = updatedPayload
                     NfcCardLocalCache.saveCard(activity, updatedPayload, onlineAvatar, attendancePct)
                 } else {
-                    // Only show unregistered if offline didn't find anything either
-                    if (!activePayload.hasStudentInfo) {
-                        showUnregisteredState(uid)
-                    }
+                    showUnregisteredState(uid)
                 }
             } catch (_: Exception) {
                 progressLoadingStudent.visibility = View.GONE

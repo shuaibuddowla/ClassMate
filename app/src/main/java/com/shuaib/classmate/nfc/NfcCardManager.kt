@@ -66,6 +66,14 @@ object NfcCardManager {
 
         val uri = intent.data
         if (uri != null) {
+            val path = uri.path.orEmpty()
+            if (path.startsWith("/c/")) {
+                val pathUid = path.removePrefix("/c/").trim().uppercase(Locale.US)
+                if (pathUid.isNotEmpty()) return pathUid
+            } else if (path.startsWith("/card/")) {
+                val pathUid = path.removePrefix("/card/").trim().uppercase(Locale.US)
+                if (pathUid.isNotEmpty()) return pathUid
+            }
             val qUid = uri.getQueryParameter("uid")?.trim()
             if (!qUid.isNullOrEmpty()) return qUid.uppercase(Locale.US)
         }
@@ -181,20 +189,11 @@ object NfcCardManager {
      * Record 2: Android Application Record (`com.shuaib.classmate`) so the OS routes cleanly.
      */
     fun createNdefMessage(payload: StudentCardPayload): NdefMessage {
-        val builder = Uri.Builder()
-            .scheme(SCHEME)
-            .authority(HOST)
-            .appendQueryParameter("uid", payload.uid)
-            .appendQueryParameter("roll", payload.roll)
-            .appendQueryParameter("name", payload.name)
-
-        if (payload.studentId.isNotBlank()) builder.appendQueryParameter("id", payload.studentId)
-        if (payload.batch.isNotBlank()) builder.appendQueryParameter("batch", payload.batch)
-        if (payload.dept.isNotBlank()) builder.appendQueryParameter("dept", payload.dept)
-        if (payload.phone.isNotBlank()) builder.appendQueryParameter("phone", payload.phone)
-        if (payload.blood.isNotBlank()) builder.appendQueryParameter("blood", payload.blood)
-
-        val uriRecord = NdefRecord.createUri(builder.build())
+        val cleanUid = payload.uid.trim().lowercase(Locale.US)
+        // Public web URL: https://classmatebd.vercel.app/c/<card_uid>
+        val webUri = Uri.parse("https://$WEB_HOST/c/$cleanUid")
+        val uriRecord = NdefRecord.createUri(webUri)
+        // Android Application Record: ensures phone opens ClassMate instantly with 0 chooser dialog
         val aarRecord = NdefRecord.createApplicationRecord(AAR_PACKAGE)
 
         return NdefMessage(arrayOf(uriRecord, aarRecord))

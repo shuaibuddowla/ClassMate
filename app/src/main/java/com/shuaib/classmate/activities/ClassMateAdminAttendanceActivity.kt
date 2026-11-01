@@ -87,6 +87,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     private var selectedStudentObj: JSONObject? = null
     private var nfcAdapter: NfcAdapter? = null
     private var nfcPendingIntent: PendingIntent? = null
+    private var activeCardWriteDialog: androidx.appcompat.app.AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -910,7 +911,15 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         btnWritePhysicalCard?.visibility = if (uid.isNotEmpty() && uid != "null") View.VISIBLE else View.GONE
         btnWritePhysicalCard?.setOnClickListener {
             ClassMateHaptics.selection(it)
-            Toast.makeText(this, "Ready: Touch card to the back of phone to write.", Toast.LENGTH_LONG).show()
+            val writeDialog = MaterialAlertDialogBuilder(this)
+                .setTitle("Write Card for $name")
+                .setMessage("Touch the NFC card to the back of your phone now.\n\nThis will program the card with the instant ClassMate shortcut and public web identity link.")
+                .setIcon(R.drawable.ic_rfid_signal)
+                .setNegativeButton("Cancel", null)
+                .create()
+            activeCardWriteDialog = writeDialog
+            writeDialog.setOnDismissListener { activeCardWriteDialog = null }
+            writeDialog.show()
         }
 
         if (uid.isNotEmpty() && uid != "null") {
@@ -1107,6 +1116,33 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
             } else {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+            }
+
+            if (activeCardWriteDialog != null && student != null) {
+                if (tag != null) {
+                    val payload = NfcCardManager.StudentCardPayload(
+                        uid = scannedUid,
+                        studentId = student.optString("student_id"),
+                        name = student.optString("full_name"),
+                        roll = student.optString("roll"),
+                        batch = batchLabel,
+                        dept = "MBSTU",
+                        phone = student.optString("phone", student.optString("mobile_number", "")),
+                        blood = student.optString("blood_group", "")
+                    )
+                    val writeRes = NfcCardManager.writeStudentCard(tag, payload)
+                    activeCardWriteDialog?.dismiss()
+                    activeCardWriteDialog = null
+                    if (writeRes.isSuccess) {
+                        ClassMateHaptics.selection(window.decorView)
+                        Toast.makeText(this, "✓ Card written & programmed for ${student.optString("full_name")}!", Toast.LENGTH_LONG).show()
+                        saveStudentCard(true)
+                    } else {
+                        ClassMateHaptics.selection(window.decorView)
+                        Toast.makeText(this, "⚠️ Failed to write card: ${writeRes.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                    return
+                }
             }
 
             if (student != null) {
