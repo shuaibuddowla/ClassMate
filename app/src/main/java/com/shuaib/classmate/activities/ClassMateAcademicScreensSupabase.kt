@@ -9626,7 +9626,7 @@ internal class ClassMateAcademicScreensSupabase(
 
         val scroll = root.v<View>(R.id.nestedScrollView)
 
-
+        val selectedBatch = batchId()
 
         val isFirst = (librarySnapshot == null || librarySnapshot?.batchId != selectedBatch) && !refresh.isRefreshing
 
@@ -9639,10 +9639,6 @@ internal class ClassMateAcademicScreensSupabase(
             shimmer?.visibility = View.GONE
             scroll.visibility = View.VISIBLE
         }
-
-
-
-        val selectedBatch = batchId()
 
 
 
