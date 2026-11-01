@@ -1307,7 +1307,13 @@ function NoticeCard({
       )}
       <div className="notice-content">
         <h2
-          className={isOverflow ? "clickable" : ""}
+          className={`${isOverflow ? "clickable" : ""} ${
+            (n.title?.length || 0) > 100
+              ? "notice-title-shrink-lg"
+              : (n.title?.length || 0) > 50
+              ? "notice-title-shrink-md"
+              : ""
+          }`}
           onClick={() => {
             if (isOverflow) setExpanded(!expanded);
           }}
@@ -2076,22 +2082,64 @@ function M3PollView({
   onVote,
 }: {
   poll: Row;
-  onVote: (optionId: string) => void;
+  onVote: (optionId: string) => Promise<void> | void;
 }) {
-  const [voting, setVoting] = useState(false);
-  const totalVotes = Number(poll.total_votes || 0);
-  const totalVoters = Number(poll.total_voters || 0);
-  const isClosed = Boolean(poll.is_closed);
-  const isMultiple = Boolean(poll.is_multiple_choice);
-  const isAnonymous = Boolean(poll.is_anonymous);
+  const [optimisticPoll, setOptimisticPoll] = useState<Row | null>(null);
+  const activePoll = optimisticPoll || poll;
+
+  useEffect(() => {
+    setOptimisticPoll(null);
+  }, [poll]);
+
+  const totalVotes = Number(activePoll.total_votes || 0);
+  const totalVoters = Number(activePoll.total_voters || 0);
+  const isClosed = Boolean(activePoll.is_closed);
+  const isMultiple = Boolean(activePoll.is_multiple_choice);
+  const isAnonymous = Boolean(activePoll.is_anonymous);
 
   const handleOptionClick = async (optionId: string) => {
-    if (voting || isClosed) return;
-    setVoting(true);
+    if (isClosed) return;
+
+    const currentOptions: Row[] = activePoll.options || [];
+    const currentVotedIds = currentOptions.filter((o) => o.is_my_vote).map((o) => o.id);
+    const newSelectedIds = isMultiple
+      ? currentVotedIds.includes(optionId)
+        ? currentVotedIds.filter((id) => id !== optionId)
+        : [...currentVotedIds, optionId]
+      : [optionId];
+
+    if (!isMultiple && currentVotedIds.length === 1 && currentVotedIds[0] === optionId) {
+      return;
+    }
+
+    let optTotalVotes = 0;
+    const newOptions = currentOptions.map((opt) => {
+      const wasVoted = Boolean(opt.is_my_vote);
+      const isNowVoted = newSelectedIds.includes(opt.id);
+      let count = Number(opt.votes_count || 0);
+      if (!wasVoted && isNowVoted) count += 1;
+      else if (wasVoted && !isNowVoted) count = Math.max(0, count - 1);
+      optTotalVotes += count;
+      return { ...opt, is_my_vote: isNowVoted, votes_count: count };
+    });
+
+    let optTotalVoters = Number(activePoll.total_voters || 0);
+    const hadVotes = currentVotedIds.length > 0;
+    const hasVotes = newSelectedIds.length > 0;
+    if (!hadVotes && hasVotes) optTotalVoters += 1;
+    else if (hadVotes && !hasVotes) optTotalVoters = Math.max(0, optTotalVoters - 1);
+
+    setOptimisticPoll({
+      ...activePoll,
+      options: newOptions,
+      total_votes: optTotalVotes,
+      total_voters: optTotalVoters,
+    });
+
     try {
       await onVote(optionId);
-    } finally {
-      setVoting(false);
+    } catch {
+      setOptimisticPoll(null);
     }
   };
 
@@ -2117,7 +2165,7 @@ function M3PollView({
       </div>
 
       <div className="m3-poll-options">
-        {(poll.options || []).map((opt: Row) => {
+        {(activePoll.options || []).map((opt: Row) => {
           const votesCount = Number(opt.votes_count || 0);
           const pct = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
           const isSelected = Boolean(opt.is_my_vote);
@@ -2127,7 +2175,7 @@ function M3PollView({
               key={opt.id}
               type="button"
               className={`m3-poll-option-btn ${isSelected ? "selected" : ""}`}
-              disabled={voting || isClosed}
+              disabled={isClosed}
               onClick={() => handleOptionClick(opt.id)}
             >
               <div className="m3-poll-track" style={{ width: `${pct}%` }} />

@@ -1559,6 +1559,14 @@ strong {
   user-select: text;
   -webkit-user-select: text;
 }
+.notice-content h2.notice-title-shrink-md {
+  font-size: 17px !important;
+  line-height: 1.35 !important;
+}
+.notice-content h2.notice-title-shrink-lg {
+  font-size: 14.5px !important;
+  line-height: 1.3 !important;
+}
 .notice-body {
   white-space: pre-wrap;
   overflow-wrap: break-word;

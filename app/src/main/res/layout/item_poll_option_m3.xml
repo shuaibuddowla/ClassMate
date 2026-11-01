@@ -8,6 +8,7 @@
     android:layout_marginBottom="8dp"
     android:clickable="true"
     android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
     app:cardBackgroundColor="@android:color/transparent"
@@ -16,13 +17,17 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:focusable="false">
 
         <!-- Fluid Progress Fill Track -->
         <View
             android:id="@+id/viewProgressTrack"
             android:layout_width="0dp"
             android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
             android:background="#248B5CF6" />
 
         <LinearLayout
@@ -30,6 +35,8 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
+            android:clickable="false"
+            android:focusable="false"
             android:paddingHorizontal="14dp"
             android:paddingVertical="11dp">
 
@@ -39,6 +46,8 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginEnd="10dp"
+                android:clickable="false"
+                android:focusable="false"
                 android:src="@drawable/ic_poll_circle_unselected" />
 
             <!-- Option Text -->
@@ -50,6 +59,8 @@
                 android:fontFamily="sans-serif-medium"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="14sp"
+                android:clickable="false"
+                android:focusable="false"
                 android:includeFontPadding="false" />
 
             <!-- Stats Block (Percentage and Vote count) -->
@@ -58,6 +69,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:gravity="end"
+                android:clickable="false"
+                android:focusable="false"
                 android:orientation="vertical">
 
                 <TextView
@@ -68,6 +81,8 @@
                     android:textColor="@color/cm_text_primary"
                     android:textSize="13sp"
                     android:textStyle="bold"
+                    android:clickable="false"
+                    android:focusable="false"
                     android:includeFontPadding="false" />
 
                 <TextView
@@ -76,6 +91,8 @@
                     android:layout_height="wrap_content"
                     android:textColor="@color/cm_text_muted"
                     android:textSize="10.5sp"
+                    android:clickable="false"
+                    android:focusable="false"
                     android:includeFontPadding="false" />
             </LinearLayout>
         </LinearLayout>

@@ -396,6 +396,7 @@ internal class ClassMateAcademicScreensSupabase(
 
     private val noticeReaderPreviews = mutableMapOf<String, List<JSONObject>>()
     private val noticePolls = mutableMapOf<String, JSONObject>()
+    private val pollVoteJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
 
 
@@ -5513,11 +5514,18 @@ internal class ClassMateAcademicScreensSupabase(
 
                 val tvTitle = card.v<TextView>(R.id.tvTitle)
 
-
-
-                tvTitle.maxLines = if (isExpanded) Int.MAX_VALUE else 3
-
-
+                val titleLen = currentTitle.length
+                val dynamicSp = when {
+                    titleLen > 110 -> 13f
+                    titleLen > 65 -> 14.5f
+                    titleLen > 35 -> 16f
+                    else -> 18f
+                }
+                tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, dynamicSp)
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    tvTitle, 12, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP
+                )
+                tvTitle.maxLines = if (isExpanded) Int.MAX_VALUE else (if (titleLen > 80) 3 else 2)
 
                 tvTitle.text = ClassMateNoticeText.styled(tvTitle, currentTitle, search)
 
@@ -5932,40 +5940,103 @@ internal class ClassMateAcademicScreensSupabase(
                             track.setBackgroundColor(0x1F8B5CF6.toInt())
                         }
 
-                        track.post {
+                        val applyTrackWidth = {
                             val totalW = cardOption.width
                             if (totalW > 0) {
+                                val targetW = (totalW * (pct / 100f)).toInt()
                                 val lp = track.layoutParams
-                                lp.width = (totalW * (pct / 100f)).toInt()
-                                track.layoutParams = lp
+                                if (lp.width != targetW) {
+                                    lp.width = targetW
+                                    track.layoutParams = lp
+                                }
                             }
+                        }
+                        if (cardOption.width > 0) {
+                            applyTrackWidth()
+                        } else {
+                            track.post { applyTrackWidth() }
                         }
 
                         if (!isClosed) {
                             cardOption.setOnClickListener {
                                 it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                                val pollId = pollData.getString("poll_id")
-                                launch(root) {
+                                val pollId = pollData.optString("poll_id").ifBlank { pollData.optString("id") }
+                                if (pollId.isBlank()) return@setOnClickListener
+
+                                val backupPoll = JSONObject(pollData.toString())
+
+                                val currentVotedIds = mutableListOf<String>()
+                                for (j in 0 until optionsArr.length()) {
+                                    val o = optionsArr.getJSONObject(j)
+                                    if (o.optBoolean("is_my_vote")) currentVotedIds.add(o.getString("id"))
+                                }
+
+                                val selectedIds = if (isMultiple) {
+                                    if (currentVotedIds.contains(optId)) currentVotedIds.filter { it != optId }
+                                    else currentVotedIds + optId
+                                } else {
+                                    listOf(optId)
+                                }
+
+                                if (!isMultiple && currentVotedIds == listOf(optId)) {
+                                    return@setOnClickListener
+                                }
+
+                                val optimisticOptions = JSONArray()
+                                var optimisticTotalVotes = 0
+                                val previouslyVotedAny = currentVotedIds.isNotEmpty()
+                                val willVoteAny = selectedIds.isNotEmpty()
+
+                                for (j in 0 until optionsArr.length()) {
+                                    val o = optionsArr.getJSONObject(j)
+                                    val oId = o.getString("id")
+                                    val wasVoted = o.optBoolean("is_my_vote")
+                                    val isNowVoted = selectedIds.contains(oId)
+                                    var vCount = o.optInt("votes_count", 0)
+
+                                    if (!wasVoted && isNowVoted) {
+                                        vCount += 1
+                                    } else if (wasVoted && !isNowVoted) {
+                                        vCount = (vCount - 1).coerceAtLeast(0)
+                                    }
+                                    optimisticTotalVotes += vCount
+
+                                    val newOpt = JSONObject(o.toString())
+                                        .put("is_my_vote", isNowVoted)
+                                        .put("votes_count", vCount)
+                                    optimisticOptions.put(newOpt)
+                                }
+
+                                var optimisticTotalVoters = pollData.optInt("total_voters", 0)
+                                if (!previouslyVotedAny && willVoteAny) {
+                                    optimisticTotalVoters += 1
+                                } else if (previouslyVotedAny && !willVoteAny) {
+                                    optimisticTotalVoters = (optimisticTotalVoters - 1).coerceAtLeast(0)
+                                }
+
+                                val optimisticPoll = JSONObject(pollData.toString())
+                                    .put("options", optimisticOptions)
+                                    .put("total_votes", optimisticTotalVotes)
+                                    .put("total_voters", optimisticTotalVoters)
+
+                                noticePolls[noticeId] = optimisticPoll
+                                renderNoticeFeed(root)
+
+                                pollVoteJobs[pollId]?.cancel()
+                                pollVoteJobs[pollId] = scope.launch {
                                     try {
-                                        val currentVotedIds = mutableListOf<String>()
-                                        for (j in 0 until optionsArr.length()) {
-                                            val o = optionsArr.getJSONObject(j)
-                                            if (o.optBoolean("is_my_vote")) currentVotedIds.add(o.getString("id"))
-                                        }
-                                        val selectedIds = if (isMultiple) {
-                                            if (currentVotedIds.contains(optId)) currentVotedIds.filter { it != optId }
-                                            else currentVotedIds + optId
-                                        } else listOf(optId)
-
-                                        if (selectedIds.isEmpty()) return@launch
-
                                         val res = ClassMateAuthApi.rpc("cast_poll_vote", JSONObject()
                                             .put("target_poll", pollId)
                                             .put("selected_option_ids", JSONArray(selectedIds)))
                                         noticePolls[noticeId] = res
                                         renderNoticeFeed(root)
                                     } catch (e: Exception) {
-                                        Toast.makeText(activity, e.message ?: "Vote failed", Toast.LENGTH_SHORT).show()
+                                        if (e is kotlinx.coroutines.CancellationException) return@launch
+                                        noticePolls[noticeId] = backupPoll
+                                        renderNoticeFeed(root)
+                                        if (root.isAttachedToWindow) {
+                                            Toast.makeText(activity, e.message ?: "Vote failed", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             }
@@ -6195,9 +6266,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
                 val signature=listOf(item.toString(),noticeStates[id]?.toString(),noticeReadCounts[id]?.toString(),
-
-
-
+                    noticePolls[id]?.toString(),
                     noticeReaderPreviews[id]?.joinToString { it.toString() },noticeTranslations[id]?.toString(),
 
 
