@@ -36,6 +36,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.bumptech.glide.Glide
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.firebase.auth.FirebaseAuth
 import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.*
@@ -102,7 +104,15 @@ private fun ClassMateHamburgerModalSheet(
     val isCr = remember(p) { p.optBoolean("is_cr") }
     val isTeacher = role == "teacher"
     val currentBatch = remember(batchLabel) { batchLabel().ifBlank { "MBSTU" } }
-    val avatarUrl = remember(p) { p.optString("avatar_url").takeUnless { it.isBlank() || it.equals("null", true) } }
+    val avatarUrl = remember(p) {
+        val fromProfile = p.optString("avatar_url").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("photo_url").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("photoUrl").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("picture").takeUnless { it.isBlank() || it.equals("null", true) }
+        fromProfile
+            ?: GoogleSignIn.getLastSignedInAccount(activity)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            ?: FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+    }
 
     val jakartaBold = remember { FontFamily(Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold)) }
     val jakartaExtraBold = remember { FontFamily(Font(R.font.plus_jakarta_sans_extrabold, FontWeight.ExtraBold)) }
@@ -440,15 +450,19 @@ private fun DrawerProfileCard(
                 factory = { ctx ->
                     ImageView(ctx).apply {
                         scaleType = ImageView.ScaleType.CENTER_CROP
-                        if (!avatarUrl.isNullOrBlank()) {
-                            Glide.with(ctx)
-                                .load(avatarUrl)
-                                .circleCrop()
-                                .placeholder(R.drawable.bg_circle_avatar_placeholder)
-                                .into(this)
-                        } else {
-                            setImageResource(R.drawable.bg_circle_avatar_placeholder)
-                        }
+                    }
+                },
+                update = { imageView ->
+                    val url = avatarUrl
+                    if (!url.isNullOrBlank()) {
+                        Glide.with(imageView.context)
+                            .load(url)
+                            .circleCrop()
+                            .placeholder(R.drawable.bg_circle_avatar_placeholder)
+                            .error(R.drawable.bg_circle_avatar_placeholder)
+                            .into(imageView)
+                    } else {
+                        imageView.setImageResource(R.drawable.bg_circle_avatar_placeholder)
                     }
                 },
                 modifier = Modifier
