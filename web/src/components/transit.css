@@ -2855,41 +2855,90 @@
   flex-shrink: 0;
 }
 
-/* Compact Live Telemetry Banner (80px replacement for bulky hero card) */
-.transit-detail-telemetry-banner {
-  background: linear-gradient(145deg, #fff5f8, #ffffff);
-  border: 1px solid #f2cfdb;
-  border-radius: 18px;
-  padding: 12px 14px;
-  box-shadow: 0 4px 16px rgba(100, 20, 50, 0.06);
+/* Sleek Segmented Control for Direction */
+.transit-detail-segmented-control {
+  display: flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 12px;
+  gap: 3px;
+}
+
+.transit-detail-seg-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.transit-detail-seg-btn.active {
+  background: #ffffff;
+  color: #b71454;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Unified Live Status & Schedule Card */
+.transit-detail-live-card {
+  background: #ffffff;
+  border: 1px solid #fce7f3;
+  border-left: 4px solid var(--bus-accent, #b71454);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.transit-telemetry-top {
+.transit-detail-live-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.transit-telemetry-approaching {
-  display: inline-flex;
+.transit-detail-live-stop {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
 
-.transit-telemetry-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--transit-pink, #b71454);
-  white-space: nowrap;
+.transit-detail-stop-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #fdf2f8;
+  color: #b71454;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
 }
 
-.transit-telemetry-stop-name {
+.transit-detail-stop-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.transit-detail-stop-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transit-detail-stop-name {
   font-size: 13.5px;
   font-weight: 800;
   color: #0f172a;
@@ -2898,57 +2947,163 @@
   text-overflow: ellipsis;
 }
 
-.transit-telemetry-user-dist {
-  display: inline-flex;
+.transit-detail-live-eta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.transit-detail-eta-badge {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transit-detail-dist-sub {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.transit-detail-live-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #f1f5f9;
+  font-size: 11px;
+}
+
+.transit-detail-sched-info {
+  display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2.5px 8px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
-  font-size: 10.5px;
+  color: #475569;
+  min-width: 0;
+}
+
+.transit-detail-clock-icon {
+  color: #b71454;
+  flex-shrink: 0;
+}
+
+.transit-detail-sched-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.transit-detail-sched-val {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.transit-detail-sched-countdown {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.transit-detail-user-dist {
+  color: #059669;
   font-weight: 700;
+  font-size: 10.5px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.transit-telemetry-pills-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #fce7f3;
-  border-radius: 12px;
-  padding: 6px 8px;
+.transit-detail-loc-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
 }
 
-.transit-telemetry-pill {
+/* Corridor Section Header */
+.transit-detail-section-bar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 1px;
-}
-
-.transit-telemetry-pill.status {
-  flex-direction: row;
-  gap: 4px;
-}
-
-.transit-pill-key {
-  font-size: 9px;
-  font-weight: 600;
+  justify-content: space-between;
+  padding: 2px 2px 0;
   color: #64748b;
-  text-transform: uppercase;
 }
 
-.transit-pill-val {
+.transit-detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.transit-detail-section-hint {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* Call Button in Header */
+.transit-detail-call-btn {
+  background: #fdf2f8;
+  color: #b71454;
+  border: 1px solid #fbcfe8;
+  border-radius: 999px;
+  padding: 5px 10px;
   font-size: 11.5px;
-  font-weight: 800;
-  color: #0f172a;
-  white-space: nowrap;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.transit-detail-call-btn:hover {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* Status Badge in Header */
+.transit-detail-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.transit-detail-status-badge.moving {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.transit-detail-status-badge.standby {
+  background: #fefce8;
+  color: #ca8a04;
+}
+
+.transit-detail-status-badge.offline {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+/* Active stop pill in list */
+.transit-active-stop-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fce7f3;
+  color: #b71454;
+  margin-left: 6px;
 }
 
 /* Hero Live Tracking Card */

@@ -31,7 +31,8 @@ import {
   SlidersHorizontal,
   Clock,
   Check,
-  AlertCircle
+  AlertCircle,
+  PhoneCall
 } from "lucide-react";
 
 /* ==========================================================================
@@ -141,6 +142,27 @@ export const KNOWN_BUS_INFO: Record<string, { nameBn: string; nameEn: string; co
   SB5448: { nameBn: "রাখালী", nameEn: "Rakhali", color: "#e11d48", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" },
   SB5488: { nameBn: "রাখালী", nameEn: "Rakhali", color: "#e11d48", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" }
 };
+
+/**
+ * Resolves the accurate stoppage list for a given bus route:
+ * - Campus ⇄ Nirala (16 stops: Mukto Mancho to Nirala More)
+ * - Campus ⇄ Puraton Bus Stand (18 stops: Mukto Mancho to Puraton Bus Stand)
+ * - Full Corridor / District (24 stops: Mukto Mancho to District Bus Stop)
+ */
+export function getStationsForBus(busId?: string, customRoute?: string): CorridorStation[] {
+  const route = customRoute || (busId ? KNOWN_BUS_INFO[busId]?.defaultRoute : "");
+  if (!route) return CORRIDOR_STATIONS.slice(0, 16);
+
+  const lower = route.toLowerCase();
+  if (lower.includes("পুরাতন") || lower.includes("puraton")) {
+    return CORRIDOR_STATIONS.slice(0, 18);
+  }
+  if (lower.includes("ডিস্ট্রিক্ট") || lower.includes("জেলা") || lower.includes("district")) {
+    return CORRIDOR_STATIONS.slice(0, 24);
+  }
+  // Standard MBSTU student route is Campus to Nirala More (16 stations)
+  return CORRIDOR_STATIONS.slice(0, 16);
+}
 
 export const GPS_IMEI_TO_BUS: Record<string, string> = {
   "353701091171641": "SB0001",
@@ -577,6 +599,7 @@ export function Transit({ ctx }: { ctx?: any }) {
   const stopMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const campusCircleRef = useRef<L.Circle | null>(null);
   const demoBusInjectedRef = useRef(false);
+  const lastCenteredBusIdRef = useRef<string | null>(null);
 
   // User Geolocation State (Real-time device tracking)
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -1099,6 +1122,12 @@ export function Transit({ ctx }: { ctx?: any }) {
 
     const dir = state.tripDirection;
     let currIdx = state.lastStationIndex;
+    const busStations = getStationsForBus(bus.id, bus.routeName);
+    const maxStationIdx = Math.max(0, busStations.length - 1);
+    if (currIdx > maxStationIdx) {
+      currIdx = maxStationIdx;
+      state.lastStationIndex = currIdx;
+    }
 
     if (dir === "to_city") {
       const targetM = CORRIDOR_MILESTONES_KM[currIdx] ?? 0;
@@ -1106,7 +1135,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       if (Math.abs(distToTarget) <= 0.035) {
         state.inArrivalZone = true;
       }
-      if (milestoneKm >= targetM + 0.020 && currIdx < CORRIDOR_STATIONS.length - 1) {
+      if (milestoneKm >= targetM + 0.020 && currIdx < maxStationIdx) {
         state.lastStationIndex = currIdx + 1;
         state.inArrivalZone = false;
       }
@@ -1123,7 +1152,7 @@ export function Transit({ ctx }: { ctx?: any }) {
       }
     }
 
-    const nextStation = CORRIDOR_STATIONS[state.lastStationIndex] || CORRIDOR_STATIONS[0];
+    const nextStation = busStations[state.lastStationIndex] || busStations[0] || CORRIDOR_STATIONS[0];
     const distanceMeters = getDistanceMeters(bus.lat, bus.lon, nextStation.lat, nextStation.lon);
     const distanceKm = (distanceMeters / 1000).toFixed(2);
     const effectiveSpeed = Math.max(bus.speed, 22);
@@ -1253,6 +1282,7 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (busId) {
       setSelectedBusId(busId);
       setDetailBusId(busId);
+      lastCenteredBusIdRef.current = busId;
       const isAlreadyLive = displayFleet.some((b) => b.id === busId && !b.isEstimated);
       if (isAlreadyLive) {
         setBusLocationLoading(false);
@@ -1300,13 +1330,16 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (!isDemoMode) {
       const existingDemoBus = fleet.some((bus) => bus.id === "SB0003");
       if (!existingDemoBus) {
-        const template = INITIAL_FLEET.find((bus) => bus.id === "SB0003") || INITIAL_FLEET[0];
+        const info = KNOWN_BUS_INFO["SB0003"] || { nameBn: "সোনারতরী", nameEn: "Sonartori", color: "#0284c7", defaultRoute: "ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)" };
         const [lat, lon] = REAL_STREET_POLYLINE[0];
         setFleet((current) => [
           ...current,
           {
-            ...template,
             id: "SB0003",
+            nameBn: info.nameBn,
+            nameEn: info.nameEn,
+            color: info.color,
+            routeName: info.defaultRoute,
             lat,
             lon,
             speed: 32,
@@ -1422,16 +1455,25 @@ export function Transit({ ctx }: { ctx?: any }) {
     }
   }, [displayFleet, busLocationLoading, selectedBusId]);
 
-  // Auto-center camera when a bus is newly selected and loaded
+  // Auto-center camera ONLY ONCE when a bus is newly selected and loaded (Zero Earthquake Loop)
   useEffect(() => {
+    if (!selectedBusId) {
+      lastCenteredBusIdRef.current = null;
+      return;
+    }
     if (busLocationLoading || !selectedBus || !mapRef.current) return;
+    if (lastCenteredBusIdRef.current === selectedBusId) return;
+
     if (!selectedBus.isEstimated) {
+      lastCenteredBusIdRef.current = selectedBusId;
       const timer = setTimeout(() => {
-        centerSelectedBus();
+        if (mapRef.current && selectedBus) {
+          mapRef.current.flyTo([selectedBus.lat, selectedBus.lon], 17, { animate: true, duration: 0.8 });
+        }
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [selectedBus?.id, selectedBus?.lat, selectedBus?.lon, busLocationLoading, centerSelectedBus]);
+  }, [selectedBusId, busLocationLoading, selectedBus?.isEstimated]);
 
   // Fly to campus
   const recenterCampus = useCallback(() => {
@@ -2551,26 +2593,41 @@ export function Transit({ ctx }: { ctx?: any }) {
   const activeDirection = timelineDirectionOverride || detectedDirection;
   const isToCampus = activeDirection === "to_campus";
 
+  // Get bus-specific stations (e.g. Nirala route: 16 stops, Puraton: 18 stops)
+  const busBaseStations = useMemo(() => {
+    return getStationsForBus(detailBus?.id, detailBus?.routeName);
+  }, [detailBus?.id, detailBus?.routeName]);
+
   // Ordered stations in active travel direction with accurate corridor distances
   const activeRouteStations = useMemo(() => {
-    const totalKm = CORRIDOR_MILESTONES_KM[CORRIDOR_MILESTONES_KM.length - 1] ?? 6.3;
+    const count = busBaseStations.length;
+    const lastOrigIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === busBaseStations[count - 1]?.id);
+    const maxKm = lastOrigIdx >= 0 && CORRIDOR_MILESTONES_KM[lastOrigIdx] !== undefined
+      ? CORRIDOR_MILESTONES_KM[lastOrigIdx]
+      : (count * 0.4);
+
     if (isToCampus) {
-      return [...CORRIDOR_STATIONS].reverse().map((st, i) => {
+      return [...busBaseStations].reverse().map((st, i) => {
         const origIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === st.id);
-        const origKm = CORRIDOR_MILESTONES_KM[origIdx] ?? 0;
+        const origKm = origIdx >= 0 ? (CORRIDOR_MILESTONES_KM[origIdx] ?? (origIdx * 0.4)) : ((count - 1 - i) * 0.4);
         return {
           ...st,
           activeOrder: i + 1,
-          activeDistanceKm: Math.max(0, parseFloat((totalKm - origKm).toFixed(2)))
+          activeDistanceKm: Math.max(0, parseFloat((maxKm - origKm).toFixed(2)))
         };
       });
     }
-    return CORRIDOR_STATIONS.map((st, i) => ({
-      ...st,
-      activeOrder: i + 1,
-      activeDistanceKm: CORRIDOR_MILESTONES_KM[i] ?? 0
-    }));
-  }, [isToCampus]);
+
+    return busBaseStations.map((st, i) => {
+      const origIdx = CORRIDOR_STATIONS.findIndex((s) => s.id === st.id);
+      const origKm = origIdx >= 0 ? (CORRIDOR_MILESTONES_KM[origIdx] ?? (origIdx * 0.4)) : (i * 0.4);
+      return {
+        ...st,
+        activeOrder: i + 1,
+        activeDistanceKm: parseFloat(origKm.toFixed(2))
+      };
+    });
+  }, [busBaseStations, isToCampus]);
 
   // Compute Next Approaching Stop along activeRouteStations using Schmitt-Trigger Hysteresis (Zero Blinking)
   const activeNextStopInfo = useMemo(() => {
@@ -2624,22 +2681,35 @@ export function Transit({ ctx }: { ctx?: any }) {
     if (activeView === "detail" && !userScrolledAwayRef.current) {
       scrollToLiveBus(true);
     }
-  }, [detailBus?.lat, detailBus?.lon, activeView, scrollToLiveBus]);
+  }, [activeNextStopInfo.nextIndex, activeView, scrollToLiveBus]);
 
   /* =========================================================================
-     VIEW 2: BUS ROUTE & STOPPAGE TIMELINE DETAIL VIEW (Image 2)
+     VIEW 2: BUS ROUTE & STOPPAGE TIMELINE DETAIL VIEW (Clean V3 Redesign)
      ========================================================================= */
   const renderDetailView = () => {
     if (!detailBus) return null;
     const userDistToBus = userLocation
       ? getDistanceMeters(userLocation.lat, userLocation.lon, detailBus.lat, detailBus.lon)
       : null;
+    const busSched = activeSchedules[detailBus.id];
+    const isMoving = detailBus.speed > 0;
+    const isOffline = detailBus.isStale;
+
+    const nextDepartureTime = isToCampus
+      ? (busSched?.toCampus || "—")
+      : (busSched?.fromCampus || "—");
+
+    const departureCountdown = isToCampus && busSched?.toCampusMin
+      ? getScheduleRemaining(busSched.toCampusMin, clockNow).text
+      : !isToCampus && busSched?.fromCampusMin
+      ? getScheduleRemaining(busSched.fromCampusMin, clockNow).text
+      : "";
 
     return (
       <div className="transit-detail-screen">
-        {/* Pinned Top Fixed Header Section (Constant, does NOT scroll) */}
+        {/* Pinned Top Fixed Header Section (Compact, ~180px total height) */}
         <div className="transit-detail-pinned-top">
-          {/* Top App Bar with Back Button & Map Switcher */}
+          {/* 1. Sleek Header Bar */}
           <div className="transit-detail-header-bar">
             <div className="transit-detail-header-left">
               <button
@@ -2654,12 +2724,33 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div className="transit-detail-bus-name-row">
                   <span className="transit-detail-bus-name">{detailBus.nameBn}</span>
                   <span className="transit-detail-bus-chip">{toBengaliDigits(formatBusShortId(detailBus.id))}</span>
+                  <span
+                    className={`transit-detail-status-badge ${isOffline ? "offline" : isMoving ? "moving" : "standby"}`}
+                  >
+                    <span
+                      className="transit-pulse-dot"
+                      style={{ background: isOffline ? "#f97316" : isMoving ? "#10b981" : "#fbbf24" }}
+                    />
+                    {isOffline ? "GPS বিলম্বিত" : isMoving ? `${toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ` : "স্ট্যান্ডবাই"}
+                  </span>
                 </div>
                 <span className="transit-detail-subtitle">{detailBus.routeName}</span>
               </div>
             </div>
 
             <div className="transit-detail-header-right">
+              {busSched?.pilotContact && (
+                <a
+                  href={`tel:${busSched.pilotContact}`}
+                  className="transit-detail-call-btn"
+                  title="চালক/পাইলটকে কল করুন"
+                  aria-label="Call bus pilot"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <PhoneCall size={14} />
+                  <span>কল</span>
+                </a>
+              )}
               <button
                 onClick={() => switchToMap(detailBus.id)}
                 className="transit-detail-map-btn"
@@ -2672,11 +2763,11 @@ export function Transit({ ctx }: { ctx?: any }) {
             </div>
           </div>
 
-          {/* Direction Switcher Pills */}
-          <div className="transit-direction-pill-toggle">
+          {/* 2. Compact Segmented Direction Toggle */}
+          <div className="transit-detail-segmented-control">
             <button
               type="button"
-              className={`transit-dir-toggle-btn ${activeDirection === "to_city" ? "active" : ""}`}
+              className={`transit-detail-seg-btn ${!isToCampus ? "active" : ""}`}
               onClick={() => {
                 setTimelineDirectionOverride("to_city");
                 userScrolledAwayRef.current = false;
@@ -2687,7 +2778,7 @@ export function Transit({ ctx }: { ctx?: any }) {
             </button>
             <button
               type="button"
-              className={`transit-dir-toggle-btn ${activeDirection === "to_campus" ? "active" : ""}`}
+              className={`transit-detail-seg-btn ${isToCampus ? "active" : ""}`}
               onClick={() => {
                 setTimelineDirectionOverride("to_campus");
                 userScrolledAwayRef.current = false;
@@ -2698,106 +2789,63 @@ export function Transit({ ctx }: { ctx?: any }) {
             </button>
           </div>
 
-          {/* Schedule Departures Card matching official timetable */}
-          {activeSchedules[detailBus.id] && (
-            <div className="transit-schedule-banner">
-              <div className="transit-schedule-banner-title">
-                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <Clock size={12} color="#b71454" />
-                  <span>পরবর্তী শিডিউল প্রস্থান (Next Departures)</span>
+          {/* 3. Consolidated Live Status & Schedule Card (One clean card, zero redundant boxes!) */}
+          <div className="transit-detail-live-card" style={{ "--bus-accent": detailBus.color || "#b71454" } as any}>
+            <div className="transit-detail-live-top">
+              <div className="transit-detail-live-stop">
+                <div className="transit-detail-stop-icon-box">
+                  <MapPin size={15} />
                 </div>
-                {activeSchedules[detailBus.id].pilotContact && (
-                  <a
-                    href={`tel:${activeSchedules[detailBus.id].pilotContact}`}
-                    className="transit-schedule-pilot-btn"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    📞 কল পাইলট ({toBengaliDigits(activeSchedules[detailBus.id].pilotContact || "")})
-                  </a>
-                )}
+                <div className="transit-detail-stop-text">
+                  <span className="transit-detail-stop-label">পরবর্তী স্টপ</span>
+                  <strong className="transit-detail-stop-name">{activeNextStopInfo.station.nameBn}</strong>
+                </div>
               </div>
-              <div className="transit-schedule-row">
-                <div className={`transit-schedule-box ${!isToCampus ? "active-leg" : ""}`}>
-                  <span className="transit-schedule-tag">From Campus</span>
-                  <strong className="transit-schedule-time">{activeSchedules[detailBus.id].fromCampus}</strong>
-                  <span className="transit-schedule-countdown">
-                    ({getScheduleRemaining(activeSchedules[detailBus.id].fromCampusMin, clockNow).text})
-                  </span>
-                </div>
-                <div className="transit-schedule-arrow">➔</div>
-                <div className={`transit-schedule-box ${isToCampus ? "active-leg" : ""}`}>
-                  <span className="transit-schedule-tag">To Campus</span>
-                  <strong className="transit-schedule-time">{activeSchedules[detailBus.id].toCampus}</strong>
-                  <span className="transit-schedule-countdown">
-                    ({getScheduleRemaining(activeSchedules[detailBus.id].toCampusMin, clockNow).text})
-                  </span>
-                </div>
+
+              <div className="transit-detail-live-eta">
+                <span className="transit-detail-eta-badge">
+                  ~{toBengaliDigits(activeNextStopInfo.etaMinutes)} মি ড্রাইভ
+                </span>
+                <span className="transit-detail-dist-sub">({toBengaliDigits(activeNextStopInfo.distanceKm)} কিমি)</span>
               </div>
             </div>
-          )}
 
-          {/* Pinned Next Stop Telemetry Banner (Auto-adjustable live distance) */}
-          <div className="transit-detail-telemetry-banner" style={{ "--bus-accent": detailBus.color } as any}>
-            <div className="transit-telemetry-top">
-              <div className="transit-telemetry-approaching">
-                <Navigation size={13} className={detailBus.speed > 0 ? "spin-slow" : ""} color="#b71454" />
-                <span className="transit-telemetry-label">পরবর্তী স্টপ:</span>
-                <strong className="transit-telemetry-stop-name">{activeNextStopInfo.station.nameBn}</strong>
+            <div className="transit-detail-live-bottom">
+              <div className="transit-detail-sched-info">
+                <Clock size={12} className="transit-detail-clock-icon" />
+                <span className="transit-detail-sched-label">শিডিউল প্রস্থান:</span>
+                <strong className="transit-detail-sched-val">{nextDepartureTime}</strong>
+                {departureCountdown && (
+                  <span className="transit-detail-sched-countdown">({departureCountdown})</span>
+                )}
               </div>
 
               {userDistToBus !== null ? (
-                <div className="transit-telemetry-user-dist" title="আপনার বর্তমান অবস্থান থেকে বাসের দূরত্ব">
-                  <MapPin size={11} color="#059669" />
-                  <span>আপনার থেকে {formatDistanceUser(userDistToBus)}</span>
-                </div>
+                <span className="transit-detail-user-dist">
+                  📍 আপনার থেকে {formatDistanceUser(userDistToBus)}
+                </span>
               ) : (
                 <button
                   type="button"
                   onClick={handleLocationPillClick}
-                  className="transit-card-req-loc-pill"
-                  title="লোকেশন চালু করুন"
+                  className="transit-detail-loc-btn"
                 >
                   📍 দূরত্ব দেখুন
                 </button>
               )}
             </div>
-
-            <div className="transit-telemetry-pills-row">
-              <div className="transit-telemetry-pill highlight">
-                <span className="transit-pill-key">পরবর্তী স্টপের দূরত্ব</span>
-                <span className="transit-pill-val">{toBengaliDigits(activeNextStopInfo.distanceKm)} কিমি</span>
-              </div>
-              <div className="transit-telemetry-pill">
-                <span className="transit-pill-key">গতি</span>
-                <span className="transit-pill-val">
-                  {detailBus.speed > 0 ? `${toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ` : "০ কিমি/ঘ"}
-                </span>
-              </div>
-              <div className="transit-telemetry-pill">
-                <span className="transit-pill-key">ড্রাইভ</span>
-                <span className="transit-pill-val">~{toBengaliDigits(activeNextStopInfo.etaMinutes)} মি</span>
-              </div>
-              <div className="transit-telemetry-pill status">
-                <span
-                  className="transit-pulse-dot"
-                  style={{ background: detailBus.isStale ? "#f97316" : detailBus.speed > 0 ? "#10b981" : "#fbbf24" }}
-                />
-                <span className="transit-pill-val">{detailBus.isStale ? "GPS বিলম্বিত" : detailBus.speed > 0 ? "চলন্ত" : "স্ট্যান্ডবাই"}</span>
-              </div>
-            </div>
           </div>
 
-          {/* Corridor Schedule Meta Bar */}
-          <div className="transit-timeline-meta-bar">
-            <div className="transit-meta-left">
-              <Clock size={13} />
-              <span>রুট স্টপেজ ({toBengaliDigits(activeRouteStations.length)}টি)</span>
-            </div>
-            <span className="transit-meta-tap-hint">🔔 অ্যালার্ট পেতে ট্যাপ করুন</span>
+          {/* 4. Corridor Section Divider */}
+          <div className="transit-detail-section-bar">
+            <span className="transit-detail-section-title">
+              রুট স্টপেজ ({toBengaliDigits(activeRouteStations.length)}টি স্টপ)
+            </span>
+            <span className="transit-detail-section-hint">🔔 অ্যালার্ট দিতে ট্যাপ করুন</span>
           </div>
         </div>
 
-        {/* Stoppage Corridor Vertical Timeline (ONLY THIS SCROLLS) */}
+        {/* Scrollable Timeline: Crisp, high-contrast, compact stoppage stepper */}
         <div
           ref={timelineContainerRef}
           className="transit-timeline-scroll-container"
@@ -2814,7 +2862,6 @@ export function Transit({ ctx }: { ctx?: any }) {
             const isApproaching = idx === activeNextStopInfo.nextIndex;
             const isPassed = idx < activeNextStopInfo.nextIndex;
             const isAlerted = !!alertedStops[station.id];
-            const isLiveSegment = idx === activeNextStopInfo.nextIndex - 1;
 
             let displayKm = "০.০০";
             let displayEta = "";
@@ -2824,9 +2871,7 @@ export function Transit({ ctx }: { ctx?: any }) {
               displayEta = "অতিক্রম করেছে";
             } else if (isApproaching) {
               displayKm = toBengaliDigits(activeNextStopInfo.distanceKm);
-              displayEta = detailBus.speed > 0
-                ? `~${toBengaliDigits(activeNextStopInfo.etaMinutes)} মি`
-                : `~${toBengaliDigits(activeNextStopInfo.etaMinutes)} মি ড্রাইভ`;
+              displayEta = `~${toBengaliDigits(activeNextStopInfo.etaMinutes)} মি`;
             } else {
               const deltaKm = Math.max(0.1, station.activeDistanceKm - activeRouteStations[activeNextStopInfo.nextIndex].activeDistanceKm);
               const totalKm = deltaKm + parseFloat(activeNextStopInfo.distanceKm);
@@ -2844,26 +2889,12 @@ export function Transit({ ctx }: { ctx?: any }) {
               >
                 {/* Milestone Rail: Laser-straight Centered Connecting Line & Node */}
                 <div className="transit-timeline-rail">
-                  {/* Connecting Line to next stop */}
                   {idx < activeRouteStations.length - 1 && (
                     <div
                       className={`transit-timeline-rail-line ${
-                        isPassed ? "line-passed" : isLiveSegment ? "line-live" : "line-upcoming"
+                        isPassed ? "line-passed" : isApproaching ? "line-live" : "line-upcoming"
                       }`}
                     />
-                  )}
-
-                  {/* Dynamic Bus Needle Card on Live Road Segment */}
-                  {isLiveSegment && detailBus && (
-                    <div className="transit-timeline-live-bus-card-wrapper">
-                      <div className="transit-timeline-live-bus-card" style={{ borderColor: detailBus.color || "#b71454" }}>
-                        <span className="transit-pulse-dot" style={{ background: detailBus.color || "#b71454", width: 7, height: 7 }} />
-                        <span style={{ fontWeight: 800, fontSize: "11px", color: "#1e293b" }}>{detailBus.nameBn}</span>
-                        <span style={{ fontSize: "10px", color: "#059669", fontWeight: 700 }}>
-                          {detailBus.speed > 0 ? `${toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ` : "স্ট্যান্ডবাই"}
-                        </span>
-                      </div>
-                    </div>
                   )}
 
                   {/* Node Milestone Circle */}
@@ -2873,9 +2904,9 @@ export function Transit({ ctx }: { ctx?: any }) {
                     }`}
                   >
                     {isApproaching ? (
-                      <Bus size={13} color="#ffffff" className="transit-approaching-bus-icon" />
+                      <Bus size={12} color="#ffffff" className="transit-approaching-bus-icon" />
                     ) : isPassed ? (
-                      <Check size={12} color="#94a3b8" />
+                      <Check size={11} color="#94a3b8" />
                     ) : (
                       <span>{toBengaliDigits(station.activeOrder)}</span>
                     )}
@@ -2886,16 +2917,14 @@ export function Transit({ ctx }: { ctx?: any }) {
                 <div className="transit-timeline-content">
                   <div className="transit-timeline-row">
                     <div className="transit-timeline-station-col">
-                      {isApproaching && (
-                        <span className="transit-approaching-badge">
-                          <span className="transit-pulse-dot" style={{ background: "#b71454", width: 6, height: 6 }} />
-                          পরবর্তী স্টপ
-                        </span>
-                      )}
                       <div className="transit-station-main-title">
                         <span>{station.nameBn}</span>
+                        {isApproaching && (
+                          <span className="transit-active-stop-pill">
+                            পরবর্তী স্টপ
+                          </span>
+                        )}
                       </div>
-                      <span className="transit-station-sub-title">{station.name}</span>
                     </div>
 
                     <div className="transit-timeline-actions">
@@ -2915,7 +2944,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                         type="button"
                         aria-label={`Toggle alert for ${station.nameBn}`}
                       >
-                        <Bell size={14} />
+                        <Bell size={13} />
                       </button>
                     </div>
                   </div>
@@ -3248,17 +3277,17 @@ export function Transit({ ctx }: { ctx?: any }) {
             <button
               onClick={centerSelectedBus}
               className="transit-offscreen-pill"
-              aria-label={`Center map on ${selectedBus.nameBn}`}
+              aria-label={`${selectedBus.nameBn || "বাস"}-এ ফোকাস করুন`}
             >
               <Compass size={14} className="transit-offscreen-spin" />
-              <span><strong>{selectedBus.nameBn}</strong> is off-screen · Tap to view</span>
+              <span><strong>{selectedBus.nameBn || "বাস"}</strong> ম্যাপের বাইরে · দেখতে ট্যাপ করুন</span>
             </button>
           )}
 
           {arrivalNotice && (
             <div className="transit-arrival-toast" role="status">
               <CheckCircle2 size={18} />
-              <span><strong>{arrivalNotice.busName}</strong> is near {arrivalNotice.stopName}</span>
+              <span><strong>{arrivalNotice.busName}</strong> {arrivalNotice.stopName}-এর কাছাকাছি এসেছে</span>
               <button type="button" onClick={() => setArrivalNotice(null)} aria-label="Dismiss arrival alert">
                 <X size={16} />
               </button>
@@ -3544,7 +3573,7 @@ export function Transit({ ctx }: { ctx?: any }) {
                 className="transit-mbc-action-btn"
                 type="button"
               >
-                <span>সম্পূর্ণ রুট ও সময়সূচী দেখুন ({toBengaliDigits(CORRIDOR_STATIONS.length)}টি স্টপেজ)</span>
+                <span>সম্পূর্ণ রুট ও সময়সূচী দেখুন ({toBengaliDigits(getStationsForBus(selectedBus.id, selectedBus.routeName).length)}টি স্টপেজ)</span>
                 <ChevronRight size={15} />
               </button>
             </div>

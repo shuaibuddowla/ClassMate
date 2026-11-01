@@ -14262,31 +14262,6 @@ const switchToMap = useCallback((busId?: string) => {
 
 ---
 
-### 205.5 Master Production Verification Matrix (Updated Master State v205)
-
-| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
-| :--- | :--- | :--- | :--- |
-| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
-| **Bus Card One-Tap Live Map Tracking** | Web & Android APK | **PRODUCTION** | Replaced call button with `btnTrackBus` ("ট্র্যাক"), navigates to Transit tab & auto-selects bus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
-| **Transit Auto-Selection & Focusing Engine** | Web & Android APK | **PRODUCTION** | `window.__classmateSelectBus`, URL param `&bus=...`, auto-centers Leaflet camera, opens details (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
-| **Resilient Synthetic Standby Bus Handling** | Web & Android APK | **PRODUCTION** | Synthesized campus terminal standby records for non-reporting buses, guaranteed focus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
-| **Redundant Next Departure Hero Removal** | Web & Android APK | **PRODUCTION** | Removed `busSummary` / `BusHero` from bus schedule tab; verified clean 8-bus grid on device `6478ab80` (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
-| **Pure MBSTU Wheels Bus Roster** | Web & Android APK | **PRODUCTION** | Stripped legacy Supabase `bus_schedules` duplicates; verified exact 8-bus fleet on device `6478ab80` (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
-| **Timetable Header Bus Count Precision** | Web & Android APK | **PRODUCTION** | Corrected count from "18 schedules" to "8 buses", removed obsolete "Add Bus" button (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
-| **Dynamic MBSTU Wheels Bus Schedule Sync** | Web & Android APK | **PRODUCTION** | Live polling of `https://transport.mbstu.ac.bd/api/bus-schedule/` with offline cache fallback (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
-| **Timetable Bus Schedule UI Overhaul** | Web & Android APK | **PRODUCTION** | Modern card layout, Next Departure Hero with countdowns, 3-way direction filter bar, timechips (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
-| **Pilot Direct Dialing (`tel:` / `ACTION_DIAL`)** | Web & Android APK | **PRODUCTION** | 1-tap driver call button on all bus cards, verified with telephone URIs and native dialer intents |
-| **Next.js SSR Prerender Resilience** | Web Companion | **PRODUCTION** | Guarded `window` and `AudioContext`, clean static build, deployed to Vercel production |
-| **Zero-Unsolicited-UI Governance Enforcement** | Web & Android APK | **PRODUCTION** | Soft ClassMate palettes, pink markers `#b71454`, lollipop stops; zero unauthorized styling (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
-| **Instant Offline-First Bootstrap** | Android APK Assets | **PRODUCTION** | Bundled Leaflet assets in `assets/transit/`, zero black screen (<50ms load) (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
-| **Schmitt-Trigger Next-Stop Hysteresis** | Web & Android APK | **PRODUCTION** | 1D milestone projection, 35m arrival / 20m departure threshold, 0 stop flips in 230 simulation frames (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
-| **Ghost Bus GPS Signal Filter** | Web & Android APK | **PRODUCTION** | Non-reporting / off-corridor buses filtered from active map/timeline, segregated to standby timetable (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
-| **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
-| **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
-| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v205) |
-
----
-
 ## 206. Transit Tab V3 UI/UX Ground-Up Redesign & Production Architecture (Master State v206)
 
 ### 206.1 Core UX Problem Statements & User Architectural Directives
@@ -14329,3 +14304,134 @@ const switchToMap = useCallback((busId?: string) => {
   7. Tapped `[✕]` close button -> Peek card dismissed cleanly (`screen_transit_card_closed.png`).
   8. Verified search query filtering and instant clear button (`screen_transit_search_test.png`).
 - **Production URL**: Deployed to [classmatebd.vercel.app](https://classmatebd.vercel.app) (Deployment ID: `dpl_2mePUEAyhfCLnYhV6iXuRBs6LPVs`).
+- **Git Commit**: Committed as [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2) (*`feat(transit): redesign transit UI from scratch, fix view hierarchy, FAB overlap and remove blue off-road line`*).
+
+---
+
+## 207. Dynamic Morphing Fluid Pill Bottom Navigation Overhaul (Master State v207)
+
+### 207.1 Design Exploration & User Selection
+- **Interactive Concept Generation**: Triggered by user request via `/generative_ui` to modernize the Android bottom navigation bar (icons, structure, and motion physics).
+- **5 Archetypes Evaluated** in interactive showcase `navbar_showcase.html`:
+  1. **Concept 1: Dynamic Morphing Fluid Pill** (Pill capsule, spring physics, floating island) — **SELECTED & APPROVED**
+  2. Concept 2: Floating Glass Island (Glassmorphism, frosted acrylic blur, perimeter specular glow)
+  3. Concept 3: Tactile Lift & Glow (Elevated button bounce, soft ambient underglow)
+  4. Concept 4: Neumorphic Floating Dock (Extruded soft tactile surfaces)
+  5. Concept 5: Minimal Borderless Fluid Dock (Edge-to-edge subtle fluid indicator)
+
+### 207.2 Root Cause Analysis & Architecture
+- **Problem Reported by User**: *"But the navigation bar is looking the same as before. It's looking like your updated things didn't work."*
+- **Root Cause**:
+  1. The navigation bar hosted in `ClassMateAuthActivity.kt` (`ClassMateBottomBar.kt`) had a flat docked edge-to-edge layout pinned to the bottom of the window without floating geometry.
+  2. The indicator was constrained inside the flat container, appearing identical to the legacy docked tab bar.
+- **Architectural Solution — Floating Curved Capsule Island**:
+  - **Floating Island Geometry**:
+    - Detached from screen edges with `20.dp` horizontal side margin and `16.dp` bottom margin above system window insets (`WindowInsets.navigationBars`).
+    - Outer shape: Continuous rounded capsule with `RoundedCornerShape(32.dp)`.
+    - Depth & Elevation: `10.dp` elevation with soft drop shadow and subtle `1.dp` border stroke (`#1A000000` light / `#26FFFFFF` dark).
+    - Surface: Frosted acrylic glass blur tint (`#F8FAFC` light / `#0F172A` dark with 92% opacity).
+  - **Motion & Spring Physics Engine (`ClassMateBottomBar.kt`)**:
+    - Replaced rigid linear tween animation with a damped harmonic spring:
+      ```kotlin
+      spring(
+          dampingRatio = 0.72f, // Smooth slight overshoot without oscillation
+          stiffness = 380f      // Responsive, snappy transitions
+      )
+      ```
+    - The fluid pill slider morphs width and horizontal offset continuously as the user switches between `Timetable`, `Notices`, `Courses`, `Transit`, and `Settings`.
+    - **Tactile Lift**: Selected tab scales softly to `1.05f` with native haptic vibration (`HapticFeedbackConstants.CLOCK_TICK`).
+
+### 207.3 Hardware Verification & Commits
+- **Verification on Device**: OnePlus Nord CE4 (`CPH2621`, Serial `6478ab80`).
+- **Commits**:
+  - [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276) (*`feat(nav): implement Concept 1 dynamic morphing fluid pill physics with damped springs and tactile lift`*)
+  - [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6) (*`feat(nav): convert bottom navigation into floating curved capsule island with morphing pill indicator`*)
+
+---
+
+## 208. Transit Map Jitter / "Earthquake" Elimination & Dynamic Route Stoppage Filtering (Master State v208)
+
+### 208.1 Core UX Problem Statements & User Architectural Directives
+1. **Map Camera Jitter / "Earthquake" Effect**:
+   - User report: *"When a bus is selected and its dialog is open, the whole map is like it's earthquake."*
+   - Whenever telemetry packets arrived while a bus was tracked on the map, the entire map viewport shook uncontrollably, making the interface unusable and frustrating user gestures.
+2. **Route Detail Stoppage Overload**:
+   - User report: *"Also, in the detail list of the bus, it shows all the routes. This page has many problems... There is too much information that maybe it's not needed. Try to fix it."*
+   - Bus details and timeline displayed all 24 corridor stations (up to District Bus Stand) even for campus buses that terminate at Nirala More (16 stations) or Puraton Bus Stand (18 stations).
+
+### 208.2 Root Cause Analysis & Technical Resolutions
+
+#### 1. Camera Earthquake Resolution (`lastCenteredBusIdRef`):
+- **Root Cause**:
+  In `web/src/components/transit.tsx`, the camera auto-center effect had `[selectedBus?.id, selectedBus?.lat, selectedBus?.lon, busLocationLoading, centerSelectedBus]` in its dependency array. Every time a WebSocket telemetry packet arrived (every 1–2 seconds), `selectedBus.lat` and `selectedBus.lon` shifted slightly. The effect continuously re-triggered `centerSelectedBus()` (`flyTo` / `setView`), fighting against Leaflet's render loop and user touch panning.
+- **Architectural Fix**:
+  Introduced `lastCenteredBusIdRef = useRef<string | null>(null)` to ensure the camera only auto-centers **once** when a bus is first selected or its initial telemetry resolves:
+  ```typescript
+  useEffect(() => {
+    if (busLocationLoading || !selectedBus || !mapRef.current) return;
+    if (!selectedBus.isEstimated && lastCenteredBusIdRef.current !== selectedBus.id) {
+      lastCenteredBusIdRef.current = selectedBus.id;
+      const timer = setTimeout(() => {
+        centerSelectedBus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedBus?.id, selectedBus?.isEstimated, busLocationLoading, centerSelectedBus]);
+  ```
+  Subsequent incoming GPS coordinates update the vehicle marker icon position smoothly via Leaflet marker interpolation without touching the map camera viewport.
+
+#### 2. Dynamic Route Stoppage Filtering (`getStationsForBus`):
+- **Root Cause**:
+  `CORRIDOR_STATIONS` statically listed all 24 stations along the entire regional corridor. However, MBSTU student buses operate on distinct official route lengths:
+  - Campus ⇄ Nirala More: 16 stations (e.g. Gitanjali `#SB0001`, Muktijoddha `#SB0007`, Sonali `#SB0008`, Rakhali `#SB5488`)
+  - Campus ⇄ Puraton Bus Stand: 18 stations
+  - Campus ⇄ District Bus Stand: 24 stations
+  Showing 24 stops for a 16-stop bus showed 8 phantom stops where the bus never goes, corrupting distance, ETA, and progress bar calculations.
+- **Architectural Fix**:
+  Implemented `getStationsForBus(busId, customRoute)`:
+  ```typescript
+  export function getStationsForBus(busId?: string, customRoute?: string): CorridorStation[] {
+    const route = customRoute || (busId ? KNOWN_BUS_INFO[busId]?.defaultRoute : "");
+    if (!route) return CORRIDOR_STATIONS.slice(0, 16);
+
+    const lower = route.toLowerCase();
+    if (lower.includes("পুরাতন") || lower.includes("puraton")) {
+      return CORRIDOR_STATIONS.slice(0, 18);
+    }
+    if (lower.includes("ডিস্ট্রিক্ট") || lower.includes("জেলা") || lower.includes("district")) {
+      return CORRIDOR_STATIONS.slice(0, 24);
+    }
+    // Standard MBSTU student route is Campus to Nirala More (16 stations)
+    return CORRIDOR_STATIONS.slice(0, 16);
+  }
+  ```
+  Clamped milestone progress and arrival hysteresis (`maxStationIdx = Math.max(0, busStations.length - 1)`), guaranteeing exact ETA calculation and clean, concise timeline rendering.
+
+---
+
+### 208.3 Master Production Verification Matrix (Updated Master State v208)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Map Camera Earthquake & Jitter Elimination** | Web & Android APK | **PRODUCTION** | `lastCenteredBusIdRef` one-shot camera centering, smooth marker interpolation without viewport jitter |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Truncates to 16 stops (Nirala) or 18 stops (Puraton) dynamically, eliminating 8 phantom stops |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | `32.dp` rounded capsule, `20.dp` margin, `10.dp` elevation, frosted acrylic glass, spring physics (`0.72f` damping, `380f` stiffness) (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Transit Tab V3 UI/UX Ground-Up Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Bus Card One-Tap Live Map Tracking** | Web & Android APK | **PRODUCTION** | Replaced call button with `btnTrackBus` ("ট্র্যাক"), navigates to Transit tab & auto-selects bus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Auto-Selection & Focusing Engine** | Web & Android APK | **PRODUCTION** | `window.__classmateSelectBus`, URL param `&bus=...`, auto-centers Leaflet camera, opens details (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Resilient Synthetic Standby Bus Handling** | Web & Android APK | **PRODUCTION** | Synthesized campus terminal standby records for non-reporting buses, guaranteed focus (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Redundant Next Departure Hero Removal** | Web & Android APK | **PRODUCTION** | Removed `busSummary` / `BusHero` from bus schedule tab; verified clean 8-bus grid on device `6478ab80` (Commit [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Pure MBSTU Wheels Bus Roster** | Web & Android APK | **PRODUCTION** | Stripped legacy Supabase `bus_schedules` duplicates; verified exact 8-bus fleet on device `6478ab80` (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Timetable Header Bus Count Precision** | Web & Android APK | **PRODUCTION** | Corrected count from "18 schedules" to "8 buses", removed obsolete "Add Bus" button (Commit [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170)) |
+| **Dynamic MBSTU Wheels Bus Schedule Sync** | Web & Android APK | **PRODUCTION** | Live polling of `https://transport.mbstu.ac.bd/api/bus-schedule/` with offline cache fallback (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Timetable Bus Schedule UI Overhaul** | Web & Android APK | **PRODUCTION** | Modern card layout, Next Departure Hero with countdowns, 3-way direction filter bar, timechips (Commit [`d274eac`](https://github.com/shuaibuddowla/ClassMate/commit/d274eacb1a8376f1f7f6564ab5971bd016e03b34)) |
+| **Pilot Direct Dialing (`tel:` / `ACTION_DIAL`)** | Web & Android APK | **PRODUCTION** | 1-tap driver call button on all bus cards, verified with telephone URIs and native dialer intents |
+| **Next.js SSR Prerender Resilience** | Web Companion | **PRODUCTION** | Guarded `window` and `AudioContext`, clean static build, deployed to Vercel production |
+| **Zero-Unsolicited-UI Governance Enforcement** | Web & Android APK | **PRODUCTION** | Soft ClassMate palettes, pink markers `#b71454`, lollipop stops; zero unauthorized styling (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Instant Offline-First Bootstrap** | Android APK Assets | **PRODUCTION** | Bundled Leaflet assets in `assets/transit/`, zero black screen (<50ms load) (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Schmitt-Trigger Next-Stop Hysteresis** | Web & Android APK | **PRODUCTION** | 1D milestone projection, 35m arrival / 20m departure threshold, 0 stop flips in 230 simulation frames (Commit [`aaec8da`](https://github.com/shuaibuddowla/ClassMate/commit/aaec8dac3d6115344589516c1f6ac02f57bbe0a4)) |
+| **Ghost Bus GPS Signal Filter** | Web & Android APK | **PRODUCTION** | Non-reporting / off-corridor buses filtered from active map/timeline, segregated to standby timetable (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **4-Tier Hybrid Origin & Direction Engine** | Web & Android APK | **PRODUCTION** | GPS progression + heading angle + schedule time window matching + manual `[ ⇄ দিক পরিবর্তন ]` override (Commit [`38ea544`](https://github.com/shuaibuddowla/ClassMate/commit/38ea5449b588cee2b62295f5f853a0d09fb7cf3d)) |
+| **Student Proximity Radar & High-Priority Alerts** | Android APK Native | **PRODUCTION** | Channel `transit_proximity_alerts`, 1.2km / 5m trigger, vibration pattern, `[ 🔔 অ্যালার্ট ]` toggle (Commit [`99568c9`](https://github.com/shuaibuddowla/ClassMate/commit/99568c9acc38429f35084ce42b60dfa9dfc164ee)) |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v208) |
