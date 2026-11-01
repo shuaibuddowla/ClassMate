@@ -1,6 +1,8 @@
 // C:/Users/USER/AndroidStudioProjects/ClassMate/app/src/main/java/com/shuaib/classmate/activities/MainActivity.kt
 package com.shuaib.classmate.activities
 
+import androidx.activity.enableEdgeToEdge
+
 import android.Manifest
 import android.content.res.Configuration
 import android.content.Intent
@@ -114,6 +116,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         applySystemBars()
