@@ -18274,3 +18274,190 @@ Standard Material 3 `BottomSheetDialog` instances default to wrapping content or
 | **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` accessible via profile settings card |
 | **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Legacy HS256 secret revoked; active ECC P-256 key operational; `NEXT_PUBLIC_SUPABASE_ANON_KEY` rotated to `sb_publishable_...` |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v233) |
+
+
+---
+
+## 234. Jetpack Compose Material 3 ModalBottomSheet Polish, Profile Hydration, Courses Shimmer State Resolution & Generative UI Architecture (Master State v234)
+
+### 234.1 Jetpack Compose Material 3 `ModalBottomSheet` Full-Screen Scrim & Status Bar Padding Resolution (`ClassMateHamburgerSheet.kt`, `MainActivity.kt`, `ClassMateAuthActivity.kt`)
+- **Status Bar Draw-Under & Icon Invisibility**:
+  - In earlier iterations, the edge-to-edge `ModalBottomSheet` drew all the way to the top physical display boundary, placing the light/white container background directly underneath the system status bar. On light backgrounds, white status icons (clock, battery, Wi-Fi) became completely invisible.
+  - Furthermore, on devices with gesture navigation or 3-button navigation bars, bottom menu items (such as Campus Emergency Contacts and the build footer) suffered from layout clipping.
+- **Height Capping & Translucent Scrim Cushion**:
+  - Dynamically calculated the maximum allowed sheet height to leave a distinct ~16dp dark scrim strip at the top:
+    ```kotlin
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val topInsetDp = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    val maxSheetHeight = (configuration.screenHeightDp.dp - topInsetDp - 16.dp).coerceAtLeast(320.dp)
+    ```
+  - Constrained the sheet container with `Modifier.statusBarsPadding()` and `.heightIn(max = maxSheetHeight)`.
+  - Configured `scrimColor = Color.Black.copy(alpha = 0.5f)` to dim the entire background window evenly.
+- **Dynamic Status Bar Insets Controller via `DialogWindowProvider`**:
+  - Traversed parent views to resolve the bottom sheet's underlying dialog window:
+    ```kotlin
+    val view = LocalView.current
+    var parentView = view.parent
+    while (parentView != null && parentView !is DialogWindowProvider) {
+        parentView = parentView.parent
+    }
+    val window = (parentView as? DialogWindowProvider)?.window
+    SideEffect {
+        window?.let { win ->
+            WindowCompat.getInsetsController(win, view).isAppearanceLightStatusBars = false // Crisp white icons on dark scrim
+        }
+    }
+    ```
+  - Automatically restores default status bar appearance when the sheet is dismissed.
+- **Gesture Bar Navigation Cushioning & Typography Spacing**:
+  - Added `Spacer(modifier = Modifier.navigationBarsPadding().height(16.dp))` to the bottom of the content container, guaranteeing that all items and footers are 100% visible and reachable above system gesture bars.
+  - Adjusted subtitle typography to `fontSize = 14.sp, lineHeight = 18.sp` to eliminate awkward line breaks and text gaps.
+  - Standardized menu item vertical padding to 12dp with 4dp horizontal; set section header margins to 16dp top and 4dp bottom.
+- **Commit Reference**: Commit [`63d101d`](https://github.com/shuaibuddowla/ClassMate/commit/63d101d7044e1441157d5db988749bbe90d046d7).
+
+### 234.2 Profile Picture Hydration from GoogleSignIn & Firebase Auth in Hamburger Sheet (`ClassMateHamburgerSheet.kt`)
+- **Profile Picture Rendering Fallback**:
+  - In `DrawerProfileCard`, students and teachers frequently saw a generic placeholder avatar even when logged in via Google OAuth.
+  - Root Cause: Supabase cached profile JSON (`p`) frequently held null or blank `avatar_url`, or used alternative JSON keys (`photo_url`, `photoUrl`, `picture`), while Google Sign-In or Firebase Auth held the verified Google account photo URL.
+- **Cascading Multi-Provider Hydration**:
+  - Implemented cascading fallback in `remember(p)`:
+    ```kotlin
+    val avatarUrl = remember(p) {
+        val fromProfile = p.optString("avatar_url").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("photo_url").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("photoUrl").takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: p.optString("picture").takeUnless { it.isBlank() || it.equals("null", true) }
+        fromProfile
+            ?: GoogleSignIn.getLastSignedInAccount(activity)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            ?: FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+    }
+    ```
+  - In the Compose `AndroidView` Glide binding, added `.error(R.drawable.bg_circle_avatar_placeholder)` alongside `.placeholder(...)` inside the `update` block, guaranteeing smooth image transitions during recomposition without blank flicker.
+- **Commit Reference**: Commit [`1565267`](https://github.com/shuaibuddowla/ClassMate/commit/1565267d2b9cf713e5305412131614bad1b1f945).
+
+### 234.3 Full Sheet Unified Scrolling & Drag Handle Gap Optimization (`ClassMateHamburgerSheet.kt`)
+- **UX Bottleneck**:
+  - The previous design pinned the user profile card (`DrawerProfileCard`) at the top, allowing only the menu list below it to scroll. On smaller devices or lower-density screens, this consumed excessive vertical real estate and cramped the scrolling viewport.
+  - In addition, an exaggerated ~12dp gap between the Material 3 drag handle indicator bar and the `classmate.` branding header created an ungrounded, disconnected appearance.
+- **Engineering Resolution**:
+  - **Unified Top-to-Bottom Scroll Flow**:
+    - Removed the pinned header restriction and applied `.verticalScroll(rememberScrollState())` to the top-level sheet `Column`.
+    - The `classmate.` branding header, close button, user profile card, and menu items now glide as a unified scroll container.
+  - **Drag Handle Metric Tightening**:
+    - Set `BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 4.dp, bottom = 0.dp))`.
+    - Reduced the spacer between drag handle and header row from `12.dp` down to `2.dp`.
+    - Reduced the spacer between header and profile card from `12.dp` to `10.dp`.
+    - Preserved a compact, cohesive Material 3 visual hierarchy.
+- **Commit Reference**: Commit [`126f2c7`](https://github.com/shuaibuddowla/ClassMate/commit/126f2c7712ab2ed724f7efdbd7f504a7e28eece5).
+
+### 234.4 Courses Library Endless Shimmer State Resolution on Tab Switching (`ClassMateAcademicScreensSupabase.kt`)
+- **Bug & Root Cause**:
+  - In `ClassMateAcademicScreensSupabase.kt`, switching between bottom navigation tabs or rapidly selecting another batch while viewing the Courses / PDF Library tab could freeze the view in an endless Facebook Shimmer animation (`shimmer?.startShimmer()`), with the underlying content remaining `INVISIBLE`.
+  - Cause: The `isFirst` loading check (`librarySnapshot == null && !refresh.isRefreshing`) evaluated before updating `selectedBatch = batchId()`. When tab switching occurred, `isFirst` evaluated to false or mismatched the snapshot batch, but the `finally` block checked `if (isFirst && root.isAttachedToWindow)` — skipping `shimmer?.stopShimmer()` and `scroll.visibility = View.VISIBLE` if the view was temporarily detached or not marked `isFirst`.
+- **Engineering Resolution**:
+  - Moved `val selectedBatch = batchId()` above `isFirst` check.
+  - Redefined `isFirst = (librarySnapshot == null || librarySnapshot?.batchId != selectedBatch) && !refresh.isRefreshing`.
+  - In the `finally` block, unconditionally guaranteed clean UI teardown:
+    ```kotlin
+    } finally {
+        refresh.isRefreshing = false
+        shimmer?.stopShimmer()
+        shimmer?.visibility = View.GONE
+        scroll.visibility = View.VISIBLE
+        if (libraryLoadingRoot === root) libraryLoadingRoot = null
+    }
+    ```
+  - Eliminated phantom shimmer locks across all tab switches, batch changes, and swipe-to-refresh events.
+- **Commit Reference**: Commit [`dba2d36`](https://github.com/shuaibuddowla/ClassMate/commit/dba2d361c9cde3630e0b299a9629f912a0891a5e).
+
+### 234.5 Material 3 Hybrid Post Notice & Course Materials Studio UI Architecture (`post_notice_hybrid_ui.html`)
+- **Product Requirement**:
+  - Posting notices and sharing course files/materials previously existed as two separate, disconnected user flows in the Android app. Faculty and CRs had to navigate to the Courses tab to upload academic materials, and to the Notice feed to announce classes.
+  - Architectural Objective: Create a unified **Hybrid Notice & Course Studio** where announcements, attachments, photos, and course library materials are posted from a single intuitive composer, eliminating redundant buttons in the Courses tab.
+- **Material Design 3 (Material You) Architectural Blueprint**:
+  - **Design Token Harmonization**:
+    - Surface Containers: `--md-sys-color-surface-container` (`#1D2024`), `--md-sys-color-surface-container-high` (`#282A2F`), `--md-sys-color-surface-bright` (`#37393E`).
+    - Primary & On-Primary: `--md-sys-color-primary` (`#A8C7FA`), `--md-sys-color-on-primary` (`#062E6F`), Container (`#0842A0`).
+    - Standard M3 8dp border radii for buttons/chips, 16dp for input fields, 28dp for bottom sheets.
+  - **WhatsApp/Telegram Floating Media Action Capsule**:
+    - Auto-resizing textarea with clean M3 outlined container.
+    - Media action capsule featuring Attachment trigger (`📎`), Photo Gallery picker (`📷`), Gemini AI Polish trigger (`✨`), and Send FAB.
+  - **Two-Tier Contextual Attachment Dispatcher**:
+    - Tapping Attachment presents an M3 bottom sheet selector:
+      1. **Notice Attachment**: General document (PDF, DOCX, ZIP) attached directly to the batch notice card.
+      2. **Course Materials (Direct to Course Library)**: Academic lecture slides, notes, syllabi, or exam question papers. Selecting this mode dynamically unfolds Course Code selection (e.g., `CSE-2201`) and Resource Category chips (`Lecture Notes`, `Slides`, `Syllabus`, `Questions`), simultaneously publishing to the batch feed and indexing in the course materials repository.
+  - **Live Interactive Prototype**: Persisted in brain artifact `post_notice_hybrid_ui.html` for design review and engineering reference.
+
+### 234.6 ClassMate Adaptive App Icon Evolution & Mascot Design Direction (`classmate_icon_lab.html`)
+- **Background**:
+  - The existing legacy app icon lacked modern Android 13+ adaptive icon compliance (Monochrome theme icons, squircle/circle dynamic masking, elevation layer separation).
+  - Iterative design progression using Generative UI (`classmate_icon_lab.html`):
+    1. *The Twin Mates*: Two student figures with shared base arc — abandoned due to perceived mouth/happy face look.
+    2. *Academic Symbolism Variants*: 10 variations exploring books, graduation caps, campus gates, and linked arms.
+    3. *Minimalist Non-Human Silhouettes*: Monolithic iconic symbols (paper plane, audio arcs, lightning chat).
+    4. *Character Mascot Direction*: Inspired by Discord Clyde, GitHub Octocat, and Duolingo Duo.
+    5. *Top User Selection — The Scholarly Cat (Cat Mascot with Glasses)*: An approachable, friendly feline character wearing bold round spectacles. Provides high brand recognition, friendly student companionship personality, and clean two-layer vector separation for Android adaptive foreground/background icon layers.
+
+### 234.7 Hardware RFID Attendance Card Payment Database Audit (`check_attendance_card_payments.py`)
+- **Context & Verification**:
+  - Verified live database records in `classmate.batch_fund_transactions` for the RFID Hardware Smart Attendance system across the CSE 22nd batch.
+- **Audit Findings**:
+  - Total transactions: 33 records across `batch_fund_transactions` matching title patterns (`Attendence card`, `Attendence Card`, `Attendance Card`).
+  - Total students paid: 33 unique regular students (32 paid ৳40, 1 paid ৳45).
+  - Total collected: ৳1,325.00 BDT.
+  - Unpaid regular students: 24 students remaining out of 57 (excluding system administrator `CE25045`).
+
+### 234.8 Master Production Verification Matrix (Updated Master State v234)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **Compose M3 ModalBottomSheet Full-Screen Scrim & Status Bar Padding** | Android APK Native | **PRODUCTION** | `Modifier.statusBarsPadding()`, `heightIn(max = screenHeightDp - topInset - 16.dp)`, `scrimColor = Color.Black.copy(0.5f)`, `isAppearanceLightStatusBars = false` via `DialogWindowProvider` in `ClassMateHamburgerSheet.kt` (Commit [`63d101d`](https://github.com/shuaibuddowla/ClassMate/commit/63d101d7044e1441157d5db988749bbe90d046d7)) |
+| **Drawer Profile Photo Multi-Provider Cascading Hydration** | Android APK Native | **PRODUCTION** | `avatar_url` $\rightarrow$ `photo_url` $\rightarrow$ `photoUrl` $\rightarrow$ `GoogleSignIn.photoUrl` $\rightarrow$ `FirebaseAuth.photoUrl` with Glide error fallback in `ClassMateHamburgerSheet.kt` (Commit [`1565267`](https://github.com/shuaibuddowla/ClassMate/commit/1565267d2b9cf713e5305412131614bad1b1f945)) |
+| **Full Sheet Unified Scrolling & Drag Handle Gap Optimization** | Android APK Native | **PRODUCTION** | Unpinned profile card, applied `.verticalScroll(rememberScrollState())` to sheet root, reduced drag handle top padding to 4dp and header spacer to 2dp (Commit [`126f2c7`](https://github.com/shuaibuddowla/ClassMate/commit/126f2c7712ab2ed724f7efdbd7f504a7e28eece5)) |
+| **Courses Library Endless Shimmer State Resolution on Tab Switching** | Android APK Native | **PRODUCTION** | Re-ordered `selectedBatch = batchId()` before `isFirst`, unconditional `shimmer?.stopShimmer()`, `shimmer?.visibility = View.GONE`, and `scroll.visibility = View.VISIBLE` in `finally` block in `ClassMateAcademicScreensSupabase.kt` (Commit [`dba2d36`](https://github.com/shuaibuddowla/ClassMate/commit/dba2d361c9cde3630e0b299a9629f912a0891a5e)) |
+| **Material 3 Hybrid Post Notice & Course Materials Studio UI** | Generative UI & Mobile Prototype | **PROTOTYPE** | M3 surface container hierarchy, outlined input fields, WhatsApp floating media capsule, and contextual notice vs course material attachment dispatcher in `post_notice_hybrid_ui.html` |
+| **ClassMate Adaptive App Icon Evolution & Mascot Design** | Generative UI & Design Lab | **EXPLORATION** | Android adaptive vector icon exploration, culminating in the Scholarly Cat Mascot with glasses in `classmate_icon_lab.html` |
+| **Hardware RFID Attendance Card Payment Database Audit** | Database & Scripts | **VERIFIED** | Live Supabase audit in `check_attendance_card_payments.py`: 33 paid students (৳1,325.00 BDT collected), 24 unpaid regular students in CSE 22nd batch |
+| **Notice Feed M3 Poll Instant 0ms Optimistic Voting** | Android APK & Web | **PRODUCTION** | Local in-memory snapshotting, `pollVoteJobs[pollId]` debounced coroutine cancellation, 0ms progress track fill, and graceful rollback on RPC error (Commit [`7ebdb11`](https://github.com/shuaibuddowla/ClassMate/commit/7ebdb1108fe43f992c466be3258526fc1c63ae21)) |
+| **Adaptive Notice Title Typography & Auto-Shrinking** | Android APK & Web | **PRODUCTION** | Dynamic SP scaling curve (18sp $\rightarrow$ 13sp), `TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration`, and `.notice-title-shrink-md`/`-lg` classes (Commit [`7ebdb11`](https://github.com/shuaibuddowla/ClassMate/commit/7ebdb1108fe43f992c466be3258526fc1c63ae21)) |
+| **Option 1 Adaptive Full Unfolding for Poll Questions** | Android APK & Web | **PRODUCTION** | Unfolded questions up to 260 chars (`maxLines = Int.MAX_VALUE`), 1.15 line spacing, and `.poll-title-unfold` CSS to guarantee full visibility (Commit [`0c5191e`](https://github.com/shuaibuddowla/ClassMate/commit/0c5191e0ffac5b5dd8cc5e6fa104f22f67dc6e55)) |
+| **Poll Card Header Illustration Pruning** | Android APK & Web | **PRODUCTION** | Removed `ivNoticeIllustration` on poll notice cards to yield 100% horizontal width for questions and options (Commit [`c2ab14e`](https://github.com/shuaibuddowla/ClassMate/commit/c2ab14ef00d4f07f289f77805602bed0e092051f)) |
+| **Timetable Header Elevation & Drawer Status Bar Tint** | Android APK Native | **PRODUCTION** | Tightened brand top margin and differentiated drawer status bar with `#E8EDF5` surface and `#D8DFEC` line (Commit [`22a3286`](https://github.com/shuaibuddowla/ClassMate/commit/22a3286c7d709d0190e04fdef4cabd1e325ad4fc)) |
+| **Developer Attribution Name Normalization** | Android APK Native | **PRODUCTION** | Corrected official name string to `"Mohammad Shuaib-Ud-Dowla"` in `classmate_profile.xml` & `fragment_profile.xml` (Commit [`22a3286`](https://github.com/shuaibuddowla/ClassMate/commit/22a3286c7d709d0190e04fdef4cabd1e325ad4fc)) |
+| **Optical Hamburger Alignment** | Android APK Native | **PRODUCTION** | 34x34 dp ripple button, 20x20 dp icon with 3dp top margin and 3dp start margin for typographic harmony with `classmate.` branding in `fragment_timetable.xml` (Commit [`912d4bc`](https://github.com/shuaibuddowla/ClassMate/commit/912d4bcd660bbf2d58ab1117875c72333a04e0f2)) |
+| **Full-Screen Edge-to-Edge Navigation Drawer** | Android APK Native | **PRODUCTION** | `MATCH_PARENT` height, `enableEdgeToEdge`, transparent navigation bar, dynamic system window insets in `ClassMateHamburgerSheet.kt` & `themes.xml` (Commit [`912d4bc`](https://github.com/shuaibuddowla/ClassMate/commit/912d4bcd660bbf2d58ab1117875c72333a04e0f2)) |
+| **Batchmates Roster Toggle Cleanup** | Android APK Native | **PRODUCTION** | Removed `toggleContainer` and `updateBatchFundBalance()` in `ClassMateFriendsScreen.kt`, streamlining screen to pure directory (Commit [`912d4bc`](https://github.com/shuaibuddowla/ClassMate/commit/912d4bcd660bbf2d58ab1117875c72333a04e0f2)) |
+| **Settings Screen Transit Deduplication** | Android APK Native | **PRODUCTION** | Removed `cardProfileTransit` and `dividerProfileTransit` from `classmate_profile.xml` and `ClassMateAcademicScreensSupabase.kt` (Commit [`912d4bc`](https://github.com/shuaibuddowla/ClassMate/commit/912d4bcd660bbf2d58ab1117875c72333a04e0f2)) |
+| **Timetable Top-Bar Hamburger Architecture** | Android APK Native | **PRODUCTION** | Top-bar hamburger button beside `classmate.` branding in `fragment_timetable.xml` opening custom navigation drawer |
+| **Navigation Drawer Campus Modules** | Android APK Native | **PRODUCTION** | Bus Transit, Teachers Directory, Batchmates, Batch Fund, Routine Export, Blood Donors, and Emergency Contacts |
+| **Bottom Navigation 4-Tab Streamlining** | Android APK Native | **PRODUCTION** | Removed `nav_friends` (Batch tab) to balance Timetable, Notices, Courses, and Settings at 25% width each |
+| **Notice Feed M3 Expressive Poll System** | Android APK, Web & DB | **PRODUCTION** | Option A pill-shaped option buttons, animated progress fills, atomic Postgres vote transactions (`cast_poll_vote`), and signature-free card harmony (Commit [`59a2602`](https://github.com/shuaibuddowla/ClassMate/commit/59a260246c4c9d0171e816d30c652b7de21942fa)) |
+| **Background I/O Payload Parsing Offloading** | Android APK Native | **PRODUCTION** | `ClassMateAuthApi.kt` `rpc` and `rows` JSON parsing offloaded to `Dispatchers.IO` (Commit [`6f14902`](https://github.com/shuaibuddowla/ClassMate/commit/6f14902ae4cd15eedd9b66889601e99791a5d796)) |
+| **Compose Recomposition Pruning & Stable Nav** | Android APK Native | **PRODUCTION** | `@Immutable` models on `NavBadge` and `TabQuickAction`, keyed `remember(tab)` `MutableInteractionSource` in `ClassMateBottomBar.kt` |
+| **Web QueryClient Cache & Stale-Time Tuning** | Next.js 15 Web Companion | **PRODUCTION** | `staleTime: 120s`, `gcTime: 10m`, `refetchOnWindowFocus: false` in `web/src/components/app.tsx` |
+| **High-Performance Composite Latency Indexes** | Supabase PostgreSQL | **PRODUCTION** | `attendance_records(student_id, marked_at DESC)`, `attendance_sessions(status, started_at DESC)`, `routine_slots(semester_course_id, day_of_week)`, `notices(batch_id, created_at DESC)` (Migration `202611010002`) |
+| **Student Smart Card Unlinking Protection** | Android APK Native | **PRODUCTION** | Removed `btnRestartCard` from `dialog_rfid_attendance.xml` to eliminate accidental card unlinking; preserved admin control in `ClassMateAdminAttendanceActivity` (Commit [`271d4f3`](https://github.com/shuaibuddowla/ClassMate/commit/271d4f3c61425cb6a92862a47ac1203abe0b5496)) |
+| **Dynamic Course Counter Reactive Hydration** | Android APK Native | **PRODUCTION** | Replaced hardcoded "2 Courses" in `fragment_pdf_library.xml` with dynamic `refreshAttendanceCount()` query in `ClassMateAcademicScreensSupabase.kt` |
+| **MaterialButton Text Overflow & Clipping Fix** | Android APK Native | **PRODUCTION** | `textAllCaps="false"`, `maxLines="1"`, `insetTop="0dp"`, `insetBottom="0dp"`, `50dp` height on `FoundCardBottomSheet` action buttons (Commit [`fc1c838`](https://github.com/shuaibuddowla/ClassMate/commit/fc1c8386c7c7f238ed613f577c2a53baf8370d1f)) |
+| **2x2 Identity Metadata Grid** | Android APK Native | **PRODUCTION** | Replaced unconstrained flexbox tags with structured Status, Blood Group, Attendance, and Smart Card tiles in `dialog_found_card_sheet.xml` |
+| **Student Header Chips & Typography** | Android APK Native | **PRODUCTION** | Dedicated Roll (`CE25057`) and Batch (`cse 22`) chips directly beneath student name with cleaned UID badge (`????E506`) |
+| **Public RPC Supabase Engine** | Android APK Native | **PRODUCTION** | `ClassMateAuthApi.publicRpc` bypassing user JWT auth headers for unauthenticated smart card student lookups |
+| **Relaxed Campus Wi-Fi Internet Validation** | Android APK Native | **PRODUCTION** | Removed `NET_CAPABILITY_VALIDATED` requirement in `NfcCardDispatcherActivity.kt` to prevent false offline fallbacks on university Wi-Fi |
+| **Pure NDEF URI Tag Engine (No AAR)** | Android APK Native | **PRODUCTION** | `createNdefMessage` in `NfcCardManager.kt` writes pure Web NDEF URI, eliminating Google Play Store 404 redirection (Commit [`6103214`](https://github.com/shuaibuddowla/ClassMate/commit/6103214a6505764a14cf6446958b33f0e4bcb261)) |
+| **Android App Links (Digital Asset Links)** | Web & Android APK | **PRODUCTION** | `/.well-known/assetlinks.json` deployed on `classmatebd.vercel.app` approving `com.shuaib.classmate` for 0ms native app interception (Commit [`2cee558`](https://github.com/shuaibuddowla/ClassMate/commit/2cee55884f09b1bb5a8c8db5b66a2d8728d59837)) |
+| **SplashActivity Deep Link Dispatcher** | Android APK Native | **PRODUCTION** | Intercepts `/c/` and `/card/` URIs and forwards directly to `NfcCardDispatcherActivity` |
+| **Universal Public Web Student Smart ID** | Next.js 15 Web Companion | **PRODUCTION** | `web/src/components/StudentCardView.tsx` with dynamic SSR routes `/c/[id]` and `/card/[id]` deployed to Vercel production |
+| **Student Portal Sign In Access** | Next.js 15 Web Companion | **PRODUCTION** | Header & footer "Sign In" buttons linking to `/auth` on verified Smart ID and unregistered card states |
+| **Supabase Key Fallback** | Next.js 15 Web Companion | **PRODUCTION** | `DEFAULT_PUBLISHABLE_KEY` (`sb_publishable_...`) hardcoded fallback in `StudentCardView.tsx` |
+| **Lost-Card Contact Actions** | Web & Android APK | **PRODUCTION** | Direct `tel:` and normalized `wa.me/8801...` action buttons for 1-tap lost card recovery |
+| **Dynamic OpenGraph Smart ID Metadata** | Next.js 15 Web Companion | **PRODUCTION** | `buildStudentCardMetadata(id)` returning student name, roll, batch, dept, and avatar preview for rich social link embeds |
+| **MIFARE Classic 1K Sector Block Engine** | Android APK Native | **PRODUCTION** | Direct block read/write in `NfcCardManager.kt` for Sectors 1 & 2 (Blocks 4, 5, 6, 8, 9) with `MifareClassic.KEY_DEFAULT` (Commit [`f962ee4`](https://github.com/shuaibuddowla/ClassMate/commit/f962ee4545629855fa4197856adf1e725728bea5)) |
+| **MIFARE Classic Tech Filter Intent** | Android APK Native | **PRODUCTION** | `res/xml/nfc_tech_filter.xml` with `MifareClassic`, `Ndef`, `NfcA` bound to `NfcCardDispatcherActivity` |
+| **Physical Card Hardware Re-Burn Action** | Android APK Native | **PRODUCTION** | `btnWritePhysicalCard` in `ClassMateAdminAttendanceActivity` for admin on-demand EEPROM burning |
+| **Network Host Error Sanitization** | Android APK Native | **PRODUCTION** | Sanitized `UnknownHostException` in `ClassMateAdminAttendanceActivity.kt` to user-friendly offline prompt (Commit [`c16c661`](https://github.com/shuaibuddowla/ClassMate/commit/c16c661fd66f60a39e4d68d73d369908893ca206)) |
+| **Two-Tier Offline & Online Roster Cache** | Android APK Native | **PRODUCTION** | `NfcCardLocalCache.kt` + `FoundCardBottomSheet.kt` with live Supabase query fallback and 5ms offline lookup |
+| **Emergency Batch Tab Restoration** | Android APK Native | **PRODUCTION** | Restored `nav_friends` (Batch tab) to bottom navigation bar in `bottom_nav_menu.xml` & `classmate_academic_nav_menu.xml` (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639)) |
+| **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` accessible via profile settings card |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Legacy HS256 secret revoked; active ECC P-256 key operational; `NEXT_PUBLIC_SUPABASE_ANON_KEY` rotated to `sb_publishable_...` |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v234) |
