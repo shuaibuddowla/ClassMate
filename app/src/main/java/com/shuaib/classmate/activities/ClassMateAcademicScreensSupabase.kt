@@ -9628,26 +9628,16 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val isFirst = librarySnapshot == null && !refresh.isRefreshing
-
-
+        val isFirst = (librarySnapshot == null || librarySnapshot?.batchId != selectedBatch) && !refresh.isRefreshing
 
         if (isFirst) {
-
-
-
             shimmer?.visibility = View.VISIBLE
-
-
-
             shimmer?.startShimmer()
-
-
-
             scroll.visibility = View.INVISIBLE
-
-
-
+        } else {
+            shimmer?.stopShimmer()
+            shimmer?.visibility = View.GONE
+            scroll.visibility = View.VISIBLE
         }
 
 
@@ -9774,9 +9764,7 @@ internal class ClassMateAcademicScreensSupabase(
 
             val favoriteIds = snapshot.favoriteIds
 
-
-
-            if (!active(root) || selectedBatch != batchId()) return@launch
+            if (selectedBatch != batchId()) return@launch
 
 
 
@@ -9929,37 +9917,11 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         } finally {
-
-
-
             refresh.isRefreshing = false
-
-
-
-            if (isFirst && root.isAttachedToWindow) {
-
-
-
-                shimmer?.stopShimmer()
-
-
-
-                shimmer?.visibility = View.GONE
-
-
-
-                scroll.visibility = View.VISIBLE
-
-
-
-            }
-
-
-
+            shimmer?.stopShimmer()
+            shimmer?.visibility = View.GONE
+            scroll.visibility = View.VISIBLE
             if (libraryLoadingRoot === root) libraryLoadingRoot = null
-
-
-
         }
 
 
