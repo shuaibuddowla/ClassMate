@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.shuaib.classmate",
+      "sha256_cert_fingerprints": [
+        "73:77:FA:8E:9D:79:CE:99:2A:90:A6:A3:8B:E8:3B:98:BD:A9:5B:2C:6E:B9:CF:C9:D6:06:AD:DC:1C:42:CD:F8",
+        "12:44:21:FC:BC:7E:8E:E1:F7:6E:94:0B:97:DA:85:F7:C6:D5:81:23:E0:B7:8B:38:2B:E3:06:8E:71:EC:91:DB"
+      ]
+    }
+  }
+]

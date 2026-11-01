@@ -10,7 +10,8 @@ import {
   Building2,
   Droplet,
   CheckCircle2,
-  Download
+  Download,
+  LogIn
 } from "lucide-react";
 
 export interface StudentCardResult {
@@ -27,9 +28,16 @@ export interface StudentCardResult {
   attendance_percentage?: number;
 }
 
+const DEFAULT_SUPABASE_URL = "https://cbskpifgbdbgdmnnxfrh.supabase.co";
+const DEFAULT_PUBLISHABLE_KEY = "sb_publishable_YcAvoJqDZQ06XZobEueGoA_mTgiGtNL";
+
 function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cbskpifgbdbgdmnnxfrh.supabase.co";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    DEFAULT_PUBLISHABLE_KEY;
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
@@ -132,9 +140,19 @@ export function StudentCardView({
             <span className="text-[10px] text-emerald-400 block font-medium uppercase tracking-wider">Smart Campus ID</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400">
-          <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="font-mono text-[11px]">••••{cleanId.slice(-4)}</span>
+
+        <div className="flex items-center gap-2">
+          <a
+            href="/auth"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-emerald-400 transition active:scale-95 shadow-sm"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </a>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400">
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-mono text-[11px]">••••{cleanId.slice(-4)}</span>
+          </div>
         </div>
       </header>
 
@@ -274,6 +292,17 @@ export function StudentCardView({
                 </div>
               )}
             </div>
+
+            {/* Student Sign In Option */}
+            <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400 font-medium">ClassMate Student Portal</span>
+              <a
+                href="/auth"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition"
+              >
+                Sign in to Dashboard →
+              </a>
+            </div>
           </div>
         ) : (
           /* Unregistered Card Screen */
@@ -289,13 +318,22 @@ export function StudentCardView({
               <p>• This physical NFC card is active, but hasn&apos;t been assigned to a student yet.</p>
               <p>• If you are a Class Representative or Teacher, open the <strong>ClassMate</strong> app to register and link this card to a student.</p>
             </div>
-            <a
-              href="https://classmatebd.vercel.app/download"
-              className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
-            >
-              <Download className="w-4 h-4" />
-              Download ClassMate App
-            </a>
+            <div className="space-y-2.5">
+              <a
+                href="/auth"
+                className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign in to ClassMate
+              </a>
+              <a
+                href="https://classmatebd.vercel.app/download"
+                className="inline-flex items-center justify-center gap-2 w-full px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition border border-slate-700"
+              >
+                <Download className="w-4 h-4" />
+                Download Android App
+              </a>
+            </div>
           </div>
         )}
       </main>
