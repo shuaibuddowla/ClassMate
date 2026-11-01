@@ -8870,38 +8870,15 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         val tvUserCardSubtitle = dialogView.findViewById<TextView>(R.id.tvUserCardSubtitle)
-        val btnRestartCard = dialogView.findViewById<MaterialButton>(R.id.btnRestartCard)
 
         fun bindCardStatus(cardUid: String) {
             val cleanUid = cardUid.trim()
             if (cleanUid.isNotEmpty() && cleanUid != "null") {
                 tvUserCardSubtitle?.text = "Linked: ••••${cleanUid.takeLast(4).uppercase(java.util.Locale.US)} · Tap Ready"
                 tvUserCardSubtitle?.setTextColor(android.graphics.Color.parseColor("#10B981"))
-                btnRestartCard?.visibility = View.VISIBLE
-                btnRestartCard?.setOnClickListener { btn ->
-                    com.shuaib.classmate.ui.ClassMateHaptics.selection(btn)
-                    com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
-                        .setTitle("Restart Smart Card?")
-                        .setMessage("This will unlink your physical RFID/NFC card from your profile. You or your CR will need to tap a new card to take tap attendance.")
-                        .setNegativeButton("Cancel", null)
-                        .setPositiveButton("Restart Card") { _, _ ->
-                            launch(dialogView) {
-                                try {
-                                    ClassMateAuthApi.rpc("restart_student_rfid", JSONObject())
-                                    profile().put("rfid_card_uid", "")
-                                    bindCardStatus("")
-                                    Toast.makeText(activity, "Attendance card restarted. You can now tap a new card.", Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(activity, "Failed to restart card: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                        .show()
-                }
             } else {
                 tvUserCardSubtitle?.text = "No card registered yet"
                 tvUserCardSubtitle?.setTextColor(activity.getColor(R.color.cm_text_muted))
-                btnRestartCard?.visibility = View.GONE
             }
         }
 
@@ -9055,14 +9032,27 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+                fun refreshAttendanceCount() {
+            launch(root) {
+                try {
+                    val params = org.json.JSONObject().put("target_batch", batchId())
+                    val res = ClassMateAuthApi.rpc("student_my_attendance", params)
+                    val arr = res?.optJSONArray("courses") ?: org.json.JSONArray()
+                    var count = 0
+                    for (i in 0 until arr.length()) {
+                        if (arr.getJSONObject(i).optInt("classes_held", 0) > 0) count++
+                    }
+                    if (active(root)) {
+                        root.findViewById<android.widget.TextView>(R.id.tvAttendanceHeroSub)?.text =
+                            if (count > 0) "$count ${if (count == 1) "Course" else "Courses"}" else "No active courses"
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        refreshAttendanceCount()
+
         root.v<View>(R.id.cardAttendanceHero).setOnClickListener {
-
-
-
             showRfidAttendanceDialog(root)
-
-
-
         }
 
 
@@ -11185,19 +11175,6 @@ internal class ClassMateAcademicScreensSupabase(
 
         }
 
-
-
-
-
-
-
-        root.v<View>(R.id.cardProfileUserAttendance).apply {
-            setOnClickListener {
-                com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-                showRfidAttendanceDialog(root)
-            }
-        }
-
         val initialCanManageAttendance = isAdmin || cachedServerOwner
 
 
@@ -11430,19 +11407,6 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                    }
-
-
-
-
-
-
-
-                    root.v<View>(R.id.cardProfileUserAttendance).apply {
-                        setOnClickListener {
-                            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-                            showRfidAttendanceDialog(root)
-                        }
                     }
 
                     val canManageAttendance = isAdmin || isServerOwner
