@@ -1,8 +1,13 @@
+import os
 import urllib.request
 import json
 
-SUPABASE_URL = 'https://cbskpifgbdbgdmnnxfrh.supabase.co'
-SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNic2twaWZnYmRiZ2Rtbm54ZnJoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDIzMjAwNCwiZXhwIjoyMTA1ODA4MDA0fQ.a4IYuyRvpKdYh6roMcGuVHC0DHaUcdBTuxvxLEg1JN8'
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://cbskpifgbdbgdmnnxfrh.supabase.co')
+SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+
+if not SERVICE_KEY:
+    print('SUPABASE_SERVICE_ROLE_KEY environment variable is required.')
+    exit(1)
 headers = {
     'apikey': SERVICE_KEY,
     'Authorization': f'Bearer {SERVICE_KEY}',

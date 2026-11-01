@@ -14808,3 +14808,117 @@ A comprehensive audit of recent Antigravity transcripts under `C:/Users/USER/.ge
 | **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v211) |
+
+
+---
+
+## 212. Cross-Session Architectural Knowledge Synthesis, Production Verification & Master State v212
+
+### 212.1 Transcripts Audit & Comprehensive Cross-Session Synthesis
+A comprehensive audit of recent Antigravity transcripts under `C:/Users/USER/.gemini/antigravity/brain` was conducted, covering active sessions:
+- [`42a413ba-f107-4c48-9378-86da3314ce96`](conversation://42a413ba-f107-4c48-9378-86da3314ce96): Active review session; end-to-end audit of recent changes, multi-repository state synchronization, and Master State v212 codification across Android APK and Web companion.
+- [`f38a9fc6-2c8f-4718-bbdc-3f397af627a2`](conversation://f38a9fc6-2c8f-4718-bbdc-3f397af627a2): Master State v211 codification; detailed post-mortem on dual-activity navigation bar host disconnect (`ClassMateAuthActivity` vs `MainActivity`) and hardware verification.
+- [`78f5100d-f603-4fcd-bc20-0a031bc3951b`](conversation://78f5100d-f603-4fcd-bc20-0a031bc3951b), [`17cff0da-e667-4140-9a8c-322d14a9b5bd`](conversation://17cff0da-e667-4140-9a8c-322d14a9b5bd), [`30aa1e65-7fa7-4c56-9c32-a46a93311998`](conversation://30aa1e65-7fa7-4c56-9c32-a46a93311998): Periodic background telemetry monitoring, memory index checks, and platform stability verification.
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b): Complete Transit V3 overhaul; reverse-engineering MBSTU Wheels portal, Leaflet map shaking camera loop fix (`lastCenteredBusIdRef`), dynamic route stoppage filtering (`getStationsForBus`), dedicated bus loading state (`.transit-detail-loading-card`), Timetable to Transit deep navigation (`btnTrackBus`), and the initial memory codification request for the notice system.
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc): Navigation bar design system showcase (`navbar_showcase.html` with 6 concepts, Concept 1 floating curved capsule selection), dual-activity host debugging (`ClassMateAuthActivity` L3375), damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`), Friends directory 860px/96% wide compact popup, active status badges, and 3-tier user hierarchy.
+- [`7bf9b1c9-a2d1-40c9-a995-c810deb70c60`](conversation://7bf9b1c9-a2d1-40c9-a995-c810deb70c60): Static Webpack chunk decompilation and Engine.IO v4 WebSocket contract probing.
+- [`0edd370b-fa58-4308-905e-72b37c274b36`](conversation://0edd370b-fa58-4308-905e-72b37c274b36): Background security audit daemonization (`classmate-daily-security-audit` scheduled daily at 09:00 Asia/Dhaka).
+- [`23e6ef71-fb08-4cf7-aaeb-8c1af319fa27`](conversation://23e6ef71-fb08-4cf7-aaeb-8c1af319fa27): Multi-developer git branching strategy, timestamped database migration isolation, and dual-repo state synchronization rules.
+
+---
+
+### 212.2 Deep Architectural Post-Mortems & Solving Experiences
+
+#### A. Transit Map Camera "Earthquake" Jitter & Decoupling Architecture
+* **The Incident & User Report**:
+  When a user tapped on a bus in the transit tracker, opening the detail bottom sheet, the entire Leaflet satellite map began violently shaking, flickering, and tile-tearing ("like an earthquake"), rendering manual touch panning and zooming completely unresponsive.
+* **Root Cause Analysis**:
+  In `web/src/components/transit.tsx`, the live fleet telemetry engine updates an internal 1-second extrapolated clock state (`clockNow`). For moving buses, `predictBusPosition(bus, clockNow)` recomputes `selectedBus.lat` and `selectedBus.lon` on every 1000ms tick. The camera auto-centering `useEffect` included `[selectedBus?.lat, selectedBus?.lon]` in its dependency array and invoked `mapRef.current.flyTo([selectedBus.lat, selectedBus.lon], zoom, { animate: true, duration: 0.8 })`. Because an 800ms camera fly animation was continuously triggered every 1000ms while the previous animation was barely finishing, any user touch gesture fought Leaflet's render pipeline, creating an infinite camera conflict loop.
+* **Architectural Resolution (Commit `888393f`)**:
+  - Implemented `lastCenteredBusIdRef = useRef<string | null>(null)`:
+    - Auto-centering `flyTo` executes **strictly once** upon initial bus selection or vehicle change (`lastCenteredBusIdRef.current !== selectedBus.id`).
+    - Subsequent 1-second coordinate updates smoothly interpolate the vehicle marker position across the canvas without triggering camera animations.
+  - Added Floating Recovery Button (`[ 🧭 বাসে ফোকাস ]`):
+    - Monitored via Leaflet `movestart` / `dragstart` events. If the user pans away from the tracked bus, the recovery button appears at the bottom-right.
+    - Tapping resets `lastCenteredBusIdRef.current = null` and glides the camera back to the bus at zoom 16.
+
+#### B. The Dual-Activity Compose Navbar Host Disconnect
+* **The Incident & User Report**:
+  After implementing Concept 1 spring physics and floating geometry in Compose, the build was deployed, but the user reported: *"But the navigation bar is looking the same as before. It's looking like your updated things didn't work."*
+* **Root Cause Analysis**:
+  The ClassMate Android APK maintains dual activity hosts: legacy `MainActivity.kt` and the modern authenticated architecture in `ClassMateAuthActivity.kt`. Initial styling was applied to `MainActivity.kt`. However, the live production interface used by authenticated students is hosted in `ClassMateAuthActivity.kt` (`ClassMateAuthActivity.kt#L3375`), which embeds `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`). Inside `ClassMateBottomBar.kt`, the outer container was styled as a flat, edge-to-edge docked rectangular surface (`Modifier.fillMaxWidth().background(...)`) without floating side insets or curved corner clipping.
+* **Architectural Resolution (Commits `9d4c229`, `c085357`)**:
+  - Refactored `ClassMateBottomBar.kt` with genuine floating island geometry:
+    - Horizontal side margins: `14.dp` padding (`Modifier.padding(horizontal = 14.dp, vertical = 10.dp)`).
+    - Continuous corner curvature: `clip(RoundedCornerShape(32.dp))` with `1.2.dp` border stroke (`cm_border_glass`).
+    - Acrylic frosted glass surface: `#F8FAFC` (92% opacity, light mode) / `#0F172A` (92% opacity, dark mode) with `14.dp` soft elevation drop shadow.
+    - Contoured sliding pill: `20.dp` rounded inner capsule with active tinted border and damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`).
+  - Verified on physical OnePlus Nord CE4 via ADB streamed install and screen capture (`navbar_new_screen.png`).
+
+#### C. Dedicated Bus Telemetry Loading State & Boilerplate Suppression
+* **The Incident & User Report**:
+  When tapping on a bus card from the list or schedule, the detail bottom sheet opened immediately displaying default boilerplate states: `0 km/h`, uncalculated ETA (`-- min`), empty driver badges, and missing stop names, misleading riders into believing tracking was broken during the 400ms–1500ms network fetch.
+* **Architectural Resolution (Commit `5b7a7b0`)**:
+  - Engineered `.transit-detail-loading-card`:
+    - When a bus selection occurs, if `bus.lat == null` or coordinates are stale (>60s), the UI displays a dedicated loading card with a pulsating radar animation, shimmering skeleton bar, and text `"বাসের লাইভ লোকেশন লোড হচ্ছে..."` (`Loading bus live location...`).
+    - The full telemetry sheet and ETA stepper only mount once valid coordinates are parsed, eliminating jarring layout shifts and false zero-speed readouts.
+
+#### D. Dynamic Route Stoppage Filtering (`getStationsForBus`) & Phantom Stop Elimination
+* **The Incident & User Report**:
+  The transit corridor was modeled as a static 24-station array ending at Tangail District Headquarters. However, buses designated for "Nirala More" (e.g., Sonartori, Agnivina) terminate at stop 16 and reverse direction. Riders were confused by 8 phantom stops (Puraton Bus Stand, Baby Stand, District Gate, etc.) appearing after Nirala More, causing the progress stepper to misrepresent milestone completion.
+* **Architectural Resolution (Commit `888393f`)**:
+  - Built `getStationsForBus(bus: BusMetadata): Station[]`:
+    - Nirala Routes: Clamped strictly to 16 stations.
+    - Puraton Bus Stand Routes: Clamped to 18 stations.
+    - District / Highway Routes: Full 24 stations.
+  - Direction Reversal:
+    - Toggling direction (`Campus -> City` vs. `City -> Campus`) instantly reverses station ordering while preserving milestone progression logic.
+  - Stepper Optimization:
+    - Clean Bengali typography (`অতিক্রম করেছে`, `আসছে`, `পরবর্তী`).
+    - Passed stops display subtle checkmark nodes (`✓`).
+    - Visible stops increased from ~1.5 to 6–8 simultaneously by removing bulky header cards.
+
+#### E. Timetable to Transit Deep Linking & Track Button
+* **The Incident & User Report**:
+  The Routine/Timetable screen suffered from duplicate bus schedule sections, a bulky 160dp "Next Departure" hero card, and an unhelpful "Call Pilot" button.
+* **Architectural Resolution (Commits `64e242d`, `7d5fc8f`, `43f7905`)**:
+  - Replaced Call Pilot with Track Button:
+    - Added `btnTrackBus` (`[ 🧭 ট্র্যাক করুন ]` in Bengali / `Track` in English).
+    - Android APK (`ClassMateAcademicScreensSupabase.kt`): clicking `btnTrackBus` sets `bottomNav.selectedItemId = R.id.nav_transit` and invokes `transitFragment.selectBusById(busId, autoFocus = true)`.
+    - Web Client (`schedule.tsx`): navigating triggers router push to `/transit?bus=${busId}&focus=true`.
+  - Removed Hero Badge & Duplicate Section:
+    - Stripped `heroNextDeparture` layout entirely.
+    - Removed redundant manual schedule array in favor of the single-source `MBSTU_WHEELS_SCHEDULE_MAP` dictionary.
+
+#### F. Friends Directory 860px Wide Compact Popup & 3-Tier Hierarchy
+* **The Incident & User Report**:
+  When clicking on a student profile in the Friends tab, the popup was narrow, causing text to wrap awkwardly across lines. Furthermore, class representatives and admins were scattered randomly throughout the batch list.
+* **Architectural Resolution**:
+  - Expanded modal width to `860px` on Web (`width: min(860px, calc(100vw - 24px))`) and `96%` width on Android.
+  - Enforced 3-tier sorting hierarchy:
+    1. App Owner / Admin (with CSE-22 batch exception pinned to top).
+    2. Active Class Representatives (CR).
+    3. Batchmates sorted alphabetically.
+  - Added relative active status badges (e.g. "Active now", "Active 5m ago") with green status indicator dots.
+
+---
+
+### 212.3 Master Production Verification Matrix (Updated Master State v212)
+
+| Target Subsystem | Platform / Module | Production State | Verification Protocol & Commit Artifacts |
+| :--- | :--- | :--- | :--- |
+| **Dual-Activity Compose Navbar Host Alignment** | Android APK Native | **PRODUCTION** | `ClassMateAuthActivity` (`L3375`) hosts `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`) with `14.dp` margins, `10.dp` elevation, `32.dp` capsule curvature, glass stroke (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with tactile scale lift (`1.05f`) and haptic clock tick feedback across all 5 navigation tabs |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Filtering (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Up Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v212) |
