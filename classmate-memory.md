@@ -15740,3 +15740,219 @@ Building upon the initial MBSTU Wheels integration ([`7bf9b1c9-a2d1-40c9-a995-c8
 | **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
 | **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v216) |
+
+
+---
+
+## 217. Transit Live Telemetry Ground-Truth Stabilization, Animated Timeline Rail Gliding, Soft Radar Pulse Physics & Master State v217
+
+### 217.1 Retrospective of Recent Brain Conversations & Production Milestones
+A rigorous retrospective review was performed across recent Antigravity conversation transcripts under `C:/Users/USER/.gemini/antigravity/brain`, focusing on real-time transit telemetry stabilization, live animation on transit timeline rails, pulse scale micro-physics, secret purge confirmation, and multi-repository synchronization:
+- [`f78a9f92-ab40-4040-be51-25ef5ecd261a`](conversation://f78a9f92-ab40-4040-be51-25ef5ecd261a): Active master memory retrospective and multi-repository synchronization session (Master State v217).
+- [`cc865f4c-aea8-4444-b5ab-10a148f88664`](conversation://cc865f4c-aea8-4444-b5ab-10a148f88664): Preceding hourly synchronization session codifying Master State v216.
+- [`f299dd3b-5ee4-474d-a380-72de6b93c62b`](conversation://f299dd3b-5ee4-474d-a380-72de6b93c62b): Intensive transit telemetry debugging, root-cause resolution, and production deployment session:
+  - Addressed real-time transit bus marker position oscillation ("jumping forward and snapping backward") on the live map.
+  - Resolved frozen bus icon on route stoppage timeline by introducing live animated bus rail gliding with real-time speed badges.
+  - Eliminated ballooning pulse animation distortions by redesigning `@keyframes transitPulse` and introducing independent radar ripple rings (`riderRadarPulse`).
+  - Verified with 0 TypeScript compilation errors and 39/39 passing unit tests; committed to `feature/live-bus-tracking` (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) and merged cleanly into `main` (Commit [`f870503`](https://github.com/shuaibuddowla/ClassMate/commit/f87050341e13016fccf93607f68f3cb067655b53)).
+- [`b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc`](conversation://b447abdd-8aa4-4ff2-a3ad-cc521c1b44fc): Android APK Concept 1 (Dynamic Morphing Fluid Pill) navigation physics delivery, dual-navbar architecture diagnostic, and Friends directory redesign (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6), [`cb05104`](https://github.com/shuaibuddowla/ClassMate/commit/cb05104), [`1b3d37d`](https://github.com/shuaibuddowla/ClassMate/commit/1b3d37d)).
+
+---
+
+### 217.2 Real-Time Transit Telemetry & Map Marker Stabilization
+
+```mermaid
+flowchart TD
+    subgraph Problem: Speculative Dead-Reckoning
+        A["WebSocket Hardware GPS Packet arrives (t = 0s)"] --> B["Clock Tick advances age > 3s (t = 3.5s)"]
+        B --> C["Artificial dead-reckoning projects bus forward along polyline"]
+        C --> D["New authentic GPS packet arrives from hardware (t = 5s)"]
+        D --> E["Marker abruptly snaps backward to true position (Oscillation Loop)"]
+    end
+
+    subgraph Solution: Ground-Truth Preservation
+        F["WebSocket Hardware GPS Packet arrives"] --> G["Preserve raw lat/lon strictly in predictBusPosition"]
+        G --> H["Track only positionAgeSeconds and isStale"]
+        H --> I["Moving buses (speed > 1) bypassed from spiderfied clustering"]
+        I --> J["Leaflet smooth CSS transform (0.6s cubic-bezier) glides forward monotonically"]
+    end
+```
+
+#### A. The Marker Oscillation Bug (Jumping Forward & Backward)
+- **User Observation**: When observing buses in the live map view, whenever a bus received location updates from the WebSocket connection, the bus marker appeared to move forward, but whenever the WebSocket connection refreshed or received new data packets, the bus snapped backward, and then surged forward again. This erratic back-and-forth shifting degraded trust in real-time tracking.
+- **Root Cause Analysis in [`transit.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.tsx)**:
+  1. **Speculative Dead-Reckoning Extrapolation**: Inside `predictBusPosition(bus, nowMs)`, the codebase previously contained logic that computed:
+     $$\text{travelMeters} = \left(\frac{\text{bus.speed} \times 1000}{3600}\right) \times \text{travelSeconds}$$
+     If a GPS packet had an age $> 3$ seconds, the function stepped indices forward along `REAL_STREET_POLYLINE` and replaced `bus.lat` and `bus.lon` with extrapolated coordinates `predLat` and `predLon`.
+  2. **Telemetry Discrepancy & Snapping**: Because actual bus movements on congested campus and city roads involve traffic pauses, red lights, and speed fluctuations, the speculative projection invariably placed the bus tens of meters ahead of its physical position. When the genuine hardware GPS packet arrived 2 to 4 seconds later over WebSocket, the bus marker was forced to snap backward to its actual coordinates.
+  3. **Spatial Clustering (Spiderfier) Collision**: Furthermore, `spiderfiedFleet` was applying 24-meter lateral cluster offsets to any buses within 25 meters of each other. When an active moving bus drove past another bus parked along the road or at a terminal, `spiderfiedFleet` suddenly applied lateral displacement offsets, compounding the jitter.
+- **Implementation Fix**:
+  1. **Ground-Truth Telemetry Preservation**: Completely removed dead-reckoning coordinate tampering from `predictBusPosition`. The function now preserves authentic GPS coordinates reported by hardware and only evaluates staleness:
+     ```typescript
+     // Preserve authentic GPS coordinates reported by hardware/socket.
+     // Never artificially advance latitude/longitude with speculative dead-reckoning,
+     // which causes the bus marker to oscillate forward and snap backward whenever updates arrive.
+     return {
+       ...bus,
+       positionAgeSeconds: ageSeconds,
+       isStale,
+       isEstimated: false
+     };
+     ```
+  2. **Moving Bus Cluster Exemption**: In `spiderfiedFleet`, moving vehicles (`bus.speed > 1 || bus.isDriving`) are strictly excluded from clustering offsets and rendered at their true geographic coordinates (`displayLat: bus.lat, displayLon: bus.lon`). Only stationary terminal buses are clustered.
+  3. **Monotonic Forward Gliding**: Leveraged Leaflet's marker CSS hardware-accelerated transform transition (`transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)`). With raw, monotonic authentic GPS coordinates, the bus marker glides smoothly forward with zero backward snapping.
+
+---
+
+### 217.3 Moving Bus Icon on Route Stoppage Timeline Rail
+
+```mermaid
+sequenceDiagram
+    participant Hardware as MBSTU Hardware GPS
+    participant Socket as MBSTU Wheels WebSocket
+    participant UI as Timeline Rail Component
+    participant CSS as Rail Animation Engine
+
+    Hardware->>Socket: Emit live lat, lon, speed (e.g. 18 km/h)
+    Socket->>UI: Update activeNextStopInfo (distanceKm, nextIndex)
+    UI->>UI: Calculate segmentProgress = clamp(1 - distToNext / totalSegDist, 0.12, 0.88)
+    UI->>CSS: Apply style top = Math.round(segmentProgress * 100)%
+    CSS-->>UI: Smooth transition: top 0.8s cubic-bezier(0.25, 1, 0.5, 1)
+    Note over UI,CSS: Live bus icon visibly glides down the rail with speed badge (১২ কিমি/ঘ)
+```
+
+#### A. The Frozen Timeline Icon Bug
+- **User Observation**: In the bus stoppage detail sheet, while the bus was physically moving on the road at speed, the bus icon in the timeline stayed frozen in place and did not move between stops.
+- **Root Cause Analysis**: The timeline previously rendered the bus icon statically inside the circular station milestone node (`.transit-timeline-node.active-bus-node`) of the upcoming station. Because milestone nodes are anchored to fixed DOM elements in the vertical stoppage list, the icon remained completely motionless until the vehicle physically crossed the station threshold.
+- **Implementation Fix in [`transit.tsx`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.tsx) & [`transit.css`](file:///d:/Code%20&%20Scripts/ClassMate-main/web/src/components/transit.css)**:
+  1. **Dynamic Segment Progress Interpolation**:
+     $$\text{segmentProgress} = \text{clamp}\left(1 - \frac{\text{distToNext}}{\text{totalSegmentDistance}}, 0.12, 0.88\right)$$
+     Computed between `activeRouteStations[nextIdx - 1]` and `activeRouteStations[nextIdx]`. Clamped between `0.12` and `0.88` so the floating rider badge never collides with or obscures station milestone nodes.
+  2. **Dedicated Live Bus Rider (`.transit-timeline-live-bus-rider`)**:
+     Rendered directly on the connecting vertical track (`transit-timeline-rail-line`):
+     ```tsx
+     {isCurrentSegment && (
+       <div
+         className="transit-timeline-live-bus-rider"
+         style={{
+           top: `${Math.round(segmentProgress * 100)}%`,
+           transition: "top 0.8s cubic-bezier(0.25, 1, 0.5, 1)"
+         }}
+         title={`${detailBus.nameBn} (${Math.round(detailBus.speed)} কিমি/ঘ)`}
+       >
+         <div
+           className="transit-timeline-rider-badge"
+           style={{ background: detailBus.color || "var(--transit-pink)" }}
+         >
+           <Bus size={11} color="#ffffff" />
+           <div className="transit-rider-radar-glow" />
+         </div>
+         {detailBus.speed > 0 && (
+           <span className="transit-timeline-rider-speed">
+             {toBengaliDigits(Math.round(detailBus.speed))} কিমি/ঘ
+           </span>
+         )}
+       </div>
+     )}
+     ```
+  3. **Milestone Node Refinement**:
+     - Approaching milestone node converted to `.active-target-node` (clean white surface, `2.5px` border in `--transit-pink`, `#b71454`, subtle `12px` box shadow).
+     - Passed stations show gray checkmarks (`passed-node`), creating an intuitive, uncluttered milestone stepper.
+
+---
+
+### 217.4 Soft Radar Pulse Physics & Animation Scale Refinement
+
+#### A. The Ballooning Pulse Animation Bug
+- **User Observation**: The pulse animation on the timeline bus icon caused it to expand excessively, ballooning up into an uncomfortably large badge and distorting surrounding text and station nodes.
+- **Root Cause Analysis**:
+  - `@keyframes transitPulse` previously scaled up to `scale(1.3)` (+30% expansion):
+    ```css
+    /* Legacy buggy keyframe */
+    @keyframes transitPulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+    ```
+  - This 30% jump distorted SVG vector geometries and caused boundary collisions.
+- **Implementation Fix**:
+  1. **Subtle Micro-Breath Keyframe**: Refactored `transitPulse` to a gentle 6% breath:
+     ```css
+     @keyframes transitPulse {
+       0%, 100% { transform: scale(0.96); opacity: 0.85; }
+       50% { transform: scale(1.06); opacity: 1; }
+     }
+     ```
+  2. **Independent Radar Ripple Ring (`.transit-rider-radar-glow`)**:
+     On `.transit-timeline-live-bus-rider`, the bus badge itself stays perfectly fixed at `scale(1)`. A separate pseudo/child element handles the radar ripple effect:
+     ```css
+     .transit-rider-radar-glow {
+       position: absolute;
+       inset: -3px;
+       border-radius: 50%;
+       border: 1.5px solid currentColor;
+       opacity: 0.6;
+       animation: riderRadarPulse 2s infinite ease-out;
+       pointer-events: none;
+     }
+
+     @keyframes riderRadarPulse {
+       0% { transform: scale(1); opacity: 0.7; }
+       60% { transform: scale(1.35); opacity: 0; }
+       100% { transform: scale(1.35); opacity: 0; }
+     }
+     ```
+     The ring expands from `scale(1)` to `scale(1.35)` while fading smoothly to `opacity: 0`, producing a radar ping without resizing the bus icon.
+
+---
+
+### 217.5 Android APK Bottom Navigation Physics & Friends Directory Redesign (Session `b447abdd`)
+
+- **Dual-Navbar Architectural Conflict Resolution**:
+  - Investigated user feedback where navbar styling changes were not reflecting in the installed APK.
+  - Identified that while `ClassMateFloatingNavigationBar` (`ClassMateBottomBar.kt`) was implemented in Compose, `ClassMateAuthActivity.kt` was actively rendering the native XML view `GlassBottomNavView.kt`.
+  - Rebuilt `GlassBottomNavView.kt` into a floating curved capsule island with:
+    - `16dp` horizontal margins, `12dp` bottom elevation offset, and `28dp` pill corner radii.
+    - Damped harmonic spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`).
+    - Fluid pill indicator morphing and `1.05f` tactile scale lift on tab touch.
+    - Haptic feedback tick via `HapticFeedbackConstants.CLOCK_TICK`.
+- **Friends Directory Modernization**:
+  - Expanded dialog layout width to `860px` on Web and `96%` width (max `720dp`) on Android (`ClassMateFriendsScreen.kt`, `dialog_profile_modern.xml`).
+  - 3-tier hierarchy sorting: Admin & Department Heads $\rightarrow$ Class Representatives (CR) $\rightarrow$ General Batchmates.
+  - Soft keyboard ergonomics: auto-resizing bottom sheets with IME actions (`cb05104`).
+  - Modern predictive back gestures and activity transitions (`1b3d37d`).
+
+---
+
+### 217.6 Master Production Verification Matrix (Updated Master State v217)
+
+| Subsystem / Feature | Target Module | Production State | Verification Evidence & Implementation References |
+| :--- | :--- | :--- | :--- |
+| **Transit Marker Oscillation & Jitter Fix** | Web & Android APK | **PRODUCTION** | Removed speculative dead-reckoning from `predictBusPosition`; preserved authentic GPS telemetry; moving buses excluded from clustering; monotonic forward gliding (Commits [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052), [`f870503`](https://github.com/shuaibuddowla/ClassMate/commit/f87050341e13016fccf93607f68f3cb067655b53)) |
+| **Live Moving Bus on Timeline Rail** | Web & Android APK | **PRODUCTION** | Added `.transit-timeline-live-bus-rider` with dynamic segment progress interpolation ($0.12 \le \text{progress} \le 0.88$), smooth `0.8s` cubic-bezier rail transition, and live speed badge (`১২ কিমি/ঘ`) (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **Soft Radar Pulse Physics (`riderRadarPulse`)** | Web & Android APK | **PRODUCTION** | Refactored `@keyframes transitPulse` to subtle `scale(1.06)`; fixed bus icon at `scale(1)` with independent outer radar ripple ring (`.transit-rider-radar-glow`) fading to 0 opacity (Commit [`9b910b6`](https://github.com/shuaibuddowla/ClassMate/commit/9b910b66eab3aeb51b55e9612a8391ee45413052)) |
+| **GitGuardian Secret Purge & Sanitization** | Full Stack (Scripts & Repos) | **PRODUCTION** | Sanitized `scripts/inspect_students.py`; enforced environment variable authentication; pushed across `main` and `feature/live-bus-tracking` (Commit [`68caed4`](https://github.com/shuaibuddowla/ClassMate/commit/68caed4bbbf530e88e2ba0f243b297fba4e61637)) |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Disabled legacy JWT keys; revoked old HS256 secret; confirmed active ECC P-256 key operational; rotated `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `sb_publishable_...` with Config visibility |
+| **Google OAuth PKCE Flow Recovery** | Web Companion | **PRODUCTION** | Verified OAuth sign-in flow post-Vercel rollout; 100% data retention verified across all database tables, rosters, and notices |
+| **Floating Curved Capsule Island Navigation** | Android APK Native | **PRODUCTION** | Rebuilt native XML `GlassBottomNavView.kt` in `ClassMateAuthActivity` with `16dp` margins, `12dp` bottom offset, `28dp` curvature, and `8dp` elevation (Commits [`9d4c229`](https://github.com/shuaibuddowla/ClassMate/commit/9d4c229e961e34176cbea23f7165e320ad0bf276), [`c085357`](https://github.com/shuaibuddowla/ClassMate/commit/c0853574ac0b74e72ebd8b933c1643bb36a127b6)) |
+| **Damped Harmonic Spring Physics (Concept 1)** | Android APK Native | **PRODUCTION** | Spring physics (`dampingRatio = 0.72f`, `stiffness = 380f`) with fluid pill morphing, `1.05f` tactile scale lift, and haptic clock tick feedback |
+| **Transit Camera Earthquake Shaking Fix** | Web & Android APK | **PRODUCTION** | Decoupled camera flyTo from 1s extrapolated clock via `lastCenteredBusIdRef`, zero camera jitter, floating `[ 🧭 বাসে ফোকাস ]` button (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Dynamic Route Stoppage Slicing (`getStationsForBus`)** | Web & Android APK | **PRODUCTION** | Dynamic route slicing (16 stops Nirala, 18 Puraton, 24 District), 0 phantom stations, clamped milestone progress (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Bus Live Tracking Dedicated Loading State** | Web & Android APK | **PRODUCTION** | Bus tracking loading card with pulsating radar, shimmer progress bar, zero premature boilerplate live options (Commit [`5b7a7b0`](https://github.com/shuaibuddowla/ClassMate/commit/5b7a7b0107ff941d23d3544a804fe9820aa11796)) |
+| **Timetable to Transit Deep Linking & Track Button** | Web & Android APK | **PRODUCTION** | Direct one-tap navigation from schedule to live bus tracking (`btnTrackBus`), zero duplicate schedule sections, next departure hero removed (Commits [`64e242d`](https://github.com/shuaibuddowla/ClassMate/commit/64e242d4c11d4d56287f68ce37c12939c07610fb), [`7d5fc8f`](https://github.com/shuaibuddowla/ClassMate/commit/7d5fc8f61e11d1ba444fa96dd582ae93072b2170), [`43f7905`](https://github.com/shuaibuddowla/ClassMate/commit/43f79058fc23038af93323e68e3bdf73a64fa54e)) |
+| **Transit Tab V3 UI/UX Ground-Ground Redesign** | Web & Android APK | **PRODUCTION** | Bus List view opens first by default, relocated FABs to top-right (no close button overlap), removed off-road blue line, clean card layout (Commit [`42c089e`](https://github.com/shuaibuddowla/ClassMate/commit/42c089e18956513c0b5bc8b59bb9d6be16a39bc2)) |
+| **Unified Transit Telemetry & Departure Card** | Web & Android APK | **PRODUCTION** | Replaced duplicate hero & 4-pill box with ultra-clean ~80px `.transit-detail-live-card`, theme accent stripe (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Sleek Segmented Direction Switcher** | Web & Android APK | **PRODUCTION** | `[ 🏫 ক্যাম্পাস ➔ শহর | 🏙️ শহর ➔ ক্যাম্পাস ]` with instant stoppage list reversal (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **Compact Stoppage Stepper & Viewport Optimization** | Web & Android APK | **PRODUCTION** | 6–8 stops visible simultaneously, checkmark nodes for passed stops, pulsing bus badge for approaching stop (Commit [`888393f`](https://github.com/shuaibuddowla/ClassMate/commit/888393f3873cb1fba899b6c54c2366559641f680)) |
+| **IoT Attendance Station Firmware** | ESP32 C++ Arduino | **PRODUCTION** | Dual-core FreeRTOS separation (`esp32_rfid_attendance.ino`), 3-tier Wi-Fi fallback (15s timeouts), 64-scan in-memory queue buffering, < 50ms edge scan latency |
+| **3D Printable Snap-Fit Enclosure** | 3D Printing & CAD | **PRODUCTION** | Watertight 2-manifold STL models (`desktop_attendance_front_panel.stl`, `desktop_attendance_main_enclosure.stl`); 1.0–1.2mm RF wall thinning, 1.2mm solder pin relief, 18.5×27.2mm OLED pocket |
+| **RFID Profile Database Indexing** | Supabase PostgreSQL | **PRODUCTION** | B-tree index `idx_profiles_rfid_card_uid` deployed via migration `202610250002_rfid_index.sql`; O(1) < 3ms card lookups |
+| **Attendance Card Batch Fund Ledger** | Full Stack (DB & Web) | **PRODUCTION** | Tracked in `classmate.batch_fund_transactions`; 33 students paid (৳1,325 collected), 24 unpaid, zero ledger discrepancies |
+| **Standalone Local FastAPI Station** | Python / FastAPI / SQLite | **PRODUCTION** | Standalone LAN station mode in `attendance-tracker/backend` with WebSockets, smart check-in/out, and 1-click enrollment |
+| **Notice System Architecture & Memory Retention** | Web & Android APK | **PRODUCTION** | Complete architecture codified in `classmate-memory.md` (Sections 1–14); 0ms optimistic updates, ListAdapter diffing, silent notice publishing |
+| **WhatsApp-Style "Message Info" Read Receipts** | Web & Android APK | **PRODUCTION** | Top-locked preview, double checkmarks `#53bdeb`, doodle wallpaper, keyset reader pagination, admin privacy toggle enforcement |
+| **Facebook-Style Social Comments Subsystem** | Web & Android APK | **PRODUCTION** | BottomSheet/Modal popup, speech bubbles, 1-level inline reply branching, compact capsule composer, soft deletion via `delete_notice_comment` |
+| **Friends Directory Wider Popup & Hierarchy Sorting** | Web & Android APK | **PRODUCTION** | 860px/96% wide compact profile popup, active status badges, 3-tier hierarchy (Admin -> CR -> Batchmates), teacher privacy protection |
+| **Automated Daily Security Audit Protocol** | CI/CD & Automation | **PRODUCTION** | Automation `classmate-daily-security-audit` scheduled at 9:00 AM Asia/Dhaka verifying secret leaks, dependency CVEs, and storage policies |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v217) |
