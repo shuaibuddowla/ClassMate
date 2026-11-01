@@ -12,13 +12,14 @@
             android:paddingTop="14dp" android:paddingBottom="2dp"
             android:clipChildren="false" android:clipToPadding="false">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:gravity="center_vertical" android:orientation="horizontal">
+                android:gravity="top" android:orientation="horizontal">
                 <View android:id="@+id/noticeAccent" android:layout_width="4dp" android:layout_height="22dp"
+                    android:layout_marginTop="2dp"
                     android:background="@drawable/bg_notice_premium_accent" />
                 <TextView android:id="@+id/tvTitle" android:layout_width="0dp" android:layout_height="wrap_content"
                     android:layout_weight="1" android:layout_marginStart="10dp" android:layout_marginEnd="8dp"
                     android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
-                    android:maxLines="3" android:ellipsize="end" android:textColor="@color/cm_text_primary"
+                    android:textColor="@color/cm_text_primary"
                     android:textSize="18sp" android:textStyle="bold"
                     app:autoSizeTextType="uniform"
                     app:autoSizeMinTextSize="12sp"

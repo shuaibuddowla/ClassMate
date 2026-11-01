@@ -1308,6 +1308,8 @@ function NoticeCard({
       <div className="notice-content">
         <h2
           className={`${isOverflow ? "clickable" : ""} ${
+            poll ? "poll-title-unfold" : ""
+          } ${
             (n.title?.length || 0) > 100
               ? "notice-title-shrink-lg"
               : (n.title?.length || 0) > 50

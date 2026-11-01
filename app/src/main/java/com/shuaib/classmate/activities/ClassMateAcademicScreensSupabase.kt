@@ -5516,16 +5516,34 @@ internal class ClassMateAcademicScreensSupabase(
 
                 val titleLen = currentTitle.length
                 val dynamicSp = when {
-                    titleLen > 110 -> 13f
-                    titleLen > 65 -> 14.5f
-                    titleLen > 35 -> 16f
-                    else -> 18f
+                    pollNotice -> when {
+                        titleLen > 140 -> 13.5f
+                        titleLen > 70 -> 14.5f
+                        titleLen > 40 -> 15.5f
+                        else -> 17f
+                    }
+                    else -> when {
+                        titleLen > 110 -> 13f
+                        titleLen > 65 -> 14.5f
+                        titleLen > 35 -> 16f
+                        else -> 18f
+                    }
                 }
                 tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, dynamicSp)
                 androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
                     tvTitle, 12, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP
                 )
-                tvTitle.maxLines = if (isExpanded) Int.MAX_VALUE else (if (titleLen > 80) 3 else 2)
+                if (pollNotice) {
+                    // Option 1: Adaptive Full Unfold for Poll Questions
+                    // Poll questions unfold completely so the entire question is always visible
+                    tvTitle.maxLines = if (isExpanded || titleLen <= 260) Int.MAX_VALUE else 6
+                    tvTitle.ellipsize = if (titleLen <= 260) null else android.text.TextUtils.TruncateAt.END
+                    tvTitle.setLineSpacing(2f, 1.15f)
+                } else {
+                    tvTitle.maxLines = if (isExpanded) Int.MAX_VALUE else (if (titleLen > 80) 3 else 2)
+                    tvTitle.ellipsize = android.text.TextUtils.TruncateAt.END
+                    tvTitle.setLineSpacing(0f, 1f)
+                }
 
                 tvTitle.text = ClassMateNoticeText.styled(tvTitle, currentTitle, search)
 
