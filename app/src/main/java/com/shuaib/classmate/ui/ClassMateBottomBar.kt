@@ -64,14 +64,18 @@ enum class ClassMateTab(
 /**
  * Generic badge model supporting either an unread count bubble or a dot.
  */
+@androidx.compose.runtime.Immutable
 sealed interface NavBadge {
+    @androidx.compose.runtime.Immutable
     object Dot : NavBadge
+    @androidx.compose.runtime.Immutable
     data class Count(val count: Int) : NavBadge
 }
 
 /**
  * Quick Action definition for long-press shortcuts.
  */
+@androidx.compose.runtime.Immutable
 data class TabQuickAction(
     val title: String,
     val subtitle: String? = null,
@@ -205,7 +209,7 @@ fun ClassMateFloatingNavigationBar(
                                     .clip(RoundedCornerShape(20.dp))
                                     .combinedClickable(
                                         indication = null, // Custom sliding indicator handles visual feedback
-                                        interactionSource = remember { MutableInteractionSource() },
+                                        interactionSource = remember(tab) { MutableInteractionSource() },
                                         onClick = {
                                             if (!isSelected) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)

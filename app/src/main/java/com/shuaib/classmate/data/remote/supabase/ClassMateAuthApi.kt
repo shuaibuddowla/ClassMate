@@ -127,12 +127,12 @@ object ClassMateAuthApi {
         }
     }
 
-    suspend fun rpc(name: String, args: JSONObject): JSONObject {
+    suspend fun rpc(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val text = request("POST", "/rest/v1/rpc/$name", args, classmate = true).trim()
-        if (text.isEmpty()) return JSONObject()
-        if (text.startsWith("{")) return JSONObject(text)
-        if (text.startsWith("[")) return JSONObject().put("data", JSONArray(text))
-        return JSONObject().put("result", text.removeSurrounding("\""))
+        if (text.isEmpty()) return@withContext JSONObject()
+        if (text.startsWith("{")) return@withContext JSONObject(text)
+        if (text.startsWith("[")) return@withContext JSONObject().put("data", JSONArray(text))
+        JSONObject().put("result", text.removeSurrounding("\""))
     }
 
     suspend fun rpcVoid(name: String, args: JSONObject) {
@@ -156,8 +156,9 @@ object ClassMateAuthApi {
         request("DELETE", "/rest/v1/device_tokens?fcm_token=eq.$encoded", classmate = true)
     }
 
-    suspend fun rows(table: String, query: String): JSONArray =
+    suspend fun rows(table: String, query: String): JSONArray = withContext(Dispatchers.IO) {
         JSONArray(request("GET", "/rest/v1/$table?$query", classmate = true))
+    }
 
     suspend fun upsert(table: String, row: JSONObject) {
         request("POST", "/rest/v1/$table", row, classmate = true,
