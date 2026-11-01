@@ -1,5 +1,7 @@
 package com.shuaib.classmate.activities
 
+import androidx.activity.enableEdgeToEdge
+
 
 
 
@@ -1753,6 +1755,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
 
 
 
@@ -3579,7 +3582,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
-        nav.menu.findItem(R.id.nav_friends)?.isVisible = showBatch
+        nav.menu.findItem(R.id.nav_friends)?.isVisible = false
+        nav.menu.findItem(R.id.nav_transit)?.isVisible = false
         nav.menu.findItem(R.id.nav_friends)?.title = if (profile?.optString("role") == "teacher") "Students" else "Batch"
 
 
@@ -3692,25 +3696,20 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         val swipeHost = homeHost as com.shuaib.classmate.ui.ClassMateSwipeTabsHost
 
-
+        val activeNavTabs = listOf(
+            R.id.nav_timetable,
+            R.id.nav_notices,
+            R.id.nav_pdf,
+            R.id.nav_profile
+        )
 
         fun destination(direction: Int): Int? {
-
-
-
-            val tabs=(0 until nav.menu.size()).map { nav.menu.getItem(it) }.filter { it.isVisible }
-
-
-
-            return tabs.getOrNull(tabs.indexOfFirst { it.itemId==selectedTab }+direction)?.itemId
-
-
-
+            val currentIndex = activeNavTabs.indexOf(selectedTab)
+            if (currentIndex == -1) return null
+            return activeNavTabs.getOrNull(currentIndex + direction)
         }
 
-
-
-        swipeHost.canSwipe = { direction -> !manageOpen && selectedTab != R.id.nav_transit && destination(direction)!=null }
+        swipeHost.canSwipe = { direction -> !manageOpen && destination(direction) != null }
 
 
 
