@@ -4,7 +4,13 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.app.PendingIntent
 import android.net.Uri
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import android.os.Build
+import com.shuaib.classmate.nfc.NfcCardManager
+import com.shuaib.classmate.nfc.NfcCardLocalCache
 import android.os.Bundle
 import android.os.Environment
 import android.view.Gravity
@@ -79,6 +85,8 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     private var coursesList: MutableList<JSONObject> = mutableListOf()
     private var studentsList: MutableList<JSONObject> = mutableListOf()
     private var selectedStudentObj: JSONObject? = null
+    private var nfcAdapter: NfcAdapter? = null
+    private var nfcPendingIntent: PendingIntent? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,17 +100,31 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         selectTab(true)
 
         loadAllData()
+
+        setupNfcDispatch()
+        val passedCardUid = intent.getStringExtra("EXTRA_CARD_UID")
+        if (!passedCardUid.isNullOrEmpty()) {
+            selectTab(false)
+            etCardUid.setText(passedCardUid)
+            Toast.makeText(this, "Card $passedCardUid ready. Select a student to assign.", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         startStationPoller()
+        try {
+            nfcAdapter?.enableForegroundDispatch(this, nfcPendingIntent, null, null)
+        } catch (_: Exception) {}
     }
 
     override fun onPause() {
         super.onPause()
         pollerJob?.cancel()
         pollerJob = null
+        try {
+            nfcAdapter?.disableForegroundDispatch(this)
+        } catch (_: Exception) {}
     }
 
     private fun bindViews() {
@@ -840,6 +862,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     studentsList.add(arr.getJSONObject(i))
                 }
                 sortStudentsWithReaddLast(studentsList)
+                NfcCardLocalCache.cacheRoster(this@ClassMateAdminAttendanceActivity, studentsList, batchLabel)
 
                 tvStudentDirectoryCount.text = "${studentsList.size} Students"
                 setupStudentAutocomplete()
@@ -877,14 +900,41 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         tvSelectedStudentName.text = "$name ($roll)"
 
         val uid = student.optString("rfid_card_uid").trim()
+        val btnAdminRestartCard = findViewById<MaterialButton>(R.id.btnAdminRestartCard)
         if (uid.isNotEmpty() && uid != "null") {
             tvSelectedStudentCardStatus.text = "Card Registered: ••••${uid.takeLast(4).uppercase()}"
             tvSelectedStudentCardStatus.setTextColor(Color.parseColor("#10B981"))
             etCardUid.setText(uid)
+            btnAdminRestartCard?.visibility = View.VISIBLE
+            btnAdminRestartCard?.setOnClickListener {
+                ClassMateHaptics.selection(it)
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Restart Student Card?")
+                    .setMessage("Unlink this card from $name ($roll)? The card can then be assigned to someone else.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Restart Card") { _, _ ->
+                        lifecycleScope.launch {
+                            try {
+                                val studentId = student.optString("student_id")
+                                withContext(Dispatchers.IO) {
+                                    ClassMateAuthApi.rpc("restart_student_rfid", JSONObject().put("p_student_id", studentId))
+                                }
+                                student.put("rfid_card_uid", "")
+                                selectStudentForCard(student)
+                                renderStudentDirectoryCards()
+                                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Card unlinked from $name", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to unlink: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    .show()
+            }
         } else {
             tvSelectedStudentCardStatus.text = "No card registered yet"
             tvSelectedStudentCardStatus.setTextColor(getColor(R.color.cm_text_muted))
             etCardUid.setText("")
+            btnAdminRestartCard?.visibility = View.GONE
         }
     }
 
@@ -934,6 +984,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 student.put("rfid_card_uid", cleanUid)
                 selectStudentForCard(student)
                 renderStudentDirectoryCards()
+                NfcCardLocalCache.cacheRoster(this@ClassMateAdminAttendanceActivity, studentsList, batchLabel)
             } catch (e: Exception) {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to assign card: ${e.message}", Toast.LENGTH_LONG).show()
             }
@@ -1012,6 +1063,64 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         } catch (_: Exception) {
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://classmatebd.vercel.app/#attendance"))
             startActivity(browserIntent)
+        }
+    }
+
+    private fun setupNfcDispatch() {
+        try {
+            nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+            val nfcIntent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            nfcPendingIntent = PendingIntent.getActivity(this, 0, nfcIntent, flags)
+        } catch (_: Exception) {}
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val scannedUid = NfcCardManager.extractUid(intent)
+        if (scannedUid.isNotEmpty()) {
+            ClassMateHaptics.selection(window.decorView)
+            selectTab(false)
+            etCardUid.setText(scannedUid)
+
+            val student = selectedStudentObj
+            val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+            }
+
+            if (student != null) {
+                if (tag != null) {
+                    val payload = NfcCardManager.StudentCardPayload(
+                        uid = scannedUid,
+                        studentId = student.optString("student_id"),
+                        name = student.optString("full_name"),
+                        roll = student.optString("roll"),
+                        batch = batchLabel,
+                        dept = "MBSTU"
+                    )
+                    NfcCardManager.writeStudentCard(tag, payload)
+                }
+                saveStudentCard()
+            } else {
+                val matched = studentsList.firstOrNull {
+                    it.optString("rfid_card_uid").equals(scannedUid, ignoreCase = true)
+                }
+                if (matched != null) {
+                    selectStudentForCard(matched)
+                    actvStudentSearch.setText("${matched.optString("roll")} - ${matched.optString("full_name")}", false)
+                    Toast.makeText(this, "Identified student: ${matched.optString("roll")}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Card $scannedUid scanned. Select a student to assign.", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 }

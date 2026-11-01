@@ -8,7 +8,9 @@
 
 
 
-    <uses-permission android:name="android.permission.INTERNET"/>
+        <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.NFC"/>
+    <uses-feature android:name="android.hardware.nfc" android:required="false"/>
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -604,6 +606,35 @@
         </receiver>
 
 
+
+            <!-- NFC Instant Card Dispatcher -->
+        <activity
+            android:name=".nfc.NfcCardDispatcherActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ClassMate.Translucent"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="classmate" android:host="card" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="https" android:host="classmatebd.vercel.app" android:pathPrefix="/card" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="classmate" android:host="card" />
+            </intent-filter>
+        </activity>
 
     </application>
 

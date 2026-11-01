@@ -8869,11 +8869,61 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+        val tvUserCardSubtitle = dialogView.findViewById<TextView>(R.id.tvUserCardSubtitle)
+        val btnRestartCard = dialogView.findViewById<MaterialButton>(R.id.btnRestartCard)
+
+        fun bindCardStatus(cardUid: String) {
+            val cleanUid = cardUid.trim()
+            if (cleanUid.isNotEmpty() && cleanUid != "null") {
+                tvUserCardSubtitle?.text = "Linked: ••••${cleanUid.takeLast(4).uppercase(java.util.Locale.US)} · Tap Ready"
+                tvUserCardSubtitle?.setTextColor(android.graphics.Color.parseColor("#10B981"))
+                btnRestartCard?.visibility = View.VISIBLE
+                btnRestartCard?.setOnClickListener { btn ->
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(btn)
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                        .setTitle("Restart Smart Card?")
+                        .setMessage("This will unlink your physical RFID/NFC card from your profile. You or your CR will need to tap a new card to take tap attendance.")
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Restart Card") { _, _ ->
+                            launch(dialogView) {
+                                try {
+                                    ClassMateAuthApi.rpc("restart_student_rfid", JSONObject())
+                                    profile().put("rfid_card_uid", "")
+                                    bindCardStatus("")
+                                    Toast.makeText(activity, "Attendance card restarted. You can now tap a new card.", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(activity, "Failed to restart card: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .show()
+                }
+            } else {
+                tvUserCardSubtitle?.text = "No card registered yet"
+                tvUserCardSubtitle?.setTextColor(activity.getColor(R.color.cm_text_muted))
+                btnRestartCard?.visibility = View.GONE
+            }
+        }
+
+        val cachedCardUid = profile().optString("rfid_card_uid", "")
+        bindCardStatus(cachedCardUid)
+
         launch(dialogView) {
-
-
-
             try {
+                // Refresh card status from database
+                try {
+                    val myProfileId = profile().optString("id")
+                    if (myProfileId.isNotBlank()) {
+                        val rows = ClassMateAuthApi.rows("profiles", "select=rfid_card_uid&id=eq.$myProfileId")
+                        if (rows.length() > 0) {
+                            val freshCardUid = rows.getJSONObject(0).optString("rfid_card_uid", "")
+                            profile().put("rfid_card_uid", freshCardUid)
+                            if (active(dialogView)) {
+                                bindCardStatus(freshCardUid)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
 
 
 
@@ -11141,6 +11191,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+        root.v<View>(R.id.cardProfileUserAttendance).apply {
+            setOnClickListener {
+                com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                showRfidAttendanceDialog(root)
+            }
+        }
+
         val initialCanManageAttendance = isAdmin || cachedServerOwner
 
 
@@ -11380,6 +11437,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+
+                    root.v<View>(R.id.cardProfileUserAttendance).apply {
+                        setOnClickListener {
+                            com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                            showRfidAttendanceDialog(root)
+                        }
+                    }
 
                     val canManageAttendance = isAdmin || isServerOwner
 
