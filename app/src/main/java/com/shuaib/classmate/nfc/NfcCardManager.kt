@@ -193,10 +193,8 @@ object NfcCardManager {
         // Public web URL: https://classmatebd.vercel.app/c/<card_uid>
         val webUri = Uri.parse("https://$WEB_HOST/c/$cleanUid")
         val uriRecord = NdefRecord.createUri(webUri)
-        // Android Application Record: ensures phone opens ClassMate instantly with 0 chooser dialog
-        val aarRecord = NdefRecord.createApplicationRecord(AAR_PACKAGE)
-
-        return NdefMessage(arrayOf(uriRecord, aarRecord))
+        // Pure NDEF URI only: Never launches Google Play Store
+        return NdefMessage(arrayOf(uriRecord))
     }
 
     /**
