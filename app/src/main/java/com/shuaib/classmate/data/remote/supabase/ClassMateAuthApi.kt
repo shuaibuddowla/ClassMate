@@ -107,6 +107,26 @@ object ClassMateAuthApi {
 
     suspend fun initializeProfile(): JSONObject = rpc("create_or_initialize_profile", JSONObject())
 
+    suspend fun publicRpc(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+        val url = "$base/rest/v1/rpc/$name"
+        val request = Request.Builder()
+            .url(url)
+            .header("apikey", key)
+            .header("Accept-Profile", "classmate")
+            .header("Content-Profile", "classmate")
+            .post(args.toString().toRequestBody(jsonType))
+            .build()
+        try {
+            http.newCall(request).execute().use { response ->
+                val result = response.body?.string().orEmpty().trim()
+                if (!response.isSuccessful) return@withContext JSONObject()
+                if (result.startsWith("{")) JSONObject(result) else JSONObject()
+            }
+        } catch (_: Exception) {
+            JSONObject()
+        }
+    }
+
     suspend fun rpc(name: String, args: JSONObject): JSONObject {
         val text = request("POST", "/rest/v1/rpc/$name", args, classmate = true).trim()
         if (text.isEmpty()) return JSONObject()

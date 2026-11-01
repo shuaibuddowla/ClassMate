@@ -136,26 +136,7 @@
                         android:textSize="11.5sp" />
                 </LinearLayout>
 
-                <!-- Restart Card Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRestartCard"
-                    style="?attr/materialButtonOutlinedStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:text="Restart Card"
-                    android:textColor="#EF4444"
-                    android:textSize="11.5sp"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="10dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:visibility="gone"
-                    app:icon="@drawable/ic_refresh"
-                    app:iconSize="14dp"
-                    app:iconTint="#EF4444"
-                    app:iconGravity="textStart"
-                    app:cornerRadius="8dp"
-                    app:strokeColor="#50EF4444" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

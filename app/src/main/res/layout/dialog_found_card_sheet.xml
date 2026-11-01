@@ -157,97 +157,201 @@
                             android:textColor="@color/cm_text_primary"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            tools:text="Shuaib Ahmed" />
+                            tools:text="Khosh Afroza Akter" />
 
-                        <TextView
-                            android:id="@+id/tvStudentRoll"
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:textColor="@color/cm_primary"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            tools:text="CE25032" />
+                            android:layout_marginTop="4dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tvStudentRoll"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_badge_blue"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="2dp"
+                                android:textColor="@color/cm_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                tools:text="CE25057" />
+
+                            <TextView
+                                android:id="@+id/tvStudentBatch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:background="@drawable/bg_segmented_container"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="2dp"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11sp"
+                                tools:text="cse 22" />
+                        </LinearLayout>
 
                         <TextView
                             android:id="@+id/tvStudentDeptBatch"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="4dp"
                             android:textColor="@color/cm_text_secondary"
                             android:textSize="12sp"
-                            tools:text="CSE 22 · Computer Science &amp; Engineering" />
+                            tools:text="Computer Science and Engineering" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Status Pills Row -->
-                <com.google.android.flexbox.FlexboxLayout
-                    xmlns:flexbox="http://schemas.android.com/apk/res-auto"
-                    android:id="@+id/layoutPills"
+                <!-- Clean Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@color/cm_border" />
+
+                <!-- 2x2 Information Grid: Well Organized, Clean & Balanced -->
+                <LinearLayout
+                    android:id="@+id/layoutStudentMetaGrid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    flexbox:flexWrap="wrap"
-                    flexbox:justifyContent="flex_start">
+                    android:orientation="vertical">
 
-                    <!-- Verified Status Pill -->
-                    <TextView
-                        android:id="@+id/tvStatusBadge"
-                        android:layout_width="wrap_content"
+                    <!-- Row 1: Verification + Blood Group -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/bg_badge_green"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:text="✓ Verified Student"
-                        android:textColor="#10B981"
-                        android:textSize="11.5sp"
-                        android:textStyle="bold" />
+                        android:orientation="horizontal">
 
-                    <!-- Blood Group Pill -->
-                    <TextView
-                        android:id="@+id/tvBloodBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/bg_segmented_container"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="#EF4444"
-                        android:textSize="11.5sp"
-                        android:textStyle="bold"
-                        tools:text="🩸 O+" />
+                        <!-- Verification Box -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_segmented_container"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="9dp">
 
-                    <!-- Attendance % Pill -->
-                    <TextView
-                        android:id="@+id/tvAttendanceBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/bg_segmented_container"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11.5sp"
-                        tools:text="📊 91.5% Attendance" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="STATUS"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="9.5sp"
+                                android:textStyle="bold" />
 
-                    <!-- Card UID Badge -->
-                    <TextView
-                        android:id="@+id/tvCardUidBadge"
-                        android:layout_width="wrap_content"
+                            <TextView
+                                android:id="@+id/tvStatusBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="✓ Verified"
+                                android:textColor="#10B981"
+                                android:textSize="12.5sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!-- Blood Group Box -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_segmented_container"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="9dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="BLOOD GROUP"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="9.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvBloodBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="🩸 B+"
+                                android:textColor="#EF4444"
+                                android:textSize="12.5sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Row 2: Attendance + Card UID -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_marginBottom="6dp"
-                        android:background="@drawable/bg_segmented_container"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="@color/cm_text_muted"
-                        android:textSize="11.5sp"
-                        tools:text="UID: ••••7B12" />
-                </com.google.android.flexbox.FlexboxLayout>
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <!-- Attendance Box -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_segmented_container"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="9dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ATTENDANCE"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="9.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvAttendanceBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="📊 100.0%"
+                                android:textColor="#10B981"
+                                android:textSize="12.5sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!-- Card UID Box -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_segmented_container"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="9dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="SMART CARD"
+                                android:textColor="@color/cm_text_muted"
+                                android:textSize="9.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvCardUidBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="💳 ••••E506"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="12.5sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -263,32 +367,49 @@
                 android:id="@+id/btnCallOwner"
                 style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
+                android:layout_height="50dp"
+                android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:text="Call Student"
+                android:textAllCaps="false"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
+                android:textColor="@android:color/white"
                 android:textSize="13.5sp"
                 android:textStyle="bold"
                 app:backgroundTint="#10B981"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_phone"
                 app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                app:iconSize="18dp"
                 app:iconTint="@android:color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWhatsappOwner"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="8dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:text="WhatsApp"
+                android:textAllCaps="false"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingHorizontal="8dp"
                 android:textColor="#25D366"
                 android:textSize="13.5sp"
                 android:textStyle="bold"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_whatsapp"
                 app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                app:iconSize="18dp"
                 app:iconTint="#25D366"
                 app:strokeColor="#25D366" />
         </LinearLayout>
@@ -348,30 +469,44 @@
                 android:id="@+id/btnCopyRoll"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:text="Copy Roll"
-                android:textSize="12sp"
+                android:textAllCaps="false"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="12.5sp"
                 app:cornerRadius="10dp"
                 app:icon="@drawable/ic_copy"
                 app:iconGravity="textStart"
-                app:iconSize="14dp"
+                app:iconPadding="6dp"
+                app:iconSize="15dp"
                 app:strokeColor="@color/cm_border" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnShareCard"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="Share Card Info"
-                android:textSize="12sp"
+                android:text="Share Card"
+                android:textAllCaps="false"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="12.5sp"
                 app:cornerRadius="10dp"
                 app:icon="@drawable/ic_share"
                 app:iconGravity="textStart"
-                app:iconSize="14dp"
+                app:iconPadding="6dp"
+                app:iconSize="15dp"
                 app:strokeColor="@color/cm_border" />
         </LinearLayout>
     </LinearLayout>
@@ -454,6 +589,9 @@
                     android:layout_height="48dp"
                     android:layout_marginTop="16dp"
                     android:text="Assign This Card to Student"
+                    android:textAllCaps="false"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:textSize="13.5sp"
                     android:textStyle="bold"
                     android:visibility="gone"

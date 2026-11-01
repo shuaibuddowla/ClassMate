@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -16,6 +17,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -49,6 +51,7 @@ class FoundCardBottomSheet(
     private val tvStudentInitials: TextView = view.findViewById(R.id.tvStudentInitials)
     private val tvStudentName: TextView = view.findViewById(R.id.tvStudentName)
     private val tvStudentRoll: TextView = view.findViewById(R.id.tvStudentRoll)
+    private val tvStudentBatch: TextView = view.findViewById(R.id.tvStudentBatch)
     private val tvStudentDeptBatch: TextView = view.findViewById(R.id.tvStudentDeptBatch)
     private val tvSheetHeaderSubtitle: TextView = view.findViewById(R.id.tvSheetHeaderSubtitle)
 
@@ -97,7 +100,7 @@ class FoundCardBottomSheet(
         }
 
         val uid = activePayload.uid.uppercase(Locale.US)
-        tvCardUidBadge.text = if (uid.isNotBlank()) "UID: ••••${uid.takeLast(4)}" else "NFC Tag"
+        tvCardUidBadge.text = if (uid.isNotBlank()) "••••${uid.takeLast(4)}" else "NFC Tag"
 
         // Online-only presentation (skip offline per user request)
         layoutRegisteredStudent.visibility = View.GONE
@@ -123,7 +126,7 @@ class FoundCardBottomSheet(
 
     private fun renderOfflineState() {
         val uid = activePayload.uid.uppercase(Locale.US)
-        tvCardUidBadge.text = if (uid.isNotBlank()) "UID: ••••${uid.takeLast(4)}" else "NFC Tag"
+        tvCardUidBadge.text = if (uid.isNotBlank()) "••••${uid.takeLast(4)}" else "NFC Tag"
 
         if (activePayload.hasStudentInfo) {
             layoutRegisteredStudent.visibility = View.VISIBLE
@@ -135,12 +138,14 @@ class FoundCardBottomSheet(
             tvStudentName.text = activeName
             tvStudentRoll.text = activeRoll.ifBlank { "Student Roll Not Set" }
 
-            val deptBatchText = buildString {
-                if (activePayload.batch.isNotBlank()) append(activePayload.batch)
-                if (activePayload.batch.isNotBlank() && activePayload.dept.isNotBlank()) append(" · ")
-                if (activePayload.dept.isNotBlank()) append(activePayload.dept)
-            }.ifBlank { "MBSTU Campus Student" }
-            tvStudentDeptBatch.text = deptBatchText
+            if (activePayload.batch.isNotBlank()) {
+                tvStudentBatch.text = activePayload.batch
+                tvStudentBatch.visibility = View.VISIBLE
+            } else {
+                tvStudentBatch.visibility = View.GONE
+            }
+
+            tvStudentDeptBatch.text = activePayload.dept.ifBlank { "MBSTU Campus Student" }
 
             // Initials fallback or cached avatar
             val cachedAvatar = NfcCardLocalCache.getCachedAvatarUrl(activity, uid)
@@ -158,34 +163,34 @@ class FoundCardBottomSheet(
             val cleanBlood = activePayload.blood.trim()
             if (cleanBlood.isNotEmpty() && cleanBlood != "null") {
                 tvBloodBadge.text = "🩸 $cleanBlood"
-                tvBloodBadge.visibility = View.VISIBLE
+                tvBloodBadge.setTextColor(Color.parseColor("#EF4444"))
             } else {
-                tvBloodBadge.visibility = View.GONE
+                tvBloodBadge.text = "Not Listed"
+                tvBloodBadge.setTextColor(ContextCompat.getColor(activity, R.color.cm_text_muted))
             }
 
             // Cached attendance %
             val cachedPct = NfcCardLocalCache.getCachedAttendancePct(activity, uid)
             if (cachedPct != null && cachedPct > 0.0) {
-                tvAttendanceBadge.text = "📊 ${String.format(Locale.US, "%.1f", cachedPct)}% Attendance"
-                tvAttendanceBadge.visibility = View.VISIBLE
+                tvAttendanceBadge.text = "📊 ${String.format(Locale.US, "%.1f", cachedPct)}%"
+                tvAttendanceBadge.setTextColor(Color.parseColor("#10B981"))
             } else {
-                tvAttendanceBadge.visibility = View.GONE
+                tvAttendanceBadge.text = "Active"
+                tvAttendanceBadge.setTextColor(ContextCompat.getColor(activity, R.color.cm_text_secondary))
             }
 
-            tvStatusBadge.text = "✓ Verified Offline Card"
+            tvStatusBadge.text = "✓ Verified Card"
 
             // Contact actions
             bindContactActions(activePayload.phone)
         } else {
             // Unregistered / blank card or pending online verification
             if (isNetworkAvailable()) {
-                // Network is available: show loading spinner while querying Supabase
                 layoutRegisteredStudent.visibility = View.GONE
                 layoutUnregisteredCard.visibility = View.GONE
                 progressLoadingStudent.visibility = View.VISIBLE
                 tvSheetHeaderSubtitle.text = "Verifying Smart Card ••••${uid.takeLast(4)}..."
             } else {
-                // Offline and not cached
                 showUnregisteredState(uid)
             }
         }
@@ -274,6 +279,7 @@ class FoundCardBottomSheet(
                 if (activeName.isNotBlank()) appendLine("Name: $activeName")
                 if (activeRoll.isNotBlank()) appendLine("Roll: $activeRoll")
                 if (activePayload.batch.isNotBlank()) appendLine("Batch: ${activePayload.batch}")
+                if (activePayload.dept.isNotBlank()) appendLine("Dept: ${activePayload.dept}")
                 if (activePhoneNumber.isNotBlank()) appendLine("Phone: $activePhoneNumber")
                 if (activePayload.uid.isNotBlank()) appendLine("Card UID: ${activePayload.uid}")
             }
@@ -294,7 +300,7 @@ class FoundCardBottomSheet(
                 val params = JSONObject().put("p_card_uid", uid)
                 val result = withContext(Dispatchers.IO) {
                     try {
-                        ClassMateAuthApi.rpc("lookup_student_by_card", params)
+                        ClassMateAuthApi.publicRpc("lookup_student_by_card", params)
                     } catch (_: Exception) {
                         null
                     }
@@ -328,14 +334,16 @@ class FoundCardBottomSheet(
                         tvStudentRoll.text = activeRoll
                     }
 
-                    val deptBatch = buildString {
-                        if (onlineBatch.isNotBlank()) append(onlineBatch)
-                        if (onlineBatch.isNotBlank() && onlineDept.isNotBlank()) append(" · ")
-                        if (onlineDept.isNotBlank()) append(onlineDept)
-                    }.ifBlank { "MBSTU Student" }
-                    tvStudentDeptBatch.text = deptBatch
+                    if (onlineBatch.isNotBlank()) {
+                        tvStudentBatch.text = onlineBatch
+                        tvStudentBatch.visibility = View.VISIBLE
+                    } else {
+                        tvStudentBatch.visibility = View.GONE
+                    }
 
-                    tvStatusBadge.text = "✓ Verified MBSTU Student"
+                    tvStudentDeptBatch.text = onlineDept.ifBlank { "MBSTU Student" }
+
+                    tvStatusBadge.text = "✓ MBSTU Verified"
 
                     // Avatar hydration
                     if (onlineAvatar.isNotBlank() && onlineAvatar != "null" && onlineAvatar.startsWith("http")) {
@@ -348,19 +356,22 @@ class FoundCardBottomSheet(
                     }
 
                     // Blood group
-                    if (onlineBlood.isNotBlank() && onlineBlood != "null") {
-                        tvBloodBadge.text = "🩸 $onlineBlood"
-                        tvBloodBadge.visibility = View.VISIBLE
+                    val cleanBlood = onlineBlood.trim()
+                    if (cleanBlood.isNotEmpty() && cleanBlood != "null") {
+                        tvBloodBadge.text = "🩸 $cleanBlood"
+                        tvBloodBadge.setTextColor(Color.parseColor("#EF4444"))
                     } else {
-                        tvBloodBadge.visibility = View.GONE
+                        tvBloodBadge.text = "Not Listed"
+                        tvBloodBadge.setTextColor(ContextCompat.getColor(activity, R.color.cm_text_muted))
                     }
 
                     // Attendance percentage
                     if (attendancePct != null && attendancePct > 0.0) {
-                        tvAttendanceBadge.text = "📊 ${String.format(Locale.US, "%.1f", attendancePct)}% Attendance"
-                        tvAttendanceBadge.visibility = View.VISIBLE
+                        tvAttendanceBadge.text = "📊 ${String.format(Locale.US, "%.1f", attendancePct)}%"
+                        tvAttendanceBadge.setTextColor(Color.parseColor("#10B981"))
                     } else {
-                        tvAttendanceBadge.visibility = View.GONE
+                        tvAttendanceBadge.text = "Active"
+                        tvAttendanceBadge.setTextColor(ContextCompat.getColor(activity, R.color.cm_text_secondary))
                     }
 
                     // Update contact actions
