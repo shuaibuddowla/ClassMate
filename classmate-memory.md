@@ -1,4 +1,4 @@
-﻿# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
+# ClassMate Platform & Android APK â€” Complete Architecture, Memory & Debugging Reference
 
 This memory file serves as the definitive engineering knowledge base and memory reference for the ClassMate Android APK project, Web companion client, and Supabase backend. It documents architecture, design tokens, data models, recent features, debugging resolutions, and implementation guidelines across all modules.
 
@@ -17275,3 +17275,127 @@ flowchart TD
 | **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` accessible via profile settings card |
 | **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Legacy HS256 secret revoked; active ECC P-256 key operational; `NEXT_PUBLIC_SUPABASE_ANON_KEY` rotated to `sb_publishable_...` |
 | **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v224) |
+
+
+---
+
+## 225. Smart Card Bottom Sheet Layout Overhaul, Action Button Text Wrapping Fix & Public RPC Architecture (Master State v225)
+
+This section documents the visual and architectural overhaul of the NFC student card bottom sheet (`FoundCardBottomSheet.kt` and `dialog_found_card_sheet.xml`), the elimination of uppercase text clipping on Material buttons, the implementation of a structured 2x2 identity metadata grid, and the addition of unauthenticated public RPC support in `ClassMateAuthApi.kt`.
+
+### 225.1 MaterialButton Uppercase Text Wrapping & Button Clipping Resolution
+1. **The Bug & Visual Defect**:
+   - In `dialog_found_card_sheet.xml`, the primary contact actions (`btnCallOwner` and `btnWhatsappOwner`) were styled with `Widget.MaterialComponents.Button`.
+   - By default, Material Components buttons enforce `textAllCaps="true"`. This forced `"Call Student"` to render as `"CALL STUDENT"`, expanding its horizontal footprint significantly.
+   - Combined with standard default vertical insets (`insetTop="6dp"` and `insetBottom="6dp"`), the text was forced into multi-line wrapping on standard and compact screen densities (e.g. 360dp–392dp widths, such as OnePlus / Oppo CPH2621).
+   - Because the button height was constrained (`48dp`), the second line was partially clipped or cut off horizontally, resulting in an unpolished, broken appearance (`"CALL"` visible, `"STUDENT"` truncated or overlapping padding).
+2. **Resolution & Styling Architecture (`Commit fc1c838`)**:
+   - Applied explicit layout controls to `btnCallOwner`, `btnWhatsappOwner`, `btnCopyRoll`, and `btnShareCard`:
+     - `android:textAllCaps="false"`: Preserves natural title-casing (`"Call Student"`, `"WhatsApp"`, `"Copy Roll"`, `"Share Card"`), reducing character width by ~20%.
+     - `android:maxLines="1"` and `android:ellipsize="end"`: Enforces strict single-line presentation without wrapping.
+     - `android:insetTop="0dp"` & `android:insetBottom="0dp"`: Clears default framework vertical button insets, allowing full utilization of the height.
+     - Adjusted heights: Increased primary contact buttons from 48dp to `50dp` with `android:paddingHorizontal="8dp"`, `app:iconPadding="6dp"`, and `app:iconSize="18dp"`.
+     - Shortened secondary action label: Renamed `"Share Card Info"` to `"Share Card"` with `44dp` height and balanced margins (`marginStart="6dp"`, `marginEnd="6dp"`).
+   - Also sanitized the admin assignment button (`btnAssignCard`): added `textAllCaps="false"`, `insetTop="0dp"`, `insetBottom="0dp"`.
+
+---
+
+### 225.2 Structured 2x2 Identity Metadata Grid
+1. **The Previous Problem**:
+   - Previously used a loose `FlexboxLayout` (`layoutPills`) with uneven wrapping pills for verification status, blood group, and attendance percentage.
+   - When cards had varying data (e.g., blood group missing or attendance null), pills wrapped inconsistently, resulting in visual clutter, jagged alignment, and poor scanability.
+2. **The Redesign (`dialog_found_card_sheet.xml` & `FoundCardBottomSheet.kt`)**:
+   - Replaced `layoutPills` with a structured, balanced 2x2 identity metadata grid (`layoutStudentMetaGrid`):
+     - **Row 1**:
+       - **Status Tile** (`layoutStatusCard`): Left column, containing a shield check icon (`ic_check_circle`), label `"STATUS"`, and value `"✓ MBSTU Verified"` (emerald `#10B981` text over subtle emerald surface `#0D10B981`) or offline `"✓ Verified Card"`.
+       - **Blood Group Tile** (`layoutBloodCard`): Right column, containing a blood drop icon (`ic_blood_drop`), label `"BLOOD GROUP"`, and value `"🩸 B+"` (in crimson `#EF4444`) or `"Not Listed"` (in muted gray `cm_text_muted`).
+     - **Row 2**:
+       - **Attendance Tile** (`layoutAttendanceCard`): Left column, containing a bar chart icon (`ic_chart_bar`), label `"ATTENDANCE"`, and value `"📊 100.0%"` (in emerald `#10B981`) or `"Active"` (in `cm_text_secondary`).
+       - **Smart Card UID Tile** (`layoutUidCard`): Right column, containing a chip icon (`ic_nfc_card`), label `"SMART CARD"`, and masked value `"••••E506"` (in `cm_text_primary`).
+   - Added a clean horizontal divider (`View`, 1dp height, `@color/cm_border`) separating the student identity header from the metadata grid.
+
+---
+
+### 225.3 Student Header Typography & Badge Refinement
+1. **Name & Chips Placement**:
+   - Student name (`tvStudentName`): Bold 18sp primary text.
+   - Directly underneath: Horizontal container with dedicated chips:
+     - **Roll Badge (`tvStudentRoll`)**: Blue pill background (`@drawable/bg_badge_blue`, 12sp bold, `@color/cm_primary`, e.g. `CE25057`).
+     - **Batch Badge (`tvStudentBatch`)**: Neutral pill background (`@drawable/bg_segmented_container`, 11sp, `@color/cm_text_secondary`, e.g. `cse 22`).
+   - Department Name (`tvStudentDeptBatch`): Full department title (`Computer Science and Engineering`), displayed as a clean secondary text line.
+2. **Top Card UID Badge**:
+   - Cleaned up top-right badge from `"UID: ••••E506"` to simply `"••••E506"`, eliminating redundant "UID:" clutter.
+
+---
+
+### 225.4 Public RPC Authentication Bypass (`ClassMateAuthApi.publicRpc`)
+1. **The Root Cause**:
+   - When a lost smart card is found on campus, the finder or security officer scanning the NFC tag may be logged out, have an expired session token, or not be a ClassMate user.
+   - The standard `ClassMateAuthApi.rpc(...)` method attaches the active user's JWT Authorization header (`Bearer <token>`). If the token is empty, expired, or invalid, PostgREST / Supabase returns `401 Unauthorized` or fails to execute the RPC.
+   - Consequently, `lookup_student_by_card` was failing online resolution on unauthenticated or logged-out devices, falling back to empty/unregistered states even though the card was fully active in the database!
+2. **Implementation (`ClassMateAuthApi.kt`)**:
+   - Introduced `publicRpc(name: String, args: JSONObject): JSONObject`:
+     ```kotlin
+     suspend fun publicRpc(name: String, args: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+         val url = "$base/rest/v1/rpc/$name"
+         val request = Request.Builder()
+             .url(url)
+             .header("apikey", key)
+             .header("Accept-Profile", "classmate")
+             .header("Content-Profile", "classmate")
+             .post(args.toString().toRequestBody(jsonType))
+             .build()
+         try {
+             http.newCall(request).execute().use { response ->
+                 val result = response.body?.string().orEmpty().trim()
+                 if (!response.isSuccessful) return@withContext JSONObject()
+                 if (result.startsWith("{")) JSONObject(result) else JSONObject()
+             }
+         } catch (_: Exception) {
+             JSONObject()
+         }
+     }
+     ```
+   - Uses only the public API key (`apikey`) with PostgREST profile schema headers, allowing public-scoped PostgreSQL stored procedures (such as `lookup_student_by_card`) to execute safely without user session authentication.
+   - In `FoundCardBottomSheet.kt`, replaced `ClassMateAuthApi.rpc("lookup_student_by_card", params)` with `ClassMateAuthApi.publicRpc("lookup_student_by_card", params)`.
+
+---
+
+### 225.5 Campus Network Connectivity Check Relaxation (`NfcCardDispatcherActivity.kt`)
+1. **The Issue**:
+   - In `NfcCardDispatcherActivity.kt`, `isNetworkAvailable()` previously required:
+     `caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)`
+   - On university Wi-Fi networks (such as MBSTU campus networks) or mobile carrier networks with high latency, Android often takes several seconds to mark a network as `NET_CAPABILITY_VALIDATED`.
+   - During this window, `isNetworkAvailable()` falsely returned `false`, causing the card dispatcher to believe the phone was offline and aborting online profile lookups prematurely.
+2. **Resolution (`Commit fc1c838`)**:
+   - Simplified to `caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)`.
+   - Network calls gracefully attempt connection via `publicRpc` with fallback handling, preventing false offline triggers on unvalidated campus networks.
+
+---
+
+### 225.6 Master Production Verification Matrix (Updated Master State v225)
+
+| Component / Subsystem | Target Platform | Verification Status | Architectural Implementation Details |
+| :--- | :--- | :---: | :--- |
+| **MaterialButton Text Overflow & Clipping Fix** | Android APK Native | **PRODUCTION** | `textAllCaps="false"`, `maxLines="1"`, `insetTop="0dp"`, `insetBottom="0dp"`, `50dp` height on `FoundCardBottomSheet` action buttons (Commit [`fc1c838`](https://github.com/shuaibuddowla/ClassMate/commit/fc1c8386c7c7f238ed613f577c2a53baf8370d1f)) |
+| **2x2 Identity Metadata Grid** | Android APK Native | **PRODUCTION** | Replaced unconstrained flexbox tags with structured Status, Blood Group, Attendance, and Smart Card tiles in `dialog_found_card_sheet.xml` |
+| **Student Header Chips & Typography** | Android APK Native | **PRODUCTION** | Dedicated Roll (`CE25057`) and Batch (`cse 22`) chips directly beneath student name with cleaned UID badge (`••••E506`) |
+| **Public RPC Supabase Engine** | Android APK Native | **PRODUCTION** | `ClassMateAuthApi.publicRpc` bypassing user JWT auth headers for unauthenticated smart card student lookups |
+| **Relaxed Campus Wi-Fi Internet Validation** | Android APK Native | **PRODUCTION** | Removed `NET_CAPABILITY_VALIDATED` requirement in `NfcCardDispatcherActivity.kt` to prevent false offline fallbacks on university Wi-Fi |
+| **Pure NDEF URI Tag Engine (No AAR)** | Android APK Native | **PRODUCTION** | `createNdefMessage` in `NfcCardManager.kt` writes pure Web NDEF URI, eliminating Google Play Store 404 redirection (Commit [`6103214`](https://github.com/shuaibuddowla/ClassMate/commit/6103214a6505764a14cf6446958b33f0e4bcb261)) |
+| **Android App Links (Digital Asset Links)** | Web & Android APK | **PRODUCTION** | `/.well-known/assetlinks.json` deployed on `classmatebd.vercel.app` approving `com.shuaib.classmate` for 0ms native app interception (Commit [`2cee558`](https://github.com/shuaibuddowla/ClassMate/commit/2cee55884f09b1bb5a8c8db5b66a2d8728d59837)) |
+| **SplashActivity Deep Link Dispatcher** | Android APK Native | **PRODUCTION** | Intercepts `/c/` and `/card/` URIs and forwards directly to `NfcCardDispatcherActivity` |
+| **Universal Public Web Student Smart ID** | Next.js 15 Web Companion | **PRODUCTION** | `web/src/components/StudentCardView.tsx` with dynamic SSR routes `/c/[id]` and `/card/[id]` deployed to Vercel production |
+| **Student Portal Sign In Access** | Next.js 15 Web Companion | **PRODUCTION** | Header & footer "Sign In" buttons linking to `/auth` on verified Smart ID and unregistered card states |
+| **Supabase Key Fallback** | Next.js 15 Web Companion | **PRODUCTION** | `DEFAULT_PUBLISHABLE_KEY` (`sb_publishable_...`) hardcoded fallback in `StudentCardView.tsx` |
+| **Lost-Card Contact Actions** | Web & Android APK | **PRODUCTION** | Direct `tel:` and normalized `wa.me/8801...` action buttons for 1-tap lost card recovery |
+| **Dynamic OpenGraph Smart ID Metadata** | Next.js 15 Web Companion | **PRODUCTION** | `buildStudentCardMetadata(id)` returning student name, roll, batch, dept, and avatar preview for rich social link embeds |
+| **MIFARE Classic 1K Sector Block Engine** | Android APK Native | **PRODUCTION** | Direct block read/write in `NfcCardManager.kt` for Sectors 1 & 2 (Blocks 4, 5, 6, 8, 9) with `MifareClassic.KEY_DEFAULT` (Commit [`f962ee4`](https://github.com/shuaibuddowla/ClassMate/commit/f962ee4545629855fa4197856adf1e725728bea5)) |
+| **MIFARE Classic Tech Filter Intent** | Android APK Native | **PRODUCTION** | `res/xml/nfc_tech_filter.xml` with `MifareClassic`, `Ndef`, `NfcA` bound to `NfcCardDispatcherActivity` |
+| **Physical Card Hardware Re-Burn Action** | Android APK Native | **PRODUCTION** | `btnWritePhysicalCard` in `ClassMateAdminAttendanceActivity` for admin on-demand EEPROM burning |
+| **Network Host Error Sanitization** | Android APK Native | **PRODUCTION** | Sanitized `UnknownHostException` in `ClassMateAdminAttendanceActivity.kt` to user-friendly offline prompt (Commit [`c16c661`](https://github.com/shuaibuddowla/ClassMate/commit/c16c661fd66f60a39e4d68d73d369908893ca206)) |
+| **Two-Tier Offline & Online Roster Cache** | Android APK Native | **PRODUCTION** | `NfcCardLocalCache.kt` + `FoundCardBottomSheet.kt` with live Supabase query fallback and 5ms offline lookup |
+| **Emergency Batch Tab Restoration** | Android APK Native | **PRODUCTION** | Restored `nav_friends` (Batch tab) to bottom navigation bar in `bottom_nav_menu.xml` & `classmate_academic_nav_menu.xml` (Commit [`5cea6c9`](https://github.com/shuaibuddowla/ClassMate/commit/5cea6c9e0dc9155250eecdce93b53ac3ba3ab639)) |
+| **MBSTU Transit Relocation to Settings** | Android APK Native | **PRODUCTION** | Standalone `ClassMateTransitActivity.kt` and `activity_classmate_transit.xml` accessible via profile settings card |
+| **Supabase Modern Key Migration (ECC P-256)** | Supabase & Vercel | **PRODUCTION** | Legacy HS256 secret revoked; active ECC P-256 key operational; `NEXT_PUBLIC_SUPABASE_ANON_KEY` rotated to `sb_publishable_...` |
+| **Dual-Repository Topology & Memory Sync** | Full Stack (All Repos) | **PRODUCTION** | Synchronized across [`AndroidStudioProjects/ClassMate`](file:///C:/Users/USER/AndroidStudioProjects/ClassMate/classmate-memory.md) and [`ClassMate-main`](file:///d:/Code%20&%20Scripts/ClassMate-main/classmate-memory.md) (Master State v225) |
