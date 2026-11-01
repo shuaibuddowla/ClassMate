@@ -3578,7 +3578,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-        nav.menu.findItem(R.id.nav_friends)?.isVisible = false
+        val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
+        nav.menu.findItem(R.id.nav_friends)?.isVisible = showBatch
+        nav.menu.findItem(R.id.nav_friends)?.title = if (profile?.optString("role") == "teacher") "Students" else "Batch"
 
 
 
@@ -3618,9 +3620,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-            val visibleTabs = androidx.compose.runtime.remember {
+            val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
 
-                listOf(
+            val visibleTabs = androidx.compose.runtime.remember(showBatch) {
+
+                listOfNotNull(
 
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
 
@@ -3628,7 +3632,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
 
-                    com.shuaib.classmate.ui.ClassMateTab.TRANSIT,
+                    if (showBatch) com.shuaib.classmate.ui.ClassMateTab.BATCH else null,
 
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
 
@@ -10014,7 +10018,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             targetIntent.removeExtra("tab")
 
-            selectHomeTab(R.id.nav_transit)
+            startActivity(Intent(this, ClassMateTransitActivity::class.java))
 
             return
 

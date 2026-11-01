@@ -77,6 +77,7 @@ export type Context = {
   batches?: Row[];
   changeBatch?: (batch: string) => void;
   manageAttendance?: () => void;
+  transit?: () => void;
 };
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -1229,6 +1230,10 @@ function Home({
       history.pushState({ classmateAttendance: true }, "", "/#attendance");
       setTab("admin-attendance");
     },
+    transit: () => {
+      history.pushState({ classmateTransit: true }, "", "/#transit");
+      setTab("transit");
+    },
   };
   const isTeacher = profile.role === "teacher";
   const isAdmin = profile.role === "admin" || owner.data === true;
@@ -1245,7 +1250,7 @@ function Home({
   const mobileDestinations = [
     ["timetable", "Timetable", CalendarDays],
     ["notices", "Notices", Bell],
-    ["transit", "Transit", Bus],
+    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
     ["library", "Courses", BookOpen],
     ["profile", "Settings", Settings],
   ] as const;
@@ -1416,7 +1421,7 @@ function Home({
             className={navigationTab === value ? "selected" : ""}
             onClick={() => select(value)}
           >
-            <span className="nav-icon"><Icon size={21} />{value === "transit" && <span className="nav-transit-live-dot" />}{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
+            <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
             <span>{label}</span>
           </button>
         ))}
