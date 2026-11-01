@@ -131,7 +131,7 @@ private fun ClassMateHamburgerModalSheet(
         scrimColor = Color.Black.copy(alpha = 0.5f),
         dragHandle = {
             BottomSheetDefaults.DragHandle(
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 0.dp)
             )
         },
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
@@ -154,11 +154,12 @@ private fun ClassMateHamburgerModalSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = maxSheetHeight)
+                .verticalScroll(rememberScrollState())
         ) {
-            // ~12dp gap between drag handle and "classmate." header row
-            Spacer(modifier = Modifier.height(12.dp))
+            // Compact gap between drag handle line and classmate. branding
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Fixed Header Row: Brand Title + Close Button
+            // Header Row: Brand Title + Close Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -205,9 +206,9 @@ private fun ClassMateHamburgerModalSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Fixed Profile Card
+            // User Profile Card (scrollable with the whole sheet, not pinned)
             DrawerProfileCard(
                 fullName = fullName,
                 studentId = studentId,
@@ -219,14 +220,10 @@ private fun ClassMateHamburgerModalSheet(
                 jakartaBold = jakartaBold
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Scrollable Menu List
+            // Menu List
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
             ) {
                 fun dismissAndRun(action: () -> Unit) {
