@@ -33,6 +33,7 @@ import {
   QrCode,
   Radio,
   Cloud,
+  Bus,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import { openAndroidInstallPrompt, isAndroidMobileDevice } from "./android-install-popup";
@@ -507,6 +508,27 @@ export function Profile({
             <ChevronRight size={18} className="chevron" />
           </button>
         )}
+
+        <button
+          type="button"
+          className="settings-row"
+          onClick={() => {
+            if (ctx.transit) {
+              ctx.transit();
+            } else {
+              location.hash = "transit";
+            }
+          }}
+        >
+          <div className="setting-icon-box cyan">
+            <Bus size={18} />
+          </div>
+          <div className="settings-row-text">
+            <span>MBSTU Bus Transit</span>
+            <small>Live bus radar, stoppage routes &amp; schedules</small>
+          </div>
+          <ChevronRight size={18} className="chevron" />
+        </button>
 
         <div className="settings-row settings-batch-row">
           <div className="settings-batch-header">

@@ -1795,24 +1795,18 @@ internal class ClassMateAcademicScreensSupabase(
 
     private var pendingTransitBusId: String? = null
 
-    fun openTransitForBus(busId: String) {
-        val authActivity = activity as? ClassMateAuthActivity
-        val cleanBusId = if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
-        pendingTransitBusId = cleanBusId
+    fun openTransitForBus(busId: String = "") {
+        val cleanBusId = if (busId.isNotBlank()) {
+            if (busId.startsWith("SB", ignoreCase = true)) busId.uppercase() else "SB$busId"
+        } else ""
+        pendingTransitBusId = cleanBusId.ifBlank { null }
 
-        // 1. Navigate directly to transit tab
-        authActivity?.selectHomeTab(R.id.nav_transit)
-
-        // 2. Select and focus on the corresponding bus in the webview
-        val webView = tabRoots[R.id.nav_transit]?.findViewById<android.webkit.WebView>(R.id.transit_webview)
-            ?: activity.findViewById<android.webkit.WebView>(R.id.transit_webview)
-
-        webView?.post {
-            webView.evaluateJavascript(
-                "if (window.__classmateSelectBus) { window.__classmateSelectBus('$cleanBusId'); } else { window.__classmateInitialBusId = '$cleanBusId'; window.location.hash = '#transit?bus=$cleanBusId'; }",
-                null
-            )
+        val intent = Intent(activity, ClassMateTransitActivity::class.java).apply {
+            if (cleanBusId.isNotBlank()) {
+                putExtra("EXTRA_BUS_ID", cleanBusId)
+            }
         }
+        activity.startActivity(intent)
     }
 
     private fun setupTransit(root: View) {
@@ -2814,7 +2808,7 @@ internal class ClassMateAcademicScreensSupabase(
 
         root.v<View>(R.id.busSummary).setOnClickListener {
             com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-            (activity as? ClassMateAuthActivity)?.selectHomeTab(R.id.nav_transit)
+            openTransitForBus("")
         }
         text(root, R.id.tvBusSummaryTitle, when { past -> "Past schedule"; finished -> "Service has ended"; empty -> "No departures listed"; date==today -> "Next departures"; else -> "First departures · ${date.format(DateTimeFormatter.ofPattern("d MMM"))}" })
 
@@ -11079,45 +11073,19 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val showBatchOption = batchId().isNotBlank() && account.optString("verification_status") == "active"
+        root.v<View>(R.id.cardProfileTransit).apply {
 
-        root.v<View>(R.id.cardProfileBatch).apply {
+            visibility = View.VISIBLE
 
-            visibility = if (showBatchOption) View.VISIBLE else View.GONE
-
-            root.v<View>(R.id.dividerProfileBatch).visibility = visibility
+            root.v<View>(R.id.dividerProfileTransit).visibility = View.VISIBLE
 
 
 
-            text(root, R.id.tvBatchDirectoryTitle, if (isTeacher) "Students Directory" else "Batch & Classmates")
+            setOnClickListener {
 
-            text(root, R.id.tvBatchDirectorySub, if (isTeacher) "Department student roster and profiles" else "Classmates, contacts, and Batch Fund")
+                com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
 
-
-
-            if (showBatchOption) {
-
-                setOnClickListener {
-
-                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-
-                    val intent = Intent(activity, ClassMateBatchActivity::class.java).apply {
-
-                        putExtra("EXTRA_BATCH_ID", batchId())
-
-                        putExtra("EXTRA_BATCH_LABEL", effectiveBatch)
-
-                        putExtra("EXTRA_ROLE", account.optString("role"))
-
-                    }
-
-                    activity.startActivity(intent)
-
-                }
-
-            } else {
-
-                setOnClickListener(null)
+                openTransitForBus("")
 
             }
 
