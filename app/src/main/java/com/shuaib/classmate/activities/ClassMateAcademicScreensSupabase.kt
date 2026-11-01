@@ -11230,23 +11230,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.cardProfileTransit).apply {
 
-            visibility = View.VISIBLE
-
-            root.v<View>(R.id.dividerProfileTransit).visibility = View.VISIBLE
-
-
-
-            setOnClickListener {
-
-                com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
-
-                openTransitForBus("")
-
-            }
-
-        }
 
 
 
