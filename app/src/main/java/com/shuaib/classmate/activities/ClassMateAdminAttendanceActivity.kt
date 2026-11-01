@@ -377,7 +377,12 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 renderCourseCards()
             } catch (e: Exception) {
                 tvCoursesEmpty.visibility = View.VISIBLE
-                tvCoursesEmpty.text = "Failed to load courses: ${e.message}"
+                val isNetworkError = e is java.net.UnknownHostException || e.message?.contains("Unable to resolve host", ignoreCase = true) == true
+                tvCoursesEmpty.text = if (isNetworkError) {
+                    "No internet connection. Please check your Wi-Fi or mobile data."
+                } else {
+                    "Failed to load courses: ${e.message}"
+                }
             } finally {
                 progressCourses.visibility = View.GONE
                 swipeRefreshCourses.isRefreshing = false
@@ -1136,3 +1141,4 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         }
     }
 }
+
