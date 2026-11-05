@@ -5,7 +5,11 @@ import kotlinx.coroutines.withContext
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -77,22 +81,242 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var onPickedFileChanged: (() -> Unit)? = null
     private var onClipboardCheckRequested: (() -> Unit)? = null
 
-    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+    data class SelectedCourseFile(
+        val uri: Uri,
+        val originalFileName: String,
+        var title: String,
+        val sizeBytes: Long,
+        val mimeType: String
+    )
+
+    private val selectedCourseFiles = mutableListOf<SelectedCourseFile>()
+
+    // Attachment state for General Notice (Material 3)
+    data class NoticeAttachmentDraft(
+        val uri: Uri,
+        val name: String,
+        val mimeType: String,
+        val sizeBytes: Long,
+        val isPdf: Boolean = false
+    )
+
+    private val selectedNoticeAttachments = mutableListOf<NoticeAttachmentDraft>()
+    private var onNoticeAttachmentChanged: (() -> Unit)? = null
+
+    private val pickNoticePhotos = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { selectedUris ->
+        if (selectedUris.isNullOrEmpty()) return@registerForActivityResult
+        selectedNoticeAttachments.removeAll { it.isPdf }
+
+        val remaining = 5 - selectedNoticeAttachments.size
+        if (remaining <= 0) {
+            Toast.makeText(this, "Maximum 5 photos allowed per notice.", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+
+        val toAdd = selectedUris.take(remaining)
+        if (selectedUris.size > remaining) {
+            Toast.makeText(this, "Only up to 5 photos can be attached. Added ${toAdd.size}.", Toast.LENGTH_SHORT).show()
+        }
+
+        toAdd.forEach { uri ->
+            extractNoticeAttachmentDraft(uri, isPdf = false)?.let { selectedNoticeAttachments.add(it) }
+        }
+        onNoticeAttachmentChanged?.invoke()
+    }
+
+    private val pickNoticePdf = registerForActivityResult(ActivityResultContracts.GetContent()) { selected ->
         if (selected == null) return@registerForActivityResult
-        uri = selected
-        runCatching { contentResolver.takePersistableUriPermission(selected, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        val label = contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+        selectedNoticeAttachments.clear()
+        extractNoticeAttachmentDraft(selected, isPdf = true)?.let { selectedNoticeAttachments.add(it) }
+        onNoticeAttachmentChanged?.invoke()
+    }
+
+    private val requestMediaPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val granted = results.values.any { it }
+        if (granted) {
+            pickNoticePhotos.launch("image/*")
+        } else {
+            showPermissionRationaleOrSettings(isPhoto = true)
+        }
+    }
+
+    private val requestSinglePhotoPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pickNoticePhotos.launch("image/*")
+        } else {
+            showPermissionRationaleOrSettings(isPhoto = true)
+        }
+    }
+
+    private val requestPdfPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pickNoticePdf.launch("application/pdf")
+        } else {
+            showPermissionRationaleOrSettings(isPhoto = false)
+        }
+    }
+
+    private fun checkAndRequestPhotoPermission() {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+                val fullGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+                val partialGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+                if (fullGranted || partialGranted) {
+                    pickNoticePhotos.launch("image/*")
+                } else {
+                    requestMediaPermissionsLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.READ_MEDIA_IMAGES,
+                            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+                        )
+                    )
+                }
+            }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED) {
+                    pickNoticePhotos.launch("image/*")
+                } else {
+                    requestSinglePhotoPermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+                }
+            }
+            else -> {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    pickNoticePhotos.launch("image/*")
+                } else {
+                    requestSinglePhotoPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            }
+        }
+    }
+
+    private fun checkAndRequestPdfPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                pickNoticePdf.launch("application/pdf")
+            } else {
+                requestPdfPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        } else {
+            pickNoticePdf.launch("application/pdf")
+        }
+    }
+
+    private fun showPermissionRationaleOrSettings(isPhoto: Boolean) {
+        val perm = if (isPhoto) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_IMAGES
+            else Manifest.permission.READ_EXTERNAL_STORAGE
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val mediaType = if (isPhoto) "photos" else "PDF documents"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && shouldShowRequestPermissionRationale(perm)) {
+            Toast.makeText(this, "Permission to access $mediaType is required to attach files.", Toast.LENGTH_LONG).show()
+        } else {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Permission Required")
+                .setMessage("ClassMate requires permission to access $mediaType on your device to attach them to notices. Please enable permission in Settings.")
+                .setPositiveButton("Settings") { _, _ ->
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun extractNoticeAttachmentDraft(selected: Uri, isPdf: Boolean): NoticeAttachmentDraft? {
+        val rawMime = contentResolver.getType(selected).orEmpty().lowercase()
+        val name = contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
-        } ?: "Selected file"
-        selectedFileLabel = label
+        } ?: if (isPdf) "document.pdf" else "photo.jpg"
 
         val size = contentResolver.query(selected, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
             if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
         } ?: 0L
-        selectedFileSize = size
 
-        if (::name.isInitialized && name.text.isNullOrBlank()) {
-            name.setText(label.substringBeforeLast('.'))
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val mimeType = if (isPdf) {
+            if (rawMime.isNotBlank() && rawMime.contains("pdf")) rawMime else "application/pdf"
+        } else {
+            if (rawMime.isNotBlank()) rawMime else when (ext) {
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                else -> "image/jpeg"
+            }
+        }
+
+        if (isPdf) {
+            if (mimeType != "application/pdf" && ext != "pdf") {
+                Toast.makeText(this, "Only PDF documents are supported.", Toast.LENGTH_LONG).show()
+                return null
+            }
+        } else {
+            if (mimeType !in setOf("image/jpeg", "image/png", "image/webp") && ext !in setOf("jpg", "jpeg", "png", "webp")) {
+                Toast.makeText(this, "Only JPG, PNG, or WebP images are supported.", Toast.LENGTH_LONG).show()
+                return null
+            }
+        }
+
+        if (size > 10L * 1024L * 1024L) {
+            Toast.makeText(this, "File size exceeds the 10 MB limit.", Toast.LENGTH_LONG).show()
+            return null
+        }
+
+        return NoticeAttachmentDraft(selected, name, mimeType, size, isPdf)
+    }
+
+    private val pickCourseFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { selectedUris ->
+        if (selectedUris.isNullOrEmpty()) return@registerForActivityResult
+        val maxFiles = 15
+        val remaining = maxFiles - selectedCourseFiles.size
+        if (remaining <= 0) {
+            Toast.makeText(this, "Maximum 15 files can be uploaded at once.", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+
+        val toAdd = selectedUris.take(remaining)
+        if (selectedUris.size > remaining) {
+            Toast.makeText(this, "Only up to 15 files can be selected at once. Added ${toAdd.size}.", Toast.LENGTH_SHORT).show()
+        }
+
+        toAdd.forEach { selected ->
+            runCatching { contentResolver.takePersistableUriPermission(selected, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val label = contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            } ?: "Selected file"
+
+            val size = contentResolver.query(selected, arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+                if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+            } ?: 0L
+
+            val mime = contentResolver.getType(selected) ?: "application/octet-stream"
+            val cleanTitle = label.substringBeforeLast('.').replace(Regex("[_-]"), " ").trim()
+
+            selectedCourseFiles.add(
+                SelectedCourseFile(
+                    uri = selected,
+                    originalFileName = label,
+                    title = cleanTitle.ifBlank { label },
+                    sizeBytes = size,
+                    mimeType = mime
+                )
+            )
+        }
+
+        if (selectedCourseFiles.isNotEmpty()) {
+            val first = selectedCourseFiles.first()
+            uri = first.uri
+            selectedFileLabel = first.originalFileName
+            selectedFileSize = first.sizeBytes
         }
         onPickedFileChanged?.invoke()
     }
@@ -114,6 +338,58 @@ class ClassMatePublishActivity : AppCompatActivity() {
         selectedFileSize = state?.getLong("file_size", 0L) ?: 0L
         restoredFileName = state?.getString("file_name").orEmpty()
         currentUploadTaskId = state?.getString("upload_task_id")
+        val resCourseUris = state?.getStringArrayList("course_file_uris")
+        val resCourseNames = state?.getStringArrayList("course_file_names")
+        val resCourseTitles = state?.getStringArrayList("course_file_titles")
+        @Suppress("UNCHECKED_CAST")
+        val resCourseSizes = state?.getSerializable("course_file_sizes") as? ArrayList<Long>
+        val resCourseMimes = state?.getStringArrayList("course_file_mimes")
+        if (!resCourseUris.isNullOrEmpty() && resCourseNames != null && resCourseTitles != null) {
+            selectedCourseFiles.clear()
+            for (i in resCourseUris.indices) {
+                selectedCourseFiles.add(
+                    SelectedCourseFile(
+                        uri = Uri.parse(resCourseUris[i]),
+                        originalFileName = resCourseNames.getOrNull(i).orEmpty(),
+                        title = resCourseTitles.getOrNull(i).orEmpty(),
+                        sizeBytes = resCourseSizes?.getOrNull(i) ?: 0L,
+                        mimeType = resCourseMimes?.getOrNull(i).orEmpty().ifBlank { "application/octet-stream" }
+                    )
+                )
+            }
+        } else if (uri != null && selectedFileLabel.isNotBlank() && selectedCourseFiles.isEmpty()) {
+            val clean = selectedFileLabel.substringBeforeLast('.').replace(Regex("[_-]"), " ").trim()
+            selectedCourseFiles.add(
+                SelectedCourseFile(
+                    uri = uri!!,
+                    originalFileName = selectedFileLabel,
+                    title = clean.ifBlank { selectedFileLabel },
+                    sizeBytes = selectedFileSize,
+                    mimeType = "application/octet-stream"
+                )
+            )
+        }
+
+        val restoredUris = state?.getStringArrayList("notice_attachment_uris")
+        val restoredNames = state?.getStringArrayList("notice_attachment_names")
+        val restoredMimes = state?.getStringArrayList("notice_attachment_mimes")
+        val restoredSizes = state?.getSerializable("notice_attachment_sizes") as? ArrayList<Long>
+        val restoredIsPdfs = state?.getSerializable("notice_attachment_is_pdfs") as? ArrayList<Boolean>
+        if (!restoredUris.isNullOrEmpty() && restoredNames != null && restoredMimes != null && restoredSizes != null && restoredIsPdfs != null) {
+            selectedNoticeAttachments.clear()
+            for (i in restoredUris.indices) {
+                selectedNoticeAttachments.add(
+                    NoticeAttachmentDraft(
+                        Uri.parse(restoredUris[i]),
+                        restoredNames.getOrNull(i) ?: "attachment",
+                        restoredMimes.getOrNull(i) ?: "image/jpeg",
+                        restoredSizes.getOrNull(i) ?: 0L,
+                        restoredIsPdfs.getOrNull(i) ?: false
+                    )
+                )
+            }
+        }
+
 
         if (batch.isBlank()) { finish(); return }
 
@@ -311,6 +587,27 @@ class ClassMatePublishActivity : AppCompatActivity() {
         outState.putLong("file_size", selectedFileSize)
         if (::name.isInitialized) outState.putString("file_name", name.text.toString())
         outState.putString("upload_task_id", currentUploadTaskId)
+        val savedUris = ArrayList(selectedNoticeAttachments.map { it.uri.toString() })
+        val savedNames = ArrayList(selectedNoticeAttachments.map { it.name })
+        val savedMimes = ArrayList(selectedNoticeAttachments.map { it.mimeType })
+        val savedSizes = ArrayList(selectedNoticeAttachments.map { it.sizeBytes })
+        val savedIsPdfs = ArrayList(selectedNoticeAttachments.map { it.isPdf })
+        outState.putStringArrayList("notice_attachment_uris", savedUris)
+        outState.putStringArrayList("notice_attachment_names", savedNames)
+        outState.putStringArrayList("notice_attachment_mimes", savedMimes)
+        outState.putSerializable("notice_attachment_sizes", savedSizes)
+        outState.putSerializable("notice_attachment_is_pdfs", savedIsPdfs)
+        val savedCourseUris = ArrayList(selectedCourseFiles.map { it.uri.toString() })
+        val savedCourseNames = ArrayList(selectedCourseFiles.map { it.originalFileName })
+        val savedCourseTitles = ArrayList(selectedCourseFiles.map { it.title })
+        val savedCourseSizes = ArrayList(selectedCourseFiles.map { it.sizeBytes })
+        val savedCourseMimes = ArrayList(selectedCourseFiles.map { it.mimeType })
+        outState.putStringArrayList("course_file_uris", savedCourseUris)
+        outState.putStringArrayList("course_file_names", savedCourseNames)
+        outState.putStringArrayList("course_file_titles", savedCourseTitles)
+        outState.putSerializable("course_file_sizes", savedCourseSizes)
+        outState.putStringArrayList("course_file_mimes", savedCourseMimes)
+
     }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -379,6 +676,314 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val messageBox = message.parent.parent as View
 
         val silentHint = form.label("Banglish auto-converts to Bengali. English remains English. Start with /silent to post without push alerts.")
+
+        // Material 3 Notice Attachment Section (Exclusive to General Notice)
+        val attachmentContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
+        }
+        form.panel.addView(attachmentContainer)
+
+        val headerLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
+        }
+        val tvAttachLabel = TextView(this).apply {
+            text = "NOTICE ATTACHMENT"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_secondary))
+            letterSpacing = 0.08f
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        val tvAttachBadge = TextView(this).apply {
+            text = "Optional"
+            textSize = 10.5f
+            setTextColor(getColor(R.color.cm_text_muted))
+        }
+        headerLayout.addView(tvAttachLabel)
+        headerLayout.addView(tvAttachBadge)
+        attachmentContainer.addView(headerLayout)
+
+        val pickerButtonsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+
+        fun createPickerCard(
+            titleText: String,
+            subtitleText: String,
+            iconRes: Int,
+            accentColor: Int,
+            bgTint: Int,
+            onClick: () -> Unit
+        ): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.bg_picker_card_empty)
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                val outVal = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, outVal, true)
+                foreground = ContextCompat.getDrawable(this@ClassMatePublishActivity, outVal.resourceId)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onClick() }
+
+                val iconFrame = FrameLayout(this@ClassMatePublishActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+                    val bg = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(10).toFloat()
+                        setColor(bgTint)
+                    }
+                    background = bg
+                }
+                val iconView = ImageView(this@ClassMatePublishActivity).apply {
+                    layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
+                    setImageResource(iconRes)
+                    setColorFilter(accentColor)
+                }
+                iconFrame.addView(iconView)
+                addView(iconFrame)
+
+                val col = LinearLayout(this@ClassMatePublishActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) }
+                }
+                val tvTitle = TextView(this@ClassMatePublishActivity).apply {
+                    text = titleText
+                    textSize = 12.5f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(getColor(R.color.cm_text_primary))
+                }
+                val tvSub = TextView(this@ClassMatePublishActivity).apply {
+                    text = subtitleText
+                    textSize = 10f
+                    setTextColor(getColor(R.color.cm_text_muted))
+                }
+                col.addView(tvTitle)
+                col.addView(tvSub)
+                addView(col)
+            }
+        }
+
+        val primaryColor = getColor(R.color.cm_primary)
+        val primarySoft = Color.argb(32, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+        val redColor = getColor(R.color.cm_cancel_red)
+        val redSoft = Color.argb(32, Color.red(redColor), Color.green(redColor), Color.blue(redColor))
+
+        val btnPhoto = createPickerCard(
+            "Add Photo",
+            "JPG, PNG, WebP",
+            R.drawable.ic_add_photo_alternate,
+            primaryColor,
+            primarySoft
+        ) {
+            checkAndRequestPhotoPermission()
+        }.apply {
+            (layoutParams as LinearLayout.LayoutParams).marginEnd = dp(4)
+        }
+
+        val btnPdf = createPickerCard(
+            "Attach PDF",
+            "Routine, Circular",
+            R.drawable.ic_picture_as_pdf,
+            redColor,
+            redSoft
+        ) {
+            checkAndRequestPdfPermission()
+        }.apply {
+            (layoutParams as LinearLayout.LayoutParams).marginStart = dp(4)
+        }
+
+        pickerButtonsLayout.addView(btnPhoto)
+        pickerButtonsLayout.addView(btnPdf)
+        attachmentContainer.addView(pickerButtonsLayout)
+
+        val activePreviewCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_picker_card_empty)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+            visibility = View.GONE
+        }
+
+        val previewIconFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+        }
+        val previewIconImg = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
+        }
+        previewIconFrame.addView(previewIconImg)
+        activePreviewCard.addView(previewIconFrame)
+
+        val previewCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+        }
+        val tvPreviewName = TextView(this).apply {
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_text_primary))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.MIDDLE
+        }
+        val tvPreviewMeta = TextView(this).apply {
+            textSize = 10.5f
+            setTextColor(getColor(R.color.cm_text_muted))
+        }
+        previewCol.addView(tvPreviewName)
+        previewCol.addView(tvPreviewMeta)
+        activePreviewCard.addView(previewCol)
+
+        val btnRemoveAttachment = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            setColorFilter(getColor(R.color.cm_cancel_red))
+            val pad = dp(6)
+            setPadding(pad, pad, pad, pad)
+            val outVal = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+            setBackgroundResource(outVal.resourceId)
+            layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                selectedNoticeAttachments.clear()
+                onNoticeAttachmentChanged?.invoke()
+            }
+        }
+        activePreviewCard.addView(btnRemoveAttachment)
+        attachmentContainer.addView(activePreviewCard)
+
+        // Multi-Photo Carousel Thumbnails Container
+        val photoThumbnailsScroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+            isFillViewport = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            visibility = View.GONE
+        }
+        val photoThumbnailsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = FrameLayout.LayoutParams(-2, -2)
+        }
+        photoThumbnailsScroll.addView(photoThumbnailsRow)
+        attachmentContainer.addView(photoThumbnailsScroll)
+
+        onNoticeAttachmentChanged = {
+            if (selectedNoticeAttachments.isNotEmpty()) {
+                pickerButtonsLayout.visibility = View.GONE
+                val first = selectedNoticeAttachments.first()
+                if (first.isPdf) {
+                    activePreviewCard.visibility = View.VISIBLE
+                    photoThumbnailsScroll.visibility = View.GONE
+                    tvPreviewName.text = first.name
+                    val bg = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(10).toFloat()
+                        setColor(redSoft)
+                    }
+                    previewIconFrame.background = bg
+                    previewIconImg.setImageResource(R.drawable.ic_picture_as_pdf)
+                    previewIconImg.setColorFilter(redColor)
+                    tvPreviewMeta.text = "${formatFileSize(first.sizeBytes)} · PDF Document"
+                    tvAttachBadge.text = "1 PDF attached"
+                    tvAttachBadge.setTextColor(primaryColor)
+                } else {
+                    activePreviewCard.visibility = View.GONE
+                    photoThumbnailsScroll.visibility = View.VISIBLE
+                    photoThumbnailsRow.removeAllViews()
+
+                    selectedNoticeAttachments.forEachIndexed { index, draft ->
+                        val thumbFrame = FrameLayout(this@ClassMatePublishActivity).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(76), dp(76)).apply {
+                                marginEnd = dp(8)
+                            }
+                        }
+
+                        val thumbImg = com.google.android.material.imageview.ShapeableImageView(this@ClassMatePublishActivity).apply {
+                            layoutParams = FrameLayout.LayoutParams(dp(70), dp(70), Gravity.BOTTOM or Gravity.START)
+                            scaleType = ImageView.ScaleType.CENTER_CROP
+                            shapeAppearanceModel = shapeAppearanceModel.toBuilder()
+                                .setAllCornerSizes(dp(12).toFloat())
+                                .build()
+                        }
+                        com.bumptech.glide.Glide.with(this@ClassMatePublishActivity)
+                            .load(draft.uri)
+                            .centerCrop()
+                            .into(thumbImg)
+                        thumbFrame.addView(thumbImg)
+
+                        val removeBtn = ImageView(this@ClassMatePublishActivity).apply {
+                            layoutParams = FrameLayout.LayoutParams(dp(24), dp(24), Gravity.TOP or Gravity.END)
+                            setImageResource(R.drawable.ic_close)
+                            setColorFilter(Color.WHITE)
+                            val bgCircle = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.OVAL
+                                setColor(getColor(R.color.cm_cancel_red))
+                            }
+                            background = bgCircle
+                            val p = dp(5)
+                            setPadding(p, p, p, p)
+                            isClickable = true
+                            isFocusable = true
+                            setOnClickListener {
+                                selectedNoticeAttachments.removeAt(index)
+                                onNoticeAttachmentChanged?.invoke()
+                            }
+                        }
+                        thumbFrame.addView(removeBtn)
+                        photoThumbnailsRow.addView(thumbFrame)
+                    }
+
+                    if (selectedNoticeAttachments.size < 5) {
+                        val addMoreBtn = LinearLayout(this@ClassMatePublishActivity).apply {
+                            orientation = LinearLayout.VERTICAL
+                            gravity = Gravity.CENTER
+                            setBackgroundResource(R.drawable.bg_picker_card_empty)
+                            layoutParams = LinearLayout.LayoutParams(dp(70), dp(70)).apply {
+                                topMargin = dp(6)
+                            }
+                            val outVal = android.util.TypedValue()
+                            theme.resolveAttribute(android.R.attr.selectableItemBackground, outVal, true)
+                            foreground = ContextCompat.getDrawable(this@ClassMatePublishActivity, outVal.resourceId)
+                            isClickable = true
+                            isFocusable = true
+                            setOnClickListener {
+                                checkAndRequestPhotoPermission()
+                            }
+                        }
+                        val addIcon = ImageView(this@ClassMatePublishActivity).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                            setImageResource(R.drawable.ic_add_photo_alternate)
+                            setColorFilter(primaryColor)
+                        }
+                        val addText = TextView(this@ClassMatePublishActivity).apply {
+                            text = "+ Add"
+                            textSize = 10f
+                            setTypeface(null, Typeface.BOLD)
+                            setTextColor(primaryColor)
+                        }
+                        addMoreBtn.addView(addIcon)
+                        addMoreBtn.addView(addText)
+                        photoThumbnailsRow.addView(addMoreBtn)
+                    }
+
+                    val count = selectedNoticeAttachments.size
+                    tvAttachBadge.text = "$count/5 Photos attached"
+                    tvAttachBadge.setTextColor(primaryColor)
+                }
+            } else {
+                pickerButtonsLayout.visibility = View.VISIBLE
+                activePreviewCard.visibility = View.GONE
+                photoThumbnailsScroll.visibility = View.GONE
+                tvAttachBadge.text = "Optional"
+                tvAttachBadge.setTextColor(getColor(R.color.cm_text_muted))
+            }
+        }
+        onNoticeAttachmentChanged?.invoke()
+
         val (courseBox, course) = dropdown(if (teacher) "Assigned course" else "Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
         status = form.status()
@@ -444,6 +1049,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 courseBox.visibility = View.VISIBLE
                 dateBox.visibility = View.VISIBLE
                 pollContainer.visibility = View.GONE
+                attachmentContainer.visibility = View.GONE
                 submit.text = "Post cancellation"
             } else if (isPoll) {
                 titleBox.visibility = View.GONE
@@ -452,6 +1058,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 courseBox.visibility = View.GONE
                 dateBox.visibility = View.GONE
                 pollContainer.visibility = View.VISIBLE
+                attachmentContainer.visibility = View.GONE
                 submit.text = "Publish poll"
             } else {
                 titleBox.visibility = if (title.text.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -460,6 +1067,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 courseBox.visibility = if (teacher) View.VISIBLE else View.GONE
                 dateBox.visibility = View.GONE
                 pollContainer.visibility = View.GONE
+                attachmentContainer.visibility = View.VISIBLE
                 submit.text = "Post notice"
             }
         }
@@ -531,13 +1139,16 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val manualTitle = title.text?.toString()?.trim().orEmpty()
             if (titleBox.visibility == View.VISIBLE && manualTitle.isNotBlank()) {
                 perform {
-                    ClassMateAuthApi.rpc(
+                    val postRes = ClassMateAuthApi.rpc(
                         "post_notice",
                         JSONObject().put("target_batch", batch)
                             .put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
                             .put("notice_title", manualTitle)
                             .put("notice_body", rawBody)
                     )
+                    val newNoticeId = postRes?.optString("id").orEmpty()
+                    uploadNoticeAttachmentIfAny(newNoticeId)
+                    postRes
                 }
                 return@setOnClickListener
             }
@@ -574,6 +1185,8 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             .put("notice_title", detectedTitle)
                             .put("notice_body", formattedBody)
                     )
+                    val newNoticeId = postRes?.optString("id").orEmpty()
+                    uploadNoticeAttachmentIfAny(newNoticeId)
 
                     Toast.makeText(this@ClassMatePublishActivity, "Notice published successfully!", Toast.LENGTH_SHORT).show()
                     val data = Intent().putExtra("created_notice", postRes.toString())
@@ -634,7 +1247,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 indTabLink?.visibility = View.VISIBLE
             }
             if (!isEditing) {
-                submit.text = if (isLink) "Share Drive link" else "Upload file"
+                submit.text = if (isLink) {
+                    "Share Drive link"
+                } else {
+                    if (selectedCourseFiles.size > 1) "Upload ${selectedCourseFiles.size} files"
+                    else if (selectedCourseFiles.size == 1) "Upload 1 file"
+                    else "Upload files"
+                }
             }
         }
 
@@ -720,80 +1339,14 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
 
-        // --- 2. Minimalist File Picker Card ---
-        val filePickerCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundResource(R.drawable.bg_picker_card_empty)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+        // --- 2. Multi-File Selection Container ---
+        val filesSectionContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(12)
             }
-            isClickable = true
-            isFocusable = true
         }
-        val fileIconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
-            setBackgroundResource(R.drawable.bg_picker_pill)
-        }
-        val fileIconImg = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
-            setImageResource(R.drawable.ic_file_generic)
-            setColorFilter(getColor(R.color.cm_primary))
-        }
-        fileIconFrame.addView(fileIconImg)
-
-        val fileDetailsCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
-        }
-        val tvFileName = TextView(this).apply {
-            text = "No file selected"
-            textSize = 13.5f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_primary))
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val tvFileMeta = TextView(this).apply {
-            text = "PDF, DOCX up to 50MB"
-            textSize = 11.5f
-            setTextColor(getColor(R.color.cm_text_muted))
-        }
-        fileDetailsCol.addView(tvFileName)
-        fileDetailsCol.addView(tvFileMeta)
-
-        val btnActionChoose = TextView(this).apply {
-            text = "Choose"
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_primary))
-            setBackgroundResource(R.drawable.bg_picker_pill)
-            setPadding(dp(14), dp(7), dp(14), dp(7))
-        }
-        val btnActionChange = TextView(this).apply {
-            text = "Change"
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_primary))
-            setBackgroundResource(R.drawable.bg_picker_pill)
-            setPadding(dp(14), dp(7), dp(14), dp(7))
-            visibility = View.GONE
-        }
-        val btnActionRemove = ImageView(this).apply {
-            setImageResource(R.drawable.ic_close)
-            setColorFilter(getColor(R.color.cm_text_muted))
-            setBackgroundResource(R.drawable.bg_picker_pill)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(6) }
-            visibility = View.GONE
-        }
-        filePickerCard.addView(fileIconFrame)
-        filePickerCard.addView(fileDetailsCol)
-        filePickerCard.addView(btnActionChoose)
-        filePickerCard.addView(btnActionChange)
-        filePickerCard.addView(btnActionRemove)
-        form.panel.addView(filePickerCard)
+        form.panel.addView(filesSectionContainer)
 
         // --- 3. Google Drive Link Section ---
         val linkSection = LinearLayout(this).apply {
@@ -1027,7 +1580,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 selectedCourse = it
                 tvSubjectValue.text = it.displayLabel
             }
-            filePickerCard.visibility = View.GONE
+            filesSectionContainer.visibility = View.GONE
             val note = if (isEditingLink) "Update the title, link or subject." else "Update the title or subject. The uploaded file stays unchanged."
             form.label(note)
         }
@@ -1057,54 +1610,227 @@ class ClassMatePublishActivity : AppCompatActivity() {
         status = form.status()
 
         fun updatePickedFileUi() {
-            if (uri != null && selectedFileLabel.isNotBlank()) {
-                filePickerCard.setBackgroundResource(R.drawable.bg_picker_card_empty)
-                tvFileName.text = selectedFileLabel
-                tvFileMeta.text = "${formatFileSize(selectedFileSize)} · Ready"
-                btnActionChoose.visibility = View.GONE
-                btnActionChange.visibility = View.VISIBLE
-                btnActionRemove.visibility = View.VISIBLE
+            filesSectionContainer.removeAllViews()
 
-                val tempPdf = PdfFile(
-                    id = "picked",
-                    title = selectedFileLabel,
-                    fileType = selectedFileLabel.substringAfterLast('.', "pdf"),
-                    materialType = "notes",
-                    sizeBytes = selectedFileSize,
-                    driveUrl = ""
-                )
-                val visuals = FileVisuals.getVisuals(tempPdf)
-                FileVisuals.applyVisuals(fileIconImg, fileIconFrame, visuals)
-
-                if (name.text.isNullOrBlank()) {
-                    name.setText(selectedFileLabel.substringBeforeLast('.'))
+            if (selectedCourseFiles.isEmpty()) {
+                val emptyCard = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setBackgroundResource(R.drawable.bg_picker_card_empty)
+                    setPadding(dp(14), dp(14), dp(14), dp(14))
+                    layoutParams = LinearLayout.LayoutParams(-1, -2)
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        if (!busy) pickCourseFiles.launch(arrayOf("*/*"))
+                    }
                 }
+
+                val iconFrame = FrameLayout(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+                    setBackgroundResource(R.drawable.bg_picker_pill)
+                }
+                val iconImg = ImageView(this).apply {
+                    layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
+                    setImageResource(R.drawable.ic_file_generic)
+                    setColorFilter(getColor(R.color.cm_primary))
+                }
+                iconFrame.addView(iconImg)
+
+                val textCol = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+                }
+                val tvTitle = TextView(this).apply {
+                    text = "Choose files to upload"
+                    textSize = 13.5f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(getColor(R.color.cm_text_primary))
+                }
+                val tvSub = TextView(this).apply {
+                    text = "Select one or multiple documents (up to 50MB each)"
+                    textSize = 11.5f
+                    setTextColor(getColor(R.color.cm_text_muted))
+                }
+                textCol.addView(tvTitle)
+                textCol.addView(tvSub)
+
+                val btnChoose = TextView(this).apply {
+                    text = "Choose"
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(getColor(R.color.cm_text_primary))
+                    setBackgroundResource(R.drawable.bg_picker_pill)
+                    setPadding(dp(14), dp(7), dp(14), dp(7))
+                }
+
+                emptyCard.addView(iconFrame)
+                emptyCard.addView(textCol)
+                emptyCard.addView(btnChoose)
+
+                filesSectionContainer.addView(emptyCard)
             } else {
-                filePickerCard.setBackgroundResource(R.drawable.bg_picker_card_empty)
-                tvFileName.text = "No file selected"
-                tvFileMeta.text = "PDF, DOCX up to 50MB"
-                btnActionChoose.visibility = View.VISIBLE
-                btnActionChange.visibility = View.GONE
-                btnActionRemove.visibility = View.GONE
-                fileIconFrame.setBackgroundResource(R.drawable.bg_picker_pill)
-                fileIconImg.setImageResource(R.drawable.ic_file_generic)
-                fileIconImg.setColorFilter(getColor(R.color.cm_primary))
+                val totalBytes = selectedCourseFiles.sumOf { it.sizeBytes }
+
+                val headerRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                        bottomMargin = dp(8)
+                    }
+                }
+                val tvSummary = TextView(this).apply {
+                    text = "${selectedCourseFiles.size} file${if (selectedCourseFiles.size > 1) "s" else ""} selected · ${formatFileSize(totalBytes)}"
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(getColor(R.color.cm_text_secondary))
+                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                }
+                headerRow.addView(tvSummary)
+
+                if (selectedCourseFiles.size < 15) {
+                    val btnAddMore = TextView(this).apply {
+                        text = "+ Add More"
+                        textSize = 12f
+                        setTypeface(null, Typeface.BOLD)
+                        setTextColor(getColor(R.color.cm_primary))
+                        setBackgroundResource(R.drawable.bg_picker_pill)
+                        setPadding(dp(10), dp(5), dp(10), dp(5))
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener {
+                            if (!busy) pickCourseFiles.launch(arrayOf("*/*"))
+                        }
+                    }
+                    headerRow.addView(btnAddMore)
+                }
+                filesSectionContainer.addView(headerRow)
+
+                selectedCourseFiles.forEachIndexed { index, item ->
+                    val card = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setBackgroundResource(R.drawable.bg_picker_card_empty)
+                        setPadding(dp(12), dp(12), dp(12), dp(12))
+                        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                            bottomMargin = dp(10)
+                        }
+                    }
+
+                    val topRow = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(-1, -2)
+                    }
+
+                    val iconFrame = FrameLayout(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+                        setBackgroundResource(R.drawable.bg_picker_pill)
+                    }
+                    val iconImg = ImageView(this).apply {
+                        layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
+                        setImageResource(R.drawable.ic_file_generic)
+                        setColorFilter(getColor(R.color.cm_primary))
+                    }
+                    iconFrame.addView(iconImg)
+
+                    val tempPdf = PdfFile(
+                        id = "picked_$index",
+                        title = item.originalFileName,
+                        fileType = item.originalFileName.substringAfterLast('.', "pdf"),
+                        materialType = "notes",
+                        sizeBytes = item.sizeBytes,
+                        driveUrl = ""
+                    )
+                    val visuals = FileVisuals.getVisuals(tempPdf)
+                    FileVisuals.applyVisuals(iconImg, iconFrame, visuals)
+
+                    val metaCol = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                            marginStart = dp(10)
+                            marginEnd = dp(8)
+                        }
+                    }
+                    val tvOrigName = TextView(this).apply {
+                        text = item.originalFileName
+                        textSize = 13f
+                        setTypeface(null, Typeface.BOLD)
+                        setTextColor(getColor(R.color.cm_text_primary))
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.MIDDLE
+                    }
+                    val tvMeta = TextView(this).apply {
+                        text = "${formatFileSize(item.sizeBytes)} · ${item.originalFileName.substringAfterLast('.', "").uppercase()}"
+                        textSize = 11f
+                        setTextColor(getColor(R.color.cm_text_muted))
+                    }
+                    metaCol.addView(tvOrigName)
+                    metaCol.addView(tvMeta)
+
+                    val btnRemove = ImageView(this).apply {
+                        setImageResource(R.drawable.ic_close)
+                        setColorFilter(getColor(R.color.cm_text_muted))
+                        setBackgroundResource(R.drawable.bg_picker_pill)
+                        setPadding(dp(6), dp(6), dp(6), dp(6))
+                        layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener {
+                            selectedCourseFiles.removeAt(index)
+                            if (selectedCourseFiles.isNotEmpty()) {
+                                val first = selectedCourseFiles.first()
+                                uri = first.uri
+                                selectedFileLabel = first.originalFileName
+                                selectedFileSize = first.sizeBytes
+                            } else {
+                                uri = null
+                                selectedFileLabel = ""
+                                selectedFileSize = 0L
+                            }
+                            updatePickedFileUi()
+                            updateTabsUi()
+                        }
+                    }
+
+                    topRow.addView(iconFrame)
+                    topRow.addView(metaCol)
+                    topRow.addView(btnRemove)
+                    card.addView(topRow)
+
+                    val tvTitleLabel = TextView(this).apply {
+                        text = "Title in Course *"
+                        textSize = 11f
+                        setTypeface(null, Typeface.BOLD)
+                        setTextColor(getColor(R.color.cm_text_secondary))
+                        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                            topMargin = dp(8)
+                            bottomMargin = dp(4)
+                        }
+                    }
+                    val etTitle = EditText(this).apply {
+                        setBackgroundResource(R.drawable.bg_clean_input)
+                        setPadding(dp(12), dp(8), dp(12), dp(8))
+                        textSize = 13f
+                        setTextColor(getColor(R.color.cm_text_primary))
+                        setHintTextColor(getColor(R.color.cm_text_disabled))
+                        hint = "e.g. Chapter 1 Notes"
+                        setSingleLine(true)
+                        setText(item.title)
+                        addTextChangedListener(object : TextWatcher {
+                            override fun afterTextChanged(s: Editable?) {
+                                item.title = s?.toString().orEmpty()
+                            }
+                            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                            override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                        })
+                    }
+                    card.addView(tvTitleLabel)
+                    card.addView(etTitle)
+
+                    filesSectionContainer.addView(card)
+                }
             }
-        }
-
-        val triggerPickFile = {
-            if (!busy) pickFile.launch(arrayOf("*/*"))
-        }
-        filePickerCard.setOnClickListener { triggerPickFile() }
-        btnActionChoose.setOnClickListener { triggerPickFile() }
-        btnActionChange.setOnClickListener { triggerPickFile() }
-
-        btnActionRemove.setOnClickListener {
-            uri = null
-            selectedFileLabel = ""
-            selectedFileSize = 0L
-            updatePickedFileUi()
-            onPickedFileChanged?.invoke()
+            updateTabsUi()
         }
 
         onPickedFileChanged = {
@@ -1115,8 +1841,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val isLink = uploadMode == "link"
             updateTabsUi()
             linkSection.visibility = if (isLink) View.VISIBLE else View.GONE
-            filePickerCard.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
+            filesSectionContainer.visibility = if (!isLink && !isEditing) View.VISIBLE else View.GONE
+            val showGlobalTitle = isLink || isEditing
+            tvNameLabel.visibility = if (showGlobalTitle) View.VISIBLE else View.GONE
+            name.visibility = if (showGlobalTitle) View.VISIBLE else View.GONE
             tvNameLabel.text = if (isLink) "Resource title *" else "Display Title"
+            if (!showGlobalTitle) tvNameError.visibility = View.GONE
             if (isLink) checkClipboard()
         }
 
@@ -1186,15 +1916,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
         submit.isEnabled = true
         submit.setOnClickListener {
             val isLink = uploadMode == "link"
-            val title = name.text.toString().trim()
-            if (title.isBlank()) {
-                tvNameError.text = if (isLink) "Resource title is required" else "Display title is required"
-                tvNameError.visibility = View.VISIBLE
-                name.requestFocus()
-                return@setOnClickListener
-            }
-            tvNameError.visibility = View.GONE
-
             val course = selectedCourse
             if (course == null) {
                 Toast.makeText(this, "Please select a subject", Toast.LENGTH_SHORT).show()
@@ -1202,11 +1923,19 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
 
             val kind = "notes"
-
             val rawUrl = urlField.text.toString().trim()
             val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
 
             if (isLink) {
+                val title = name.text.toString().trim()
+                if (title.isBlank()) {
+                    tvNameError.text = "Resource title is required"
+                    tvNameError.visibility = View.VISIBLE
+                    name.requestFocus()
+                    return@setOnClickListener
+                }
+                tvNameError.visibility = View.GONE
+
                 if (rawUrl.isBlank()) {
                     tvUrlError.text = "Google Drive link is required"
                     tvUrlError.visibility = View.VISIBLE
@@ -1228,18 +1957,37 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
                 tvUrlError.visibility = View.GONE
+            } else if (isEditing) {
+                val title = name.text.toString().trim()
+                if (title.isBlank()) {
+                    tvNameError.text = "Display title is required"
+                    tvNameError.visibility = View.VISIBLE
+                    name.requestFocus()
+                    return@setOnClickListener
+                }
+                tvNameError.visibility = View.GONE
             } else {
-                if (uri == null && editingFile == null) {
+                if (selectedCourseFiles.isEmpty()) {
                     status.visibility = View.VISIBLE
-                    status.text = "Please choose a file to upload"
+                    status.text = "Please choose at least one file to upload"
+                    Toast.makeText(this, "Please choose at least one file to upload", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val blankIdx = selectedCourseFiles.indexOfFirst { it.title.trim().isBlank() }
+                if (blankIdx >= 0) {
+                    Toast.makeText(this, "Please enter a title for \"${selectedCourseFiles[blankIdx].originalFileName}\"", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val oversize = selectedCourseFiles.firstOrNull { it.sizeBytes > 50L * 1024L * 1024L }
+                if (oversize != null) {
+                    Toast.makeText(this, "\"${oversize.originalFileName}\" exceeds the 50 MB limit.", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
             }
 
-            // Perform submission with duplicate detection
             fun executeSubmission(targetResourceId: String?) {
-
                 if (isLink) {
+                    val title = name.text.toString().trim()
                     perform {
                         if (targetResourceId != null || editingFile != null) {
                             val resId = targetResourceId ?: editingFile!!.getString("id")
@@ -1262,84 +2010,93 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             null
                         }
                     }
+                } else if (isEditing) {
+                    val title = name.text.toString().trim()
+                    val resId = targetResourceId ?: editingFile!!.getString("id")
+                    perform {
+                        ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
+                            .put("target_resource", resId)
+                            .put("target_title", title)
+                            .put("target_category", kind)
+                            .put("target_course", course.offeringId)
+                            .put("target_link_url", null)
+                        )
+                        null
+                    }
                 } else {
-                    if (editingFile != null || (targetResourceId != null && uri == null)) {
-                        val resId = targetResourceId ?: editingFile!!.getString("id")
-                        perform {
-                            ClassMateAuthApi.rpc("edit_resource_metadata", JSONObject()
-                                .put("target_resource", resId)
-                                .put("target_title", title)
-                                .put("target_category", kind)
-                                .put("target_course", course.offeringId)
-                                .put("target_link_url", null)
-                            )
-                            null
-                        }
-                    } else if (uri != null) {
-                        if (busy) return
-                        busy = true
-                        submit.isEnabled = false
-                        status.visibility = View.VISIBLE
-                        status.text = "Preparing upload…"
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            try {
-                                val stats = runCatching { ClassMateAuthApi.rpc("get_r2_storage_stats", JSONObject()) }.getOrNull()
-                                val totalBytes = stats?.optLong("total_bytes", 0L) ?: 0L
-                                val limitBytes = stats?.optLong("limit_bytes", 10_630_044_057L) ?: 10_630_044_057L
-                                if (totalBytes >= limitBytes || totalBytes + selectedFileSize > limitBytes) {
-                                    withContext(Dispatchers.Main) {
-                                        busy = false
-                                        submit.isEnabled = true
-                                        status.text = "Storage limit reached (9.9 GB). File uploads are paused. Please share via Drive Link."
-                                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
-                                            .setTitle("Storage Quota Reached")
-                                            .setMessage("Cloudflare R2 free tier storage has reached the 9.9 GB limit. Direct file uploads are paused.\n\nYou can still share this resource using Drive Link!")
-                                            .setPositiveButton("OK", null)
-                                            .show()
-                                    }
-                                    return@launch
-                                }
-                                withContext(Dispatchers.Main) {
-                                    val mime = contentResolver.getType(uri!!) ?: "application/pdf"
-                                    val taskId = LibraryUploadManager.enqueueUpload(
-                                        context = this@ClassMatePublishActivity,
-                                        uri = uri!!,
-                                        fileName = selectedFileLabel,
-                                        batchId = batch,
-                                        courseId = course.offeringId,
-                                        courseName = course.code,
-                                        title = title,
-                                        mimeType = mime,
-                                        sizeBytes = selectedFileSize,
-                                        category = kind
-                                    )
-                                    currentUploadTaskId = taskId
-                                    progressContainer.visibility = View.VISIBLE
-                                    progressText.text = "Starting background upload…"
-                                    determinateProgress.isIndeterminate = true
-                                    determinateProgress.progress = 0
-                                    status.text = "Upload running in background. You may leave this screen."
-                                    Toast.makeText(this@ClassMatePublishActivity, "Upload started in background", Toast.LENGTH_SHORT).show()
-                                    submit.isEnabled = false
-                                }
-                            } catch (e: Exception) {
+                    if (busy) return
+                    busy = true
+                    submit.isEnabled = false
+                    status.visibility = View.VISIBLE
+                    status.text = "Preparing upload…"
+
+                    val totalSelectedBytes = selectedCourseFiles.sumOf { it.sizeBytes }
+
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            val stats = runCatching { ClassMateAuthApi.rpc("get_r2_storage_stats", JSONObject()) }.getOrNull()
+                            val totalBytes = stats?.optLong("total_bytes", 0L) ?: 0L
+                            val limitBytes = stats?.optLong("limit_bytes", 10_630_044_057L) ?: 10_630_044_057L
+                            if (totalBytes >= limitBytes || totalBytes + totalSelectedBytes > limitBytes) {
                                 withContext(Dispatchers.Main) {
                                     busy = false
                                     submit.isEnabled = true
-                                    status.text = "Failed to start upload: ${e.message}"
-                                    progressContainer.visibility = View.GONE
+                                    status.text = "Storage limit reached (9.9 GB). File uploads are paused. Please share via Drive Link."
+                                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                                        .setTitle("Storage Quota Reached")
+                                        .setMessage("Cloudflare R2 free tier storage has reached the 9.9 GB limit. Direct file uploads are paused.\n\nYou can still share this resource using Drive Link!")
+                                        .setPositiveButton("OK", null)
+                                        .show()
                                 }
+                                return@launch
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                val count = selectedCourseFiles.size
+                                var lastTaskId: String? = null
+                                for (item in selectedCourseFiles) {
+                                    val taskId = LibraryUploadManager.enqueueUpload(
+                                        context = this@ClassMatePublishActivity,
+                                        uri = item.uri,
+                                        fileName = item.originalFileName,
+                                        batchId = batch,
+                                        courseId = course.offeringId,
+                                        courseName = course.code,
+                                        title = item.title.trim(),
+                                        mimeType = item.mimeType,
+                                        sizeBytes = item.sizeBytes,
+                                        category = kind
+                                    )
+                                    lastTaskId = taskId
+                                }
+                                currentUploadTaskId = lastTaskId
+                                progressContainer.visibility = View.VISIBLE
+                                progressText.text = if (count > 1) "Starting upload of $count files in background…" else "Starting background upload…"
+                                determinateProgress.isIndeterminate = true
+                                determinateProgress.progress = 0
+                                status.text = if (count > 1) "$count files uploading in background. You may leave this screen." else "Upload running in background. You may leave this screen."
+                                Toast.makeText(this@ClassMatePublishActivity, if (count > 1) "$count files queued for background upload" else "Upload started in background", Toast.LENGTH_SHORT).show()
+                                submit.isEnabled = false
+                                setResult(RESULT_OK)
+                                finish()
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                busy = false
+                                submit.isEnabled = true
+                                status.text = "Failed to start upload: ${e.message}"
+                                progressContainer.visibility = View.GONE
                             }
                         }
                     }
                 }
             }
 
-            // Check duplicate
-            lifecycleScope.launch {
-                var duplicateId: String? = null
-                var duplicateTitle: String? = null
-                if (!isEditing) {
+            if (isLink) {
+                val title = name.text.toString().trim()
+                lifecycleScope.launch {
+                    var duplicateId: String? = null
+                    var duplicateTitle: String? = null
                     try {
                         val checkRes = ClassMateAuthApi.rows(
                             "resources",
@@ -1357,22 +2114,51 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             }
                         }
                     } catch (_: Exception) {}
-                }
 
-                if (duplicateId != null && duplicateTitle != null) {
-                    MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
-                        .setTitle("Similar file already exists")
-                        .setMessage("A file titled \"$duplicateTitle\" already exists in ${course.code} under ${kind.replaceFirstChar { it.uppercase() }}.\n\nWould you like to add this as a new file, or update the existing file instead?")
-                        .setPositiveButton("Update existing") { _, _ ->
-                            executeSubmission(targetResourceId = duplicateId)
-                        }
-                        .setNegativeButton("Add as new") { _, _ ->
-                            executeSubmission(targetResourceId = null)
-                        }
-                        .setNeutralButton("Cancel", null)
-                        .show()
-                } else {
-                    executeSubmission(targetResourceId = null)
+                    if (duplicateId != null && duplicateTitle != null) {
+                        MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                            .setTitle("Similar link already exists")
+                            .setMessage("A resource titled \"$duplicateTitle\" already exists in ${course.code} under ${kind.replaceFirstChar { it.uppercase() }}.\n\nWould you like to add this as a new link, or update the existing resource instead?")
+                            .setPositiveButton("Update existing") { _, _ ->
+                                executeSubmission(targetResourceId = duplicateId)
+                            }
+                            .setNegativeButton("Add as new") { _, _ ->
+                                executeSubmission(targetResourceId = null)
+                            }
+                            .setNeutralButton("Cancel", null)
+                            .show()
+                    } else {
+                        executeSubmission(targetResourceId = null)
+                    }
+                }
+            } else {
+                executeSubmission(targetResourceId = null)
+            }
+        }
+    }
+
+    private suspend fun uploadNoticeAttachmentIfAny(noticeId: String) {
+        if (selectedNoticeAttachments.isEmpty() || noticeId.isBlank()) return
+        val total = selectedNoticeAttachments.size
+        val repository = com.shuaib.classmate.repositories.NoticeRepository.getInstance(this@ClassMatePublishActivity)
+
+        selectedNoticeAttachments.forEachIndexed { index, item ->
+            withContext(Dispatchers.Main) {
+                status.visibility = View.VISIBLE
+                val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
+                status.text = "$label 0%"
+            }
+            repository.uploadSupabaseNoticeAttachment(
+                this@ClassMatePublishActivity,
+                noticeId,
+                item.uri,
+                item.name,
+                item.mimeType,
+                item.sizeBytes
+            ) { pct ->
+                runOnUiThread {
+                    val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
+                    status.text = "$label $pct%"
                 }
             }
         }

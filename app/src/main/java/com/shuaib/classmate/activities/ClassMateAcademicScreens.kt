@@ -494,8 +494,7 @@ internal class ClassMateAcademicScreens(
             isChecked = prefs.isDarkMode()
             setOnCheckedChangeListener { _, checked ->
                 prefs.setDarkMode(checked)
-                AppCompatDelegate.setDefaultNightMode(if (checked)
-                    AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO)
+                com.shuaib.classmate.utils.ThemeColors.applyThemeMode(context, if (checked) "dark" else "light")
             }
         }
         root.v<SwitchCompat>(R.id.switchNotifications).apply {

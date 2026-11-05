@@ -31,6 +31,8 @@ internal object ClassMateTeachersDialog {
         val name: String,
         val email: String,
         val recordId: String,
+        val departmentCode: String,
+        val designation: String,
         val courses: MutableList<String>,
         val courseOfferingIds: MutableList<String>
     )
@@ -45,6 +47,7 @@ internal object ClassMateTeachersDialog {
     ) {
         val role = profile.optString("role")
         val isAdmin = role in setOf("admin", "teacher") || profile.optBoolean("is_server_owner")
+        val canDeleteTeacher = role == "admin" || profile.optBoolean("is_server_owner")
         val isCr = profile.optBoolean("is_cr")
         val canManage = isAdmin || isCr
 
@@ -87,7 +90,20 @@ internal object ClassMateTeachersDialog {
             override fun onBindViewHolder(holder: TeacherViewHolder, position: Int) {
                 val t = filteredList[position]
                 holder.tvName.text = t.name
-                holder.tvCourses.text = if (t.courses.isNotEmpty()) t.courses.joinToString(" · ") else "No courses linked"
+                val deptLabel = when (t.departmentCode.lowercase()) {
+                    "cse" -> "CSE"
+                    "phy" -> "Physics"
+                    "chem" -> "Chemistry"
+                    "acct" -> "Accounting"
+                    "eco" -> "Economics"
+                    "math" -> "Math"
+                    else -> t.departmentCode.uppercase().takeIf { it.isNotBlank() }
+                }
+                holder.tvCourses.text = listOfNotNull(
+                    deptLabel,
+                    t.designation.takeIf { it.isNotBlank() },
+                    t.courses.joinToString(" · ").takeIf { it.isNotBlank() } ?: "No courses linked"
+                ).joinToString(" · ")
                 holder.tvEmail.text = t.email.ifBlank { "Email not available" }
 
                 // Initials
@@ -103,6 +119,15 @@ internal object ClassMateTeachersDialog {
                 holder.btnEdit.setOnClickListener {
                     it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     showEditTeacherDialog(context, scope, batchId, t, isAdmin) {
+                        dialog.dismiss()
+                        show(context, scope, batchId, batchLabel, profile, onTeacherDataChanged)
+                        onTeacherDataChanged?.invoke()
+                    }
+                }
+                holder.btnDelete.visibility = if (canDeleteTeacher && t.recordId.isNotBlank()) View.VISIBLE else View.GONE
+                holder.btnDelete.setOnClickListener {
+                    it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    showDeleteTeacherDialog(context, scope, t) {
                         dialog.dismiss()
                         show(context, scope, batchId, batchLabel, profile, onTeacherDataChanged)
                         onTeacherDataChanged?.invoke()
@@ -147,6 +172,8 @@ internal object ClassMateTeachersDialog {
                 filteredList.addAll(fullTeachersList.filter {
                     it.name.lowercase().contains(query) ||
                     it.email.lowercase().contains(query) ||
+                    it.departmentCode.lowercase().contains(query) ||
+                    it.designation.lowercase().contains(query) ||
                     it.courses.any { c -> c.lowercase().contains(query) }
                 })
             }
@@ -168,7 +195,7 @@ internal object ClassMateTeachersDialog {
 
                 val directoryRows = withContext(Dispatchers.IO) {
                     try {
-                        val arr = ClassMateAuthApi.rows("teacher_directory", "select=id,full_name,email")
+                        val arr = JSONArray(ClassMateAuthApi.rpcText("batch_teachers_directory", JSONObject().put("target_batch", batchId)))
                         val list = mutableListOf<JSONObject>()
                         for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { list.add(it) }
                         list
@@ -177,8 +204,22 @@ internal object ClassMateTeachersDialog {
                     }
                 }
 
-                val directoryMap = directoryRows.associateBy({ it.optString("id") }, { it.optString("email") })
                 val teachersMap = linkedMapOf<String, TeacherItem>()
+                for (teacher in directoryRows) {
+                    val id = teacher.optString("id")
+                    val name = teacher.optString("full_name").trim()
+                    if (name.isBlank()) continue
+                    val coursesArr = teacher.optJSONArray("courses")
+                    val coursesList = mutableListOf<String>()
+                    if (coursesArr != null) {
+                        for (j in 0 until coursesArr.length()) {
+                            val c = coursesArr.optString(j).trim()
+                            if (c.isNotBlank()) coursesList.add(c)
+                        }
+                    }
+                    teachersMap[id] = TeacherItem(name, teacher.optString("email"), id,
+                        teacher.optString("department_code"), teacher.optString("designation"), coursesList, mutableListOf())
+                }
 
                 for (i in 0 until coursesJson.length()) {
                     val c = coursesJson.optJSONObject(i) ?: continue
@@ -191,7 +232,7 @@ internal object ClassMateTeachersDialog {
                     val courseTitle = c.optString("course_title").trim()
                     val courseLabel = if (courseCode.isNotBlank()) courseCode else courseTitle
 
-                    val email = if (recordId.isNotBlank()) directoryMap[recordId].orEmpty() else ""
+                    val email = teachersMap[recordId]?.email.orEmpty()
 
                     val key = if (recordId.isNotBlank()) recordId else teacherName.lowercase()
                     val existing = teachersMap[key]
@@ -207,6 +248,8 @@ internal object ClassMateTeachersDialog {
                             name = teacherName,
                             email = email,
                             recordId = recordId,
+                            departmentCode = "cse",
+                            designation = "",
                             courses = if (courseLabel.isNotBlank()) mutableListOf(courseLabel) else mutableListOf(),
                             courseOfferingIds = if (offeringId.isNotBlank()) mutableListOf(offeringId) else mutableListOf()
                         )
@@ -215,7 +258,7 @@ internal object ClassMateTeachersDialog {
 
                 fullTeachersList.clear()
                 fullTeachersList.addAll(teachersMap.values)
-                fullTeachersList.sortBy { it.name }
+                fullTeachersList.sortWith(compareBy<TeacherItem>({ if (it.departmentCode.equals("cse", true)) 0 else 1 }, { it.name.lowercase() }))
 
                 pb.visibility = View.GONE
                 applyFilter(etSearch.text?.toString().orEmpty())
@@ -377,12 +420,40 @@ internal object ClassMateTeachersDialog {
             .show()
     }
 
+    private fun showDeleteTeacherDialog(
+        context: Context,
+        scope: CoroutineScope,
+        teacher: TeacherItem,
+        onSuccess: () -> Unit
+    ) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Delete ${teacher.name}?")
+            .setMessage("This removes the teacher from the directory and clears their course assignments. Students will see those courses as unassigned.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete") { _, _ ->
+                scope.launch {
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            ClassMateAuthApi.rpc("owner_delete_teacher", JSONObject().put("target_record", teacher.recordId))
+                        }
+                        if (!result.optBoolean("deleted")) throw IllegalStateException("The server did not confirm deletion")
+                        Toast.makeText(context, "${teacher.name} deleted", Toast.LENGTH_SHORT).show()
+                        onSuccess()
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Could not delete teacher: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .show()
+    }
+
     private class TeacherViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val tvName: TextView = v.findViewById(R.id.tvTeacherName)
         val tvCourses: TextView = v.findViewById(R.id.tvTeacherCourses)
         val tvEmail: TextView = v.findViewById(R.id.tvTeacherEmail)
         val tvInitials: TextView = v.findViewById(R.id.tvTeacherInitials)
         val btnEdit: ImageView = v.findViewById(R.id.btnTeacherEdit)
+        val btnDelete: ImageView = v.findViewById(R.id.btnTeacherDelete)
         val btnCopyEmail: MaterialButton = v.findViewById(R.id.btnTeacherCopyEmail)
         val btnSendEmail: MaterialButton = v.findViewById(R.id.btnTeacherSendEmail)
     }

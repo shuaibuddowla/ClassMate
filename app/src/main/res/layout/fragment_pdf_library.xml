@@ -9,58 +9,80 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/headerLayout"
         android:layout_width="match_parent"
-        android:layout_height="76dp"
-        android:paddingStart="16dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="10dp">
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
+
+        <FrameLayout
+            android:id="@+id/btnHamburgerMenu"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="3dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Menu"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:layout_width="23dp"
+                android:layout_height="23dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_hamburger_menu"
+                app:tint="@color/cm_text_primary" />
+        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/titleColumn"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:orientation="vertical"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/btnLibrarySearch"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/btnHamburgerMenu"
             app:layout_constraintTop_toTopOf="parent">
 
             <TextView
                 android:id="@+id/tvLibraryTitle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
+                android:layout_height="38dp"
+                android:layout_marginTop="3dp"
+                android:gravity="center_vertical"
+                android:fontFamily="@font/plus_jakarta_sans_extrabold"
                 android:includeFontPadding="false"
                 android:text="Courses"
                 android:textColor="@color/cm_text_primary"
-                android:textSize="29sp"
+                android:textSize="23sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvLibrarySubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
+                android:layout_marginTop="-2dp"
                 android:text="0 files this semester"
                 android:textColor="@color/cm_text_secondary"
-                android:textSize="12.5sp" />
+                android:textSize="11.5sp" />
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/btnLibrarySearch"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="6dp"
             android:background="@drawable/bg_notice_search_icon_button"
             android:clickable="true"
             android:focusable="true"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@+id/btnHamburgerMenu"
             app:layout_constraintEnd_toStartOf="@+id/btnUploadPdf"
-            app:layout_constraintTop_toTopOf="parent">
+            app:layout_constraintTop_toTopOf="@+id/btnHamburgerMenu">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="19dp"
+                android:layout_height="19dp"
                 android:layout_gravity="center"
                 android:contentDescription="Search"
                 android:src="@drawable/ic_search_modern"
@@ -70,38 +92,37 @@
         <TextView
             android:id="@+id/btnUploadPdf"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="38dp"
             android:background="@drawable/bg_btn_primary_pill"
             android:drawableStart="@drawable/ic_add"
-            android:drawablePadding="6dp"
-            android:elevation="3dp"
+            android:drawablePadding="4dp"
+            android:elevation="2dp"
             android:gravity="center"
-            android:minWidth="96dp"
-            android:paddingHorizontal="16dp"
+            android:paddingHorizontal="14dp"
             android:text="Add file"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="12.5sp"
             android:textStyle="bold"
             android:visibility="gone"
             app:drawableTint="#FFFFFF"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@+id/btnHamburgerMenu"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/btnHamburgerMenu"
             tools:visibility="visible" />
 
         <LinearLayout
             android:id="@+id/librarySearchContainer"
             android:layout_width="0dp"
-            android:layout_height="42dp"
+            android:layout_height="38dp"
             android:background="@drawable/bg_notice_search"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="14dp"
+            android:paddingHorizontal="12dp"
             android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@+id/btnHamburgerMenu"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            app:layout_constraintTop_toTopOf="@+id/btnHamburgerMenu">
 
             <ImageView
                 android:layout_width="18dp"
@@ -144,7 +165,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="76dp">
+        android:layout_marginTop="56dp">
 
         <FrameLayout
             android:layout_width="match_parent"

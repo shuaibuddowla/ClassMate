@@ -1,8 +1,11 @@
 package com.shuaib.classmate.utils
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import androidx.annotation.ColorRes
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import com.shuaib.classmate.R
 
@@ -15,6 +18,33 @@ object ThemeColors {
         if (context == null) return false
         return (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /**
+     * Applies the user theme mode across both AppCompat and Android 13+ OS UiModeManager
+     * so that both runtime activities and system-rendered splash starting windows match.
+     */
+    fun applyThemeMode(context: Context, mode: String) {
+        val appCompatMode = when (mode) {
+            "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+            "light" -> AppCompatDelegate.MODE_NIGHT_NO
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        AppCompatDelegate.setDefaultNightMode(appCompatMode)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+                val osMode = when (mode) {
+                    "dark" -> UiModeManager.MODE_NIGHT_YES
+                    "light" -> UiModeManager.MODE_NIGHT_NO
+                    else -> UiModeManager.MODE_NIGHT_AUTO
+                }
+                uiModeManager?.setApplicationNightMode(osMode)
+            } catch (t: Throwable) {
+                android.util.Log.w("ThemeColors", "Failed to set application night mode: ${t.message}")
+            }
+        }
     }
 
     fun get(context: Context, @ColorRes colorRes: Int): Int =

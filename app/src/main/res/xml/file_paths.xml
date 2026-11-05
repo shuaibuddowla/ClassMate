@@ -4,8 +4,11 @@
         name="external_files"
         path="." />
     <files-path
-        name="internal_files"
-        path="." />
+        name="internal_updates"
+        path="updates/" />
+    <files-path
+        name="internal_exports"
+        path="exports/" />
     <cache-path
         name="cache_files"
         path="." />

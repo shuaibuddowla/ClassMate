@@ -9,6 +9,8 @@ import android.net.Uri
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.view.Gravity
+import android.view.LayoutInflater
+import androidx.core.content.ContextCompat
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -23,6 +25,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -46,6 +49,9 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
     private var cachedBatch=""
     private var cachedRoot: LinearLayout?=null
     private var tvToggleBatchFund: TextView?=null
+    private var viewerProfile: JSONObject?=null
+    private var viewerIsOwner=false
+    private var onMemberStateChanged: ((String,Boolean?,Boolean?,Boolean)->Unit)?=null
     private val pages=linkedMapOf<String,List<JSONObject>>()
     private fun dp(n: Int)=(n*activity.resources.displayMetrics.density).toInt()
     private fun text(value: String,size: Float=14f,primary: Boolean=false)=TextView(activity).apply {
@@ -254,7 +260,12 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         val list=RecyclerView(activity).apply {
             layoutManager=LinearLayoutManager(activity); clipToPadding=false; setPadding(dp(12),0,dp(12),dp(108)); itemAnimator=null
         }
-        root.addView(list,LinearLayout.LayoutParams(-1,0,1f))
+        val swipeRefresh=SwipeRefreshLayout(activity).apply {
+            setColorSchemeResources(R.color.cm_primary)
+            setProgressBackgroundColorSchemeResource(R.color.cm_surface)
+            addView(list,ViewGroup.LayoutParams(-1,-1))
+        }
+        root.addView(swipeRefresh,LinearLayout.LayoutParams(-1,0,1f))
         var detailsDialog: AlertDialog?=null
         var detailJob: Job?=null
         val adapter=FriendsAdapter { member ->
@@ -291,9 +302,18 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             loadJob=scope.launch {
                 try {
                     if(wait) delay(250)
+                    if(viewerProfile==null) viewerProfile=ClassMateAuthApi.initializeProfile()
+                    if(!viewerIsOwner) viewerIsOwner=runCatching { ClassMateAuthApi.rpcText("is_owner",JSONObject()).trim()=="true" }.getOrDefault(false)
                     val result=JSONArray(ClassMateAuthApi.rpcText("batch_friends",JSONObject().put("target_batch",batch).put("query_text",query).put("result_offset",requestedOffset)))
                     if(!root.isAttachedToWindow || currentBatch()!=batch || request!=generation) return@launch
-                    val page=(0 until result.length()).map { result.getJSONObject(it) }.filter { it.optString("role") in setOf("student", "admin") }
+                    val canReviewBans=viewerIsOwner || (viewerProfile?.optBoolean("is_cr")==true && viewerProfile?.optString("cr_batch_id")==batch)
+                    val bannedProfiles=if(canReviewBans) runCatching {
+                        val bans=JSONArray(ClassMateAuthApi.rpcText("batch_active_ban_list",JSONObject().put("target_batch",batch)))
+                        (0 until bans.length()).mapNotNull { bans.optJSONObject(it)?.optString("profile_id")?.takeIf { id -> id.isNotBlank() } }.toSet()
+                    }.getOrDefault(emptySet()) else emptySet()
+                    val page=(0 until result.length()).map { i ->
+                        result.getJSONObject(i).apply { put("is_banned",optString("profile_id") in bannedProfiles) }
+                    }.filter { it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
                     val pfxRegex = Regex("^([A-Za-z]+)(\\d{2})")
                     val counts = mutableMapOf<String, Int>()
@@ -344,9 +364,24 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                 } catch(e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) {
                     if(request==generation && root.isAttachedToWindow) { status.text="Could not load Batch members. Check your connection."; retry.visibility=View.VISIBLE }
-                } finally { if(request==generation) loading=false }
+                } finally { if(request==generation) { loading=false; swipeRefresh.isRefreshing=false } }
             }
         }
+        onMemberStateChanged = { profileId,cr,banned,refreshViewer ->
+            val updated=adapter.currentList.map { old ->
+                val copy=JSONObject(old.toString())
+                if(copy.optString("profile_id")==profileId) {
+                    cr?.let { copy.put("is_cr",it) }
+                    banned?.let { copy.put("is_banned",it) }
+                }
+                copy
+            }
+            pages[query]=updated
+            adapter.submitList(updated)
+            if(refreshViewer) { viewerProfile=null; viewerIsOwner=false }
+            load(true)
+        }
+        swipeRefresh.setOnRefreshListener { load(true) }
         input.doAfterTextChanged { load(true,true) }
         retry.setOnClickListener { load(offset==0) }
         list.addOnScrollListener(object: RecyclerView.OnScrollListener() {
@@ -397,6 +432,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
 
             val labels=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,dp(8),0) }
             val name=text("",16f,true).apply { setTypeface(null,1) }
+            val actions=ImageView(activity).apply { setImageResource(R.drawable.ic_more_vert); contentDescription="Student actions"; visibility=View.GONE; setPadding(dp(8),dp(8),dp(8),dp(8)) }
             val badgeRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; setPadding(0,dp(4),0,0) }
             val badge=text("Admin",11f,true).apply {
                 setPadding(dp(8),dp(3),dp(8),dp(3)); setTextColor(activity.getColor(R.color.cm_primary))
@@ -405,12 +441,22 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             badgeRow.addView(badge,LinearLayout.LayoutParams(-2,-2))
             val id=text("",12f).apply { setPadding(0,dp(4),0,0) }
             labels.addView(name); labels.addView(badgeRow); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
+            row.addView(actions,LinearLayout.LayoutParams(dp(40),dp(40)))
             row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO },LinearLayout.LayoutParams(dp(18),dp(18)))
             card.addView(row)
-            return FriendHolder(card,avatar,onlineDot,name,id,badge)
+            return FriendHolder(card,avatar,onlineDot,name,id,badge,actions)
         }
         override fun onBindViewHolder(holder: FriendHolder,position: Int) {
             val member=getItem(position)
+            val viewer=viewerProfile
+            val crActive=viewer?.isNull("cr_valid_until")!=false || runCatching { java.time.Instant.parse(viewer?.optString("cr_valid_until")).isAfter(java.time.Instant.now()) }.getOrDefault(false)
+            val canManage=viewerIsOwner || (viewer?.optBoolean("is_cr")==true && viewer?.optString("cr_batch_id")==currentBatch() && crActive)
+            holder.actions.visibility=if(canManage && member.optString("role")=="student" && member.optString("profile_id")!=viewer?.optString("id")) View.VISIBLE else View.GONE
+            holder.actions.setOnClickListener { anchor ->
+                showMemberActions(anchor,member,viewerIsOwner,viewer?.optString("role")=="student" && viewer.optBoolean("is_cr")) { cr,banned,refreshViewer ->
+                    onMemberStateChanged?.invoke(member.optString("profile_id"),cr,banned,refreshViewer)
+                }
+            }
             holder.badge.visibility=if(member.optString("role")=="admin") View.VISIBLE else View.GONE
             holder.onlineDot.visibility=if(member.optBoolean("is_online")) View.VISIBLE else View.GONE
             holder.name.text=member.optString("full_name").ifBlank { "ClassMate member" }
@@ -463,7 +509,197 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             holder.itemView.contentDescription="${holder.name.text}, ${holder.studentId.text}. Open profile"
         }
     }
-    private class FriendHolder(view: View,val avatar: ImageView,val onlineDot: View,val name: TextView,val studentId: TextView,val badge: TextView): RecyclerView.ViewHolder(view)
+    private fun showMemberActions(
+        anchor: View,
+        member: JSONObject,
+        isOwner: Boolean,
+        isCr: Boolean,
+        onStateChanged: (Boolean?,Boolean?,Boolean)->Unit
+    ) {
+        val popup=android.widget.PopupMenu(activity,anchor)
+        val profileId=member.optString("profile_id")
+        val fullName=member.optString("full_name").ifBlank { "this student" }
+        val targetIsCr=member.optBoolean("is_cr")
+        val targetIsBanned=member.optBoolean("is_banned")
+        if(targetIsCr) popup.menu.add("Revoke CR access").setOnMenuItemClickListener {
+            scope.launch {
+                try {
+                    ClassMateAuthApi.rpc("set_batch_cr",JSONObject().put("target_profile",profileId).put("target_active",false))
+                    onStateChanged(false,null,false)
+                    Toast.makeText(activity,"CR access removed from $fullName",Toast.LENGTH_SHORT).show()
+                } catch(e: Exception) { Toast.makeText(activity,e.message ?: "Could not revoke CR access",Toast.LENGTH_LONG).show() }
+            }
+            true
+        } else {
+            popup.menu.add("Make CR").setOnMenuItemClickListener {
+                scope.launch {
+                    try {
+                        ClassMateAuthApi.rpc("set_batch_cr",JSONObject().put("target_profile",profileId).put("target_active",true))
+                        onStateChanged(true,null,false)
+                        Toast.makeText(activity,"$fullName is now a CR",Toast.LENGTH_SHORT).show()
+                    } catch(e: Exception) { Toast.makeText(activity,e.message ?: "Could not assign CR",Toast.LENGTH_LONG).show() }
+                }
+                true
+            }
+            if(isCr && !isOwner) popup.menu.add("Transfer my CR role").setOnMenuItemClickListener {
+                MaterialAlertDialogBuilder(activity)
+                    .setTitle("Transfer CR role?")
+                    .setMessage("$fullName will become the CR, and you will lose CR access.")
+                    .setNegativeButton("Cancel",null)
+                    .setPositiveButton("Transfer") { _,_ ->
+                        scope.launch {
+                            try {
+                                ClassMateAuthApi.rpc("transfer_batch_cr",JSONObject().put("target_profile",profileId))
+                                onStateChanged(true,null,true)
+                                Toast.makeText(activity,"CR role transferred to $fullName",Toast.LENGTH_SHORT).show()
+                            } catch(e: Exception) { Toast.makeText(activity,e.message ?: "Could not transfer CR role",Toast.LENGTH_LONG).show() }
+                        }
+                    }.show()
+                true
+            }
+        }
+        if(targetIsBanned) popup.menu.add("Lift restriction / Unban").setOnMenuItemClickListener {
+            MaterialAlertDialogBuilder(activity)
+                .setTitle("Unban $fullName?")
+                .setMessage("This will restore $fullName's full access to ClassMate immediately across Android and Web, and send an unban notification.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Unban") { _, _ ->
+                    scope.launch {
+                        try {
+                            ClassMateAuthApi.rpc("manage_student_ban", JSONObject().put("target_profile", profileId).put("target_days", 1).put("target_reason", "unban").put("target_lift", true))
+                            onStateChanged(null, false, false)
+                            Toast.makeText(activity, "$fullName has been unbanned", Toast.LENGTH_SHORT).show()
+                        } catch(e: Exception) {
+                            Toast.makeText(activity, e.message ?: "Could not unban student", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.show()
+            true
+        } else popup.menu.add("Restrict student access").setOnMenuItemClickListener {
+            showBanBottomSheet(member, isOwner, onStateChanged)
+            true
+        }
+        popup.show()
+    }
+
+
+    private fun showBanBottomSheet(
+        member: JSONObject,
+        isOwner: Boolean,
+        onStateChanged: (Boolean?, Boolean?, Boolean) -> Unit
+    ) {
+        val profileId = member.optString("profile_id")
+        val fullName = member.optString("full_name").ifBlank { "Student" }
+        val studentId = member.optString("student_id").ifBlank { "Student" }
+        val batch = member.optString("batch").ifBlank { "" }
+
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(
+            activity,
+            R.style.Theme_ClassMate_BottomSheetDialog
+        )
+        val view = LayoutInflater.from(activity).inflate(R.layout.dialog_ban_student_sheet, null, false)
+        sheet.setContentView(view)
+
+        val initials = fullName.split(" ").filter { it.isNotBlank() }.take(2).map { it.first().uppercaseChar() }.joinToString("")
+        view.findViewById<TextView>(R.id.tvStudentAvatarBubble)?.text = initials.ifBlank { "ST" }
+        view.findViewById<TextView>(R.id.tvBanStudentName)?.text = fullName
+        view.findViewById<TextView>(R.id.tvBanStudentId)?.text = if (batch.isNotBlank()) "$studentId · $batch" else studentId
+
+        var selectedDays = 3
+        val btn3 = view.findViewById<MaterialButton>(R.id.btnBan3Days)
+        val btn7 = view.findViewById<MaterialButton>(R.id.btnBan7Days)
+        val btn30 = view.findViewById<MaterialButton>(R.id.btnBan30Days)
+        val etReason = view.findViewById<TextInputEditText>(R.id.etBanReason)
+        val tilReason = view.findViewById<TextInputLayout>(R.id.tilBanReason)
+        val btnConfirm = view.findViewById<MaterialButton>(R.id.btnConfirmBan)
+        val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancelBan)
+
+        if (isOwner) {
+            btn30?.visibility = View.VISIBLE
+        }
+
+        fun updateDayButtons() {
+            val primaryColor = ContextCompat.getColor(activity, R.color.cm_primary)
+            val mutedColor = ContextCompat.getColor(activity, R.color.cm_text_muted)
+            val containerColor = ContextCompat.getColor(activity, R.color.cm_primary_container)
+
+            listOf(btn3 to 3, btn7 to 7, btn30 to 30).forEach { (btn, days) ->
+                if (btn == null) return@forEach
+                val isSelected = days == selectedDays
+                if (isSelected) {
+                    btn.setBackgroundColor(containerColor)
+                    btn.setTextColor(primaryColor)
+                    btn.strokeColor = ColorStateList.valueOf(primaryColor)
+                    btn.strokeWidth = dp(2)
+                } else {
+                    btn.setBackgroundColor(Color.TRANSPARENT)
+                    btn.setTextColor(mutedColor)
+                    btn.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(activity, R.color.cm_divider))
+                    btn.strokeWidth = dp(1)
+                }
+            }
+        }
+        updateDayButtons()
+
+        btn3?.setOnClickListener { selectedDays = 3; updateDayButtons() }
+        btn7?.setOnClickListener { selectedDays = 7; updateDayButtons() }
+        btn30?.setOnClickListener { selectedDays = 30; updateDayButtons() }
+
+        // Quick reason chips
+        view.findViewById<com.google.android.material.chip.Chip>(R.id.chipReasonDisruption)?.setOnClickListener {
+            etReason?.setText("Batch disruption and repetitive uncooperative behavior")
+            tilReason?.error = null
+        }
+        view.findViewById<com.google.android.material.chip.Chip>(R.id.chipReasonMisconduct)?.setOnClickListener {
+            etReason?.setText("Misconduct and harassment within batch communication channels")
+            tilReason?.error = null
+        }
+        view.findViewById<com.google.android.material.chip.Chip>(R.id.chipReasonSpam)?.setOnClickListener {
+            etReason?.setText("Spamming unapproved messages and links across batch channels")
+            tilReason?.error = null
+        }
+        view.findViewById<com.google.android.material.chip.Chip>(R.id.chipReasonInappropriate)?.setOnClickListener {
+            etReason?.setText("Inappropriate language and non-academic content in batch threads")
+            tilReason?.error = null
+        }
+
+        btnCancel?.setOnClickListener { sheet.dismiss() }
+
+        btnConfirm?.setOnClickListener {
+            val reason = etReason?.text?.toString()?.trim().orEmpty()
+            if (reason.length < 3) {
+                tilReason?.error = "Please provide a reason (minimum 3 characters)"
+                return@setOnClickListener
+            }
+            tilReason?.error = null
+            btnConfirm.isEnabled = false
+            btnConfirm.text = "Restricting..."
+
+            scope.launch {
+                try {
+                    ClassMateAuthApi.rpc(
+                        "manage_student_ban",
+                        JSONObject()
+                            .put("target_profile", profileId)
+                            .put("target_days", selectedDays)
+                            .put("target_reason", reason)
+                            .put("target_lift", false)
+                    )
+                    sheet.dismiss()
+                    onStateChanged(null, true, false)
+                    Toast.makeText(activity, "$fullName has been restricted for $selectedDays days", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    btnConfirm.isEnabled = true
+                    btnConfirm.text = "Restrict Access"
+                    Toast.makeText(activity, e.message ?: "Could not ban student", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        sheet.show()
+    }
+
+    private class FriendHolder(view: View,val avatar: ImageView,val onlineDot: View,val name: TextView,val studentId: TextView,val badge: TextView,val actions: ImageView): RecyclerView.ViewHolder(view)
 
     private fun showDetails(member: JSONObject): AlertDialog {
         val panel=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(4),dp(18),dp(8)) }

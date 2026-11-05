@@ -23,8 +23,23 @@ class SplashActivity : AppCompatActivity() {
     private var isReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val prefs = AppPreferences(this)
+        com.shuaib.classmate.utils.ThemeColors.applyThemeMode(this, prefs.getThemeMode())
+        val isDark = prefs.isAppInDarkMode(this)
+
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
+        }
+
+        splashScreen.setOnExitAnimationListener { splashScreenView ->
+            val bgColor = if (isDark) 0xFF0B0C0E.toInt() else 0xFFF1F5F9.toInt()
+            splashScreenView.view.setBackgroundColor(bgColor)
+            splashScreenView.remove()
+        }
 
         // Keep system splash screen visible until routing is determined
         splashScreen.setKeepOnScreenCondition { !isReady }

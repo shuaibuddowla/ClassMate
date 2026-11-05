@@ -15,6 +15,7 @@ import android.content.ClipboardManager
 
 
 import android.content.Context
+import android.content.SharedPreferences
 
 
 
@@ -1952,6 +1953,21 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+    private fun bindHamburgerMenu(root: View) {
+        root.findViewById<View>(R.id.btnHamburgerMenu)?.apply {
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                com.shuaib.classmate.ui.ClassMateHamburgerSheet.show(
+                    activity = activity,
+                    scope = scope,
+                    batchId = batchId,
+                    batchLabel = batchLabel,
+                    profile = profile
+                )
+            }
+        }
+    }
+
     private fun setupTimetable(root: View) {
 
 
@@ -2030,17 +2046,48 @@ internal class ClassMateAcademicScreensSupabase(
 
         }
 
-        root.findViewById<View>(R.id.btnHamburgerMenu)?.apply {
-            setOnClickListener {
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                com.shuaib.classmate.ui.ClassMateHamburgerSheet.show(
-                    activity = activity,
-                    scope = scope,
-                    batchId = batchId,
-                    batchLabel = batchLabel,
-                    profile = profile
-                )
+        bindHamburgerMenu(root)
+
+        // Interim CR Onboarding Guide Banner
+        val isUserCr = profile().optBoolean("is_cr")
+        val crGuideCard = root.findViewById<View>(R.id.cardCrOnboardingGuide)
+        val prefs = activity.getSharedPreferences("classmate_prefs", android.content.Context.MODE_PRIVATE)
+        if (crGuideCard != null) {
+            val isDismissed = prefs.getBoolean("cr_guide_dismissed_${batchId()}", false)
+            crGuideCard.visibility = if (isUserCr && !isDismissed) View.VISIBLE else View.GONE
+            root.findViewById<View>(R.id.btnDismissCrGuide)?.setOnClickListener {
+                crGuideCard.visibility = View.GONE
+                prefs.edit().putBoolean("cr_guide_dismissed_${batchId()}", true).apply()
             }
+            root.findViewById<View>(R.id.btnCrGuideAddCourses)?.setOnClickListener {
+                onConfigure()
+            }
+            root.findViewById<View>(R.id.btnCrGuideAddRoutine)?.setOnClickListener {
+                activity.startActivity(android.content.Intent(activity, TimetableManagementActivity::class.java))
+            }
+        }
+
+        // Student Welcome Dialog for Active Semester progression
+        scope.launch {
+            try {
+                val semRows = ClassMateAuthApi.rows("semesters", "select=id,semester_number&batch_id=eq.${batchId()}&status=eq.active&limit=1")
+                if (semRows.length() > 0) {
+                    val sem = semRows.getJSONObject(0)
+                    val semId = sem.getString("id")
+                    val semNum = sem.optInt("semester_number")
+                    val userId = profile().optString("id")
+                    val prefKey = "welcomed_sem_${semId}_${userId}"
+                    val welcomed = prefs.getBoolean(prefKey, false)
+                    if (!welcomed && semNum > 0 && !activity.isFinishing) {
+                        prefs.edit().putBoolean(prefKey, true).apply()
+                        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                            .setTitle("🎉 Welcome to Semester $semNum!")
+                            .setMessage("You have progressed to Semester $semNum of ${com.shuaib.classmate.models.Batch.formatName(batchId())}.\n\nYour courses and timetable routine have refreshed for this semester. All previous notices remain intact.")
+                            .setPositiveButton("Let's Go!", null)
+                            .show()
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
 
@@ -2574,9 +2621,6 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun canEditBus(): Boolean {
-
-
-
         val account = profile()
 
 
@@ -4528,6 +4572,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         currentNoticeRoot = root
+        bindHamburgerMenu(root)
 
 
 
@@ -4684,6 +4729,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             root.v<View>(R.id.btnSearch).visibility = View.GONE
+            root.findViewById<View>(R.id.btnHamburgerMenu)?.visibility = View.GONE
 
 
 
@@ -4728,6 +4774,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             root.v<View>(R.id.searchContainer).visibility = View.GONE
+            root.findViewById<View>(R.id.btnHamburgerMenu)?.visibility = View.VISIBLE
 
 
 
@@ -9216,6 +9263,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         currentLibraryRoot = root
+        bindHamburgerMenu(root)
 
 
 
@@ -9269,6 +9317,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             root.v<View>(R.id.titleColumn).visibility = View.GONE
+            root.findViewById<View>(R.id.btnHamburgerMenu)?.visibility = View.GONE
 
 
 
@@ -9321,6 +9370,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             root.v<View>(R.id.librarySearchContainer).visibility = View.GONE
+            root.findViewById<View>(R.id.btnHamburgerMenu)?.visibility = View.VISIBLE
 
 
 
@@ -11019,6 +11069,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun setupProfile(root: View) {
+        bindHamburgerMenu(root)
 
 
 
@@ -11078,91 +11129,78 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        // Top-Right Profile Launcher Button
-
-
-
-        val photo = account.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
-
-
-
-            ?: ownGoogleAvatar
-
-
-
-        val avatarView = root.findViewById<ImageView>(R.id.ivHeaderProfileAvatar)
-
-
-
-        if (avatarView != null) {
-
-
-
-            if (!photo.isNullOrBlank()) {
-
-
-
-                com.bumptech.glide.Glide.with(activity)
-
-
-
-                    .load(photo)
-
-
-
-                    .placeholder(R.drawable.ic_default_avatar)
-
-
-
-                    .into(avatarView)
-
-
-
-            } else {
-
-
-
-                avatarView.setImageResource(R.drawable.ic_default_avatar)
-
-
-
-            }
-
-
-
-        }
-
-
-
-        root.findViewById<View>(R.id.btnHeaderProfile)?.setOnClickListener {
-
-
-
-            val intent = Intent(activity, ClassMateProfileActivity::class.java)
-
-
-
-            activity.startActivity(intent)
-
-
-
-        }
-
-
-
-
-
-
-
         val effectiveBatch = batchLabel().trim().ifBlank {
-
-
-
             ClassMateAcademicCache.home(activity)?.optString("label")?.trim().orEmpty()
-
-
-
         }
+
+        // Bind Compact Hero Student & Batch Identity Card
+        val photo = account.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: ownGoogleAvatar
+        val heroAvatar = root.findViewById<ImageView>(R.id.ivHeroAvatar)
+        if (heroAvatar != null) {
+            if (!photo.isNullOrBlank()) {
+                com.bumptech.glide.Glide.with(activity)
+                    .load(photo)
+                    .placeholder(R.drawable.ic_default_avatar)
+                    .into(heroAvatar)
+            } else {
+                heroAvatar.setImageResource(R.drawable.ic_default_avatar)
+            }
+        }
+
+        // Student identity details
+        val fullName = account.optString("full_name").ifBlank { "ClassMate Student" }
+        val studentId = account.optString("student_id").takeIf { it.isNotBlank() } ?: "MBSTU Student"
+        val hometown = account.optString("hometown").takeIf { it.isNotBlank() }?.let { " · $it" } ?: " · MBSTU"
+
+        root.findViewById<TextView>(R.id.tvHeroName)?.text = fullName
+        root.findViewById<TextView>(R.id.tvHeroStudentId)?.text = studentId
+        root.findViewById<TextView>(R.id.tvHeroHometown)?.text = hometown
+        root.findViewById<TextView>(R.id.tvHeroBatchTitle)?.text = effectiveBatch.ifBlank { "MBSTU Academic Batch" }
+
+        // Role badge on Hero card
+        root.findViewById<TextView>(R.id.tvHeroRoleBadge)?.apply {
+            when {
+                isAdmin -> {
+                    text = "ADMIN"
+                    setTextColor(activity.getColor(R.color.cm_primary))
+                    setBackgroundResource(R.drawable.bg_r2_status_pill)
+                }
+                isCr -> {
+                    text = "CR"
+                    setTextColor(android.graphics.Color.parseColor("#D97706"))
+                    setBackgroundResource(R.drawable.bg_status_pill_active)
+                }
+                isTeacher -> {
+                    text = "FACULTY"
+                    setTextColor(android.graphics.Color.parseColor("#06B6D4"))
+                    setBackgroundResource(R.drawable.bg_r2_status_pill)
+                }
+                else -> {
+                    text = "STUDENT"
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    setBackgroundResource(R.drawable.bg_segmented_container)
+                }
+            }
+        }
+
+        // Blood badge on Hero card
+        val bloodGroup = account.optString("blood_group").trim()
+        root.findViewById<TextView>(R.id.tvHeroBloodBadge)?.apply {
+            if (bloodGroup.isNotBlank() && bloodGroup != "null") {
+                visibility = View.VISIBLE
+                text = "🩸 $bloodGroup"
+            } else {
+                visibility = View.GONE
+            }
+        }
+
+        // Direct edit button on Hero card
+        root.findViewById<View>(R.id.btnHeroEditProfile)?.setOnClickListener {
+            onEditProfile()
+        }
+
+
 
 
 
@@ -11174,7 +11212,6 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.btnEditPersonal).setOnClickListener { onEditProfile() }
 
 
 
@@ -11858,7 +11895,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            com.shuaib.classmate.utils.ThemeColors.applyThemeMode(activity, "light")
 
 
 
@@ -11878,7 +11915,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            com.shuaib.classmate.utils.ThemeColors.applyThemeMode(activity, "dark")
 
 
 
@@ -11898,7 +11935,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            com.shuaib.classmate.utils.ThemeColors.applyThemeMode(activity, "system")
 
 
 

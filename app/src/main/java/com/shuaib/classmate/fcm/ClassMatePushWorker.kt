@@ -36,12 +36,21 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         val release = inputData.getString("kind") == "app_update"
         val blood = inputData.getString("kind") == "blood_request"
         val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update")
-        val attendance = inputData.getString("kind") == "attendance_open"
+        val attendance = inputData.getString("kind") in setOf("attendance_open", "attendance_marked")
         if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
                 ClassMateAuthApi.saveNotificationIdentity(identity)
             } catch (_: Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
+        }
+        val isTargetedPersonal = inputData.getString("kind") in setOf(
+            "student_ban", "student_ban_lifted",
+            "batch_fund_deposit", "batch_fund_update",
+            "attendance_marked"
+        )
+        val targetRecipient = inputData.getString("recipient_id")
+        if (isTargetedPersonal && !targetRecipient.isNullOrBlank() && targetRecipient != identity?.optString("id")) {
+            return Result.success()
         }
         if (!ClassMatePushPolicy.addressedToCurrentUser(inputData.getString("project_ref"),inputData.getString("recipient_id"),
                 inputData.getString("batch_id"),release || blood,expectedProject,identity.optString("id"),identity.optString("verification_status"),

@@ -53,4 +53,25 @@
         <item name="android:fontFamily">sans-serif</item>
     </style>
 
+
+    <!-- Splash theme for dark mode -->
+    <style name="Theme.ClassMate.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/cm_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_classmate_splash_logo</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/cm_background</item>
+        <item name="windowSplashScreenAnimationDuration">350</item>
+        <item name="postSplashScreenTheme">@style/Theme.ClassMate.Splash</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.ClassMate.Splash" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_splash_screen</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>

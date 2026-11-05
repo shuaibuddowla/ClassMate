@@ -53,7 +53,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         if(mode=="overrides") {
             form.panel.addView(MaterialButton(this).apply {
                 text="＋ Add student override"; isAllCaps=false; cornerRadius=dp(16)
-                setOnClickListener { overrideForm() }
+                setOnClickListener { overrideForm(prefillBatchId = batch.ifBlank { null }) }
             },LinearLayout.LayoutParams(-1,dp(56)))
         }
         if(mode=="teachers") form.panel.addView(MaterialButton(this).apply {
@@ -114,6 +114,15 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                     val target=intent.getStringExtra("edit_target")
                     if(!openedTarget && mode=="catalog") { openedTarget=true; catalogPicker() }
                     else if(!openedTarget && !target.isNullOrBlank()) { openedTarget=true; courses.find {it.optString("offering_id")==target}?.let {courseForm(it)} }
+                    else if(!openedTarget && mode=="courses" && courses.isEmpty() && semesterAvailable) {
+                        openedTarget = true
+                        MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity)
+                            .setTitle("You haven't added courses yet")
+                            .setMessage("Your batch doesn't have any courses configured for this active semester. Start by adding your first course and assigning its instructor.")
+                            .setPositiveButton("Add Course") { _, _ -> courseForm(null) }
+                            .setNegativeButton("Later", null)
+                            .show()
+                    }
                     status.text=if(!semesterAvailable) "No active semester. Ask the global admin to publish one." else if(courses.isEmpty()) "No courses yet. Add your first course." else "${courses.size} courses · Changes stay within this batch"
                 }
             } catch(e: kotlinx.coroutines.CancellationException) { throw e }
@@ -146,49 +155,205 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
             } catch(e: Exception) { Toast.makeText(this@ClassMateConfigurationActivity,e.message,Toast.LENGTH_LONG).show() }
         }
     }
-    private fun courseForm(current: JSONObject?,existing: JSONObject?=null) {
-        if(editor?.isShowing==true || busy) return
-        val initial=current ?: existing; val f=ClassMateFormUi(this)
-        f.label("Names ending in Lab are detected as lab courses.")
-        val code=f.field("Course code").apply { setText(initial?.optString("course_code")); filters=arrayOf(android.text.InputFilter.LengthFilter(30)) }
-        val name=f.field("Course name").apply { setText(initial?.optString("course_title")); filters=arrayOf(android.text.InputFilter.LengthFilter(200)) }
-        val teacher=f.field("Teacher name (optional)").apply { setText(current?.let { clean(it,"teacher_name") }); filters=arrayOf(android.text.InputFilter.LengthFilter(200)) }
-        var selectedTeacher=current?.let { clean(it,"teacher_record_id").ifBlank { null } }
-        teacher.doAfterTextChanged { if(teacher.text.toString()!=current?.let { clean(it,"teacher_name") }) selectedTeacher=null }
-        val available=courses.filter { clean(it,"teacher_record_id").isNotBlank() }.distinctBy { it.optString("teacher_record_id") }
-        if(available.isNotEmpty() || role=="admin") f.panel.addView(MaterialButton(this,null,com.google.android.material.R.attr.borderlessButtonStyle).apply {
-            text="Choose a configured teacher"; isAllCaps=false; setOnClickListener {
-                lifecycleScope.launch {
-                    try {
-                        val options=if(role=="admin") {
-                            val dept=ClassMateAuthApi.rows("batches","select=department_id&id=eq.$batch").getJSONObject(0).getString("department_id")
-                            rows(ClassMateAuthApi.rows("teacher_directory","select=id,full_name,email&department_id=eq.$dept&order=full_name"))
-                                .map { JSONObject(it.toString()).put("teacher_record_id",it.getString("id")).put("teacher_name",it.getString("full_name")) }
-                        } else available
-                        if(options.isEmpty()) { Toast.makeText(this@ClassMateConfigurationActivity,"No teachers configured yet. Enter a name to create one.",Toast.LENGTH_LONG).show(); return@launch }
-                        MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity).setTitle("Choose teacher").setItems(options.map { clean(it,"teacher_name")+clean(it,"email").takeIf { email -> email.isNotBlank() }?.let { email -> " · $email" }.orEmpty() }.toTypedArray()) { _,i ->
-                            teacher.setText(clean(options[i],"teacher_name")); selectedTeacher=options[i].getString("teacher_record_id")
-                        }.show()
-                    } catch(e: Exception) { Toast.makeText(this@ClassMateConfigurationActivity,e.message,Toast.LENGTH_LONG).show() }
+    private fun showTeacherSearchBottomSheet(onTeacherSelected: (JSONObject) -> Unit) {
+        lifecycleScope.launch {
+            try {
+                val arr = try {
+                    JSONArray(ClassMateAuthApi.rpcText("assignable_teachers", JSONObject().put("target_batch", batch.takeIf { it.isNotBlank() } ?: JSONObject.NULL)))
+                } catch (_: Exception) {
+                    ClassMateAuthApi.rows("teacher_directory", "select=id,full_name,email,designation&order=full_name")
                 }
+                val options = rows(arr).map {
+                    JSONObject(it.toString()).put("teacher_record_id", it.getString("id")).put("teacher_name", it.getString("full_name"))
+                }
+                if (options.isEmpty()) {
+                    Toast.makeText(this@ClassMateConfigurationActivity, "No teachers found in directory.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this@ClassMateConfigurationActivity)
+                val sheetView = LinearLayout(this@ClassMateConfigurationActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(20), dp(14), dp(20), dp(24))
+                }
+
+                // Drag handle pill
+                val handle = View(this@ClassMateConfigurationActivity).apply {
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        cornerRadius = dp(3).toFloat()
+                        setColor(android.graphics.Color.parseColor("#CBD5E1"))
+                    }
+                }
+                val handleLp = LinearLayout.LayoutParams(dp(44), dp(5)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    bottomMargin = dp(14)
+                }
+                sheetView.addView(handle, handleLp)
+
+                // Title & Subtitle
+                val title = TextView(this@ClassMateConfigurationActivity).apply {
+                    text = "Choose Teacher from Directory"
+                    textSize = 17f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.cm_text_primary))
+                }
+                sheetView.addView(title)
+
+                val sub = TextView(this@ClassMateConfigurationActivity).apply {
+                    text = "Search by teacher name, designation, or email"
+                    textSize = 12f
+                    setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.cm_text_secondary))
+                    setPadding(0, dp(2), 0, dp(12))
+                }
+                sheetView.addView(sub)
+
+                // Search Box
+                val searchInput = com.google.android.material.textfield.TextInputEditText(this@ClassMateConfigurationActivity).apply {
+                    hint = "Search faculty name or initial…"
+                    textSize = 14f
+                    maxLines = 1
+                    inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                }
+                val searchLayout = com.google.android.material.textfield.TextInputLayout(this@ClassMateConfigurationActivity, null, com.google.android.material.R.attr.textInputOutlinedStyle).apply {
+                    val r = dp(12).toFloat()
+                    setBoxCornerRadii(r, r, r, r)
+                    endIconMode = com.google.android.material.textfield.TextInputLayout.END_ICON_CLEAR_TEXT
+                    startIconDrawable = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_search_modern)
+                    addView(searchInput)
+                }
+                sheetView.addView(searchLayout, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+
+                // Scroll container
+                val resultsScroll = ScrollView(this@ClassMateConfigurationActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(-1, dp(340))
+                }
+                val resultsContainer = LinearLayout(this@ClassMateConfigurationActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                }
+                resultsScroll.addView(resultsContainer)
+                sheetView.addView(resultsScroll)
+
+                fun renderList(query: String) {
+                    resultsContainer.removeAllViews()
+                    val q = query.trim().lowercase()
+                    val filtered = if (q.isBlank()) options else options.filter { t ->
+                        val n = clean(t, "teacher_name").lowercase()
+                        val des = clean(t, "designation").lowercase()
+                        val em = clean(t, "email").lowercase()
+                        n.contains(q) || des.contains(q) || em.contains(q)
+                    }
+
+                    if (filtered.isEmpty()) {
+                        val emptyTv = TextView(this@ClassMateConfigurationActivity).apply {
+                            text = "No teachers found matching \"$query\""
+                            gravity = Gravity.CENTER
+                            textSize = 13f
+                            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.cm_text_muted))
+                            setPadding(dp(16), dp(32), dp(16), dp(32))
+                        }
+                        resultsContainer.addView(emptyTv)
+                    } else {
+                        filtered.forEach { t ->
+                            val card = LinearLayout(this@ClassMateConfigurationActivity).apply {
+                                orientation = LinearLayout.VERTICAL
+                                isClickable = true
+                                isFocusable = true
+                                val typedValue = android.util.TypedValue()
+                                theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+                                setBackgroundResource(typedValue.resourceId)
+                                setPadding(dp(12), dp(10), dp(12), dp(10))
+                                setOnClickListener {
+                                    bottomSheetDialog.dismiss()
+                                    onTeacherSelected(t)
+                                }
+                            }
+                            val nameTv = TextView(this@ClassMateConfigurationActivity).apply {
+                                text = clean(t, "teacher_name")
+                                textSize = 15f
+                                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                                setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.cm_text_primary))
+                            }
+                            val des = clean(t, "designation")
+                            val em = clean(t, "email")
+                            val subtitleText = listOf(des.takeIf { it.isNotBlank() }, em.takeIf { it.isNotBlank() }).filterNotNull().joinToString(" • ")
+                            val subTv = TextView(this@ClassMateConfigurationActivity).apply {
+                                text = subtitleText.ifBlank { "Faculty Member" }
+                                textSize = 12f
+                                setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.cm_text_secondary))
+                                setPadding(0, dp(2), 0, 0)
+                            }
+                            card.addView(nameTv)
+                            card.addView(subTv)
+                            resultsContainer.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
+                        }
+                    }
+                }
+
+                searchInput.doAfterTextChanged { renderList(it?.toString().orEmpty()) }
+                renderList("")
+
+                bottomSheetDialog.setContentView(sheetView)
+                bottomSheetDialog.show()
+            } catch (e: Exception) {
+                Toast.makeText(this@ClassMateConfigurationActivity, "Could not load teachers: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    private fun courseForm(current: JSONObject?, existing: JSONObject? = null) {
+        if (editor?.isShowing == true || busy) return
+        val initial = current ?: existing; val f = ClassMateFormUi(this)
+        f.label("Names ending in Lab are detected as lab courses.")
+        val code = f.field("Course code *").apply { setText(initial?.optString("course_code")); filters = arrayOf(android.text.InputFilter.LengthFilter(30)) }
+        val name = f.field("Course name *").apply { setText(initial?.optString("course_title")); filters = arrayOf(android.text.InputFilter.LengthFilter(200)) }
+        val teacher = f.field("Teacher name (Mandatory) *").apply {
+            setText(current?.let { clean(it, "teacher_name") })
+            filters = arrayOf(android.text.InputFilter.LengthFilter(200))
+            isFocusable = false
+            isClickable = true
+        }
+        var selectedTeacher = current?.let { clean(it, "teacher_record_id").ifBlank { null } }
+
+        val openTeacherPicker = {
+            showTeacherSearchBottomSheet { chosen ->
+                val teacherName = clean(chosen, "teacher_name")
+                val recordId = clean(chosen, "teacher_record_id")
+                teacher.setText(teacherName)
+                selectedTeacher = recordId
+            }
+        }
+
+        teacher.setOnClickListener { openTeacherPicker() }
+
+        f.panel.addView(MaterialButton(this, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+            text = "Choose teacher from directory"
+            isAllCaps = false
+            setOnClickListener { openTeacherPicker() }
         })
-        val credit=f.field("Credit (optional)").apply { inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setText(initial?.optString("credit")?.takeUnless { it=="null" }) }
-        val error=f.status()
-        val dialog=MaterialAlertDialogBuilder(this).setTitle(if(current==null) "Add course" else "Edit course").setView(f.scroll)
-            .setNegativeButton("Cancel",null).setPositiveButton(if(current==null) "Add course" else "Save",null).create()
-        editor=dialog; dialog.show()
+
+        val credit = f.field("Credit (optional)").apply { inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setText(initial?.optString("credit")?.takeUnless { it == "null" }) }
+        val error = f.status()
+        val dialog = MaterialAlertDialogBuilder(this).setTitle(if (current == null) "Add course" else "Edit course").setView(f.scroll)
+            .setNegativeButton("Cancel", null).setPositiveButton(if (current == null) "Add course" else "Save", null).create()
+        editor = dialog; dialog.show()
         dialog.getButton(-1).setOnClickListener {
-            val c=code.text.toString().trim(); val n=name.text.toString().trim(); val t=teacher.text.toString().trim(); val creditText=credit.text.toString().trim()
-            if(c.length !in 2..30 || n.length !in 2..200 || (t.isNotEmpty() && t.length<2) || (creditText.isNotEmpty() && creditText.toDoubleOrNull()?.let { it>0 && it<=30 }!=true)) {
-                error.visibility=View.VISIBLE; error.text="Check the course code, name, teacher and credit."; return@setOnClickListener
+            val c = code.text.toString().trim()
+            val n = name.text.toString().trim()
+            val t = teacher.text.toString().trim()
+            val creditText = credit.text.toString().trim()
+
+            if (c.length !in 2..30 || n.length !in 2..200 || t.length < 2 || selectedTeacher.isNullOrBlank()) {
+                error.visibility = View.VISIBLE
+                error.text = if (selectedTeacher.isNullOrBlank()) "Please choose a teacher from the Teachers Directory." else "Check the course code, name, and teacher."
+                return@setOnClickListener
             }
-            write(dialog,error,{
-                ClassMateAuthApi.rpc("save_batch_course",JSONObject().put("target_batch",batch)
-                    .put("target_offering",current?.optString("offering_id") ?: JSONObject.NULL).put("target_code",c).put("target_title",n)
-                    .put("target_teacher_name",t).put("target_teacher_record",selectedTeacher ?: JSONObject.NULL)
-                    .put("target_credit",creditText.toDoubleOrNull() ?: JSONObject.NULL).put("target_catalog_course",existing?.optString("id") ?: JSONObject.NULL))
-                current?.let { ClassMateAcademicCache.renameCourse(this,setOf(it.getString("offering_id")),n,c) }
+            write(dialog, error, {
+                ClassMateAuthApi.rpc("save_batch_course", JSONObject().put("target_batch", batch)
+                    .put("target_offering", current?.optString("offering_id") ?: JSONObject.NULL).put("target_code", c).put("target_title", n)
+                    .put("target_teacher_name", t).put("target_teacher_record", selectedTeacher ?: JSONObject.NULL)
+                    .put("target_credit", creditText.toDoubleOrNull() ?: JSONObject.NULL).put("target_catalog_course", existing?.optString("id") ?: JSONObject.NULL))
+                current?.let { ClassMateAcademicCache.renameCourse(this, setOf(it.getString("offering_id")), n, c) }
             })
         }
     }

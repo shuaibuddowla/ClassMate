@@ -454,8 +454,9 @@ class ProfileFragment : Fragment() {
             // Re-apply theme with a slight delay to allow the switch animation to finish
             // and avoid immediate activity recreation in the middle of a callback
             binding.root.postDelayed({
-                AppCompatDelegate.setDefaultNightMode(
-                    if (isChecked) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
+                com.shuaib.classmate.utils.ThemeColors.applyThemeMode(
+                    requireContext(),
+                    if (isChecked) "dark" else "light"
                 )
             }, 150)
         }

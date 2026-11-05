@@ -15,203 +15,291 @@
         android:fillViewport="true"
         android:clipToPadding="false">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="24dp"
-        android:clipToPadding="false">
-
-        <!-- Settings Header with Top-Right Profile Launcher -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="18dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp">
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="24dp"
+            android:clipToPadding="false">
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvProfileHeaderTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Settings"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/cm_text_primary"
-                    android:fontFamily="sans-serif"
-                    android:includeFontPadding="false" />
-
-                <TextView
-                    android:id="@+id/tvProfileHeaderSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Preferences, management and system controls"
-                    android:textSize="12.5sp"
-                    android:textColor="@color/cm_text_secondary"
-                    android:layout_marginTop="2dp" />
-            </LinearLayout>
-
-            <!-- Top Right Profile Launcher Button -->
-            <LinearLayout
-                android:id="@+id/btnHeaderProfile"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:padding="6dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:contentDescription="View Profile">
-
-                <FrameLayout
-                    android:layout_width="48dp"
-                    android:layout_height="48dp">
-
-                    <View
-                        android:id="@+id/ivHeaderProfileBorder"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/bg_profile_picture_border" />
-
-                    <de.hdodenhof.circleimageview.CircleImageView
-                        android:id="@+id/ivHeaderProfileAvatar"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_default_avatar"
-                        android:contentDescription="Profile photo" />
-                </FrameLayout>
-
-                <TextView
-                    android:id="@+id/tvHeaderProfileLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Profile"
-                    android:textSize="11sp"
-                    android:textColor="@color/cm_primary"
-                    android:fontFamily="sans-serif-medium"
-                    android:textStyle="bold"
-                    android:layout_marginTop="4dp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- 3. ACCOUNT & MANAGEMENT Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="ACCOUNT &amp; MANAGEMENT"
-            android:textColor="@color/cm_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"
-            android:layout_marginStart="6dp"
-            android:layout_marginBottom="8dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="18dp"
-            app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
-
+            <!-- Profile Screen Header (Aligned with Timetable/Notices/Courses) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
+                android:orientation="horizontal"
+                android:gravity="top"
+                android:layout_marginBottom="14dp">
 
-                <!-- Edit Profile Information -->
-                <LinearLayout
-                    android:id="@+id/btnEditPersonal"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
+                <FrameLayout
+                    android:id="@+id/btnHamburgerMenu"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="3dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:contentDescription="Menu">
 
                     <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#203B82F6"
-                        android:src="@drawable/ic_edit"
-                        app:tint="#3B82F6"
-                        android:importantForAccessibility="no" />
+                        android:layout_width="23dp"
+                        android:layout_height="23dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_hamburger_menu"
+                        app:tint="@color/cm_text_primary" />
+                </FrameLayout>
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Edit Profile Information"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Update contact number, blood group, and hometown"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp" />
-
-                <!-- Switch Active Batch -->
                 <LinearLayout
-                    android:id="@+id/btnSwitchBatch"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvProfileHeaderTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="3dp"
+                        android:gravity="center_vertical"
+                        android:text="Profile"
+                        android:textSize="23sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/cm_text_primary"
+                        android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                        android:includeFontPadding="false" />
+
+                    <TextView
+                        android:id="@+id/tvProfileHeaderSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Identity, academic batch and app preferences"
+                        android:textSize="11.5sp"
+                        android:textColor="@color/cm_text_secondary"
+                        android:layout_marginTop="-2dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 1. Expressive Hero Student Identity Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardHeroProfile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border">
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="12dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:padding="18dp">
 
+                    <!-- Top Row: Avatar + Details + Edit Button -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!-- Avatar Container -->
+                        <FrameLayout
+                            android:layout_width="64dp"
+                            android:layout_height="64dp">
+
+                            <com.google.android.material.imageview.ShapeableImageView
+                                android:id="@+id/ivHeroAvatar"
+                                android:layout_width="64dp"
+                                android:layout_height="64dp"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/ic_default_avatar"
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                                app:strokeWidth="2dp"
+                                app:strokeColor="@color/cm_primary" />
+                        </FrameLayout>
+
+                        <!-- Student Information -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="14dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvHeroName"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="18sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/cm_text_primary"
+                                android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                                android:includeFontPadding="false"
+                                android:maxLines="1"
+                                android:ellipsize="end"
+                                tools:text="Mohammad Shuaib" />
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:id="@+id/tvHeroStudentId"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="12.5sp"
+                                    android:textColor="@color/cm_text_secondary"
+                                    tools:text="CE25045" />
+
+                                <TextView
+                                    android:id="@+id/tvHeroHometown"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="12.5sp"
+                                    android:textColor="@color/cm_text_secondary"
+                                    tools:text=" · Tangail" />
+                            </LinearLayout>
+
+                            <!-- Role and Blood Group Badges -->
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:id="@+id/tvHeroRoleBadge"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:paddingHorizontal="9dp"
+                                    android:paddingVertical="2dp"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold"
+                                    android:letterSpacing="0.04"
+                                    android:background="@drawable/bg_r2_status_pill"
+                                    android:textColor="@color/cm_primary"
+                                    tools:text="ADMIN" />
+
+                                <TextView
+                                    android:id="@+id/tvHeroBloodBadge"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:paddingHorizontal="8dp"
+                                    android:paddingVertical="2dp"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold"
+                                    android:background="@drawable/bg_status_pill_active"
+                                    android:textColor="#D97706"
+                                    android:visibility="gone"
+                                    tools:visibility="visible"
+                                    tools:text="🩸 B+" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Quick Edit Profile Action -->
+                        <FrameLayout
+                            android:id="@+id/btnHeroEditProfile"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_notice_search_icon_button"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="Edit Profile">
+
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_edit"
+                                app:tint="@color/cm_text_primary" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <!-- Embedded Batch Banner inside Hero Card -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:background="@drawable/bg_segmented_container"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="10dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_academic_cap"
+                            app:tint="@color/cm_primary"
+                            android:importantForAccessibility="no" />
+
+                        <TextView
+                            android:id="@+id/tvHeroBatchTitle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="10dp"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/cm_text_primary"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            tools:text="CSE 22 · Session 24-25" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============================================== -->
+            <!-- SECTION 1: ACADEMIC & BATCH                    -->
+            <!-- ============================================== -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Academic &amp; Batch"
+                android:textColor="@color/cm_primary"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Switch Active Batch (Integrated M3 List Tile) -->
+                    <LinearLayout
+                        android:id="@+id/btnSwitchBatch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <ImageView
                             android:layout_width="38dp"
@@ -236,7 +324,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Switch Active Batch"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
+                                android:textSize="14.5sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -248,227 +336,453 @@
                                 android:textColor="@color/cm_text_secondary"
                                 android:textSize="11.5sp" />
                         </LinearLayout>
-                    </LinearLayout>
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_segmented_container"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="12dp"
-                        android:orientation="horizontal">
-
+                        <!-- Batch badge chip on trailing edge -->
                         <TextView
                             android:id="@+id/tvSwitchBatchBadge"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:maxWidth="130dp"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
+                            android:background="@drawable/bg_segmented_container"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="13sp"
+                            android:textSize="11.5sp"
                             android:textStyle="bold"
                             android:singleLine="true"
                             android:maxLines="1"
                             android:ellipsize="end"
-                            tools:text="CSE 22 | 24-25" />
+                            tools:text="CSE 22" />
 
                         <ImageView
                             android:id="@+id/ivSwitchBatchChevron"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
-                            android:src="@drawable/ic_chevron_down"
+                            android:layout_marginStart="4dp"
+                            android:src="@drawable/ic_chevron_right"
                             app:tint="@color/cm_text_secondary"
                             android:importantForAccessibility="no" />
                     </LinearLayout>
-                </LinearLayout>
 
-                <!-- Batch Administration (CR/Admin/Teacher) -->
-                <View
-                    android:id="@+id/dividerProfileManage"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp"
-                    android:visibility="gone" />
 
-                <LinearLayout
-                    android:id="@+id/cardProfileManage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:visibility="gone"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#2010B981"
-                        android:src="@drawable/ic_nav_manage_grid"
-                        app:tint="#10B981"
-                        android:importantForAccessibility="no" />
+                    <!-- Batch Administration (CR/Admin/Teacher Only) -->
+                    <View
+                        android:id="@+id/dividerProfileManage"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp"
+                        android:visibility="gone" />
 
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:id="@+id/tvBatchAdminTitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Batch Administration"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvBatchAdminSub"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Manage timetable, members and batch settings"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
-                </LinearLayout>
-
-                <!-- Manage Attendance (Admin Only) -->
-                <View
-                    android:id="@+id/dividerProfileAttendance"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/cardProfileAttendance"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:visibility="gone"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#2010B981"
-                        android:src="@drawable/ic_rfid_signal"
-                        app:tint="#10B981"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:id="@+id/tvAttendanceAdminTitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Manage Attendance"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvAttendanceAdminSub"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Live RFID station, card registration &amp; Excel exports"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 4. PREFERENCES & APPEARANCE Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="PREFERENCES &amp; APPEARANCE"
-            android:textColor="@color/cm_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"
-            android:layout_marginStart="6dp"
-            android:layout_marginBottom="8dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="18dp"
-            app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
-
-                <!-- Theme Appearance (Segmented 3-Way Picker) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingTop="14dp"
-                    android:paddingBottom="12dp">
-
-                    <LinearLayout
+                        android:id="@+id/cardProfileManage"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:minHeight="64dp"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:visibility="gone"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <ImageView
-                            android:id="@+id/ivThemeIcon"
                             android:layout_width="38dp"
                             android:layout_height="38dp"
                             android:padding="9dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#206366F1"
-                            android:src="@drawable/ic_dark_mode"
-                            app:tint="#6366F1"
+                            android:backgroundTint="#2010B981"
+                            android:src="@drawable/ic_nav_manage_grid"
+                            app:tint="#10B981"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:id="@+id/tvBatchAdminTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Batch Administration"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvBatchAdminSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Manage timetable, members and batch settings"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <!-- Manage Attendance (Admin Only) -->
+                    <View
+                        android:id="@+id/dividerProfileAttendance"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/cardProfileAttendance"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:visibility="gone"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#2010B981"
+                            android:src="@drawable/ic_rfid_signal"
+                            app:tint="#10B981"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:id="@+id/tvAttendanceAdminTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Manage Attendance"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvAttendanceAdminSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Live RFID station, card registration &amp; exports"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ============================================== -->
+            <!-- SECTION 2: PREFERENCES & PERSONALIZATION       -->
+            <!-- ============================================== -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Preferences"
+                android:textColor="@color/cm_primary"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- Theme Appearance (Segmented 3-Way Picker) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingTop="14dp"
+                        android:paddingBottom="14dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:id="@+id/ivThemeIcon"
+                                android:layout_width="38dp"
+                                android:layout_height="38dp"
+                                android:padding="9dp"
+                                android:background="@drawable/bg_settings_icon"
+                                android:backgroundTint="#206366F1"
+                                android:src="@drawable/ic_dark_mode"
+                                app:tint="#6366F1"
+                                android:importantForAccessibility="no" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical"
+                                android:layout_marginStart="14dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Theme Appearance"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="14.5sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/tvThemeAppearanceSub"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Comfortable dark palette"
+                                    android:textColor="@color/cm_text_secondary"
+                                    android:textSize="11.5sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Segmented Control [ Light | Dark | System ] -->
+                        <LinearLayout
+                            android:id="@+id/themeSegmentedControl"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_segmented_container"
+                            android:padding="3.5dp"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:id="@+id/btnThemeLight"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:orientation="horizontal"
+                                android:gravity="center"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <ImageView
+                                    android:id="@+id/ivThemeLightIcon"
+                                    android:layout_width="15dp"
+                                    android:layout_height="15dp"
+                                    android:src="@drawable/ic_sun"
+                                    app:tint="@color/cm_text_secondary"
+                                    android:importantForAccessibility="no" />
+
+                                <TextView
+                                    android:id="@+id/tvThemeLightText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Light"
+                                    android:textSize="12sp"
+                                    android:textColor="@color/cm_text_secondary" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/btnThemeDark"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:orientation="horizontal"
+                                android:gravity="center"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <ImageView
+                                    android:id="@+id/ivThemeDarkIcon"
+                                    android:layout_width="15dp"
+                                    android:layout_height="15dp"
+                                    android:src="@drawable/ic_dark_mode"
+                                    app:tint="@color/cm_text_secondary"
+                                    android:importantForAccessibility="no" />
+
+                                <TextView
+                                    android:id="@+id/tvThemeDarkText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Dark"
+                                    android:textSize="12sp"
+                                    android:textColor="@color/cm_text_secondary" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/btnThemeSystem"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:orientation="horizontal"
+                                android:gravity="center"
+                                android:clickable="true"
+                                android:focusable="true">
+
+                                <ImageView
+                                    android:id="@+id/ivThemeSystemIcon"
+                                    android:layout_width="15dp"
+                                    android:layout_height="15dp"
+                                    android:src="@drawable/ic_monitor"
+                                    app:tint="@color/cm_text_secondary"
+                                    android:importantForAccessibility="no" />
+
+                                <TextView
+                                    android:id="@+id/tvThemeSystemText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="System"
+                                    android:textSize="12sp"
+                                    android:textColor="@color/cm_text_secondary" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Inset Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp" />
+
+                    <!-- Push Notifications (Material 3 Toggle Row) -->
+                    <LinearLayout
+                        android:id="@+id/rowNotifications"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#20F59E0B"
+                            android:src="@drawable/ic_bell_outline"
+                            app:tint="#F59E0B"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Push Notifications"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="14.5sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/tvPushStatusPill"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ACTIVE"
+                                    android:textColor="#10B981"
+                                    android:background="@drawable/bg_status_pill_active"
+                                    android:paddingHorizontal="7dp"
+                                    android:paddingVertical="1.5dp"
+                                    android:textSize="9.5sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginStart="8dp" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvNotificationStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Instant updates for notices and class schedules"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchNotifications"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="Push notifications" />
+                    </LinearLayout>
+
+                    <!-- Notice Read Receipts (Admin Only) -->
+                    <View
+                        android:id="@+id/dividerReadReceipts"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/rowReadReceipts"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#2006B6D4"
+                            android:src="@drawable/ic_eye_outline"
+                            app:tint="#06B6D4"
                             android:importantForAccessibility="no" />
 
                         <LinearLayout
@@ -481,331 +795,70 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Theme Appearance"
+                                android:text="Notice Read Receipts"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
+                                android:textSize="14.5sp"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/tvThemeAppearanceSub"
+                                android:id="@+id/tvReadReceiptsStatus"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Comfortable dark palette"
+                                android:text="Recording your reads on notices"
                                 android:textColor="@color/cm_text_secondary"
                                 android:textSize="11.5sp" />
                         </LinearLayout>
-                    </LinearLayout>
 
-                    <!-- Segmented Control [ Light | Dark | System ] -->
-                    <LinearLayout
-                        android:id="@+id/themeSegmentedControl"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_segmented_container"
-                        android:padding="3.5dp"
-                        android:orientation="horizontal">
-
-                        <LinearLayout
-                            android:id="@+id/btnThemeLight"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:orientation="horizontal"
-                            android:gravity="center"
-                            android:clickable="true"
-                            android:focusable="true">
-
-                            <ImageView
-                                android:id="@+id/ivThemeLightIcon"
-                                android:layout_width="15dp"
-                                android:layout_height="15dp"
-                                android:src="@drawable/ic_sun"
-                                app:tint="@color/cm_text_secondary"
-                                android:importantForAccessibility="no" />
-
-                            <TextView
-                                android:id="@+id/tvThemeLightText"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:text="Light"
-                                android:textSize="12.5sp"
-                                android:textColor="@color/cm_text_secondary" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/btnThemeDark"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:orientation="horizontal"
-                            android:gravity="center"
-                            android:clickable="true"
-                            android:focusable="true">
-
-                            <ImageView
-                                android:id="@+id/ivThemeDarkIcon"
-                                android:layout_width="15dp"
-                                android:layout_height="15dp"
-                                android:src="@drawable/ic_dark_mode"
-                                app:tint="@color/cm_text_secondary"
-                                android:importantForAccessibility="no" />
-
-                            <TextView
-                                android:id="@+id/tvThemeDarkText"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:text="Dark"
-                                android:textSize="12.5sp"
-                                android:textColor="@color/cm_text_secondary" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/btnThemeSystem"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:orientation="horizontal"
-                            android:gravity="center"
-                            android:clickable="true"
-                            android:focusable="true">
-
-                            <ImageView
-                                android:id="@+id/ivThemeSystemIcon"
-                                android:layout_width="15dp"
-                                android:layout_height="15dp"
-                                android:src="@drawable/ic_monitor"
-                                app:tint="@color/cm_text_secondary"
-                                android:importantForAccessibility="no" />
-
-                            <TextView
-                                android:id="@+id/tvThemeSystemText"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="6dp"
-                                android:text="System"
-                                android:textSize="12.5sp"
-                                android:textColor="@color/cm_text_secondary" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Notice Read Receipts (Admin / Owner only) -->
-                <View
-                    android:id="@+id/dividerReadReceipts"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/rowReadReceipts"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="68dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#2006B6D4"
-                        android:src="@drawable/ic_eye_outline"
-                        app:tint="#06B6D4"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchReadReceipts"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Notice Read Receipts"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvReadReceiptsStatus"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Recording your reads on notices"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
+                            android:contentDescription="Notice read receipts" />
                     </LinearLayout>
 
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switchReadReceipts"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:trackTint="@color/cm_switch_track_tint"
-                        app:thumbTint="@color/cm_switch_thumb_tint"
-                        android:contentDescription="Notice read receipts" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <!-- ============================================== -->
+            <!-- SECTION 3: STORAGE & SYSTEM                    -->
+            <!-- ============================================== -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Storage &amp; System"
+                android:textColor="@color/cm_primary"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="8dp" />
 
-        <!-- 5. NOTIFICATIONS & CONNECTIVITY Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="NOTIFICATIONS &amp; CONNECTIVITY"
-            android:textColor="@color/cm_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"
-            android:layout_marginStart="6dp"
-            android:layout_marginBottom="8dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="18dp"
-            app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
-
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAppUpdates"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
+                android:layout_marginBottom="22dp"
+                app:cardBackgroundColor="@color/cm_surface"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border">
 
-                <!-- Push Notifications -->
                 <LinearLayout
-                    android:id="@+id/rowNotifications"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="68dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
+                    android:orientation="vertical">
 
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#20F59E0B"
-                        android:src="@drawable/ic_bell_outline"
-                        app:tint="#F59E0B"
-                        android:importantForAccessibility="no" />
-
+                    <!-- Offline Storage & Cache Row -->
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Push Notifications"
-                                android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvPushStatusPill"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="ACTIVE"
-                                android:textColor="#10B981"
-                                android:background="@drawable/bg_status_pill_active"
-                                android:paddingHorizontal="8dp"
-                                android:paddingVertical="1.5dp"
-                                android:textSize="9.5sp"
-                                android:textStyle="bold"
-                                android:layout_marginStart="8dp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvNotificationStatus"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Instant notifications for academic notices and reminders"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switchNotifications"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:trackTint="@color/cm_switch_track_tint"
-                        app:thumbTint="@color/cm_switch_thumb_tint"
-                        android:contentDescription="Push notifications" />
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 6. UTILITIES & STORAGE Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="UTILITIES &amp; STORAGE"
-            android:textColor="@color/cm_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"
-            android:layout_marginStart="6dp"
-            android:layout_marginBottom="8dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="18dp"
-            app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
-
-                <!-- Offline Cache & Storage -->
-                <LinearLayout
-                    android:id="@+id/rowOfflineStorage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="12dp">
-
-                    <LinearLayout
+                        android:id="@+id/rowOfflineStorage"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:minHeight="64dp"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="38dp"
@@ -827,9 +880,9 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Offline Cache &amp; Storage"
+                                android:text="Offline Cache &amp; Data"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
+                                android:textSize="14.5sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -837,407 +890,390 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Local timetable, notices, and offline resources"
+                                android:text="Cached notices and offline resources"
                                 android:textColor="@color/cm_text_secondary"
                                 android:textSize="11.5sp" />
                         </LinearLayout>
-                    </LinearLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearCache"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="12dp"
-                        android:text="Clear Cache"
-                        android:textSize="12sp"
-                        app:cornerRadius="10dp"
-                        app:strokeColor="@color/cm_border" />
-                </LinearLayout>
-
-                <View
-                    android:id="@+id/dividerR2Storage"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
-
-                <!-- Cloudflare R2 Storage (Admin & CR only) -->
-                <LinearLayout
-                    android:id="@+id/layoutR2Storage"
-                    android:layout_width="match_parent"
-                    android:layout_height="70dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="8.5dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:src="@drawable/ic_cloud"
-                        app:tint="@color/cm_primary"
-                        android:importantForAccessibility="no"/>
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Cloudflare R2 storage"
-                                android:textColor="@color/cm_text_primary"
-                                android:textSize="15sp"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:id="@+id/tvR2StoragePill"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:paddingHorizontal="6dp"
-                                android:paddingVertical="1.5dp"
-                                android:background="@drawable/bg_r2_status_pill"
-                                android:text="10 GB Limit"
-                                android:textColor="@color/cm_primary"
-                                android:textSize="9.5sp"
-                                android:textStyle="bold"/>
-                        </LinearLayout>
+                        <!-- Clear Cache Pill Action -->
                         <TextView
-                            android:id="@+id/tvR2StorageSubtitle"
+                            android:id="@+id/btnClearCache"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Bucket records and 9.9 GB quota limit"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-                    <ImageButton
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        android:background="@android:color/transparent"
-                        android:clickable="false"
-                        android:focusable="false"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no"/>
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 7. SYSTEM & UPDATES Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SYSTEM &amp; UPDATES"
-            android:textColor="@color/cm_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"
-            android:layout_marginStart="6dp"
-            android:layout_marginBottom="8dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardAppUpdates"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="@color/cm_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="1dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/cm_border">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingVertical="4dp">
-
-                <!-- Check for Updates -->
-                <LinearLayout
-                    android:id="@+id/layoutCheckUpdates"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#202563EB"
-                        android:src="@drawable/ic_download_outline"
-                        app:tint="#2563EB"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Check for updates"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvAppVersion"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="1.1.30 (31)"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp" />
-
-                <!-- Automatic updates -->
-                <LinearLayout
-                    android:id="@+id/rowAuto"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#202563EB"
-                        android:src="@drawable/ic_refresh"
-                        app:tint="#2563EB"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Automatic updates"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Check for new releases in the background"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switchAutoUpdates"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:trackTint="@color/cm_switch_track_tint"
-                        app:thumbTint="@color/cm_switch_thumb_tint"
-                        android:contentDescription="Automatic updates" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp" />
-
-                <!-- Download on Wi-Fi only -->
-                <LinearLayout
-                    android:id="@+id/rowWifi"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:padding="9dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#202563EB"
-                        android:src="@drawable/ic_wifi"
-                        app:tint="#2563EB"
-                        android:importantForAccessibility="no" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Download on Wi-Fi only"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Manage mobile data usage"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
-                    </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switchWifiOnlyUpdates"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:trackTint="@color/cm_switch_track_tint"
-                        app:thumbTint="@color/cm_switch_thumb_tint"
-                        android:contentDescription="Download on Wi-Fi only" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/cm_border"
-                    android:layout_marginHorizontal="16dp" />
-
-                <!-- About Developer -->
-                <LinearLayout
-                    android:id="@+id/cardAboutDeveloper"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="64dp"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <FrameLayout
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:background="@drawable/bg_settings_icon"
-                        android:backgroundTint="#206366F1">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center"
-                            android:text="&lt;/&gt;"
-                            android:textSize="15sp"
+                            android:layout_height="34dp"
+                            android:gravity="center"
+                            android:paddingHorizontal="14dp"
+                            android:background="@drawable/bg_notice_search_icon_button"
+                            android:text="Clear"
+                            android:textColor="@color/cm_primary"
+                            android:textSize="12sp"
                             android:textStyle="bold"
-                            android:textColor="#6366F1" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="About Developer"
-                            android:textColor="@color/cm_text_primary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Designed &amp; built by Mohammad Shuaib-Ud-Dowla · MBSTU"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11.5sp" />
+                            android:clickable="true"
+                            android:focusable="true" />
                     </LinearLayout>
 
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"
-                        app:tint="@color/cm_text_secondary"
-                        android:importantForAccessibility="no" />
+                    <!-- Cloudflare R2 Storage (Admin & CR only) -->
+                    <View
+                        android:id="@+id/dividerR2Storage"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutR2Storage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="8.5dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:src="@drawable/ic_cloud"
+                            app:tint="@color/cm_primary"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Cloudflare R2 Storage"
+                                    android:textColor="@color/cm_text_primary"
+                                    android:textSize="14.5sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/tvR2StoragePill"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:paddingHorizontal="6dp"
+                                    android:paddingVertical="1.5dp"
+                                    android:background="@drawable/bg_r2_status_pill"
+                                    android:text="10 GB Limit"
+                                    android:textColor="@color/cm_primary"
+                                    android:textSize="9.5sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvR2StorageSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Bucket storage &amp; file quota"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <!-- Inset Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp" />
+
+                    <!-- Check for Updates -->
+                    <LinearLayout
+                        android:id="@+id/layoutCheckUpdates"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#202563EB"
+                            android:src="@drawable/ic_download_outline"
+                            app:tint="#2563EB"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="App Version &amp; Updates"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvAppVersion"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="1.1.30 (31)"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <!-- Inset Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp" />
+
+                    <!-- Automatic Updates Toggle -->
+                    <LinearLayout
+                        android:id="@+id/rowAuto"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#202563EB"
+                            android:src="@drawable/ic_refresh"
+                            app:tint="#2563EB"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Automatic Updates"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Check for new releases in background"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchAutoUpdates"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="Automatic updates" />
+                    </LinearLayout>
+
+                    <!-- Inset Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp" />
+
+                    <!-- Wi-Fi Only Toggle -->
+                    <LinearLayout
+                        android:id="@+id/rowWifi"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp">
+
+                        <ImageView
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:padding="9dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#202563EB"
+                            android:src="@drawable/ic_wifi"
+                            app:tint="#2563EB"
+                            android:importantForAccessibility="no" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Download on Wi-Fi Only"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Save mobile cellular data"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchWifiOnlyUpdates"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="Download on Wi-Fi only" />
+                    </LinearLayout>
+
+                    <!-- Inset Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="68dp" />
+
+                    <!-- About Developer -->
+                    <LinearLayout
+                        android:id="@+id/cardAboutDeveloper"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#206366F1">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:text="&lt;/&gt;"
+                                android:textSize="14sp"
+                                android:textStyle="bold"
+                                android:textColor="#6366F1" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="About Developer"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="14.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Mohammad Shuaib-Ud-Dowla · MBSTU"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="11.5sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <!-- ============================================== -->
+            <!-- SECTION 4: ACCOUNT DESTRUCTIVE ACTION          -->
+            <!-- ============================================== -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLogout"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="16dp"
+                android:text="Sign Out of ClassMate"
+                android:textColor="@color/cm_cancel_red"
+                android:textSize="14.5sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:strokeColor="@color/cm_cancel_red"
+                app:strokeWidth="1.2dp"
+                app:icon="@drawable/ic_logout"
+                app:iconTint="@color/cm_cancel_red"
+                app:iconGravity="textStart" />
 
-        <!-- 8. Sign Out Button (Outlined Red Button with Logout Icon) -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnLogout"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="16dp"
-            android:text="Sign Out of ClassMate"
-            android:textColor="@color/cm_cancel_red"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:cornerRadius="16dp"
-            app:strokeColor="@color/cm_cancel_red"
-            app:strokeWidth="1dp"
-            app:icon="@drawable/ic_logout"
-            app:iconTint="@color/cm_cancel_red"
-            app:iconGravity="textStart" />
+            <!-- Floating Navigation Bar Inset Spacer -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:importantForAccessibility="no" />
 
-        <!-- Floating Navigation Bar Inset Spacer: ensures Sign Out button is never obstructed -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="110dp"
-            android:importantForAccessibility="no" />
-
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

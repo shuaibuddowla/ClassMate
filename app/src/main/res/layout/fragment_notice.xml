@@ -24,7 +24,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="88dp"
+                android:paddingTop="68dp"
                 android:paddingBottom="100dp"
                 android:scrollbars="vertical"
                 android:overScrollMode="never"
@@ -37,7 +37,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="top"
                 android:layout_marginStart="14dp"
-                android:layout_marginTop="72dp"
+                android:layout_marginTop="58dp"
                 android:layout_marginEnd="14dp"
                 android:layout_marginBottom="14dp"
                 android:background="@drawable/bg_card_primary"
@@ -83,7 +83,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="88dp"
+                android:paddingTop="68dp"
                 android:visibility="gone"
                 app:shimmer_auto_start="true"
                 app:shimmer_base_alpha="0.4"
@@ -110,7 +110,7 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:paddingHorizontal="24dp"
-                android:paddingTop="88dp"
+                android:paddingTop="68dp"
                 android:visibility="gone">
 
                 <LinearLayout
@@ -226,9 +226,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingStart="18dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="18dp"
+                android:paddingStart="12dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="12dp"
                 android:paddingBottom="6dp"
                 android:background="@android:color/transparent"
                 android:layout_gravity="top"
@@ -238,51 +238,72 @@
                     android:id="@+id/appBar"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="44dp"
+                    android:gravity="top"
                     android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:id="@+id/btnHamburgerMenu"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="3dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Menu">
+
+                        <ImageView
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_hamburger_menu"
+                            app:tint="@color/cm_text_primary" />
+                    </FrameLayout>
 
                     <LinearLayout
                         android:id="@+id/headerTitleBlock"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:layout_marginStart="4dp"
                         android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/tvNoticeTitle"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif"
+                            android:layout_width="wrap_content"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="3dp"
+                            android:gravity="center_vertical"
+                            android:fontFamily="@font/plus_jakarta_sans_extrabold"
                             android:includeFontPadding="false"
                             android:maxLines="1"
                             android:text="@string/nav_notices"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="28sp"
+                            android:textSize="23sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvNoticeSubtitle"
-                            android:layout_width="match_parent"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="-2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/cm_text_secondary"
-                            android:textSize="12.5sp"
+                            android:textSize="11.5sp"
                             tools:text="12 updates · Pull to refresh" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/searchContainer"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="3dp"
+                        android:layout_marginStart="4dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_notice_search"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="14dp"
+                        android:paddingHorizontal="12dp"
                         android:visibility="gone">
 
                         <ImageView
@@ -305,7 +326,7 @@
                             android:singleLine="true"
                             android:textColor="@color/cm_text_primary"
                             android:textColorHint="@color/cm_text_secondary"
-                            android:textSize="14sp" />
+                            android:textSize="13.5sp" />
 
                         <ImageButton
                             android:id="@+id/btnCloseSearch"
@@ -319,16 +340,17 @@
 
                     <FrameLayout
                         android:id="@+id/btnSearch"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="3dp"
+                        android:layout_marginStart="6dp"
                         android:background="@drawable/bg_notice_search_icon_button"
                         android:clickable="true"
                         android:focusable="true">
 
                         <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="19dp"
+                            android:layout_height="19dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/hint_notice_search"
                             android:src="@drawable/ic_search_modern"
@@ -338,14 +360,15 @@
                     <TextView
                         android:id="@+id/btnPostNotice"
                         android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="3dp"
+                        android:layout_marginStart="6dp"
                         android:background="@drawable/bg_notice_post_pill"
                         android:gravity="center"
-                        android:paddingHorizontal="16dp"
+                        android:paddingHorizontal="14dp"
                         android:text="+ Post"
                         android:textColor="@color/cm_on_primary"
-                        android:textSize="13sp"
+                        android:textSize="12.5sp"
                         android:textStyle="bold"
                         android:visibility="gone"
                         tools:visibility="visible" />

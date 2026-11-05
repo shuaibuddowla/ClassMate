@@ -300,8 +300,8 @@ class ClassMateApp : Application() {
     }
 
     private fun applyThemePreference(prefs: AppPreferences) {
-        // Respect the saved theme.
-        AppCompatDelegate.setDefaultNightMode(if (prefs.isDarkMode()) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO)
+        // Respect the saved theme across AppCompat and Android 13+ OS UiModeManager.
+        com.shuaib.classmate.utils.ThemeColors.applyThemeMode(this, prefs.getThemeMode())
     }
 
     private fun syncNotificationPreference(prefs: AppPreferences) {

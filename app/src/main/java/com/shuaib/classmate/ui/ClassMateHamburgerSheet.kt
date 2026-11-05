@@ -9,6 +9,8 @@ import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -67,7 +69,29 @@ internal object ClassMateHamburgerSheet {
         composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
             setContent {
-                MaterialTheme {
+                val isDark = com.shuaib.classmate.utils.ThemeColors.isDark(activity)
+                val colorScheme = if (isDark) {
+                    darkColorScheme(
+                        surface = colorResource(R.color.cm_surface),
+                        onSurface = colorResource(R.color.cm_text_primary),
+                        surfaceVariant = colorResource(R.color.cm_surface_elevated),
+                        onSurfaceVariant = colorResource(R.color.cm_text_secondary),
+                        background = colorResource(R.color.cm_bg),
+                        onBackground = colorResource(R.color.cm_text_primary),
+                        primary = colorResource(R.color.cm_primary)
+                    )
+                } else {
+                    lightColorScheme(
+                        surface = colorResource(R.color.cm_surface),
+                        onSurface = colorResource(R.color.cm_text_primary),
+                        surfaceVariant = colorResource(R.color.cm_surface_light),
+                        onSurfaceVariant = colorResource(R.color.cm_text_secondary),
+                        background = colorResource(R.color.cm_bg),
+                        onBackground = colorResource(R.color.cm_text_primary),
+                        primary = colorResource(R.color.cm_primary)
+                    )
+                }
+                MaterialTheme(colorScheme = colorScheme) {
                     ClassMateHamburgerModalSheet(
                         activity = activity,
                         scope = scope,
@@ -121,17 +145,22 @@ private fun ClassMateHamburgerModalSheet(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val maxSheetHeight = (configuration.screenHeightDp.dp - topInset - 16.dp).coerceAtLeast(200.dp)
 
+    val isDark = com.shuaib.classmate.utils.ThemeColors.isDark(activity)
+    val sheetSurface = colorResource(R.color.cm_surface)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = Modifier.statusBarsPadding(),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = sheetSurface,
+        contentColor = colorResource(R.color.cm_text_primary),
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = 0.5f),
         dragHandle = {
             BottomSheetDefaults.DragHandle(
-                modifier = Modifier.padding(top = 4.dp, bottom = 0.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 0.dp),
+                color = colorResource(R.color.cm_border)
             )
         },
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
@@ -159,7 +188,7 @@ private fun ClassMateHamburgerModalSheet(
             // Compact gap between drag handle line and classmate. branding
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Header Row: Brand Title + Close Button
+            // Header Row: Brand Title with Logo + Close Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -168,6 +197,14 @@ private fun ClassMateHamburgerModalSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_classmate_splash_logo),
+                        contentDescription = "ClassMate Logo",
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "classmate",
                         fontFamily = jakartaExtraBold,
@@ -217,7 +254,8 @@ private fun ClassMateHamburgerModalSheet(
                 isTeacher = isTeacher,
                 isCr = isCr,
                 avatarUrl = avatarUrl,
-                jakartaBold = jakartaBold
+                jakartaBold = jakartaBold,
+                isDark = isDark
             )
 
             // Menu List
@@ -253,8 +291,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "MBSTU Bus Transit",
                     subtitle = "Live bus radar, schedule & routes",
                     iconRes = R.drawable.ic_bus_filled,
-                    iconTint = Color(0xFF2563EB),
+                    iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             val intent = Intent(activity, ClassMateTransitActivity::class.java).apply {
@@ -270,8 +309,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Teachers Directory",
                     subtitle = "Faculty contacts & assigned courses",
                     iconRes = R.drawable.ic_academic_cap,
-                    iconTint = Color(0xFF7C3AED),
+                    iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             ClassMateTeachersDialog.show(
@@ -281,6 +321,20 @@ private fun ClassMateHamburgerModalSheet(
                                 batchLabel = batchLabel(),
                                 profile = profile()
                             )
+                        }
+                    }
+                )
+
+                DrawerMenuItem(
+                    title = "App Guide",
+                    subtitle = "Revisit the latest ClassMate features",
+                    iconRes = R.drawable.ic_info,
+                    iconTint = if (isDark) Color(0xFF93C5FD) else Color(0xFF2563EB),
+                    jakartaBold = jakartaBold,
+                    isDark = isDark,
+                    onClick = {
+                        dismissAndRun {
+                            ClassMateSpotlightTour.start(activity, force = true)
                         }
                     }
                 )
@@ -306,8 +360,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Batchmates",
                     subtitle = "Student roster, rolls & contact info",
                     iconRes = R.drawable.ic_batch_friends,
-                    iconTint = Color(0xFF0D9488),
+                    iconTint = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             val intent = Intent(activity, ClassMateBatchActivity::class.java).apply {
@@ -324,8 +379,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Batch Fund",
                     subtitle = "Treasury balance, collections & expenses",
                     iconRes = R.drawable.ic_fund_wallet,
-                    iconTint = Color(0xFFEA580C),
+                    iconTint = if (isDark) Color(0xFFFB923C) else Color(0xFFEA580C),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             val intent = Intent(activity, ClassMateBatchFundActivity::class.java).apply {
@@ -358,8 +414,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Export Class Routine",
                     subtitle = "Share weekly routine via WhatsApp",
                     iconRes = R.drawable.ic_share_outline,
-                    iconTint = Color(0xFF4338CA),
+                    iconTint = if (isDark) Color(0xFF818CF8) else Color(0xFF4338CA),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             ClassMateRoutineExporter.exportRoutine(
@@ -376,8 +433,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Blood Donor Directory",
                     subtitle = "Campus emergency blood donors",
                     iconRes = R.drawable.ic_blood_drop,
-                    iconTint = Color(0xFFDC2626),
+                    iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             val intent = Intent(activity, ClassMateBloodActivity::class.java).apply {
@@ -392,8 +450,9 @@ private fun ClassMateHamburgerModalSheet(
                     title = "Emergency Hotlines",
                     subtitle = "Proctor, Medical Center & Ambulance",
                     iconRes = R.drawable.ic_phone,
-                    iconTint = Color(0xFFD97706),
+                    iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
                     jakartaBold = jakartaBold,
+                    isDark = isDark,
                     onClick = {
                         dismissAndRun {
                             ClassMateEmergencyDialog.show(activity)
@@ -426,15 +485,17 @@ private fun DrawerProfileCard(
     isTeacher: Boolean,
     isCr: Boolean,
     avatarUrl: String?,
-    jakartaBold: FontFamily
+    jakartaBold: FontFamily,
+    isDark: Boolean
 ) {
+    val cardBg = if (isDark) colorResource(R.color.cm_surface_elevated) else colorResource(R.color.cm_bg)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colorResource(R.color.cm_background)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, colorResource(R.color.cm_border).copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colorResource(R.color.cm_border).copy(alpha = if (isDark) 0.35f else 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -492,10 +553,10 @@ private fun DrawerProfileCard(
             }
 
             val (badgeText, badgeColor, badgeBg) = when {
-                isServerOwner -> Triple("Admin", Color(0xFFEA580C), Color(0x1AEA580C))
-                isTeacher -> Triple("Faculty", Color(0xFF2563EB), Color(0x1A2563EB))
-                isCr -> Triple("CR", Color(0xFF7C3AED), Color(0x1A7C3AED))
-                else -> Triple("Student", Color(0xFF16A34A), Color(0x1A16A34A))
+                isServerOwner -> Triple("Admin", Color(0xFFFB923C), Color(0xFFFB923C).copy(alpha = if (isDark) 0.20f else 0.12f))
+                isTeacher -> Triple("Faculty", Color(0xFF60A5FA), Color(0xFF60A5FA).copy(alpha = if (isDark) 0.20f else 0.12f))
+                isCr -> Triple("CR", Color(0xFFA78BFA), Color(0xFFA78BFA).copy(alpha = if (isDark) 0.20f else 0.12f))
+                else -> Triple("Student", Color(0xFF4ADE80), Color(0xFF4ADE80).copy(alpha = if (isDark) 0.20f else 0.12f))
             }
 
             Box(
@@ -523,6 +584,7 @@ private fun DrawerMenuItem(
     iconRes: Int,
     iconTint: Color,
     jakartaBold: FontFamily,
+    isDark: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -530,14 +592,19 @@ private fun DrawerMenuItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 4.dp),
+            .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(42.dp)
                 .background(
-                    color = iconTint.copy(alpha = 0.12f),
+                    color = iconTint.copy(alpha = if (isDark) 0.18f else 0.10f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    color = iconTint.copy(alpha = if (isDark) 0.32f else 0.18f),
                     shape = RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
@@ -546,7 +613,7 @@ private fun DrawerMenuItem(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 tint = iconTint,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
 
@@ -558,16 +625,16 @@ private fun DrawerMenuItem(
             Text(
                 text = title,
                 fontFamily = jakartaBold,
-                fontSize = 14.5.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = colorResource(R.color.cm_text_primary)
             )
             Text(
                 text = subtitle,
-                fontSize = 14.sp,
-                lineHeight = 18.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
                 color = colorResource(R.color.cm_text_secondary),
-                modifier = Modifier.padding(top = 1.dp)
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
 

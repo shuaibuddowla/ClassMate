@@ -54,7 +54,7 @@ enum class ClassMateTab(
     COURSES(R.id.nav_pdf, "Courses", R.drawable.ic_library_outline, R.drawable.ic_library_filled),
     TRANSIT(R.id.nav_transit, "Transit", R.drawable.ic_bus_outline, R.drawable.ic_bus_filled),
     BATCH(R.id.nav_friends, "Batch", R.drawable.ic_batch_friends, R.drawable.ic_batch_friends_filled),
-    SETTINGS(R.id.nav_profile, "Settings", R.drawable.ic_nav_settings_outline, R.drawable.ic_nav_settings);
+    SETTINGS(R.id.nav_profile, "Profile", R.drawable.ic_profile_outline, R.drawable.ic_profile_modern);
 
     companion object {
         fun fromId(id: Int): ClassMateTab? = values().firstOrNull { it.id == id }

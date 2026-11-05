@@ -34,8 +34,23 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
-    fun isDarkMode(): Boolean =
-        prefs.getBoolean("dark_mode", false)
+    fun isDarkMode(): Boolean {
+        val mode = prefs.getString("theme_mode", null)
+        return when (mode) {
+            "dark" -> true
+            "light" -> false
+            else -> prefs.getBoolean("dark_mode", false)
+        }
+    }
+
+    fun isAppInDarkMode(context: Context): Boolean {
+        val mode = prefs.getString("theme_mode", null)
+        return when (mode) {
+            "dark" -> true
+            "light" -> false
+            else -> if (prefs.contains("dark_mode")) prefs.getBoolean("dark_mode", false) else ThemeColors.isDark(context)
+        }
+    }
 
     fun setDarkMode(enabled: Boolean) {
         prefs.edit()
@@ -44,14 +59,16 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
-    fun getThemeMode(): String =
-        prefs.getString("theme_mode", if (prefs.contains("dark_mode")) (if (isDarkMode()) "dark" else "light") else "system") ?: "system"
-
     fun setThemeMode(mode: String) {
         prefs.edit()
             .putString("theme_mode", mode)
             .putBoolean("dark_mode", mode == "dark")
             .apply()
+    }
+
+    fun getThemeMode(): String {
+        return prefs.getString("theme_mode", null)
+            ?: if (prefs.contains("dark_mode")) (if (prefs.getBoolean("dark_mode", false)) "dark" else "light") else "system"
     }
 
     fun isNoticeReadReceiptsEnabled(): Boolean =

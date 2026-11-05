@@ -301,25 +301,72 @@ class NoticeAdapter(
                 binding.tvTitle.text = title
             }
 
-            // Image Preview Upgrade
-            val imageUrl = notice.attachments.firstOrNull { it["type"] == "image" }?.get("url")?.toString()
-                ?: notice.attachmentUrl.takeIf { notice.attachmentType == "image" }
+            // Multi-Image & Single-Image Attachment Binding
+            val imageUrls = notice.attachments.filter { it["type"] == "image" }
+                .mapNotNull { it["url"]?.toString()?.takeIf { u -> u.isNotBlank() } }
+                .ifEmpty {
+                    val fallback = notice.attachmentUrl.takeIf { notice.attachmentType == "image" && it.isNotBlank() }
+                    if (fallback != null) listOf(fallback) else emptyList()
+                }
 
-            val hasImage = !imageUrl.isNullOrBlank()
-            binding.imagePreviewContainer.isVisible = hasImage
-            if (hasImage) {
-                Glide.with(itemView.context)
-                    .load(imageUrl)
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .placeholder(R.drawable.bg_notice_modern_card)
-                    .centerCrop()
-                    .into(binding.ivPreview)
+            val hasImages = imageUrls.isNotEmpty()
+            binding.imagePreviewContainer.isVisible = hasImages
+            if (hasImages) {
+                if (imageUrls.size > 1) {
+                    // Multi-Image Carousel
+                    binding.ivPreview.visibility = View.GONE
+                    binding.imageCarouselPager.visibility = View.VISIBLE
+                    binding.tvCarouselIndicator.visibility = View.VISIBLE
+                    binding.tvCarouselIndicator.text = "1 / ${imageUrls.size}"
+                    binding.tvTapToView.text = "Tap to view & zoom"
 
-                // Launch full-screen image viewer on tap
-                binding.imagePreviewContainer.setOnClickListener {
-                    val intent = Intent(itemView.context, ImageViewerActivity::class.java)
-                        .putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, imageUrl)
-                    itemView.context.startActivity(intent)
+                    binding.imageCarouselPager.adapter = NoticeImageCarouselAdapter(imageUrls) { clickedPos ->
+                        val intent = Intent(itemView.context, ImageViewerActivity::class.java).apply {
+                            putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URLS, ArrayList(imageUrls))
+                            putExtra(ImageViewerActivity.EXTRA_INITIAL_POSITION, clickedPos)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, imageUrls[clickedPos])
+                        }
+                        itemView.context.startActivity(intent)
+                    }
+
+                    binding.imageCarouselPager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+                        override fun onPageSelected(position: Int) {
+                            binding.tvCarouselIndicator.text = "${position + 1} / ${imageUrls.size}"
+                        }
+                    })
+
+                    binding.imagePreviewContainer.setOnClickListener {
+                        val currentPos = binding.imageCarouselPager.currentItem
+                        val intent = Intent(itemView.context, ImageViewerActivity::class.java).apply {
+                            putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URLS, ArrayList(imageUrls))
+                            putExtra(ImageViewerActivity.EXTRA_INITIAL_POSITION, currentPos)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, imageUrls[currentPos])
+                        }
+                        itemView.context.startActivity(intent)
+                    }
+                } else {
+                    // Single Image
+                    val singleUrl = imageUrls.first()
+                    binding.ivPreview.visibility = View.VISIBLE
+                    binding.imageCarouselPager.visibility = View.GONE
+                    binding.tvCarouselIndicator.visibility = View.GONE
+                    binding.tvTapToView.text = "Tap to view"
+
+                    Glide.with(itemView.context)
+                        .load(singleUrl)
+                        .transition(DrawableTransitionOptions.withCrossFade())
+                        .placeholder(R.drawable.bg_notice_modern_card)
+                        .centerCrop()
+                        .into(binding.ivPreview)
+
+                    binding.imagePreviewContainer.setOnClickListener {
+                        val intent = Intent(itemView.context, ImageViewerActivity::class.java).apply {
+                            putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URLS, ArrayList(imageUrls))
+                            putExtra(ImageViewerActivity.EXTRA_INITIAL_POSITION, 0)
+                            putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, singleUrl)
+                        }
+                        itemView.context.startActivity(intent)
+                    }
                 }
             } else {
                 binding.imagePreviewContainer.setOnClickListener(null)
@@ -347,8 +394,9 @@ class NoticeAdapter(
                     else -> Pair(R.drawable.bg_library_file_icon_purple, R.color.cm_file_other)
                 }
                 binding.fileIconContainer.setBackgroundResource(iconBg)
+                binding.tvFileExtension.setBackgroundResource(iconBg)
                 binding.tvFileExtension.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, iconColor))
-                binding.tvFileSize.text = "Tap to open ${fileType.uppercase()} file"
+                binding.tvFileSize.text = if (fileType == "pdf") "PDF Document · Tap to view" else "${fileType.uppercase()} File · Tap to open"
 
                 val openAction = View.OnClickListener {
                     if (fileUrl.isNotBlank()) {

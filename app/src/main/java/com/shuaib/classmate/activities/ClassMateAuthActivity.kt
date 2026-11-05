@@ -1055,6 +1055,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private var welcomeDialog: AlertDialog? = null
+    private var studentBanDialog: AlertDialog? = null
 
 
 
@@ -1848,6 +1849,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 showHome(); renderHomeTab(selectedTab)
+                maybeTriggerSpotlightTour()
 
 
 
@@ -2601,6 +2603,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         loaded.put("is_server_owner", isServerOwner)
 
+        if (showStudentBanGate()) return
+
 
 
         authBusy = false
@@ -2676,8 +2680,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                     renderHomeTab(selectedTab)
-
-
+                    maybeTriggerSpotlightTour()
 
                 }
 
@@ -2704,8 +2707,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 renderHomeTab(selectedTab)
-
-
+                maybeTriggerSpotlightTour()
 
             }
 
@@ -2765,11 +2767,110 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     }
 
+    private suspend fun showStudentBanGate(): Boolean {
+        val ban = runCatching { ClassMateAuthApi.rpc("active_student_ban", JSONObject()) }.getOrNull()
+        if (ban == null || ban.isNull("ends_at")) return false
+        if (studentBanDialog?.isShowing != true) {
+            val density = resources.displayMetrics.density
+            fun dp(value: Int) = (value * density).toInt()
+            fun textView(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+                text = value
+                textSize = size
+                setTextColor(color)
+                if (bold) setTypeface(typeface, Typeface.BOLD)
+                setLineSpacing(dp(3).toFloat(), 1f)
+            }
+            fun infoSection(title: String, body: String, warning: Boolean = false) = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(17), dp(15), dp(17), dp(15))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(getColor(if (warning) R.color.cm_notice_deadline_bg else R.color.cm_bg_secondary))
+                    cornerRadius = dp(17).toFloat()
+                    if (warning) setStroke(dp(1), getColor(R.color.cm_notice_deadline_text))
+                }
+                addView(textView(title.uppercase(), 10f, getColor(if (warning) R.color.cm_notice_deadline_text else R.color.cm_text_muted), true))
+                addView(textView(body, if (warning) 15f else 14f, getColor(R.color.cm_text_primary), warning).apply {
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) }
+                })
+            }
+            val accessReturn = runCatching {
+                java.time.Instant.parse(ban.optString("ends_at")).atZone(java.time.ZoneId.of("Asia/Dhaka"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMM yyyy · h:mm a")) + " · Bangladesh time"
+            }.getOrElse { ban.optString("ends_at").replace("T", " ").take(16) }
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(24), dp(24), dp(24), dp(22))
+                addView(TextView(this@ClassMateAuthActivity).apply {
+                    text = "!"; gravity = Gravity.CENTER; textSize = 25f
+                    setTypeface(typeface, Typeface.BOLD); setTextColor(getColor(R.color.cm_error))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(getColor(R.color.cm_notice_deadline_bg))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(dp(58), dp(58)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(15) }
+                })
+                addView(textView("CLASSMATE ACCESS PAUSED", 10f, getColor(R.color.cm_error), true).apply { gravity = Gravity.CENTER; letterSpacing = 0.12f })
+                addView(textView("You’re temporarily banned", 24f, getColor(R.color.cm_text_primary), true).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+                })
+                addView(textView("Your account access is restricted until the ban expires or is lifted by your batch CR or an administrator.", 14f, getColor(R.color.cm_text_muted)).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(19) }
+                })
+                addView(infoSection("Reason for this ban", ban.optString("reason").takeIf { it.isNotBlank() } ?: "No reason was provided. Ask your batch CR or an administrator for details.", true))
+                addView(infoSection("Access expected to return", accessReturn).apply {
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) }
+                })
+                addView(textView("Need a review? Contact your batch CR or a ClassMate administrator. This screen will close automatically as soon as your access is restored.", 12f, getColor(R.color.cm_text_muted)).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(17) }
+                })
+            }
+            val dialogContent = ScrollView(this).apply {
+                isFillViewport = true
+                addView(MaterialCardView(this@ClassMateAuthActivity).apply {
+                    radius = dp(26).toFloat(); strokeWidth = dp(1)
+                    strokeColor = getColor(R.color.cm_border)
+                    setCardBackgroundColor(getColor(R.color.cm_surface)); cardElevation = dp(18).toFloat()
+                    addView(content)
+                })
+            }
+            val dialogHeight = (resources.displayMetrics.heightPixels * 0.84f).toInt()
+            studentBanDialog = AlertDialog.Builder(this)
+                .setView(dialogContent).setCancelable(false).create().also { dialog ->
+                    dialog.setCanceledOnTouchOutside(false)
+                    dialog.show()
+                    dialog.window?.apply {
+                        setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                        setLayout((resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(440)), dialogHeight)
+                    }
+                }
+            lifecycleScope.launch {
+                while (!isFinishing && studentBanDialog?.isShowing == true) {
+                    kotlinx.coroutines.delay(5000)
+                    val latest = runCatching { ClassMateAuthApi.rpc("active_student_ban", JSONObject()) }.getOrNull()
+                    if (latest == null || latest.isNull("ends_at")) {
+                        studentBanDialog?.dismiss()
+                        studentBanDialog = null
+                        if (!isFinishing) runCatching { loadProfile() }
+                        break
+                    }
+                }
+            }
+        }
+        return true
+    }
 
+    private fun maybeTriggerSpotlightTour() {
+        if (studentBanDialog?.isShowing == true) return
+        if (com.shuaib.classmate.ui.ClassMateSpotlightTour.shouldShow(this)) {
+            window.decorView.postDelayed({
+                if (!isFinishing && !isDestroyed && homeShown && studentBanDialog?.isShowing != true) {
+                    com.shuaib.classmate.ui.ClassMateSpotlightTour.start(this)
+                }
+            }, 800)
+        }
+    }
 
-
-
-
+    private fun maybeShowFeatureGuide() {}
 
     private fun showProfilePending(loaded: JSONObject) {
 
@@ -8190,8 +8291,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 renderHomeTab(selectedTab)
-
-
+                if (com.shuaib.classmate.ui.ClassMateSpotlightTour.shouldShow(this)) {
+                    com.shuaib.classmate.ui.ClassMateSpotlightTour.start(this)
+                }
 
             }
 

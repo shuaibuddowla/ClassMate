@@ -244,6 +244,106 @@
             android:orientation="vertical">
 
             <!-- ═══════════════════════════════════════════════════ -->
+            <!-- INTERIM CR ONBOARDING SETUP BANNER                  -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardCrOnboardingGuide"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#93C5FD"
+                app:strokeWidth="1.5dp"
+                app:cardBackgroundColor="#EFF6FF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_academic_cap"
+                            app:tint="#1D4ED8" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/plus_jakarta_sans_bold"
+                            android:text="Class Representative Setup Guide"
+                            android:textColor="#1E3A8A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/btnDismissCrGuide"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="Dismiss"
+                            android:src="@drawable/ic_close"
+                            app:tint="#64748B" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="As the Class Representative, set up your batch's active courses, assign instructors from the directory, and add weekly routine slots so your classmates can see their schedule."
+                        android:textColor="#334155"
+                        android:textSize="12sp"
+                        android:lineSpacingExtra="2dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCrGuideAddCourses"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
+                            android:paddingHorizontal="8dp"
+                            android:textSize="11.5sp"
+                            android:text="1. Add Courses"
+                            app:cornerRadius="10dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCrGuideAddRoutine"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:paddingHorizontal="8dp"
+                            android:textSize="11.5sp"
+                            android:text="2. Add Routine"
+                            app:cornerRadius="10dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ═══════════════════════════════════════════════════ -->
             <!-- NEXT CLASS HERO CARD                                -->
             <!-- ═══════════════════════════════════════════════════ -->
             <com.google.android.material.card.MaterialCardView
@@ -703,23 +803,6 @@
                     android:visibility="gone"
                     app:lottie_autoPlay="true"
                     app:lottie_loop="true" />
-
-                <!-- Modern Circular Icon Bubble -->
-                <FrameLayout
-                    android:id="@+id/flEmptyIconContainer"
-                    android:layout_width="68dp"
-                    android:layout_height="68dp"
-                    android:background="@drawable/bg_empty_state_icon"
-                    android:padding="16dp">
-
-                    <ImageView
-                        android:id="@+id/ivEmptyIcon"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/ic_sun"
-                        app:tint="@color/cm_primary"
-                        android:contentDescription="No classes icon" />
-                </FrameLayout>
 
                 <TextView
                     android:id="@+id/tvEmptyEmoji"
