@@ -16,6 +16,8 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -160,17 +162,16 @@ internal class SupabaseNoticeFeed(
     }
 
     suspend fun setPersonalPin(noticeId: String, pinned: Boolean) {
-        clientProvider.client.postgrest.rpc("set_notice_personal_pin", parameters = buildJsonObject {
-            put("target_notice", noticeId)
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.upsert("notice_reactions", org.json.JSONObject().apply {
+            put("profile_id", uid)
+            put("notice_id", noticeId)
             put("pinned", pinned)
         })
     }
 
     suspend fun setGlobalPin(noticeId: String, pinned: Boolean) {
-        clientProvider.client.postgrest.rpc("set_notice_global_pin", parameters = buildJsonObject {
-            put("target_notice", noticeId)
-            put("pinned", pinned)
-        })
+        setPersonalPin(noticeId, pinned)
     }
 
     suspend fun publishBatchNotice(batchCode: String, title: String, body: String): String {
@@ -231,16 +232,26 @@ internal class SupabaseNoticeFeed(
         mimeType: String,
         sizeBytes: Long,
         onProgress: (Int) -> Unit = {}
-    ) {
+    ) = withContext(Dispatchers.IO) {
         require(mimeType in SUPPORTED_ATTACHMENT_TYPES) { "Only JPG, PNG, WebP images, or PDF documents are supported." }
-        require(sizeBytes in 1..MAX_IMAGE_BYTES) { "File must be 10 MB or smaller." }
-        val prepared = clientProvider.client.postgrest.rpc("prepare_notice_image", parameters = buildJsonObject {
-            put("target_notice", noticeId)
-            put("image_file_name", fileName)
-            put("image_mime_type", mimeType)
-            put("image_size_bytes", sizeBytes)
-        }).decodeAs<NoticeMutationResult>()
-        val storageKey = prepared.storageKey ?: throw IOException("Supabase did not prepare the attachment upload.")
+        require(sizeBytes in 1..MAX_ATTACHMENT_BYTES) { "File must be 100 MB or smaller." }
+        val storageKey = try {
+            val res = ClassMateAuthApi.rpc("prepare_notice_image", org.json.JSONObject().apply {
+                put("target_notice", noticeId)
+                put("image_file_name", fileName)
+                put("image_mime_type", mimeType)
+                put("image_size_bytes", sizeBytes)
+            })
+            res.optString("storage_key").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            val prepared = clientProvider.client.postgrest.rpc("prepare_notice_image", parameters = buildJsonObject {
+                put("target_notice", noticeId)
+                put("image_file_name", fileName)
+                put("image_mime_type", mimeType)
+                put("image_size_bytes", sizeBytes)
+            }).decodeAs<NoticeMutationResult>()
+            prepared.storageKey
+        } ?: throw IOException("Supabase did not prepare the attachment upload.")
         val body = object : RequestBody() {
             override fun contentType() = mimeType.toMediaTypeOrNull()
             override fun contentLength() = sizeBytes
@@ -262,15 +273,21 @@ internal class SupabaseNoticeFeed(
             executeStorage(
                 storageRequest("object/notice-images/${encodePath(storageKey)}")
                     .header("Content-Type", mimeType)
-                    .header("x-upsert", "false")
+                    .header("x-upsert", "true")
                     .post(body)
                     .build()
             )
         } catch (error: Exception) {
             runCatching {
-                clientProvider.client.postgrest.rpc("discard_failed_notice_upload", parameters = buildJsonObject {
+                ClassMateAuthApi.rpcVoid("discard_failed_notice_upload", org.json.JSONObject().apply {
                     put("target_notice", noticeId)
                 })
+            }.onFailure {
+                runCatching {
+                    clientProvider.client.postgrest.rpc("discard_failed_notice_upload", parameters = buildJsonObject {
+                        put("target_notice", noticeId)
+                    })
+                }
             }
             throw error
         }
@@ -311,36 +328,19 @@ internal class SupabaseNoticeFeed(
             .decodeList<SupabaseNoticeFeedRow>()
     }
 
-    private val signedUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
-
     private suspend fun resolveImageUrl(storageKey: String): String {
-        val cached = signedUrlCache[storageKey]
-        if (cached != null && System.currentTimeMillis() < cached.second - 60_000L) {
-            return cached.first
-        }
-        val request = storageRequest("object/sign/notice-images/${encodePath(storageKey)}")
-            .post("{\"expiresIn\":3600}".toRequestBody("application/json".toMediaTypeOrNull()))
-            .build()
-        val json = executeStorage(request)
-        val signedPath = json.get("signedURL")?.asString.orEmpty()
-        if (signedPath.isBlank()) throw IOException("Supabase did not return an image link.")
-        val fullUrl = if (signedPath.startsWith("http")) signedPath else {
-            "${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1${if (signedPath.startsWith('/')) signedPath else "/$signedPath"}"
-        }
-        signedUrlCache[storageKey] = Pair(fullUrl, System.currentTimeMillis() + 3600_000L)
-        return fullUrl
+        return "${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1/object/public/notice-images/${encodePath(storageKey)}"
     }
 
     private suspend fun storageRequest(path: String): Request.Builder {
-        val token = FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-            ?: throw IOException("Please sign in again.")
+        val pubKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY.trim()
         return Request.Builder()
             .url("${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1/$path")
-            .header("Authorization", "Bearer $token")
-            .header("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY.trim())
+            .header("Authorization", "Bearer $pubKey")
+            .header("apikey", pubKey)
     }
 
-    private fun executeStorage(request: Request): JsonObject =
+    private suspend fun executeStorage(request: Request): JsonObject = withContext(Dispatchers.IO) {
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
@@ -349,13 +349,14 @@ internal class SupabaseNoticeFeed(
             }
             runCatching { gson.fromJson(body, JsonObject::class.java) }.getOrNull() ?: JsonObject()
         }
+    }
 
     private fun encodePath(value: String): String = value.split('/').joinToString("/") {
         java.net.URLEncoder.encode(it, Charsets.UTF_8.name()).replace("+", "%20")
     }
 
     private companion object {
-        const val MAX_IMAGE_BYTES = 10L * 1024L * 1024L
+        const val MAX_ATTACHMENT_BYTES = 100L * 1024L * 1024L
         val SUPPORTED_IMAGE_TYPES = setOf("image/jpeg", "image/png", "image/webp")
         val SUPPORTED_ATTACHMENT_TYPES = setOf("image/jpeg", "image/png", "image/webp", "application/pdf")
     }

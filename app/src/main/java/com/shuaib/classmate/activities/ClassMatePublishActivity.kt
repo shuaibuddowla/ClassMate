@@ -321,6 +321,62 @@ class ClassMatePublishActivity : AppCompatActivity() {
         onPickedFileChanged?.invoke()
     }
 
+    private fun getCachedCourses(batchId: String): List<CourseEntry> {
+        val prefs = getSharedPreferences("cm_publish_cache", Context.MODE_PRIVATE)
+        val raw = prefs.getString("courses_$batchId", null)
+        if (!raw.isNullOrBlank()) {
+            val parsed = runCatching {
+                val arr = JSONArray(raw)
+                (0 until arr.length()).map {
+                    val obj = arr.getJSONObject(it)
+                    CourseEntry(obj.getString("offeringId"), obj.getString("code"), obj.getString("title"))
+                }
+            }.getOrNull()
+            if (!parsed.isNullOrEmpty()) return parsed
+        }
+
+        // Resilient fallback: Read from ClassMateAcademicCache
+        val profileId = intent.getStringExtra("profile_id").orEmpty()
+        val libCache = ClassMateAcademicCache.read(this, profileId, batchId, "library")
+            ?: ClassMateAcademicCache.read(this, "default_user", batchId, "library")
+            ?: run {
+                val allPrefs = getSharedPreferences("classmate_academic_cache_${com.shuaib.classmate.BuildConfig.CLASSMATE_ENV}", Context.MODE_PRIVATE).all
+                val matchingKey = allPrefs.keys.firstOrNull { it.endsWith(":$batchId:library") }
+                matchingKey?.let { key -> runCatching { JSONObject(allPrefs[key] as String) }.getOrNull() }
+            }
+
+        if (libCache != null) {
+            val offeringsArr = libCache.optJSONArray("offerings") ?: JSONArray()
+            val coursesObj = libCache.optJSONObject("courses") ?: JSONObject()
+            val result = mutableListOf<CourseEntry>()
+            for (i in 0 until offeringsArr.length()) {
+                val off = offeringsArr.optJSONObject(i) ?: continue
+                val offId = off.optString("id")
+                val courseId = off.optString("course_id")
+                val courseMeta = coursesObj.optJSONObject(courseId)
+                val code = courseMeta?.optString("course_code") ?: "Course"
+                val title = courseMeta?.optString("course_title") ?: ""
+                result.add(CourseEntry(offId, code, title))
+            }
+            if (result.isNotEmpty()) {
+                saveCachedCourses(batchId, result, prefs.getString("sem_$batchId", null))
+                return result
+            }
+        }
+
+        return emptyList()
+    }
+
+    private fun saveCachedCourses(batchId: String, list: List<CourseEntry>, semTitle: String?) {
+        val prefs = getSharedPreferences("cm_publish_cache", Context.MODE_PRIVATE)
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(JSONObject().put("offeringId", it.offeringId).put("code", it.code).put("title", it.title))
+        }
+        prefs.edit().putString("courses_$batchId", arr.toString())
+            .putString("sem_$batchId", semTitle.orEmpty()).apply()
+    }
+
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
 
@@ -528,6 +584,17 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         })
 
+        var editorBuilt = false
+        val cachedCourses = getCachedCourses(batch)
+        val cachedSem = getSharedPreferences("cm_publish_cache", Context.MODE_PRIVATE).getString("sem_$batch", null)
+        if (!cachedSem.isNullOrBlank()) {
+            badgeSemester?.text = cachedSem
+        }
+        courses = cachedCourses
+        loading.visibility = View.GONE
+        if (upload) buildUpload() else buildNotice()
+        editorBuilt = true
+
         lifecycleScope.launch {
             try {
                 val semesterObj = ClassMateAuthApi.rows("semesters", "select=id,semester_number&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)
@@ -544,7 +611,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     (0 until rows.length()).map { rows.getJSONObject(it).getString("semester_course_id") }.toSet()
                 } else null
 
-                courses = (0 until offerings.length()).map { offerings.getJSONObject(it) }
+                val freshCourses = (0 until offerings.length()).map { offerings.getJSONObject(it) }
                     .filter { assigned == null || it.getString("id") in assigned }
                     .map { off ->
                         val offId = off.getString("id")
@@ -554,21 +621,28 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         CourseEntry(offId, code, title)
                     }
 
-                editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" && courses.none { c -> c.offeringId == it } }?.let { id ->
+                var finalCourses = freshCourses
+                editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" && finalCourses.none { c -> c.offeringId == it } }?.let { id ->
                     val offering = ClassMateAuthApi.rows("semester_courses", "select=course_id&id=eq.$id").optJSONObject(0)
                     val cat = offering?.optString("course_id")?.let { catalogMap[it] }
-                    courses = courses + CourseEntry(id, cat?.optString("course_code") ?: "Course", cat?.optString("course_title") ?: "Current subject")
+                    finalCourses = finalCourses + CourseEntry(id, cat?.optString("course_code") ?: "Course", cat?.optString("course_title") ?: "Current subject")
                 }
 
-                loading.visibility = View.GONE
-                if (upload) buildUpload() else {
-                    buildNotice()
+                courses = finalCourses
+                saveCachedCourses(batch, finalCourses, semTitle)
+
+                if (!editorBuilt) {
+                    loading.visibility = View.GONE
+                    if (upload) buildUpload() else buildNotice()
+                    editorBuilt = true
                 }
             } catch (e: Exception) {
-                loading.text = "Could not load editor. ${e.message}"
-                submit.text = "Retry"
-                submit.isEnabled = true
-                submit.setOnClickListener { recreate() }
+                if (!editorBuilt) {
+                    loading.text = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
+                    submit.text = "Retry"
+                    submit.isEnabled = true
+                    submit.setOnClickListener { recreate() }
+                }
             }
         }
     }
@@ -1036,7 +1110,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         pollContainer.addView(cbMulti)
         pollContainer.addView(cbAnon)
 
-        val (durationBox, durationField) = createDropdown("Poll Duration", listOf("24 hours", "3 days (default)", "7 days", "No expiration"))
+        val (durationBox, durationField) = createDropdown("Poll Duration", listOf("1 hour", "6 hours", "12 hours", "24 hours", "2 days", "3 days (default)", "7 days", "No expiration"))
         pollContainer.addView(durationBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
 
         choices.setOnCheckedChangeListener { _, checked ->
@@ -1089,7 +1163,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 }
                 val durationText = durationField.text.toString()
                 val durationHours: Any = when (durationText) {
+                    "1 hour" -> 1
+                    "6 hours" -> 6
+                    "12 hours" -> 12
                     "24 hours" -> 24
+                    "2 days" -> 48
                     "7 days" -> 168
                     "No expiration" -> JSONObject.NULL
                     else -> 72
@@ -1137,72 +1215,172 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
 
             val manualTitle = title.text?.toString()?.trim().orEmpty()
-            if (titleBox.visibility == View.VISIBLE && manualTitle.isNotBlank()) {
-                perform {
-                    val postRes = ClassMateAuthApi.rpc(
-                        "post_notice",
-                        JSONObject().put("target_batch", batch)
-                            .put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
-                            .put("notice_title", manualTitle)
-                            .put("notice_body", rawBody)
-                    )
-                    val newNoticeId = postRes?.optString("id").orEmpty()
-                    uploadNoticeAttachmentIfAny(newNoticeId)
-                    postRes
-                }
-                return@setOnClickListener
-            }
 
             if (busy) return@setOnClickListener
             busy = true
             submit.isEnabled = false
             status.visibility = View.VISIBLE
-            status.text = "Detecting title & formatting notice with ClassMate AI…"
+            status.text = if (manualTitle.isNotBlank()) "Publishing notice to batch…" else "Detecting title & formatting notice with ClassMate AI…"
 
-            lifecycleScope.launch {
-                try {
-                    val reqId = java.util.UUID.randomUUID().toString()
-                    val response = ClassMateAuthApi.ai(
-                        JSONObject()
-                            .put("mode", "auto_notice")
-                            .put("batch_id", batch)
-                            .put("request_id", reqId)
-                            .put("text", rawBody)
-                    )
-                    val result = response.optJSONObject("result")
-                    val detectedTitle = result?.optString("title")?.trim().orEmpty()
-                    val formattedBody = result?.optString("body")?.trim().orEmpty()
+            val progressView = LinearLayout(this@ClassMatePublishActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(24), dp(18), dp(24), dp(16))
+            }
 
-                    if (detectedTitle.isBlank() || formattedBody.isBlank()) {
-                        throw IllegalStateException("AI returned empty notice details")
+            val tvDialogHeader = TextView(this@ClassMatePublishActivity).apply {
+                text = "✨ CLASSMATE AI ENGINE"
+                textSize = 11.5f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(getColor(R.color.cm_primary))
+                letterSpacing = 0.08f
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
+            }
+            val tvDialogTitle = TextView(this@ClassMatePublishActivity).apply {
+                text = if (manualTitle.isNotBlank()) "Publishing Notice" else "AI Title Detection"
+                textSize = 17.5f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(getColor(R.color.cm_text_primary))
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
+            }
+
+            val pBar = ProgressBar(this@ClassMatePublishActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+                isIndeterminate = true
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+            }
+
+            val tvStepStatus = TextView(this@ClassMatePublishActivity).apply {
+                text = if (manualTitle.isNotBlank()) "Publishing notice to batch feed…" else "Analyzing notice content & language structure…"
+                textSize = 13.5f
+                setTextColor(getColor(R.color.cm_text_secondary))
+                layoutParams = LinearLayout.LayoutParams(-1, -2)
+            }
+
+            progressView.addView(tvDialogHeader)
+            progressView.addView(tvDialogTitle)
+            progressView.addView(pBar)
+            progressView.addView(tvStepStatus)
+
+            val progressDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                .setView(progressView)
+                .setCancelable(true)
+                .setPositiveButton("Run in background") { dialog, _ ->
+                    Toast.makeText(applicationContext, "Notice is publishing in background…", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                    setResult(RESULT_OK)
+                    finish()
+                }
+                .create()
+            progressDialog.show()
+
+            val appCtx = applicationContext
+            val courseIdParam = if (teacher) selected?.first else null
+
+            // If offline from the start, queue immediately without blocking
+            if (!com.shuaib.classmate.activities.ClassMateAcademicCache.online(this@ClassMatePublishActivity)) {
+                val fallbackTitle = manualTitle.ifBlank { rawBody.lines().firstOrNull()?.trim()?.take(60) ?: "Notice" }
+                val pending = com.shuaib.classmate.workers.PendingNotice(
+                    batchId = batch,
+                    title = if (manualTitle.isNotBlank()) manualTitle else null,
+                    body = rawBody,
+                    courseId = courseIdParam,
+                    isTeacher = teacher
+                )
+                com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(appCtx, pending)
+                runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
+                Toast.makeText(appCtx, "Offline: Notice saved to queue. It will post automatically once connection returns.", Toast.LENGTH_LONG).show()
+                setResult(RESULT_OK)
+                finish()
+                return@setOnClickListener
+            }
+
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                var finalTitle = manualTitle
+                var finalBody = rawBody
+
+                if (finalTitle.isBlank()) {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            runCatching {
+                                tvStepStatus.text = "Detecting optimal title & smart category with ClassMate AI…"
+                            }
+                        }
+                        val reqId = java.util.UUID.randomUUID().toString()
+                        val response = ClassMateAuthApi.ai(
+                            JSONObject()
+                                .put("mode", "auto_notice")
+                                .put("batch_id", batch)
+                                .put("request_id", reqId)
+                                .put("text", rawBody)
+                        )
+                        val result = response.optJSONObject("result")
+                        val detected = result?.optString("title")?.trim().orEmpty()
+                        val formatted = result?.optString("body")?.trim().orEmpty()
+                        if (detected.isNotBlank()) finalTitle = detected
+                        if (formatted.isNotBlank()) finalBody = formatted
+                    } catch (_: Exception) {
+                        finalTitle = rawBody.lines().firstOrNull()?.trim()?.take(60) ?: "Notice"
                     }
+                }
 
-                    status.text = "Publishing notice to batch…"
+                if (finalTitle.isBlank()) {
+                    finalTitle = rawBody.lines().firstOrNull()?.trim()?.take(60) ?: "Notice"
+                }
+
+                try {
+                    withContext(Dispatchers.Main) {
+                        runCatching {
+                            tvStepStatus.text = "Publishing notice to batch feed…"
+                        }
+                    }
                     val postRes = ClassMateAuthApi.rpc(
                         "post_notice",
                         JSONObject().put("target_batch", batch)
-                            .put("target_course", if (teacher) selected!!.first else JSONObject.NULL)
-                            .put("notice_title", detectedTitle)
-                            .put("notice_body", formattedBody)
+                            .put("target_course", if (courseIdParam != null) courseIdParam else JSONObject.NULL)
+                            .put("notice_title", finalTitle)
+                            .put("notice_body", finalBody)
                     )
-                    val newNoticeId = postRes?.optString("id").orEmpty()
-                    uploadNoticeAttachmentIfAny(newNoticeId)
+                    val newNoticeId = postRes.optString("id").orEmpty()
+                    if (selectedNoticeAttachments.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            runCatching {
+                                tvStepStatus.text = "Uploading attachments & syncing feed…"
+                            }
+                        }
+                        uploadNoticeAttachmentIfAny(newNoticeId) { text ->
+                            runCatching { tvStepStatus.text = text }
+                        }
+                    }
 
-                    Toast.makeText(this@ClassMatePublishActivity, "Notice published successfully!", Toast.LENGTH_SHORT).show()
-                    val data = Intent().putExtra("created_notice", postRes.toString())
-                    setResult(RESULT_OK, data)
-                    finish()
-                } catch (e: Exception) {
-                    busy = false
-                    submit.isEnabled = true
-                    titleBox.visibility = View.VISIBLE
-                    title.requestFocus()
-                    status.text = "ClassMate AI title detection failed. Please enter a title manually and tap Post notice."
-                    Toast.makeText(
-                        this@ClassMatePublishActivity,
-                        "Notice title detection failed. Please enter title manually.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    withContext(Dispatchers.Main) {
+                        runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
+                        Toast.makeText(appCtx, "Notice published successfully!", Toast.LENGTH_SHORT).show()
+                        val data = Intent().putExtra("created_notice", postRes.toString())
+                        setResult(RESULT_OK, data)
+                        finish()
+                    }
+                } catch (netErr: Exception) {
+                    // Network unavailable or interrupted: Queue locally for automatic background upload!
+                    com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
+                        appCtx,
+                        com.shuaib.classmate.workers.PendingNotice(
+                            batchId = batch,
+                            title = finalTitle,
+                            body = finalBody,
+                            courseId = courseIdParam,
+                            isTeacher = teacher
+                        )
+                    )
+
+                    withContext(Dispatchers.Main) {
+                        runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
+                        Toast.makeText(
+                            appCtx,
+                            "Offline: Notice saved to queue. It will post automatically once connection returns.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        setResult(RESULT_OK)
+                        finish()
+                    }
                 }
             }
         }
@@ -2084,7 +2262,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             withContext(Dispatchers.Main) {
                                 busy = false
                                 submit.isEnabled = true
-                                status.text = "Failed to start upload: ${e.message}"
+                                status.text = "Failed to start upload: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
                                 progressContainer.visibility = View.GONE
                             }
                         }
@@ -2137,16 +2315,17 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun uploadNoticeAttachmentIfAny(noticeId: String) {
+    private suspend fun uploadNoticeAttachmentIfAny(noticeId: String, onProgressText: ((String) -> Unit)? = null) {
         if (selectedNoticeAttachments.isEmpty() || noticeId.isBlank()) return
         val total = selectedNoticeAttachments.size
         val repository = com.shuaib.classmate.repositories.NoticeRepository.getInstance(this@ClassMatePublishActivity)
 
         selectedNoticeAttachments.forEachIndexed { index, item ->
+            val initialLabel = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
             withContext(Dispatchers.Main) {
                 status.visibility = View.VISIBLE
-                val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
-                status.text = "$label 0%"
+                status.text = "$initialLabel 0%"
+                onProgressText?.invoke("$initialLabel 0%")
             }
             repository.uploadSupabaseNoticeAttachment(
                 this@ClassMatePublishActivity,
@@ -2159,6 +2338,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 runOnUiThread {
                     val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
                     status.text = "$label $pct%"
+                    onProgressText?.invoke("$label $pct%")
                 }
             }
         }
@@ -2180,7 +2360,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 Toast.makeText(this@ClassMatePublishActivity, successMsg, Toast.LENGTH_SHORT).show()
                 finish()
             } catch (e: Exception) {
-                val errMsg = e.message ?: "Could not complete. Try again."
+                val errMsg = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
                 status.text = errMsg
                 Toast.makeText(this@ClassMatePublishActivity, errMsg, Toast.LENGTH_LONG).show()
             } finally {
