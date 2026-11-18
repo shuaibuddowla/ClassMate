@@ -12,35 +12,58 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-function isAuthorized(request: Request, deviceId?: string): boolean {
+async function isAuthorized(request: Request, deviceId?: string): Promise<boolean> {
   const deviceSecret = process.env.HARDWARE_DEVICE_SECRET;
   const clientDeviceKey =
     request.headers.get("x-device-key") ||
     request.headers.get("x-dispatch-secret");
 
-  // If a hardware device secret is configured and client sent matching key, approve
-  if (deviceSecret && clientDeviceKey && clientDeviceKey === deviceSecret) {
-    return true;
+  // 1. If a dedicated hardware secret is configured and client sent matching key, approve
+  if (deviceSecret && clientDeviceKey) {
+    return clientDeviceKey === deviceSecret;
   }
 
-  // If Bearer token is provided, approve
+  // 2. Cryptographic session verification for web/app users if Bearer token is provided
   const authHeader = request.headers.get("authorization") || "";
-  if (authHeader.startsWith("Bearer ") && authHeader.slice(7).trim().length > 10) {
-    return true;
-  }
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice(7).trim();
+    if (token.length > 10) {
+      const supabaseUrl =
+        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey =
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If a dedicated hardware secret is required on server and client sent mismatched key, reject
-  if (deviceSecret && clientDeviceKey && clientDeviceKey !== deviceSecret) {
+      if (supabaseUrl && supabaseAnonKey) {
+        try {
+          const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { persistSession: false },
+          });
+          const { data: { user }, error } = await authClient.auth.getUser(token);
+          if (!error && user) {
+            return true;
+          }
+        } catch (e) {
+          console.error("[RFID Auth] Bearer verification failed:", e);
+        }
+      }
+    }
+    // Bearer token was provided but failed verification
     return false;
   }
 
-  // Allow standard registered attendance stations (e.g. ESP32-READER-01 or prefixed device IDs)
+  // 3. If a hardware secret is configured on the server, reject any request missing or failing the secret
+  if (deviceSecret) {
+    return false;
+  }
+
+  // 4. Fallback for unconfigured dev/field environments: allow recognized reader prefixes
   const dev = (deviceId || "").trim().toUpperCase();
-  if (dev.startsWith("ESP32") || dev.startsWith("SCANNER") || dev.length >= 3) {
+  if (dev.startsWith("ESP32") || dev.startsWith("SCANNER")) {
     return true;
   }
 
-  return true;
+  return false;
 }
 
 export async function GET(request: Request) {
@@ -48,7 +71,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const deviceId = (searchParams.get("device_id") || "ESP32-READER-01").trim();
 
-    if (!isAuthorized(request, deviceId)) {
+    if (!await isAuthorized(request, deviceId)) {
       return NextResponse.json(
         { status: "UNAUTHORIZED", message: "Unauthorized device" },
         { status: 401, headers: corsHeaders }
@@ -74,9 +97,57 @@ export async function GET(request: Request) {
       auth: { persistSession: false },
     });
 
-    const isRoster =
-      searchParams.get("action") === "roster" ||
-      searchParams.get("roster") === "true";
+    const action = (searchParams.get("action") || "").toLowerCase();
+    const isRoster = action === "roster" || searchParams.get("roster") === "true";
+    const isTimetable = action === "timetable" || action === "schedule";
+
+    if (isTimetable) {
+      // Return weekly timetable routine slots for autonomous offline course switching
+      const { data: slots, error: slotErr } = await supabase
+        .from("routine_slots")
+        .select(`
+          id,
+          day_of_week,
+          start_time,
+          end_time,
+          room,
+          semester_courses (
+            id,
+            courses (
+              course_code,
+              course_title
+            ),
+            semesters (
+              batch_id
+            )
+          )
+        `)
+        .order("day_of_week", { ascending: true })
+        .order("start_time", { ascending: true });
+
+      if (slotErr) {
+        console.error("[RFID Timetable] Supabase Query Error:", slotErr);
+        return NextResponse.json({ status: "ERROR", message: slotErr.message }, { headers: corsHeaders });
+      }
+
+      const formatted = (slots || []).map((s: any) => ({
+        slot_id: s.id,
+        day: s.day_of_week,
+        start: String(s.start_time).slice(0, 5),
+        end: String(s.end_time).slice(0, 5),
+        room: s.room || "",
+        course_code: s.semester_courses?.courses?.course_code || "CLASS",
+        course_title: s.semester_courses?.courses?.course_title || "Class Attendance",
+        semester_course_id: s.semester_courses?.id || "",
+        batch_id: s.semester_courses?.semesters?.batch_id || "",
+      }));
+
+      return NextResponse.json({
+        status: "OK",
+        server_epoch: Math.floor(Date.now() / 1000),
+        slots: formatted,
+      }, { headers: corsHeaders });
+    }
 
     const { data, error } = isRoster
       ? await supabase.rpc("get_device_session_roster", {
@@ -117,7 +188,7 @@ export async function POST(request: Request) {
 
     const deviceId = (body.device_id || "ESP32-READER-01").trim();
 
-    if (!isAuthorized(request, deviceId)) {
+    if (!await isAuthorized(request, deviceId)) {
       return NextResponse.json(
         {
           status: "UNAUTHORIZED",
@@ -154,26 +225,57 @@ export async function POST(request: Request) {
       auth: { persistSession: false },
     });
 
-    // Handle batch upload if provided by background sync worker
-    if (Array.isArray(body.batch) && body.batch.length > 0) {
-      const results = [];
-      for (const rawUid of body.batch) {
-        const uid = String(rawUid || "").trim();
-        if (!uid) continue;
-        const { data } = await supabase.rpc("process_rfid_scan", {
-          p_card_uid: uid,
-          p_device_id: deviceId,
-        });
-        results.push(data || { status: "UNKNOWN", uid });
-      }
-      return NextResponse.json(
+    // Handle batch or offline queued uploads
+    const incomingBatch = Array.isArray((body as any).scans)
+      ? (body as any).scans
+      : Array.isArray(body.batch)
+      ? body.batch
+      : null;
+
+    if (incomingBatch && incomingBatch.length > 0) {
+      // Normalize items into { card_uid, timestamp, course_code, session_id }
+      const normalizedScans = incomingBatch.map((item: any) => {
+        if (typeof item === "string") {
+          return { card_uid: item.trim() };
+        }
+        return {
+          card_uid: String(item.card_uid || item.uid || "").trim(),
+          timestamp: item.timestamp || item.scanned_at || undefined,
+          course_code: item.course_code || item.course || undefined,
+          session_id: item.session_id || undefined,
+        };
+      }).filter((s: any) => s.card_uid.length > 0);
+
+      const { data: batchResult, error: batchErr } = await supabase.rpc(
+        "process_offline_rfid_batch",
         {
-          status: "BATCH_OK",
-          processed: results.length,
-          results,
-        },
-        { status: 200, headers: corsHeaders }
+          p_device_id: deviceId,
+          p_scans: normalizedScans,
+        }
       );
+
+      if (batchErr) {
+        console.error("[RFID Batch Sync] RPC Error:", batchErr);
+        // Fallback to sequential process_rfid_scan if offline batch RPC failed
+        const fallbackResults = [];
+        for (const scan of normalizedScans) {
+          const { data } = await supabase.rpc("process_rfid_scan", {
+            p_card_uid: scan.card_uid,
+            p_device_id: deviceId,
+          });
+          fallbackResults.push(data || { status: "UNKNOWN", uid: scan.card_uid });
+        }
+        return NextResponse.json({
+          status: "BATCH_OK",
+          processed: fallbackResults.length,
+          results: fallbackResults,
+        }, { status: 200, headers: corsHeaders });
+      }
+
+      return NextResponse.json(batchResult || { status: "BATCH_OK", processed: normalizedScans.length }, {
+        status: 200,
+        headers: corsHeaders,
+      });
     }
 
     const cardUid = (body.card_uid || "").trim();

@@ -141,8 +141,14 @@ class GroqAiProvider(private val client: OkHttpClient, private val gson: Gson) :
               - "hw" or "task" -> "Assignment"
               - "sombar" -> "Monday", "mangalbar" -> "Tuesday", "budhbar" -> "Wednesday", "brihoshpotibar" -> "Thursday", "shukrobar" -> "Friday", "shonibar" -> "Saturday", "robibar" -> "Sunday".
             - Resolve relative dates (e.g., "tomorrow", "next Monday", "sombar") to yyyy-MM-dd using the currentDate.
-            - Format the "body" text beautifully using Markdown. Use bold (e.g., **10:30 AM**, **Room 403**, **Dr. X**) for key parameters, and clean bullet points.
-            - Keep the notice "body" extremely concise, high-density, and focused purely on the main context and key details (cancellations, timings, deadlines, tasks). Avoid verbose fluff or excessive elaboration so students can grasp the core message immediately. Do not write long paragraphs; use concise bullet points instead.
+            - Format the "body" text beautifully using ClassMate WhatsApp-style formatting:
+              - Use *bold* (e.g., *10:30 AM*, *Room 403*, *Dr. X*, *CSE-3101*) for key parameters, dates, times, rooms, courses, and important headings.
+              - When organizing long, massive, or unorganized announcements, structure them clearly:
+                - Use concise bold section headers if needed (e.g., *Important Details:*, *Syllabus:*).
+                - Use clean bullet points (• ) for lists of rules, criteria, or syllabus topics.
+                - Use numbered lists (1. , 2. ) for multi-step procedures, guidelines, or instructions.
+              - Strictly preserve all original factual context, dates, numbers, teacher names, and instructions without altering meaning or inventing unmentioned information.
+              - Keep the notice "body" extremely concise, high-density, and focused purely on the main context and key details (cancellations, timings, deadlines, tasks). Avoid verbose fluff or excessive elaboration.
             - Never invent dates, subjects, teacher names, or room numbers. Leave fields as null or use the missingFields array.
             - Output JSON only. No markdown wrapping.
 

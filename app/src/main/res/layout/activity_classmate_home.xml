@@ -56,10 +56,23 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Jetpack Compose Floating Bottom Navigation Bar -->
-    <androidx.compose.ui.platform.ComposeView
-        android:id="@+id/classmate_home_compose_nav"
+    <!-- Unified Bottom Navigation Bar Container (Blur Backdrop + Floating Icons) -->
+    <FrameLayout
+        android:id="@+id/classmate_bottom_nav_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom" />
+        android:layout_gravity="bottom">
+
+        <com.shuaib.classmate.ui.FrostedGlassBackdropView
+            android:id="@+id/classmate_home_blur_backdrop"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_gravity="bottom" />
+
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/classmate_home_compose_nav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom" />
+    </FrameLayout>
 </FrameLayout>

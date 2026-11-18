@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Outermost subtle ambient glow halo (114dp) -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#0F2563EB" />
+        </shape>
+    </item>
+    <!-- Outer mid soft blur halo (108dp) -->
+    <item
+        android:left="3dp"
+        android:top="3dp"
+        android:right="3dp"
+        android:bottom="3dp">
+        <shape android:shape="oval">
+            <solid android:color="#1A2563EB" />
+        </shape>
+    </item>
+    <!-- Mid-inner luminous glow halo (102dp) -->
+    <item
+        android:left="6dp"
+        android:top="6dp"
+        android:right="6dp"
+        android:bottom="6dp">
+        <shape android:shape="oval">
+            <solid android:color="#282563EB" />
+        </shape>
+    </item>
+    <!-- Core soft glow halo hugging the blue ring (98dp) -->
+    <item
+        android:left="8dp"
+        android:top="8dp"
+        android:right="8dp"
+        android:bottom="8dp">
+        <shape android:shape="oval">
+            <solid android:color="#3D2563EB" />
+        </shape>
+    </item>
+</layer-list>

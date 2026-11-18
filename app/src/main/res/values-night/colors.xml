@@ -15,7 +15,7 @@
     <color name="cm_text_disabled">#64748B</color>
     <color name="cm_text_inverse">#0F172A</color>
 
-    <color name="cm_border">#272930</color>
+    <color name="cm_border">#2A3942</color>
     <color name="cm_border_strong">#383C44</color>
     <color name="cm_divider">#1F2126</color>
 
@@ -56,19 +56,19 @@
     <color name="wa_double_check_blue">#53BDEB</color>
     <color name="wa_bubble_bg">#005C4B</color>
     <color name="wa_bubble_border">#02725D</color>
-    <color name="wa_wallpaper_bg">#111215</color>
+    <color name="wa_wallpaper_bg">#0B141A</color>
     <color name="wa_time_text">#8696A0</color>
-    <color name="cm_notice_general_start">#E6181B20</color>
-    <color name="cm_notice_general_end">#D6131519</color>
-    <color name="cm_notice_cancel_start">#E6201618</color>
-    <color name="cm_notice_cancel_end">#D6191113</color>
-    <color name="cm_notice_resource_start">#E6181C20</color>
-    <color name="cm_notice_resource_end">#D613161A</color>
+    <color name="cm_notice_general_start">#E6182229</color>
+    <color name="cm_notice_general_end">#D8111B21</color>
+    <color name="cm_notice_cancel_start">#E62A141A</color>
+    <color name="cm_notice_cancel_end">#D8220F14</color>
+    <color name="cm_notice_resource_start">#E6102620</color>
+    <color name="cm_notice_resource_end">#D80B1E19</color>
     <color name="cm_notice_screen_bg">#0B0C0E</color>
     <color name="cm_notice_premium_general">#B794F5</color>
     <color name="cm_notice_premium_cancel">#FDA4AF</color>
     <color name="cm_notice_premium_resource">#58D9B6</color>
-    <color name="cm_notice_premium_stroke">#272930</color>
+    <color name="cm_notice_premium_stroke">#2A3942</color>
     <color name="cm_notice_summary">#141519</color>
     <color name="cm_notice_action">#2B252A36</color>
     <color name="cm_notice_attachment">#161D22</color>
@@ -104,7 +104,7 @@
     <color name="bottom_nav_active">#60A5FA</color>
     <color name="bottom_nav_inactive">#94A3B8</color>
     <color name="bottom_nav_glass">#E6111215</color>
-    <color name="bottom_nav_stroke">#272930</color>
+    <color name="bottom_nav_stroke">#2A3942</color>
     <color name="cm_accent">#FBBF24</color>
     <color name="cm_accent_warm">#F59E0B</color>
     <color name="cm_accent_glow">#FBBF2430</color>
@@ -129,5 +129,29 @@
     <color name="cm_version_pill_installed_text">#94A3B8</color>
     <color name="cm_version_card_bg">#16171B</color>
     <color name="cm_changelog_bg">#1A1B20</color>
-    <color name="cm_changelog_border">#272930</color>
+    <color name="cm_changelog_border">#2A3942</color>
+
+    <!-- Dynamic Island & Peek Sheet Theme Colors (Dark) -->
+    <color name="cm_dynamic_island_bg">#1E2025</color>
+    <color name="cm_dynamic_island_stroke">#2E323B</color>
+    <color name="cm_dynamic_island_title">#F8FAFC</color>
+    <color name="cm_dynamic_island_subtitle">#94A3B8</color>
+    <color name="cm_dynamic_island_action_bg">#2A3942</color>
+    <color name="cm_dynamic_island_action_icon">#60A5FA</color>
+    <color name="cm_dynamic_island_dismiss_icon">#94A3B8</color>
+
+    <color name="cm_peek_sheet_bg">#16171B</color>
+    <color name="cm_peek_sheet_card_bg">#1E2025</color>
+    <color name="cm_peek_sheet_card_stroke">#2E323B</color>
+    <color name="cm_peek_sheet_title">#F8FAFC</color>
+    <color name="cm_peek_sheet_subtitle">#94A3B8</color>
+    <color name="cm_peek_sheet_item_title">#F8FAFC</color>
+    <color name="cm_peek_sheet_item_body">#CBD5E1</color>
+    <color name="cm_peek_sheet_item_meta">#94A3B8</color>
+    <color name="cm_peek_sheet_divider">#2A3942</color>
+
+    <!-- Date Header Styling (WhatsApp Style) -->
+    <color name="cm_date_header_bg">#1E293B</color>
+    <color name="cm_date_header_stroke">#334155</color>
+    <color name="cm_unread_dot">#3B82F6</color>
 </resources>

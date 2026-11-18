@@ -54,6 +54,15 @@ object NotificationSender {
                         put("relation", "=")
                         put("value", batchId)
                     })
+                    put(JSONObject().apply {
+                        put("operator", "OR")
+                    })
+                    put(JSONObject().apply {
+                        put("field", "tag")
+                        put("key", "batch_$batchId")
+                        put("relation", "=")
+                        put("value", "true")
+                    })
                 }
 
                 val body = JSONObject().apply {

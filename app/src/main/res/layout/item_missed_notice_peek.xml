@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/cm_peek_sheet_card_stroke"
+    app:cardBackgroundColor="@color/cm_peek_sheet_card_bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- Top Row: Category Chip & Timestamp -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:id="@+id/tvPeekNoticeCategory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_peek_category_pill"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textColor="@color/cm_primary"
+                android:textSize="10.5sp"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                tools:text="GENERAL" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvPeekNoticeTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/cm_peek_sheet_item_meta"
+                android:textSize="11sp"
+                tools:text="2h ago" />
+        </LinearLayout>
+
+        <!-- Notice Title -->
+        <TextView
+            android:id="@+id/tvPeekNoticeTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/plus_jakarta_sans_bold"
+            android:textColor="@color/cm_peek_sheet_item_title"
+            android:textSize="14.5sp"
+            android:lineSpacingExtra="2dp"
+            tools:text="New Academic Routine Published for CSE 2022" />
+
+        <!-- Notice Body Snippet -->
+        <TextView
+            android:id="@+id/tvPeekNoticeBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/cm_peek_sheet_item_body"
+            android:textSize="12.5sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            tools:text="Please check your timetable for the updated class schedule starting from next Monday." />
+
+        <!-- Bottom Footer Row: Author & Action Arrow -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvPeekNoticeAuthor"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/cm_peek_sheet_item_meta"
+                android:textSize="11.5sp"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:ellipsize="end"
+                tools:text="By Dr. Mehedi Hasan Talukder" />
+
+            <!-- Attachment badge if present -->
+            <TextView
+                android:id="@+id/tvPeekNoticeAttachmentBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:background="#E0E7FF"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textColor="#4338CA"
+                android:textSize="10.5sp"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:visibility="gone"
+                android:text="📎 File" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/cm_peek_sheet_item_meta"
+                android:importantForAccessibility="no" />
+        </LinearLayout>
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

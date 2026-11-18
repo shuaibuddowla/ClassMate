@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import {
   Bell,
@@ -12,6 +13,34 @@ import {
   Globe,
   Share2,
 } from "lucide-react";
+
+export interface PublicNoticeAttachment {
+  id: string;
+  url: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_key?: string;
+}
+
+export interface PublicPollOption {
+  id: string;
+  option_text: string;
+  position: number;
+  votes_count: number;
+}
+
+export interface PublicPoll {
+  id: string;
+  question: string;
+  is_multiple_choice: boolean;
+  is_anonymous: boolean;
+  expires_at?: string;
+  is_closed: boolean;
+  total_voters: number;
+  total_votes: number;
+  options: PublicPollOption[];
+}
 
 interface PublicNotice {
   id: string;
@@ -36,12 +65,15 @@ interface PublicNotice {
   class_change_date?: string;
   class_change_details?: string;
   resource_id?: string;
+  resource_slug?: string;
   resource_title?: string;
   resource_file_type?: string;
   resource_size_bytes?: number;
   resource_mime_type?: string;
   resource_link_url?: string;
   resource_is_link?: boolean;
+  attachments?: PublicNoticeAttachment[];
+  poll?: PublicPoll;
 }
 
 function getSupabase() {
@@ -55,13 +87,81 @@ async function fetchPublicNotice(id: string): Promise<PublicNotice | null> {
     return null;
   }
   const db = getSupabase();
+  let notice: PublicNotice | null = null;
   const { data, error } = await db.schema("classmate").rpc("get_public_notice", { target_identifier: id });
   if (error || !data) {
     const { data: fallbackData } = await db.rpc("get_public_notice", { target_identifier: id });
-    if (!fallbackData) return null;
-    return fallbackData as PublicNotice;
+    if (fallbackData) notice = fallbackData as PublicNotice;
+  } else {
+    notice = data as PublicNotice;
   }
-  return data as PublicNotice;
+
+  if (notice && (!notice.attachments || notice.attachments.length === 0)) {
+    try {
+      const { data: atts } = await db
+        .schema("public")
+        .from("notice_attachments")
+        .select("id,storage_key,file_name,mime_type,size_bytes")
+        .eq("notice_id", notice.id);
+      if (atts && atts.length > 0) {
+        notice.attachments = atts.map((a: any) => ({
+          id: a.id,
+          url: db.storage.from("notice-images").getPublicUrl(a.storage_key).data.publicUrl,
+          file_name: a.file_name,
+          mime_type: a.mime_type,
+          size_bytes: a.size_bytes,
+          storage_key: a.storage_key,
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (notice && !notice.poll) {
+    try {
+      const { data: pollRow } = await db
+        .schema("classmate")
+        .from("polls")
+        .select("id,question,is_multiple_choice,is_anonymous,expires_at")
+        .eq("notice_id", notice.id)
+        .maybeSingle();
+
+      if (pollRow) {
+        const { data: opts } = await db
+          .schema("classmate")
+          .from("poll_options")
+          .select("id,option_text,position,votes_count")
+          .eq("poll_id", pollRow.id)
+          .order("position", { ascending: true });
+
+        const options = (opts || []).map((o: any) => ({
+          id: o.id,
+          option_text: o.option_text,
+          position: o.position,
+          votes_count: o.votes_count || 0,
+        }));
+
+        const totalVotes = options.reduce((sum, o) => sum + o.votes_count, 0);
+
+        notice.poll = {
+          id: pollRow.id,
+          question: pollRow.question,
+          is_multiple_choice: pollRow.is_multiple_choice,
+          is_anonymous: pollRow.is_anonymous,
+          expires_at: pollRow.expires_at,
+          is_closed: pollRow.expires_at ? new Date(pollRow.expires_at).getTime() < Date.now() : false,
+          total_voters: totalVotes,
+          total_votes: totalVotes,
+          options,
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return notice;
 }
 
 export async function generateMetadata({
@@ -72,7 +172,13 @@ export async function generateMetadata({
   const { id } = await params;
   const notice = await fetchPublicNotice(id);
   if (!notice) {
-    return { title: "Notice Not Found · ClassMate" };
+    return {
+      title: "Notice Not Found · ClassMate",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
   }
 
   const deptBatch = `${notice.department_code ? notice.department_code.toUpperCase() : "MBSTU"} · Batch ${notice.batch_number || "CSE"}`;
@@ -80,11 +186,17 @@ export async function generateMetadata({
   const snippet = notice.body.slice(0, 150).replace(/\s+/g, " ").trim();
   const description = `${author} (${deptBatch}): ${snippet || notice.title}`;
   const pageUrl = `https://classmatebd.vercel.app/n/${notice.id}`;
-  const ogImageUrl = `https://classmatebd.vercel.app/n/${notice.id}/opengraph-image`;
+  const firstImage = notice.attachments?.find(
+    (a) => a.mime_type?.startsWith("image/") || !a.file_name?.toLowerCase().endsWith(".pdf")
+  );
+  const ogImageUrl = firstImage?.url || `https://classmatebd.vercel.app/n/${notice.id}/opengraph-image`;
 
   return {
     title: `${notice.title} · ClassMate Notice`,
     description,
+    alternates: {
+      canonical: pageUrl,
+    },
     openGraph: {
       title: notice.title,
       description,
@@ -120,22 +232,7 @@ export default async function PublicNoticePage({
   const notice = await fetchPublicNotice(id);
 
   if (!notice) {
-    return (
-      <main className="public-notice-page">
-        <div className="public-notice-wrapper">
-          <div className="public-notice-card not-found-card">
-            <div className="not-found-icon">📢</div>
-            <h1 className="not-found-title">Notice Not Found</h1>
-            <p className="not-found-text">
-              This notice link is either invalid, deleted, or no longer available.
-            </p>
-            <a href="https://classmatebd.vercel.app" className="primary-action-btn">
-              <span>Go to ClassMate Home</span>
-            </a>
-          </div>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   const publishedDate = notice.published_at
@@ -152,8 +249,68 @@ export default async function PublicNoticePage({
 
   const appIntentUrl = `intent://classmatebd.vercel.app/n/${notice.id}#Intent;scheme=https;package=com.shuaib.classmate;end`;
 
+  const firstImage = notice.attachments?.find(
+    (a) => a.mime_type?.startsWith("image/") || !a.file_name?.toLowerCase().endsWith(".pdf")
+  );
+  const ogImageUrl = firstImage?.url || `https://classmatebd.vercel.app/n/${notice.id}/opengraph-image`;
+
+  const noticeJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `https://classmatebd.vercel.app/n/${notice.id}#article`,
+        headline: notice.title,
+        description: notice.body ? notice.body.slice(0, 150).replace(/\s+/g, " ").trim() : notice.title,
+        datePublished: notice.published_at,
+        dateModified: notice.published_at,
+        mainEntityOfPage: `https://classmatebd.vercel.app/n/${notice.id}`,
+        image: ogImageUrl,
+        author: {
+          "@type": "Person",
+          name: notice.author_name || "Academic Department",
+        },
+        publisher: {
+          "@type": "EducationalOrganization",
+          name: "ClassMate",
+          url: "https://classmatebd.vercel.app",
+          logo: "https://classmatebd.vercel.app/logo.png",
+        },
+        articleBody: notice.body || notice.title,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: "https://classmatebd.vercel.app",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Notices",
+            item: "https://classmatebd.vercel.app/#notices",
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: notice.title,
+            item: `https://classmatebd.vercel.app/n/${notice.id}`,
+          },
+        ],
+      },
+    ],
+  };
+
   return (
-    <main className="public-notice-page">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(noticeJsonLd) }}
+      />
+      <main className="public-notice-page">
       <div className="public-notice-wrapper">
         {/* App Link Floating Banner for Mobile Users */}
         <div className="mobile-app-banner">
@@ -234,6 +391,170 @@ export default async function PublicNoticePage({
             {notice.body}
           </div>
 
+          {/* Poll Card (if notice is a poll) */}
+          {notice.poll && (
+            <div className="notice-public-poll-container">
+              <div className="notice-poll-header">
+                <div className="poll-badge-row">
+                  <span className="poll-tag">📊 Poll</span>
+                  <span className="poll-meta-badge">
+                    {notice.poll.is_multiple_choice ? "Multiple choice" : "Single choice"}
+                  </span>
+                  {notice.poll.is_closed ? (
+                    <span className="poll-closed-badge">Closed</span>
+                  ) : (
+                    <span className="poll-active-badge">Active</span>
+                  )}
+                </div>
+                <h3 className="notice-poll-question">{notice.poll.question}</h3>
+              </div>
+
+              <div className="notice-poll-options-list">
+                {notice.poll.options.map((opt) => {
+                  const percent =
+                    notice.poll!.total_votes > 0
+                      ? Math.round((opt.votes_count / notice.poll!.total_votes) * 100)
+                      : 0;
+                  return (
+                    <div key={opt.id} className="notice-poll-option-row">
+                      <div
+                        className="poll-option-bar-fill"
+                        style={{ width: `${percent}%` }}
+                      />
+                      <div className="poll-option-content">
+                        <span className="poll-option-label">{opt.option_text}</span>
+                        <span className="poll-option-votes">
+                          {opt.votes_count} ({percent}%)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="notice-poll-footer">
+                <span>
+                  {notice.poll.total_voters} {notice.poll.total_voters === 1 ? "voter" : "voters"} ·{" "}
+                  {notice.poll.total_votes} {notice.poll.total_votes === 1 ? "vote" : "votes"}
+                </span>
+                {notice.poll.expires_at && (
+                  <span>
+                    Ends {new Date(notice.poll.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Notice Attachments (Documents & Images) */}
+          {notice.attachments && notice.attachments.length > 0 && (
+            <div className="notice-public-attachments-section">
+              {/* PDF Documents */}
+              {notice.attachments
+                .filter(
+                  (a) =>
+                    a.mime_type === "application/pdf" ||
+                    a.file_name?.toLowerCase().endsWith(".pdf"),
+                )
+                .map((doc) => (
+                  <div key={doc.id} className="notice-attachment-box">
+                    <div className="attachment-left">
+                      <div className="attachment-icon-pill doc-pill">
+                        <FileText size={20} />
+                      </div>
+                      <div className="attachment-meta">
+                        <span className="attachment-title">{doc.file_name}</span>
+                        <span className="attachment-sub">
+                          PDF Document
+                          {doc.size_bytes && doc.size_bytes > 0
+                            ? ` · ${
+                                doc.size_bytes > 1048576
+                                  ? `${(doc.size_bytes / 1048576).toFixed(1)} MB`
+                                  : `${Math.round(doc.size_bytes / 1024)} KB`
+                              }`
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="attachment-open-btn"
+                    >
+                      <span>Open PDF</span>
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                ))}
+
+              {/* Images */}
+              {(() => {
+                const images = notice.attachments.filter(
+                  (a) =>
+                    a.mime_type?.startsWith("image/") ||
+                    !a.file_name?.toLowerCase().endsWith(".pdf"),
+                );
+                if (images.length === 0) return null;
+
+                if (images.length === 1) {
+                  return (
+                    <div className="notice-public-single-image-wrapper">
+                      <a
+                        href={images[0].url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Click to view full resolution"
+                      >
+                        <img
+                          src={images[0].url}
+                          alt={images[0].file_name || notice.title}
+                          className="notice-public-image"
+                          loading="lazy"
+                        />
+                      </a>
+                      <div className="notice-public-image-footer">
+                        <span>{images[0].file_name}</span>
+                        {images[0].size_bytes ? (
+                          <span>
+                            {images[0].size_bytes > 1048576
+                              ? `${(images[0].size_bytes / 1048576).toFixed(1)} MB`
+                              : `${Math.round(images[0].size_bytes / 1024)} KB`}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className={`notice-public-images-grid grid-${Math.min(images.length, 3)}`}>
+                    {images.map((img, idx) => (
+                      <a
+                        key={img.id || idx}
+                        href={img.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="notice-public-grid-item"
+                        title={`View ${img.file_name || "full image"}`}
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.file_name || `Attachment ${idx + 1}`}
+                          className="notice-public-image-thumbnail"
+                          loading="lazy"
+                        />
+                        <div className="notice-public-grid-overlay">
+                          <span className="notice-public-grid-name">{img.file_name}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Resource / File Attachment if any */}
           {notice.resource_id && (
             <div className="notice-attachment-box">
@@ -254,7 +575,7 @@ export default async function PublicNoticePage({
                 </div>
               </div>
               <a
-                href={notice.resource_link_url || `/r/${notice.resource_id}`}
+                href={notice.resource_slug ? `/r/${notice.resource_slug}` : (notice.resource_link_url || `/r/${notice.resource_id}`)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="attachment-open-btn"
@@ -547,6 +868,126 @@ export default async function PublicNoticePage({
           word-break: break-word;
         }
 
+        /* Public Poll Component */
+        .notice-public-poll-container {
+          margin-top: 24px;
+          padding: 20px;
+          border-radius: 16px;
+          background: var(--attachment-bg);
+          border: 1px solid var(--attachment-border);
+        }
+
+        .poll-badge-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+
+        .poll-tag {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: rgba(14, 165, 233, 0.15);
+          color: #0284c7;
+        }
+
+        .poll-meta-badge {
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--text-muted);
+        }
+
+        .poll-active-badge {
+          margin-left: auto;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 7px;
+          border-radius: 10px;
+          background: rgba(34, 197, 94, 0.15);
+          color: #16a34a;
+        }
+
+        .poll-closed-badge {
+          margin-left: auto;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 7px;
+          border-radius: 10px;
+          background: rgba(156, 163, 175, 0.15);
+          color: var(--text-muted);
+        }
+
+        .notice-poll-question {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text-main);
+          margin: 0 0 16px 0;
+          line-height: 1.4;
+        }
+
+        .notice-poll-options-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .notice-poll-option-row {
+          position: relative;
+          padding: 12px 14px;
+          border-radius: 10px;
+          border: 1px solid var(--attachment-border);
+          background: var(--card-bg);
+          overflow: hidden;
+        }
+
+        .poll-option-bar-fill {
+          position: absolute;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          background: rgba(14, 165, 233, 0.12);
+          transition: width 0.3s ease;
+          border-radius: 10px 0 0 10px;
+        }
+
+        .poll-option-content {
+          position: relative;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          z-index: 1;
+        }
+
+        .poll-option-label {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--text-main);
+          word-break: break-word;
+        }
+
+        .poll-option-votes {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-muted);
+          white-space: nowrap;
+        }
+
+        .notice-poll-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 14px;
+          font-size: 12px;
+          color: var(--text-muted);
+          padding-top: 10px;
+          border-top: 1px dashed var(--attachment-border);
+        }
+
         .notice-attachment-box {
           display: flex;
           align-items: center;
@@ -617,6 +1058,103 @@ export default async function PublicNoticePage({
         .attachment-open-btn:hover {
           opacity: 0.9;
           transform: translateY(-1px);
+        }
+
+        .notice-public-attachments-section {
+          margin-top: 18px;
+        }
+
+        .doc-pill {
+          background: rgba(239, 68, 68, 0.12) !important;
+          color: #ef4444 !important;
+        }
+
+        .notice-public-single-image-wrapper {
+          margin-top: 16px;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid var(--attachment-border);
+          background: var(--attachment-bg);
+        }
+
+        .notice-public-image {
+          width: 100%;
+          max-height: 480px;
+          object-fit: contain;
+          display: block;
+          background: rgba(0, 0, 0, 0.04);
+          transition: transform 0.2s ease;
+        }
+
+        .notice-public-single-image-wrapper:hover .notice-public-image {
+          transform: scale(1.008);
+        }
+
+        .notice-public-image-footer {
+          padding: 8px 14px;
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          color: var(--text-muted);
+          background: var(--card-bg);
+          border-top: 1px solid var(--attachment-border);
+        }
+
+        .notice-public-images-grid {
+          display: grid;
+          gap: 12px;
+          margin-top: 16px;
+          border-radius: 14px;
+        }
+
+        .notice-public-images-grid.grid-2 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .notice-public-images-grid.grid-3 {
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .notice-public-grid-item {
+          position: relative;
+          display: block;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid var(--attachment-border);
+          aspect-ratio: 4 / 3;
+          background: var(--attachment-bg);
+          text-decoration: none;
+        }
+
+        .notice-public-image-thumbnail {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transition: transform 0.25s ease;
+        }
+
+        .notice-public-grid-item:hover .notice-public-image-thumbnail {
+          transform: scale(1.04);
+        }
+
+        .notice-public-grid-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 6px 10px;
+          background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+          color: #ffffff;
+          font-size: 11px;
+          display: flex;
+          align-items: center;
+        }
+
+        .notice-public-grid-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .gateway-section {
@@ -756,5 +1294,6 @@ export default async function PublicNoticePage({
         }
       `}</style>
     </main>
+    </>
   );
 }

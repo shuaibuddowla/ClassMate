@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Phone, MessageCircle, ChevronRight, Droplets, ArrowLeft, X } from "lucide-react";
+import { Search, Phone, MessageCircle, ChevronRight, Droplets, ArrowLeft, X, MoreVertical, RefreshCw } from "lucide-react";
 import { BloodNetwork } from "./blood-network";
 import { AboutDeveloper } from "./about-developer";
 import { BatchFund } from "./batch-fund";
@@ -15,6 +15,15 @@ export function Friends({ ctx }: { ctx: Context }) {
   const [subTab, setSubTab] = useState<"batchmates" | "fund">("batchmates");
   const [developer, setDeveloper] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
+  const canManageBatchmates = ctx.owner || (ctx.profile.is_cr === true && ctx.profile.cr_batch_id === ctx.batch);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStart = useRef<number | null>(null);
+  const activeBans = useQuery({
+    queryKey: [ctx.user, ctx.batch, "active-batch-bans"],
+    queryFn: () => rpc<Row[]>("batch_active_ban_list", { target_batch: ctx.batch }),
+    enabled: !!ctx.batch && canManageBatchmates,
+    refetchInterval: 30_000,
+  });
   useEffect(() => {
     let live = true;
     setAlert(null);
@@ -49,10 +58,37 @@ export function Friends({ ctx }: { ctx: Context }) {
   const [input, setInput] = useState(""),
     [search, setSearch] = useState(""),
     [person, setPerson] = useState<Row | null>(null),
+    [banTarget, setBanTarget] = useState<Row | null>(null),
+    [banDays, setBanDays] = useState<number>(3),
+    [banReason, setBanReason] = useState<string>(""),
     [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false),
     [online, setOnline] = useState(true),
     [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  async function manageStudent(p: Row, action: "appoint" | "transfer" | "ban" | "unban") {
+    try {
+      setBusy(true);
+      if (action === "appoint") {
+        await rpc("set_batch_cr", { target_profile: p.profile_id, target_active: !p.is_cr });
+        qc.setQueriesData<any>({ queryKey: [ctx.user, ctx.batch, "friends"] }, (old: any) => old && ({ ...old, pages: old.pages.map((page: Row[]) => page.map((row: Row) => row.profile_id === p.profile_id ? { ...row, is_cr: !p.is_cr } : row)) }));
+      } else if (action === "transfer") {
+        await rpc("transfer_batch_cr", { target_profile: p.profile_id });
+        await ctx.refreshProfile(await rpc<Row>("create_or_initialize_profile"));
+      } else if (action === "ban") {
+        setBanDays(3);
+        setBanReason("");
+        setBanTarget(p);
+        document.querySelectorAll<HTMLDetailsElement>(".batchmate-actions[open]").forEach(el => { el.open = false; });
+        return;
+      } else if (action === "unban") {
+        await rpc("manage_student_ban", { target_profile: p.profile_id, target_days: 1, target_reason: "unban", target_lift: true });
+        qc.setQueryData<Row[]>([ctx.user, ctx.batch, "active-batch-bans"], old => (old || []).filter(b => b.profile_id !== p.profile_id));
+      }
+      document.querySelectorAll<HTMLDetailsElement>(".batchmate-actions[open]").forEach(el => { el.open = false; });
+      await qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "friends"] });
+      await activeBans.refetch();
+    } catch (e) { setError(e); } finally { setBusy(false); }
+  }
   useEffect(() => {
     if (!ctx.active || !ctx.batch || !navigator.onLine) return;
     rpc("touch_presence").catch(() => {});
@@ -126,7 +162,7 @@ export function Friends({ ctx }: { ctx: Context }) {
   const fundBalance = Number(fundSummary.data?.current_balance || 0);
 
   return (
-    <div className="batch-screen">
+    <div className="batch-screen" onTouchStart={e => { if(subTab === "batchmates" && window.scrollY <= 2) touchStart.current = e.touches[0]?.clientY ?? null; }} onTouchMove={e => { if(touchStart.current === null || window.scrollY > 2) return; const distance = Math.max(0, Math.min(90, (e.touches[0]?.clientY ?? touchStart.current) - touchStart.current)); setPullDistance(distance); }} onTouchEnd={() => { const shouldRefresh = pullDistance >= 55; touchStart.current = null; setPullDistance(0); if(shouldRefresh) { void friends.refetch(); if(canManageBatchmates) void activeBans.refetch(); } }}>
       {developer && <AboutDeveloper user={ctx.user} close={() => setDeveloper(false)} />}
       {alert && ctx.active && <Modal title={`${alert.blood_group} blood needed`} close={()=>setAlert(null)}>
         <div className="blood-detail"><h3>{alert.hospital}</h3>
@@ -174,7 +210,7 @@ export function Friends({ ctx }: { ctx: Context }) {
       ) : (
         <div className="page-heading">
           <div>
-            <span className="eyebrow">YOUR BATCH COMMUNITY</span>
+            <span className="eyebrow">{ctx.profile.role === "teacher" ? "ENROLLED STUDENTS" : "YOUR BATCH COMMUNITY"}</span>
             <h1>{ctx.profile.role==="teacher" ? "Students" : "Batch"}</h1>
           </div>
           {subTab === "batchmates" && (
@@ -188,6 +224,25 @@ export function Friends({ ctx }: { ctx: Context }) {
               <Search size={20} />
             </button>
           )}
+        </div>
+      )}
+
+      {ctx.profile.role === "teacher" && (ctx.batches || []).length > 0 && (
+        <div className="segment modes teacher-batch-toggle" style={{ marginBottom: "16px", overflowX: "auto" }}>
+          {ctx.batches!.map((b) => {
+            const isSelected = ctx.batch === b.id;
+            const label = `${b.departments?.code ? String(b.departments.code).toUpperCase() + " " : ""}Batch ${b.batch_number}`;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                className={isSelected ? "selected" : ""}
+                onClick={() => ctx.changeBatch?.(b.id)}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -229,13 +284,17 @@ export function Friends({ ctx }: { ctx: Context }) {
             error={error || friends.error}
             retry={() => friends.refetch()}
           />
+          <div className="batchmate-refresh-row"><span>{pullDistance >= 55 ? "Release to refresh" : pullDistance > 0 ? "Pull to refresh" : ""}</span><button className="icon" aria-label="Refresh batchmates" title="Refresh batchmates" disabled={friends.isFetching} onClick={() => { void friends.refetch(); if(canManageBatchmates) void activeBans.refetch(); }}><RefreshCw size={17} className={friends.isFetching ? "spin" : undefined}/></button></div>
           {friends.isPending ? (
             <Skeleton />
           ) : (
             <div className="people-grid">
               {friends.data?.pages.flat().filter(p=>ctx.profile.role!=="teacher" || ["student", "admin"].includes(p.role)).map((p) => (
-                <button
-                  disabled={busy}
+                <div
+                  aria-disabled={busy}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !busy) { e.preventDefault(); (e.currentTarget as HTMLDivElement).click(); } }}
                   className="card person"
                   key={p.profile_id}
                   onClick={async () => {
@@ -271,7 +330,17 @@ export function Friends({ ctx }: { ctx: Context }) {
                     </small>
                   </span>
                   <ChevronRight size={17} />
-                </button>
+                  {canManageBatchmates && p.role === "student" && p.profile_id !== ctx.user && (
+                    <details className="batchmate-actions" onClick={(e) => e.stopPropagation()}>
+                      <summary aria-label={`Manage ${p.full_name}`} title="Manage student"><MoreVertical size={18} /></summary>
+                      <div className="batchmate-actions-menu">
+                        <button disabled={busy} onClick={() => void manageStudent(p,"appoint")}>{p.is_cr ? "Revoke CR access" : "Make CR"}</button>
+                        {!ctx.owner && !p.is_cr && <button disabled={busy} onClick={() => { if(window.confirm(`Transfer your CR role to ${p.full_name}?`)) void manageStudent(p,"transfer"); }}>Transfer my CR role</button>}
+                        {activeBans.isPending || activeBans.isError ? null : (activeBans.data || []).some(b => b.profile_id === p.profile_id) ? <button disabled={busy} onClick={() => void manageStudent(p,"unban")}>Unban</button> : <button disabled={busy} onClick={() => void manageStudent(p,"ban")}>Ban temporarily</button>}
+                      </div>
+                    </details>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -287,6 +356,61 @@ export function Friends({ ctx }: { ctx: Context }) {
             </button>
           )}
         </>
+      )}
+      {banTarget && (
+        <Modal title={`Ban ${banTarget.full_name}`} close={() => setBanTarget(null)}>
+          <div className="ban-dialog-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <p style={{ margin: 0, fontSize: "14px", color: "var(--muted)" }}>
+              The student will be instantly locked out from ClassMate until the ban expires or is lifted by a CR.
+            </p>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Duration</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {[3, 7, ...(ctx.owner ? [30] : [])].map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={banDays === d ? "primary" : "secondary"}
+                    style={{ flex: 1, padding: "8px 12px", fontSize: "13px" }}
+                    onClick={() => setBanDays(d)}
+                  >
+                    {d} Days
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Reason for ban</label>
+              <input
+                type="text"
+                value={banReason}
+                onChange={e => setBanReason(e.target.value)}
+                placeholder="e.g., Disruption in batch group, misconduct"
+                style={{ width: "100%", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
+              <button type="button" className="secondary" onClick={() => setBanTarget(null)}>Cancel</button>
+              <button
+                type="button"
+                className="danger"
+                disabled={busy || !banReason.trim()}
+                onClick={async () => {
+                  try {
+                    setBusy(true);
+                    await rpc("manage_student_ban", { target_profile: banTarget.profile_id, target_days: banDays, target_reason: banReason.trim(), target_lift: false });
+                    qc.setQueryData<Row[]>([ctx.user, ctx.batch, "active-batch-bans"], old => [...(old || []).filter(b => b.profile_id !== banTarget.profile_id), { profile_id: banTarget.profile_id }]);
+                    setBanTarget(null);
+                    await qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "friends"] });
+                    await activeBans.refetch();
+                  } catch(e) { setError(e); } finally { setBusy(false); }
+                }}
+              >
+                Confirm Ban
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
       {person && (
         <Modal title={person.role === "teacher" ? "Teacher profile" : "Batchmate profile"} close={() => setPerson(null)}>

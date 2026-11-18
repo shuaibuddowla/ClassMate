@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.browser.customtabs.CustomTabsIntent
+import org.json.JSONArray
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.databinding.ActivityClassmateCourseFilesBinding
@@ -143,6 +144,29 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
     }
 
     private fun loadFiles(showShimmer: Boolean) = lifecycleScope.launch {
+        val cacheScope = if (courseId.isBlank()) "batch_$batchId" else "course_$courseId"
+
+        // Restore cached files immediately for instant 0ms offline display
+        if (files.isEmpty()) {
+            val cachedJson = ClassMateAcademicCache.read(this@ClassMateCourseFilesActivity, "course_files", cacheScope, "list")
+            val cachedFiles = cachedJson?.optJSONArray("files")
+            if (cachedFiles != null && cachedFiles.length() > 0) {
+                files.clear()
+                for (i in 0 until cachedFiles.length()) {
+                    files.add(cachedFiles.getJSONObject(i))
+                }
+                showFiles()
+            }
+        }
+
+        if (!ClassMateAcademicCache.online(this@ClassMateCourseFilesActivity)) {
+            binding.shimmerView.stopShimmer()
+            binding.shimmerView.isVisible = false
+            binding.swipeRefresh.isRefreshing = false
+            showFiles()
+            return@launch
+        }
+
         if (showShimmer && files.isEmpty()) {
             binding.shimmerView.isVisible = true
             binding.shimmerView.startShimmer()
@@ -175,13 +199,35 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
 
             files.clear()
             files.addAll(loadedFiles)
+            ClassMateAcademicCache.save(
+                this@ClassMateCourseFilesActivity,
+                "course_files",
+                cacheScope,
+                "list",
+                JSONObject().put("files", JSONArray(loadedFiles))
+            )
             showFiles()
         }.onFailure { error ->
             binding.shimmerView.stopShimmer()
             binding.shimmerView.isVisible = false
             binding.swipeRefresh.isRefreshing = false
-            binding.tvFileCount.text = "Could not load files"
-            Toast.makeText(this@ClassMateCourseFilesActivity, error.message, Toast.LENGTH_LONG).show()
+            if (files.isNotEmpty()) {
+                showFiles()
+            } else {
+                val cachedJson = ClassMateAcademicCache.read(this@ClassMateCourseFilesActivity, "course_files", cacheScope, "list")
+                val cachedFiles = cachedJson?.optJSONArray("files")
+                if (cachedFiles != null && cachedFiles.length() > 0) {
+                    files.clear()
+                    for (i in 0 until cachedFiles.length()) {
+                        files.add(cachedFiles.getJSONObject(i))
+                    }
+                    showFiles()
+                } else {
+                    binding.tvFileCount.text = "Offline · No connection"
+                    val safeMsg = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(error)
+                    Toast.makeText(this@ClassMateCourseFilesActivity, safeMsg, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -191,7 +237,8 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
         }
 
         val total = filtered.size
-        binding.tvFileCount.text = if (total == 0) "No files" else "$total ${if (total == 1) "file" else "files"}"
+        val isOnline = ClassMateAcademicCache.online(this)
+        binding.tvFileCount.text = if (total == 0) "No files" else "$total ${if (total == 1) "file" else "files"}${if (!isOnline) " · Offline" else ""}"
 
         val isEmpty = filtered.isEmpty()
         binding.rvFiles.isVisible = !isEmpty

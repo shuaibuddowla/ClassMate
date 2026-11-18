@@ -156,7 +156,11 @@ internal class ClassMateAcademicScreens(
         }
         val routine = root.v<TextView>(R.id.btnToggleRoutine)
         val bus = root.v<TextView>(R.id.btnToggleBus)
+        val hasTransit = ClassMateAcademicCache.hasBusTransit(activity)
+        bus.visibility = if (hasTransit) View.VISIBLE else View.GONE
         fun updateToggle() {
+            if (!hasTransit && busMode) busMode = false
+            bus.visibility = if (hasTransit) View.VISIBLE else View.GONE
             routine.setBackgroundResource(if (busMode) android.R.color.transparent else R.drawable.bg_toggle_item_selected)
             bus.setBackgroundResource(if (busMode) R.drawable.bg_toggle_item_selected else android.R.color.transparent)
             routine.setTextColor(activity.getColor(if (busMode) R.color.cm_text_secondary else android.R.color.white))
@@ -272,7 +276,7 @@ internal class ClassMateAcademicScreens(
                     JSONArray(visible.map { it.getString("id") }))))).associateBy { it.getString("notice_id") }
             if (!active(root) || selectedBatch != batchId() ||
                 search != root.v<EditText>(R.id.etNoticeSearch).text.toString().trim()) return@launch
-            text(root, R.id.tvNoticeSubtitle, "${visible.size} updates · Pull to refresh")
+            root.v<View>(R.id.tvNoticeSubtitle)?.visibility = View.GONE
             val filtered = visible.filter { search.isBlank() ||
                 it.optString("title").contains(search, true) || it.optString("body").contains(search, true) }
                 .sortedWith(compareByDescending<JSONObject> {
@@ -288,8 +292,19 @@ internal class ClassMateAcademicScreens(
                 text(card, R.id.tvAuthorName, if (item.optString("author_id") == profile().optString("id"))
                     profile().optString("full_name") else "ClassMate")
                 text(card, R.id.tvMeta, item.optString("published_at").replace('T', ' ').take(16))
-                text(card, R.id.tvLikeCount, state?.optLong("like_count")?.toString() ?: "0")
-                text(card, R.id.tvCommentCount, state?.optLong("comment_count")?.toString() ?: "0")
+                val likeCount = state?.optLong("like_count") ?: 0L
+                val isLiked = state?.optBoolean("is_liked") == true
+                card.v<TextView>(R.id.tvLikeCount)?.apply {
+                    text = if (likeCount > 0) likeCount.toString() else ""
+                    setTextColor(activity.getColor(if (isLiked) R.color.cm_notice_like else R.color.cm_text_secondary))
+                    visibility = if (likeCount > 0) View.VISIBLE else View.GONE
+                }
+                val commentCount = state?.optLong("comment_count") ?: 0L
+                card.v<TextView>(R.id.tvCommentCount)?.apply {
+                    text = if (commentCount > 0) commentCount.toString() else ""
+                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    visibility = if (commentCount > 0) View.VISIBLE else View.GONE
+                }
                 card.v<android.widget.ImageView>(R.id.ivLikeIcon).setImageResource(
                     if (state?.optBoolean("is_liked") == true) R.drawable.ic_heart_filled
                     else R.drawable.ic_heart_outline)

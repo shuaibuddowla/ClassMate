@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter
 
 /** The same day pills and period cards as the timetable; writes stay server-authorized. */
 class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
-    private data class Offering(val id: String, val title: String, val name: String, val type: String)
+    private data class Offering(val id: String, val title: String, val name: String, val type: String, val teachers: List<JSONObject> = emptyList())
     private val days = arrayOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
     private val offerings = mutableListOf<Offering>()
     private val catalog = mutableMapOf<String,Offering>()
@@ -124,9 +124,22 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
             fun text(viewId:Int,value:String) { card.findViewById<TextView>(viewId).text=value }
             val from=time(slot.optString("start_time")); val to=time(slot.optString("end_time")); val format=DateTimeFormatter.ofPattern("hh:mm a")
             text(R.id.tvSubject,offering?.name ?: "Class"); text(R.id.tvStartTime,from.format(format)); text(R.id.tvEndTime,to.format(format))
-            val teacher=teachers[id].orEmpty(); text(R.id.tvTeacher,teacher); card.findViewById<View>(R.id.layoutTeacherInfo).visibility=if(teacher.isBlank()) View.GONE else View.VISIBLE
+            val slotTeacher = slot.optString("teacher_name").trim().takeUnless { it.isBlank() || it.equals("null", true) }
+            val teacher=slotTeacher ?: teachers[id].orEmpty(); text(R.id.tvTeacher,teacher); card.findViewById<View>(R.id.layoutTeacherInfo).visibility=if(teacher.isBlank()) View.GONE else View.VISIBLE
             val room=slot.optString("room").takeUnless { it == "null" }.orEmpty(); text(R.id.tvRoom,room); card.findViewById<View>(R.id.layoutRoomInfo).visibility=if(room.isBlank()) View.GONE else View.VISIBLE
-            text(R.id.tvTypeBadge,slot.optString("type").takeUnless { it.isBlank() || it=="null" }?.uppercase() ?: if(offering?.type=="lab") "LAB" else "CLASS")
+            val isLabSession = slot.optString("type").equals("lab", true) ||
+                slot.optString("type").equals("practical", true) ||
+                (offering?.name ?: "").trim().endsWith("lab", ignoreCase = true) ||
+                (offering?.name ?: "").trim().endsWith("labs", ignoreCase = true) ||
+                (offering?.name ?: "").trim().endsWith("practical", ignoreCase = true) ||
+                (offering?.name ?: "").trim().endsWith("practicals", ignoreCase = true)
+            val labBadge = if (isLabSession) {
+                val sub = (offering?.name ?: "").lowercase()
+                if (sub.contains("practical") && !sub.contains("lab")) "PRACTICAL"
+                else if (sub.contains("lab") && !sub.contains("practical")) "LAB"
+                else "PRACTICAL / LAB"
+            } else "CLASS"
+            text(R.id.tvTypeBadge, labBadge)
             text(R.id.tvDuration,"${Duration.between(from,to).toMinutes()} min")
             card.setOnClickListener { if(offerings.any { it.id==id }) openPeriod(slot) else Toast.makeText(this,if(loading) "Loading courses…" else if(!ClassMateAcademicCache.online(this)) "Connect to edit periods." else "You can edit only your assigned courses.",Toast.LENGTH_SHORT).show() }
             slotList.addView(card)
@@ -147,10 +160,19 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
                 val nextCatalog=mutableMapOf<String,Offering>()
                 for(i in 0 until rows.length()) {
                     val item=rows.getJSONObject(i); val c=names[item.optString("course_id")] ?: continue
-                    val name=c.optString("course_title"); nextCatalog[item.getString("id")]=Offering(item.getString("id"),"${c.optString("course_code")} · $name",name,c.optString("course_type"))
+                    val name=c.optString("course_title")
+                    val teachersList = mutableListOf<JSONObject>()
+                    val assigned = c.optJSONArray("assigned_teachers")
+                    if (assigned != null) {
+                        for (j in 0 until assigned.length()) assigned.optJSONObject(j)?.let { teachersList.add(it) }
+                    }
+                    if (teachersList.isEmpty() && c.optString("teacher_record_id").isNotBlank() && c.optString("teacher_record_id") != "null") {
+                        teachersList.add(JSONObject().put("id", c.optString("teacher_record_id")).put("name", c.optString("teacher_name")))
+                    }
+                    nextCatalog[item.getString("id")]=Offering(item.getString("id"),"${c.optString("course_code")} · $name",name,c.optString("course_type"), teachersList)
                 }
                 val ids=nextCatalog.keys.joinToString(",")
-                val routine=if(ids.isEmpty()) org.json.JSONArray() else ClassMateAuthApi.rows("routine_slots","select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.($ids)&order=start_time")
+                val routine=if(ids.isEmpty()) org.json.JSONArray() else ClassMateAuthApi.rows("routine_slots","select=id,semester_course_id,day_of_week,start_time,end_time,room,type,teacher_record_id,teacher_name&semester_course_id=in.($ids)&order=start_time")
                 val details=if(ids.isEmpty()) org.json.JSONArray() else org.json.JSONArray(ClassMateAuthApi.rpcText("timetable_details",JSONObject().put("target_batch",batchId).put("target_date",LocalDate.now().toString()).put("target_course_ids",org.json.JSONArray(nextCatalog.keys.toList()))))
                 configured=nextCatalog.isNotEmpty(); catalog.clear(); catalog.putAll(nextCatalog); offerings.clear(); offerings.addAll(nextCatalog.values.filter { allowed==null || it.id in allowed })
                 slots.clear(); for(i in 0 until routine.length()) slots.add(routine.getJSONObject(i))
@@ -182,9 +204,73 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
         val box=TextInputLayout(this,null,com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply { hint="Course"; boxBackgroundMode=TextInputLayout.BOX_BACKGROUND_OUTLINE; setBoxCornerRadii(dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat(),dp(12).toFloat()) }
         val course=MaterialAutoCompleteTextView(box.context).apply { inputType=android.text.InputType.TYPE_NULL; setTextColor(getColor(R.color.cm_text_primary)); setAdapter(ArrayAdapter(this@ClassMatePeriodEditorActivity,android.R.layout.simple_dropdown_item_1line,offerings.map { it.title })) }
         box.addView(course); dialogForm.panel.addView(box)
-        val selected=offerings.firstOrNull { it.id==slot?.optString("semester_course_id") } ?: offerings.first()
+        var selected=offerings.firstOrNull { it.id==slot?.optString("semester_course_id") } ?: offerings.first()
         course.setText(selected.title,false)
-        val room=dialogForm.field("Room or lab").apply { setText(slot?.optString("room")?.takeUnless { it=="null" }.orEmpty()) }
+
+        var selectedTeacherRecord = slot?.optString("teacher_record_id")?.takeUnless { it.isBlank() || it == "null" }
+        var selectedTeacherName = slot?.optString("teacher_name")?.takeUnless { it.isBlank() || it == "null" }.orEmpty()
+
+        val teacherBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
+            hint = "Instructor for this class"
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            setBoxCornerRadii(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat())
+        }
+        val teacherDropdown = MaterialAutoCompleteTextView(teacherBox.context).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        teacherBox.addView(teacherDropdown)
+        dialogForm.panel.addView(teacherBox)
+
+        fun updateTeacherDropdown(offering: Offering) {
+            val options = mutableListOf<Pair<String, Pair<String?, String>>>()
+            if (offering.teachers.isNotEmpty()) {
+                offering.teachers.forEach { t ->
+                    val tid = t.optString("id").takeUnless { it.isBlank() || it == "null" }
+                    val tname = t.optString("name").trim()
+                    if (tname.isNotBlank()) options.add(tname to Pair(tid, tname))
+                }
+                if (offering.teachers.size > 1) {
+                    val joint = offering.teachers.map { it.optString("name").trim() }.filter { it.isNotBlank() }.joinToString(" & ")
+                    options.add("Both / Joint ($joint)" to Pair(null, joint))
+                }
+            } else {
+                val tname = teachers[offering.id]?.trim().orEmpty()
+                if (tname.isNotBlank()) options.add(tname to Pair(null, tname))
+            }
+            if (options.isEmpty()) {
+                options.add("Course Default" to Pair(null, ""))
+            }
+
+            val labels = options.map { it.first }
+            teacherDropdown.setAdapter(ArrayAdapter(this@ClassMatePeriodEditorActivity, android.R.layout.simple_dropdown_item_1line, labels))
+
+            val currentSelected = options.firstOrNull {
+                (selectedTeacherRecord != null && it.second.first == selectedTeacherRecord) ||
+                (selectedTeacherName.isNotBlank() && it.second.second.equals(selectedTeacherName, ignoreCase = true))
+            } ?: options.first()
+
+            teacherDropdown.setText(currentSelected.first, false)
+            selectedTeacherRecord = currentSelected.second.first
+            selectedTeacherName = currentSelected.second.second
+
+            teacherDropdown.setOnItemClickListener { _, _, position, _ ->
+                val chosen = options.getOrNull(position)
+                selectedTeacherRecord = chosen?.second?.first
+                selectedTeacherName = chosen?.second?.second.orEmpty()
+            }
+        }
+
+        updateTeacherDropdown(selected)
+
+        course.setOnItemClickListener { _, _, position, _ ->
+            selected = offerings.getOrNull(position) ?: selected
+            selectedTeacherRecord = null
+            selectedTeacherName = ""
+            updateTeacherDropdown(selected)
+        }
+
+        val room=dialogForm.field("Room or lab/practical").apply { setText(slot?.optString("room")?.takeUnless { it=="null" }.orEmpty()) }
         var from=slot?.let { time(it.optString("start_time")) } ?: slots.filter { it.optInt("day_of_week")==day }.maxByOrNull { it.optString("end_time") }?.let { time(it.optString("end_time")) } ?: LocalTime.of(9,0)
         var to=slot?.let { time(it.optString("end_time")) } ?: from.plusMinutes(45)
         val times=LinearLayout(this)
@@ -212,7 +298,16 @@ class ClassMatePeriodEditorActivity : ClassMateScheduleEditor() {
                         slots.removeAll { it.optString("id")==slot.optString("id") }
                         ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",null,deletedId=slot.getString("id"))
                     } else {
-                        val saved=ClassMateAuthApi.rpc("save_routine_slot",JSONObject().put("target_id",slot?.optString("id") ?: JSONObject.NULL).put("target_semester_course",offering!!.id).put("target_day",selectedPeriodDay).put("target_start",from.toString()).put("target_end",to.toString()).put("target_room",room.text.toString().trim()))
+                        val saved=ClassMateAuthApi.rpc("save_routine_slot",JSONObject()
+                            .put("target_id",slot?.optString("id") ?: JSONObject.NULL)
+                            .put("target_semester_course",offering!!.id)
+                            .put("target_day",selectedPeriodDay)
+                            .put("target_start",from.toString())
+                            .put("target_end",to.toString())
+                            .put("target_room",room.text.toString().trim())
+                            .put("target_teacher_record",selectedTeacherRecord ?: JSONObject.NULL)
+                            .put("target_teacher_name",selectedTeacherName.ifBlank { JSONObject.NULL })
+                        )
                         slots.removeAll { it.optString("id")==saved.optString("id") }; slots.add(saved)
                         ClassMateAcademicCache.updateSchedule(this@ClassMatePeriodEditorActivity,profileId,batchId,"routine",saved,courseName=offering.name)
                     }

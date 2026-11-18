@@ -41,7 +41,10 @@ class ClassMateNoticeReminderReceiver : android.content.BroadcastReceiver() {
         val open = PendingIntent.getActivity(context, noticeId.hashCode(),
             Intent(context, ClassMateAuthActivity::class.java).apply {
                 putExtra("OPEN_TAB", "notices")
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra("TARGET_NOTICE_ID", noticeId)
+                putExtra("noticeId", noticeId)
+                putExtra("record_id", noticeId)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, "classmate_notices")
             .setSmallIcon(R.drawable.ic_classmate_notification)

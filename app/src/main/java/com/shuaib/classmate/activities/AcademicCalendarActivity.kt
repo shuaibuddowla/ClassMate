@@ -34,6 +34,12 @@ class AcademicCalendarActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!ClassMateAcademicCache.hasAcademicCalendar(this)) {
+            com.shuaib.classmate.ui.ClassMateNoticeDialog.showUnconfiguredDialog(this, "Academic Calendar") {
+                finish()
+            }
+            return
+        }
         binding = ActivityAcademicCalendarBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

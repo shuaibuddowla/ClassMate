@@ -194,7 +194,13 @@ internal object ClassMateMessageInfo {
                         val itemDivider = rowView.findViewById<View>(R.id.itemDivider)
 
                         val readerName = reader.optString("reader_name", "ClassMate Member").trim()
-                        val avatarUrl = reader.optString("avatar_url").trim()
+                        val rawAvatarUrl = reader.optString("avatar_url").trim()
+                        val avatarUrl = if (reader.optString("profile_id") == currentUserId) {
+                            (activity as? ClassMateAuthActivity)?.profile?.optString("avatar_url")
+                                ?.takeUnless { it.isBlank() || it.equals("null", true) } ?: rawAvatarUrl
+                        } else {
+                            rawAvatarUrl
+                        }
                         val readAt = reader.optString("read_at")
 
                         tvReaderName.text = readerName

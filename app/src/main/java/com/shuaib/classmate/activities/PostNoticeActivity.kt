@@ -26,6 +26,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ActivityPostNoticeBinding
 import com.shuaib.classmate.notices.NoticeTextFormatter
+import com.shuaib.classmate.notices.WhatsAppEditorHelper
 import com.shuaib.classmate.models.Assignment
 import com.shuaib.classmate.models.Course
 import com.shuaib.classmate.services.AIService
@@ -126,6 +127,7 @@ class PostNoticeActivity : AppCompatActivity() {
         setupEditModeIfNeeded()
 
         setupVacationSection()
+        WhatsAppEditorHelper.attach(binding.etBody)
 
         binding.btnPublish.setOnClickListener {
             editNoticeId?.let {
@@ -208,7 +210,7 @@ class PostNoticeActivity : AppCompatActivity() {
             }.onFailure { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this@PostNoticeActivity, "Update failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@PostNoticeActivity, "Update failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -462,7 +464,7 @@ class PostNoticeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -567,7 +569,21 @@ class PostNoticeActivity : AppCompatActivity() {
                 }.onFailure { error ->
                     binding.progressBar.isVisible = false
                     binding.btnPublish.isEnabled = true
-                    Toast.makeText(this@PostNoticeActivity, "Notice could not be posted: ${error.message}", Toast.LENGTH_LONG).show()
+                    val isOffline = !com.shuaib.classmate.activities.ClassMateAcademicCache.online(this@PostNoticeActivity)
+                    if (isOffline) {
+                        com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
+                            applicationContext,
+                            com.shuaib.classmate.workers.PendingNotice(
+                                batchId = targetBatchId,
+                                title = title,
+                                body = body
+                            )
+                        )
+                        Toast.makeText(this@PostNoticeActivity, "Offline: Notice saved to queue. It will post automatically once connection returns.", Toast.LENGTH_LONG).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this@PostNoticeActivity, "Notice could not be posted: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(error), Toast.LENGTH_LONG).show()
+                    }
                 }
             }
             return
@@ -629,7 +645,7 @@ class PostNoticeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -707,7 +723,7 @@ class PostNoticeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -787,7 +803,7 @@ class PostNoticeActivity : AppCompatActivity() {
             }.onFailure { error ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this@PostNoticeActivity, "Cancellation could not be posted: ${error.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@PostNoticeActivity, "Cancellation could not be posted: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(error), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -940,7 +956,7 @@ class PostNoticeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
             }
     }
 
@@ -1171,12 +1187,12 @@ class PostNoticeActivity : AppCompatActivity() {
                     .addOnFailureListener { e ->
                         binding.progressBar.isVisible = false
                         binding.btnPublish.isEnabled = true
-                        Toast.makeText(this@PostNoticeActivity, "Notice creation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@PostNoticeActivity, "Notice creation failed: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
                     }
             } else {
                 binding.progressBar.isVisible = false
                 binding.btnPublish.isEnabled = true
-                val errorMsg = result.exceptionOrNull()?.message ?: "Unknown error"
+                val errorMsg = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(result.exceptionOrNull())
                 Toast.makeText(this@PostNoticeActivity, "Calendar Exception failed: $errorMsg", Toast.LENGTH_LONG).show()
             }
         }

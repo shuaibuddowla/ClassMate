@@ -97,6 +97,7 @@ internal object ClassMateTeachersDialog {
                     "acct" -> "Accounting"
                     "eco" -> "Economics"
                     "math" -> "Math"
+                    "fisheries" -> "Fisheries"
                     else -> t.departmentCode.uppercase().takeIf { it.isNotBlank() }
                 }
                 holder.tvCourses.text = listOfNotNull(
@@ -118,7 +119,7 @@ internal object ClassMateTeachersDialog {
                 holder.btnEdit.visibility = if (canManage) View.VISIBLE else View.GONE
                 holder.btnEdit.setOnClickListener {
                     it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                    showEditTeacherDialog(context, scope, batchId, t, isAdmin) {
+                    showEditTeacherDialog(context, scope, batchId, t, canManage) {
                         dialog.dismiss()
                         show(context, scope, batchId, batchLabel, profile, onTeacherDataChanged)
                         onTeacherDataChanged?.invoke()
@@ -273,7 +274,7 @@ internal object ClassMateTeachersDialog {
         // Add Teacher action (Admin & CR only)
         btnAddTeacher.setOnClickListener {
             it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-            showAddTeacherDialog(context, scope, batchId, isAdmin) {
+            showAddTeacherDialog(context, scope, batchId, profile, canManage) {
                 dialog.dismiss()
                 show(context, scope, batchId, batchLabel, profile, onTeacherDataChanged)
                 onTeacherDataChanged?.invoke()
@@ -287,7 +288,8 @@ internal object ClassMateTeachersDialog {
         context: Context,
         scope: CoroutineScope,
         batchId: String,
-        isAdmin: Boolean,
+        profile: JSONObject,
+        canManage: Boolean,
         onSuccess: () -> Unit
     ) {
         val layout = LinearLayout(context).apply {
@@ -297,12 +299,12 @@ internal object ClassMateTeachersDialog {
         }
 
         val etName = EditText(context).apply {
-            hint = "Teacher Full Name"
+            hint = "Teacher Full Name *"
             textSize = 14f
             setSingleLine(true)
         }
         val etEmail = EditText(context).apply {
-            hint = "Email (e.g. name@mbstu.ac.bd)"
+            hint = "Email (e.g. teacher@university.ac.bd or Gmail)"
             textSize = 14f
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -313,10 +315,10 @@ internal object ClassMateTeachersDialog {
 
         MaterialAlertDialogBuilder(context)
             .setTitle("Add Faculty Member")
-            .setMessage("Enter the teacher's name and university email.")
+            .setMessage("Enter the teacher's name and email address.")
             .setView(layout)
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Add") { d, _ ->
+            .setPositiveButton("Add") { _, _ ->
                 val name = etName.text.toString().trim()
                 val email = etEmail.text.toString().trim()
                 if (name.length < 2) {
@@ -328,21 +330,28 @@ internal object ClassMateTeachersDialog {
                     try {
                         val dept = withContext(Dispatchers.IO) {
                             try {
-                                ClassMateAuthApi.rows("batches", "select=department_id&id=eq.$batchId")
-                                    .optJSONObject(0)?.optString("department_id").orEmpty()
-                            } catch (_: Exception) { "" }
+                                val b = ClassMateAuthApi.rows("batches", "select=department_id&id=eq.$batchId").optJSONObject(0)
+                                b?.optString("department_id")?.takeUnless { it.isBlank() }
+                                    ?: profile.optString("department_id").takeUnless { it.isBlank() }
+                                    ?: ""
+                            } catch (_: Exception) {
+                                profile.optString("department_id").orEmpty()
+                            }
                         }
 
-                        if (isAdmin && dept.isNotBlank()) {
-                            withContext(Dispatchers.IO) {
-                                ClassMateAuthApi.rpc(
-                                    "owner_create_teacher",
-                                    JSONObject()
-                                        .put("target_department", dept)
-                                        .put("target_name", name)
-                                        .put("target_email", email)
-                                )
-                            }
+                        if (dept.isBlank()) {
+                            Toast.makeText(context, "Could not determine department for this batch.", Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+
+                        withContext(Dispatchers.IO) {
+                            ClassMateAuthApi.rpc(
+                                "owner_create_teacher",
+                                JSONObject()
+                                    .put("target_department", dept)
+                                    .put("target_name", name)
+                                    .put("target_email", if (email.isBlank()) JSONObject.NULL else email)
+                            )
                         }
                         Toast.makeText(context, "Teacher added successfully.", Toast.LENGTH_SHORT).show()
                         onSuccess()
@@ -375,7 +384,7 @@ internal object ClassMateTeachersDialog {
             setSingleLine(true)
         }
         val etEmail = EditText(context).apply {
-            hint = "Email (e.g. name@mbstu.ac.bd)"
+            hint = "Email (e.g. teacher@university.ac.bd or Gmail)"
             setText(teacher.email)
             textSize = 14f
             setSingleLine(true)
@@ -406,7 +415,7 @@ internal object ClassMateTeachersDialog {
                                     JSONObject()
                                         .put("target_record", teacher.recordId)
                                         .put("target_name", newName)
-                                        .put("target_email", newEmail)
+                                        .put("target_email", if (newEmail.isBlank()) JSONObject.NULL else newEmail)
                                 )
                             }
                         }

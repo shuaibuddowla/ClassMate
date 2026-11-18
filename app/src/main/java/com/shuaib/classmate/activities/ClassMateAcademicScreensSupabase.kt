@@ -1,5 +1,7 @@
 package com.shuaib.classmate.activities
 
+import android.view.MotionEvent
+
 
 
 
@@ -73,9 +75,10 @@ import android.widget.LinearLayout
 
 import android.widget.TextView
 
-
-
 import android.widget.Toast
+import android.widget.FrameLayout
+import androidx.viewpager2.widget.ViewPager2
+import com.shuaib.classmate.adapters.NoticeImageCarouselAdapter
 
 
 
@@ -297,6 +300,61 @@ internal class ClassMateAcademicScreensSupabase(
 
     private var lastTimetableSetupDate = LocalDate.now()
 
+    var statusBarInsetTop: Int = 0
+
+    fun onStatusBarInset(top: Int) {
+        if (top <= 0 || top == statusBarInsetTop) return
+        statusBarInsetTop = top
+        for ((_, root) in tabRoots) {
+            applyHeaderTopInset(root)
+        }
+    }
+
+    fun applyHeaderTopInset(root: View?) {
+        if (root == null || statusBarInsetTop <= 0) return
+        val header = root.findViewById<View>(R.id.noticeHeaderPanel)
+            ?: root.findViewById<View>(R.id.timetableHeaderLayout)
+            ?: root.findViewById<View>(R.id.headerLayout)
+            ?: root.findViewById<View>(R.id.profileHeaderLayout)
+        header?.let { h ->
+            val baseTop = (2 * activity.resources.displayMetrics.density).toInt()
+            val targetPaddingTop = statusBarInsetTop + baseTop
+            if (h.paddingTop != targetPaddingTop) {
+                h.setPadding(h.paddingLeft, targetPaddingTop, h.paddingRight, h.paddingBottom)
+            }
+            // For Timetable: header and day selectors are already in vertical LinearLayout, no extra paddingTop needed
+            if (h.id == R.id.timetableHeaderLayout) {
+                root.findViewById<View>(R.id.nestedScrollView)?.let { s ->
+                    if (s.paddingTop != 0) {
+                        s.setPadding(s.paddingLeft, 0, s.paddingRight, s.paddingBottom)
+                    }
+                }
+            }
+            // Only adjust scroll padding for floating headers (Courses, Profile)
+            val isFloatingHeader = (h.id == R.id.headerLayout || h.id == R.id.profileHeaderLayout)
+            if (isFloatingHeader) {
+                val adjustScrollPadding = {
+                    val hHeight = h.height.takeIf { it > 0 } ?: h.measuredHeight
+                    if (hHeight > 0) {
+                        val scroll = root.findViewById<View>(R.id.nestedScrollView)
+                            ?: root.findViewById<View>(R.id.scrollProfile)
+                        scroll?.let { s ->
+                            val minPadding = hHeight + (6 * activity.resources.displayMetrics.density).toInt()
+                            if (s.paddingTop != minPadding) {
+                                s.setPadding(s.paddingLeft, minPadding, s.paddingRight, s.paddingBottom)
+                            }
+                        }
+                    }
+                }
+                if (h.isLaidOut) {
+                    adjustScrollPadding()
+                } else {
+                    h.post { adjustScrollPadding() }
+                }
+            }
+        }
+    }
+
 
 
     private var busMode = false
@@ -351,7 +409,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private val noticeDateFormatter=DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm").withZone(ZoneId.systemDefault())
+    private val noticeDateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH).withZone(ZoneId.systemDefault())
 
 
 
@@ -396,8 +454,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private val noticeReaderPreviews = mutableMapOf<String, List<JSONObject>>()
+    private val noticeResources = mutableMapOf<String, JSONObject>()
+    private val noticeAttachments = mutableMapOf<String, List<JSONObject>>()
     private val noticePolls = mutableMapOf<String, JSONObject>()
     private val pollVoteJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
+    private var hasShownUnreadIslandThisSession = false
+    private var isCheckingUnreadIsland = false
+    private var noticeTabVisitId = 0
 
 
 
@@ -629,6 +692,47 @@ internal class ClassMateAcademicScreensSupabase(
 
     private var libraryLoadingRoot: View? = null
 
+    private fun saveLibraryCache(snapshot: LibrarySnapshot) {
+        val bId = snapshot.batchId.ifBlank { batchId() }
+        if (bId.isBlank()) return
+        val json = JSONObject().apply {
+            put("batch_id", bId)
+            put("offerings", JSONArray(snapshot.offerings))
+            val coursesObj = JSONObject()
+            snapshot.courses.forEach { (k, v) -> coursesObj.put(k, v) }
+            put("courses", coursesObj)
+            put("files", JSONArray(snapshot.files))
+            put("favorites", JSONArray(snapshot.favoriteIds))
+            put("saved_at", System.currentTimeMillis())
+        }
+        val pId = profile().optString("id").ifBlank { "default_user" }
+        ClassMateAcademicCache.save(activity, pId, bId, "library", json)
+        ClassMateAcademicCache.save(activity, "default_user", bId, "library", json)
+    }
+
+    private fun restoreLibraryCache(batch: String): LibrarySnapshot? {
+        if (batch.isBlank()) return null
+        val pId = profile().optString("id")
+        val data = ClassMateAcademicCache.read(activity, pId, batch, "library")
+            ?: ClassMateAcademicCache.read(activity, "default_user", batch, "library")
+            ?: run {
+                val allPrefs = activity.getSharedPreferences("classmate_academic_cache_${BuildConfig.CLASSMATE_ENV}", Context.MODE_PRIVATE).all
+                val matchingKey = allPrefs.keys.firstOrNull { it.endsWith(":$batch:library") }
+                matchingKey?.let { key -> runCatching { JSONObject(allPrefs[key] as String) }.getOrNull() }
+            } ?: return null
+
+        val offerings = rows(data.optJSONArray("offerings") ?: JSONArray())
+        val coursesJson = data.optJSONObject("courses") ?: JSONObject()
+        val courses = mutableMapOf<String, JSONObject>()
+        coursesJson.keys().forEach { k -> coursesJson.optJSONObject(k)?.let { courses[k] = it } }
+        val files = rows(data.optJSONArray("files") ?: JSONArray())
+        val favorites = mutableSetOf<String>()
+        data.optJSONArray("favorites")?.let { arr ->
+            for (i in 0 until arr.length()) favorites.add(arr.optString(i))
+        }
+        return LibrarySnapshot(batch, offerings, courses, files, favorites)
+    }
+
 
 
     fun invalidateLibrary() { librarySnapshot = null }
@@ -823,6 +927,32 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+    fun prewarmTabs(host: ViewGroup) {
+        com.shuaib.classmate.ui.ClassMateHamburgerSheet.warmUp(activity)
+        host.postDelayed({
+            val tabsToPrewarm = listOf(R.id.nav_notices, R.id.nav_pdf, R.id.nav_profile)
+            for (tab in tabsToPrewarm) {
+                if (tabRoots[tab] == null) {
+                    try {
+                        val layout = when (tab) {
+                            R.id.nav_notices -> R.layout.fragment_notice
+                            R.id.nav_pdf -> R.layout.fragment_pdf_library
+                            else -> R.layout.classmate_profile
+                        }
+                        val prewarmed = inflater.inflate(layout, host, false)
+                        tabRoots[tab] = prewarmed
+                        when (tab) {
+                            R.id.nav_notices -> setupNotices(prewarmed)
+                            R.id.nav_pdf -> setupLibrary(prewarmed)
+                            else -> setupProfile(prewarmed)
+                        }
+                        bindFloatingNavigation(tab, prewarmed)
+                    } catch (_: Throwable) {}
+                }
+            }
+        }, 150)
+    }
+
     fun render(tab: Int, host: LinearLayout) {
 
 
@@ -840,6 +970,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             host.addView(root,LinearLayout.LayoutParams(-1,-1))
+            applyHeaderTopInset(root)
 
             if (tab == R.id.nav_transit) {
                 resumeTransitWebView()
@@ -856,6 +987,15 @@ internal class ClassMateAcademicScreensSupabase(
             }
 
             root.doOnAttach {
+                bindFloatingNavigation(tab, root)
+                val atTop = when (tab) {
+                    R.id.nav_notices -> !(root.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvNotices)?.canScrollVertically(-1) ?: false)
+                    R.id.nav_timetable, R.id.nav_pdf -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.nestedScrollView)?.scrollY ?: 0) == 0
+                    R.id.nav_profile -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile)?.scrollY ?: 0) == 0
+                    else -> true
+                }
+                updateTabHeaderColors(root, !atTop)
+                setTabHeaderCollapsed(root, !atTop)
 
                 if (tab == R.id.nav_transit) {
                     resumeTransitWebView()
@@ -916,33 +1056,23 @@ internal class ClassMateAcademicScreensSupabase(
 
 
                     R.id.nav_notices -> {
-
-
-
                         startNoticePoller(root)
-
-
-
-                        if(noticeFeed.isEmpty() || noticeBatch!=batchId() || android.os.SystemClock.elapsedRealtime()-noticeSyncedAt>10_000) loadNotices(root,preserveOlder=true)
-
-
-
+                        if (!ClassMateAcademicCache.online(activity)) {
+                            if (noticeFeed.isEmpty() || noticeBatch != batchId()) restoreNoticeCache()
+                            renderNoticeFeed(root)
+                        } else if (noticeFeed.isEmpty() || noticeBatch != batchId() || android.os.SystemClock.elapsedRealtime() - noticeSyncedAt > 10_000) {
+                            loadNotices(root, preserveOlder = true)
+                        }
                     }
 
-
-
                     R.id.nav_pdf -> {
-
-
-
                         stopNoticePoller()
-
-
-
+                        if (!ClassMateAcademicCache.online(activity)) {
+                            if (librarySnapshot == null || librarySnapshot?.batchId != batchId()) {
+                                librarySnapshot = restoreLibraryCache(batchId())
+                            }
+                        }
                         loadLibrary(root)
-
-
-
                     }
 
 
@@ -1032,6 +1162,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         host.addView(root, LinearLayout.LayoutParams(-1, -1))
+        applyHeaderTopInset(root)
 
 
 
@@ -1059,11 +1190,17 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                R.id.nav_timetable -> setupTimetable(root)
+                R.id.nav_timetable -> {
+                    setupTimetable(root)
+                    prewarmTabs(host)
+                }
 
 
 
-                R.id.nav_notices -> setupNotices(root)
+                R.id.nav_notices -> {
+                    noticeTabVisitId++
+                    setupNotices(root)
+                }
 
 
 
@@ -1112,322 +1249,243 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun bindFloatingNavigation(tab: Int, root: View) {
+        if (root.getTag(R.id.tag_floating_nav_bound) == true) return
+        root.setTag(R.id.tag_floating_nav_bound, true)
 
-
-
-        var navigationTravel = 0
-
-
-
-        val threshold = (16 * activity.resources.displayMetrics.density).toInt()
-
-
+        var navDownTravel = 0
+        var navUpTravel = 0
+        val density = activity.resources.displayMetrics.density
+        val hideThreshold = (20 * density).toInt()
+        val showThreshold = (16 * density).toInt()
+        val threshold = (16 * density).toInt()
 
         fun react(delta: Int, atTop: Boolean) {
-
-
-
-            if (atTop || delta < -2) {
-
-
-
-                navigationTravel = 0
-
-
-
+            if (atTop) {
+                navDownTravel = 0
+                navUpTravel = 0
                 setNavigationShown(true)
-
-
-
                 return
-
-
-
             }
 
-
-
-            if (delta <= 0) return
-
-
-
-            navigationTravel = (navigationTravel + delta).coerceIn(0, threshold * 3)
-
-
-
-            if (navigationTravel >= (threshold * 2)) setNavigationShown(false)
-
-
-
+            if (delta > 0) {
+                navUpTravel = 0
+                navDownTravel += delta
+                if (navDownTravel >= hideThreshold) {
+                    setNavigationShown(false)
+                }
+            } else if (delta < 0) {
+                navDownTravel = 0
+                navUpTravel += (-delta)
+                if (navUpTravel >= showThreshold) {
+                    setNavigationShown(true)
+                }
+            }
         }
 
-
+        var tabScrollTravel = 0
+        fun handleHeaderScroll(dy: Int, atTop: Boolean) {
+            updateTabHeaderColors(root, !atTop)
+            if (atTop) {
+                tabScrollTravel = 0
+                setTabHeaderCollapsed(root, false)
+            } else if (dy != 0) {
+                tabScrollTravel = if ((tabScrollTravel >= 0 && dy > 0) ||
+                    (tabScrollTravel <= 0 && dy < 0))
+                    (tabScrollTravel + dy).coerceIn(-threshold * 2, threshold * 2) else dy
+                if (tabScrollTravel >= threshold) setTabHeaderCollapsed(root, true)
+                if (tabScrollTravel <= -threshold) setTabHeaderCollapsed(root, false)
+            }
+        }
 
         when (tab) {
-
-
-
             R.id.nav_notices -> root.v<RecyclerView>(R.id.rvNotices)
-
-
-
                 .addOnScrollListener(object : RecyclerView.OnScrollListener() {
-
-
-
                     override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-
-
-
                         if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-
-
-
                             markVisibleNoticesRead(root, recyclerView)
-
-
-
-                            setNavigationShown(true)
-
-
-
                         }
-
-
-
                     }
-
-
 
                     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                        val atTop = !recyclerView.canScrollVertically(-1)
+                        react(dy, atTop)
+                        handleHeaderScroll(dy, atTop)
 
-
-
-                        react(dy, !recyclerView.canScrollVertically(-1))
-
-
-
-                        if (!recyclerView.canScrollVertically(-1)) {
-
-
-
-                            noticeScrollTravel = 0
-
-
-
-                            setNoticeHeaderCollapsed(root, false)
-
-
-
-                        } else if (dy != 0) {
-
-
-
-                            noticeScrollTravel = if ((noticeScrollTravel >= 0 && dy > 0) ||
-
-
-
-                                (noticeScrollTravel <= 0 && dy < 0))
-
-
-
-                                (noticeScrollTravel + dy).coerceIn(-threshold * 2, threshold * 2) else dy
-
-
-
-                            if (noticeScrollTravel >= threshold) setNoticeHeaderCollapsed(root, true)
-
-
-
-                            if (noticeScrollTravel <= -threshold) setNoticeHeaderCollapsed(root, false)
-
-
-
+                        val last = (recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
+                        if (dy > 0 && recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE && last >= noticeHeaderOffset + noticeVisibleIds.size - 3) {
+                            loadOlderNotices(root)
                         }
-
-
-
-                        val last=(recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
-
-
-
-                        if(dy>0 && recyclerView.scrollState!=RecyclerView.SCROLL_STATE_IDLE && last>=noticeHeaderOffset+noticeVisibleIds.size-3) loadOlderNotices(root)
-
-
-
                     }
-
-
-
                 })
 
-
-
             R.id.nav_timetable, R.id.nav_pdf -> root.v<androidx.core.widget.NestedScrollView>(
-
-
-
                 R.id.nestedScrollView).setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
-
-
-
-                    _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
-
-
+                    _: Int, scrollY: Int, _: Int, oldY: Int ->
+                val dy = scrollY - oldY
+                val atTop = scrollY == 0
+                react(dy, atTop)
+                handleHeaderScroll(dy, atTop)
+            }
 
             R.id.nav_transit -> {
-
-
-
                 setNavigationShown(true)
-
-
-
+                root.findViewById<android.webkit.WebView>(R.id.transit_webview)?.setOnScrollChangeListener { _, _, scrollY, _, oldY ->
+                    react(scrollY - oldY, scrollY == 0)
+                }
             }
-
-
 
             R.id.nav_profile -> {
-
-
-
                 setNavigationShown(true)
-
-
-
                 root.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile)?.setOnScrollChangeListener { _: androidx.core.widget.NestedScrollView,
-
-
-
-                    _: Int, scrollY: Int, _: Int, oldY: Int -> react(scrollY - oldY, scrollY == 0) }
-
-
-
+                    _: Int, scrollY: Int, _: Int, oldY: Int ->
+                    val dy = scrollY - oldY
+                    val atTop = scrollY == 0
+                    react(dy, atTop)
+                    handleHeaderScroll(dy, atTop)
+                }
             }
-
-
-
         }
-
-
 
         if (tab == R.id.nav_timetable) {
-
-
-
             (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.scroll?.setOnScrollChangeListener { _, _, y, _, oldY ->
-
-
-
-                react(y - oldY, y == 0)
-
-
-
+                val dy = y - oldY
+                val atTop = y == 0
+                react(dy, atTop)
+                handleHeaderScroll(dy, atTop)
             }
-
-
-
         }
-
-
-
     }
 
+    fun setTabHeaderCollapsed(root: View, collapsed: Boolean) {
+        val current = root.getTag(R.id.tag_header_collapsed_state) as? Boolean
+        if (current == collapsed) return
+        root.setTag(R.id.tag_header_collapsed_state, collapsed)
 
-
-
-
-
-
-    private fun setNoticeHeaderCollapsed(root: View, collapsed: Boolean) {
-
-
-
-        if (noticeHeaderCollapsed == collapsed || !root.isAttachedToWindow) return
-
-
-
-        noticeHeaderCollapsed = collapsed
-
-
-
-        val title = root.v<TextView>(R.id.tvNoticeTitle)
-
-
+        val title = root.findViewById<TextView>(R.id.tvNoticeTitle)
+            ?: root.findViewById<TextView>(R.id.tvBrandTitle)
+            ?: root.findViewById<TextView>(R.id.tvLibraryTitle)
+            ?: root.findViewById<TextView>(R.id.tvProfileHeaderTitle)
+            ?: return
 
         val density = activity.resources.displayMetrics.density
-
-
-
         title.pivotX = 0f
-
-
-
         title.pivotY = 0f
-
-
-
         title.animate().cancel()
-
-
-
         title.animate().scaleX(if (collapsed) 0.86f else 1f)
-
-
-
             .scaleY(if (collapsed) 0.86f else 1f)
-
-
-
             .translationY(if (collapsed) 3f * density else 0f)
-
-
-
             .setDuration(180).start()
 
-
-
-        val subtitle = root.v<View>(R.id.tvNoticeSubtitle)
-
-
-
-        subtitle.animate().cancel()
-
-
-
-        subtitle.animate().alpha(if (collapsed) 0f else 1f)
-
-
-
-            .translationY(if (collapsed) -5f * density else 0f)
-
-
-
-            .setDuration(150).start()
-
-
-
-        listOf(R.id.btnSearch, R.id.btnPostNotice).forEach { id ->
-
-
-
-            root.v<View>(id).animate().cancel()
-
-
-
-            root.v<View>(id).animate().scaleX(if (collapsed) 0.88f else 1f)
-
-
-
-                .scaleY(if (collapsed) 0.88f else 1f).setDuration(180).start()
-
-
-
+        val subtitle = root.findViewById<View>(R.id.tvNoticeSubtitle)
+            ?: root.findViewById<View>(R.id.tvLibrarySubtitle)
+        subtitle?.let {
+            it.animate().cancel()
+            it.animate().alpha(if (collapsed) 0f else 1f)
+                .translationY(if (collapsed) -5f * density else 0f)
+                .setDuration(150).start()
         }
 
-
-
+        listOf(R.id.btnSearch, R.id.btnPostNotice, R.id.btnLibrarySearch, R.id.btnUploadPdf, R.id.btnAddPeriod).forEach { id ->
+            root.findViewById<View>(id)?.let { actionView ->
+                actionView.animate().cancel()
+                actionView.animate().scaleX(if (collapsed) 0.88f else 1f)
+                    .scaleY(if (collapsed) 0.88f else 1f).setDuration(180).start()
+            }
+        }
     }
+
+    private var tabHeaderColorAnimator: android.animation.ValueAnimator? = null
+
+    fun updateTabHeaderColors(root: View, scrolledDown: Boolean) {
+        val isDark = com.shuaib.classmate.utils.AppPreferences(activity).isAppInDarkMode(activity)
+        val window = activity.window
+        val insetsController = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+
+        val title = root.findViewById<TextView>(R.id.tvNoticeTitle)
+            ?: root.findViewById<TextView>(R.id.tvBrandTitle)
+            ?: root.findViewById<TextView>(R.id.tvLibraryTitle)
+            ?: root.findViewById<TextView>(R.id.tvProfileHeaderTitle)
+            ?: return
+        val subtitle = root.findViewById<TextView>(R.id.tvNoticeSubtitle)
+            ?: root.findViewById<TextView>(R.id.tvLibrarySubtitle)
+        val ivHamburger = root.findViewById<ImageView>(R.id.ivHamburgerMenu)
+            ?: (root.findViewById<ViewGroup>(R.id.btnHamburgerMenu)?.getChildAt(0) as? ImageView)
+        val ivSearch = root.findViewById<ImageView>(R.id.ivNoticeSearch)
+            ?: root.findViewById<ImageView>(R.id.ivLibrarySearch)
+            ?: (root.findViewById<ViewGroup>(R.id.btnSearch)?.getChildAt(0) as? ImageView)
+            ?: (root.findViewById<ViewGroup>(R.id.btnLibrarySearch)?.getChildAt(0) as? ImageView)
+        val btnSearch = root.findViewById<View>(R.id.btnSearch)
+            ?: root.findViewById<View>(R.id.btnLibrarySearch)
+
+        // In dark mode: keep standard clean dark mode styling always (white text/icons, no scroll color changes)
+        if (isDark) {
+            tabHeaderColorAnimator?.cancel()
+            val white = android.graphics.Color.WHITE
+            title.setTextColor(white)
+            title.setShadowLayer(0f, 0f, 0f, 0)
+            subtitle?.setTextColor(android.graphics.Color.parseColor("#94A3B8"))
+            subtitle?.setShadowLayer(0f, 0f, 0f, 0)
+            val csl = android.content.res.ColorStateList.valueOf(white)
+            ivHamburger?.imageTintList = csl
+            ivSearch?.imageTintList = csl
+            btnSearch?.setBackgroundResource(R.drawable.bg_notice_search_icon_button)
+
+            insetsController.isAppearanceLightStatusBars = false
+            return
+        }
+
+        // In light mode:
+        //   Top (scrolledDown = false) -> Black (#0F172A)
+        //   Scrolled down (scrolledDown = true) -> White (#FFFFFF)
+        val isHeaderDark = !scrolledDown
+        insetsController.isAppearanceLightStatusBars = isHeaderDark
+
+        val currentState = root.getTag(R.id.tag_header_scrolled_state) as? Boolean
+        if (currentState == scrolledDown) return
+        root.setTag(R.id.tag_header_scrolled_state, scrolledDown)
+
+        val targetColor = if (scrolledDown) android.graphics.Color.WHITE else android.graphics.Color.parseColor("#0F172A")
+        val startColor = title.currentTextColor
+
+        // Drop shadow for white text in light mode so it remains crisp and legible over cards
+        val shadowRadius = if (scrolledDown) 8f else 0f
+        val shadowColor = if (scrolledDown) android.graphics.Color.argb(160, 0, 0, 0) else 0
+
+        title.setShadowLayer(shadowRadius, 0f, 2f, shadowColor)
+        subtitle?.setShadowLayer(shadowRadius, 0f, 2f, shadowColor)
+
+        // Adapt search button circular background in light mode
+        if (scrolledDown) {
+            btnSearch?.setBackgroundResource(R.drawable.bg_notice_search_icon_button_scrolled)
+        } else {
+            btnSearch?.setBackgroundResource(R.drawable.bg_notice_search_icon_button)
+        }
+
+        tabHeaderColorAnimator?.cancel()
+        if (startColor == targetColor) {
+            title.setTextColor(targetColor)
+            subtitle?.setTextColor(targetColor)
+            val csl = android.content.res.ColorStateList.valueOf(targetColor)
+            ivHamburger?.imageTintList = csl
+            ivSearch?.imageTintList = csl
+        } else {
+            tabHeaderColorAnimator = android.animation.ValueAnimator.ofArgb(startColor, targetColor).apply {
+                duration = 200
+                addUpdateListener { animator ->
+                    val color = animator.animatedValue as Int
+                    title.setTextColor(color)
+                    subtitle?.setTextColor(color)
+                    val csl = android.content.res.ColorStateList.valueOf(color)
+                    ivHamburger?.imageTintList = csl
+                    ivSearch?.imageTintList = csl
+                }
+                start()
+            }
+        }
+    }
+
+    private fun setNoticeHeaderCollapsed(root: View, collapsed: Boolean) = setTabHeaderCollapsed(root, collapsed)
+    fun updateNoticeHeaderColors(root: View, scrolledDown: Boolean) = updateTabHeaderColors(root, scrolledDown)
 
 
 
@@ -1436,73 +1494,34 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     internal fun setNavigationShown(show: Boolean) {
-
-
-
-        if (show) {
-
-
-
-            navShown = true
-
-
-
-            (activity as? ClassMateAuthActivity)?.composeNavVisible = true
-
-
-
-            val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
-
-
-
-            nav.animate().cancel()
-
-
-
-            nav.animate().translationY(0f).alpha(1f).setDuration(180).start()
-
-
-
-            return
-
-
-
-        }
-
-
-
         if (navShown == show) return
-
-
-
         navShown = show
 
+        val container = activity.findViewById<View>(R.id.classmate_bottom_nav_container)
+            ?: activity.findViewById<View>(R.id.classmate_home_compose_nav)
+            ?: return
 
+        container.animate().cancel()
+        val travel = if (container.height > 0) {
+            container.height.toFloat() + (24f * activity.resources.displayMetrics.density)
+        } else {
+            300f
+        }
 
-        (activity as? ClassMateAuthActivity)?.composeNavVisible = show
+        container.animate()
+            .translationY(if (show) 0f else travel)
+            .setDuration(200)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .withEndAction {
+                if (show) {
+                    activity.findViewById<View>(R.id.classmate_home_blur_backdrop)?.invalidate()
+                }
+            }
+            .start()
 
-
-
-        val nav = activity.findViewById<View>(R.id.classmate_home_nav) ?: return
-
-
-
-        nav.animate().cancel()
-
-
-
-        nav.animate().translationY(if (show) 0f else
-
-
-
-            nav.height.toFloat() + 24f * activity.resources.displayMetrics.density)
-
-
-
-            .alpha(if (show) 1f else 0.15f).setDuration(220).start()
-
-
-
+        val nav = activity.findViewById<View>(R.id.classmate_home_nav)
+        nav?.animate()?.cancel()
+        nav?.animate()?.translationY(if (show) 0f else travel)?.setDuration(200)?.start()
     }
 
 
@@ -1511,7 +1530,20 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private fun <T : View> View.v(id: Int): T = findViewById(id)
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : View> View.v(id: Int): T {
+        var cache = getTag(R.id.tag_view_holder_cache) as? android.util.SparseArray<View>
+        if (cache == null) {
+            cache = android.util.SparseArray(16)
+            setTag(R.id.tag_view_holder_cache, cache)
+        }
+        var target = cache.get(id)
+        if (target == null) {
+            target = findViewById(id) ?: return findViewById(id)
+            cache.put(id, target)
+        }
+        return target as T
+    }
 
 
 
@@ -1520,33 +1552,12 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun launch(root: View, task: suspend () -> Unit) {
-
-
-
         scope.launch {
-
-
-
             runCatching { task() }.onFailure { error ->
-
-
-
                 if (root.isAttachedToWindow) Toast.makeText(activity,
-
-
-
-                    error.message ?: "Could not load data", Toast.LENGTH_LONG).show()
-
-
-
+                    com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(error), Toast.LENGTH_LONG).show()
             }
-
-
-
         }
-
-
-
     }
 
 
@@ -2322,6 +2333,15 @@ internal class ClassMateAcademicScreensSupabase(
 
             }
 
+            val canManageSpeedDial = profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
+            root.findViewById<View>(R.id.btnSpeedDialFab)?.visibility = if (canManageSpeedDial && !calendarMode) View.VISIBLE else View.GONE
+            if (calendarMode) {
+                root.findViewById<View>(R.id.fabSpeedDialScrim)?.visibility = View.GONE
+                root.findViewById<View>(R.id.layoutSpeedDialOptions)?.visibility = View.GONE
+                root.findViewById<ImageView>(R.id.ivSpeedDialFabIcon)?.rotation = 0f
+                root.findViewById<View>(R.id.layoutDynamicIslandContainer)?.visibility = View.GONE
+            }
+
 
 
             if (calendarMode) { stopAttendanceSessionsPoller(); timetableRequest++; calendarUi.show() }
@@ -2401,9 +2421,505 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         updateToggle()
+        setupSpeedDial(root)
+        checkUnreadNoticesIsland(root)
 
 
 
+    }
+
+    private fun setupSpeedDial(root: View) {
+        val canManage = profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
+        val fabSpeedDial = root.findViewById<View>(R.id.btnSpeedDialFab) ?: return
+        val scrim = root.findViewById<View>(R.id.fabSpeedDialScrim)
+        val layoutOptions = root.findViewById<ViewGroup>(R.id.layoutSpeedDialOptions)
+        val fabIcon = root.findViewById<ImageView>(R.id.ivSpeedDialFabIcon)
+        val btnPostNotice = root.findViewById<View>(R.id.btnSpeedDialPostNotice)
+        val btnAddFile = root.findViewById<View>(R.id.btnSpeedDialAddFile)
+        val btnAddFund = root.findViewById<View>(R.id.btnSpeedDialAddFund)
+        val nestedScrollView = root.findViewById<androidx.core.widget.NestedScrollView>(R.id.nestedScrollView)
+        val rvNotices = root.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvNotices)
+
+        if (!canManage) {
+            fabSpeedDial.visibility = View.GONE
+            scrim?.visibility = View.GONE
+            layoutOptions?.visibility = View.GONE
+            return
+        }
+
+        val isTimetable = root.findViewById<View>(R.id.timetableContentContainer) != null
+        fabSpeedDial.visibility = if (isTimetable && calendarMode) View.GONE else View.VISIBLE
+        var isSpeedDialOpen = false
+
+        fun setSpeedDialState(open: Boolean, animated: Boolean = true) {
+            android.util.Log.d("SPEED_DIAL", "setSpeedDialState called: open=$open, current=$isSpeedDialOpen")
+            if (isSpeedDialOpen == open) return
+            isSpeedDialOpen = open
+            android.util.Log.d("SPEED_DIAL", "setSpeedDialState executing: open=$open")
+
+            if (animated) {
+                val duration = 280L
+                val rotationTarget = if (open) 135f else 0f
+                fabIcon?.animate()
+                    ?.rotation(rotationTarget)
+                    ?.setDuration(duration)
+                    ?.setInterpolator(android.view.animation.OvershootInterpolator(2.2f))
+                    ?.start()
+
+                if (open) {
+                    scrim?.apply {
+                        visibility = View.VISIBLE
+                        alpha = 0f
+                        animate().alpha(1f).setDuration(220L).start()
+                    }
+                    layoutOptions?.apply {
+                        visibility = View.VISIBLE
+                        val count = childCount
+                        for (i in 0 until count) {
+                            val child = getChildAt(i)
+                            child.alpha = 0f
+                            child.scaleX = 0.5f
+                            child.scaleY = 0.5f
+                            child.translationY = 40f
+                            val delay = ((count - 1 - i) * 40L).coerceAtLeast(0L)
+                            child.animate()
+                                .alpha(1f)
+                                .scaleX(1f)
+                                .scaleY(1f)
+                                .translationY(0f)
+                                .setStartDelay(delay)
+                                .setDuration(250L)
+                                .setInterpolator(android.view.animation.OvershootInterpolator(1.8f))
+                                .start()
+                        }
+                    }
+                } else {
+                    scrim?.animate()?.alpha(0f)?.setDuration(180L)?.withEndAction {
+                        scrim.visibility = View.GONE
+                    }?.start()
+                    layoutOptions?.apply {
+                        val count = childCount
+                        for (i in 0 until count) {
+                            val child = getChildAt(i)
+                            child.animate()
+                                .alpha(0f)
+                                .scaleX(0.6f)
+                                .scaleY(0.6f)
+                                .translationY(30f)
+                                .setStartDelay(0L)
+                                .setDuration(160L)
+                                .setInterpolator(android.view.animation.AccelerateInterpolator())
+                                .start()
+                        }
+                        postDelayed({
+                            if (!isSpeedDialOpen) visibility = View.GONE
+                        }, 180L)
+                    }
+                }
+            } else {
+                fabIcon?.rotation = if (open) 135f else 0f
+                scrim?.visibility = if (open) View.VISIBLE else View.GONE
+                scrim?.alpha = if (open) 1f else 0f
+                layoutOptions?.visibility = if (open) View.VISIBLE else View.GONE
+            }
+        }
+
+        fabSpeedDial.setOnClickListener {
+            android.util.Log.d("SPEED_DIAL", "fabSpeedDial clicked! isSpeedDialOpen=$isSpeedDialOpen")
+            com.shuaib.classmate.utils.HapticHelper.lightPop(it)
+            setSpeedDialState(!isSpeedDialOpen)
+        }
+
+        scrim?.setOnClickListener {
+            android.util.Log.d("SPEED_DIAL", "scrim clicked!")
+            com.shuaib.classmate.utils.HapticHelper.lightPop(it)
+            setSpeedDialState(false)
+        }
+
+        btnPostNotice?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            setSpeedDialState(false)
+            onPostNotice()
+        }
+
+        btnAddFile?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            setSpeedDialState(false)
+            onUpload()
+        }
+
+        btnAddFund?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            setSpeedDialState(false)
+            val intent = Intent(activity, ClassMateBatchFundActivity::class.java)
+                .putExtra("batch_id", batchId())
+                .putExtra("batch_label", batchLabel())
+                .putExtra("open_record_dialog", true)
+                .putExtra("open_add_fund", true)
+            activity.startActivity(intent)
+        }
+
+        // Dismiss on scroll handled centrally in bindFloatingNavigation and rvNotices listener
+        rvNotices?.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                if (isSpeedDialOpen && Math.abs(dy) > 8) {
+                    setSpeedDialState(false)
+                }
+            }
+        })
+    }
+
+    private fun checkUnreadNoticesIsland(root: View) {
+        if (hasShownUnreadIslandThisSession || isCheckingUnreadIsland || !ClassMateAcademicCache.online(activity)) return
+        isCheckingUnreadIsland = true
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                var currentBatch = batchId()
+                var attempts = 0
+                while (currentBatch.isBlank() && attempts < 20) {
+                    kotlinx.coroutines.delay(200)
+                    currentBatch = batchId()
+                    attempts++
+                }
+                if (currentBatch.isBlank()) {
+                    isCheckingUnreadIsland = false
+                    return@launch
+                }
+
+                val counts = ClassMateAuthApi.rpc("unread_activity", JSONObject().put("target_batch", currentBatch))
+                val unreadCount = counts.optInt("notices")
+                if (unreadCount <= 0) {
+                    hasShownUnreadIslandThisSession = true
+                    isCheckingUnreadIsland = false
+                    return@launch
+                }
+
+                val raw = ClassMateAuthApi.rows(
+                    "notices",
+                    "select=id,title,body,published_at,semester_course_id,author_id,resource_id,class_change_id,poll_id" +
+                        "&batch_id=eq.$currentBatch${teacherNoticeFilter()}&order=published_at.desc,id.desc&limit=15"
+                )
+                val list = rows(raw)
+                if (list.isEmpty()) {
+                    hasShownUnreadIslandThisSession = true
+                    isCheckingUnreadIsland = false
+                    return@launch
+                }
+
+                val details = ClassMateAuthApi.rpc(
+                    "notice_feed_details",
+                    JSONObject().put("target_ids", JSONArray(list.map { it.getString("id") }))
+                )
+                val reads = rows(details.optJSONArray("reads") ?: JSONArray())
+                val authors = rows(details.optJSONArray("authors") ?: JSONArray())
+                val authorsMap = authors.associateBy { it.optString("notice_id").ifBlank { it.optString("id") } }
+
+                val readIds = reads.filter { it.optBoolean("read_by_me") }.map { it.optString("notice_id") }.toSet()
+                val unreadList = list.filter { !readIds.contains(it.optString("id")) }
+                if (unreadList.isEmpty()) {
+                    hasShownUnreadIslandThisSession = true
+                    isCheckingUnreadIsland = false
+                    return@launch
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (calendarMode || hasShownUnreadIslandThisSession) {
+                        isCheckingUnreadIsland = false
+                        return@withContext
+                    }
+                    showDynamicIsland(root, unreadList, authorsMap)
+                }
+            } catch (e: Exception) {
+                isCheckingUnreadIsland = false
+                android.util.Log.e("ClassMateTimetable", "Error checking unread notices island", e)
+            }
+        }
+    }
+
+    private fun showDynamicIsland(
+        root: View,
+        unreadList: List<JSONObject>,
+        authorsMap: Map<String, JSONObject>
+    ) {
+        val container = root.findViewById<ViewGroup>(R.id.layoutDynamicIslandContainer) ?: return
+        if (container.visibility == View.VISIBLE || hasShownUnreadIslandThisSession) return
+        hasShownUnreadIslandThisSession = true
+        isCheckingUnreadIsland = false
+        val card = root.findViewById<View>(R.id.cardDynamicIsland) ?: return
+        val tvBadge = root.findViewById<TextView>(R.id.tvDynamicIslandCountBadge)
+        val tvTitle = root.findViewById<TextView>(R.id.tvDynamicIslandTitle)
+        val tvSubtitle = root.findViewById<TextView>(R.id.tvDynamicIslandSubtitle)
+        val btnDismiss = root.findViewById<View>(R.id.btnDynamicIslandDismiss)
+        val btnExpand = root.findViewById<View>(R.id.btnDynamicIslandExpand)
+
+        val count = unreadList.size
+        tvBadge?.text = if (count > 99) "99+" else count.toString()
+        tvTitle?.text = "$count Missed Notice${if (count > 1) "s" else ""}"
+
+        val latestTitle = unreadList.firstOrNull()?.optString("title")?.takeIf { it.isNotBlank() }
+            ?: "Tap or swipe up to view"
+        tvSubtitle?.text = latestTitle
+
+        btnDismiss?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.lightPop(it)
+            dismissDynamicIsland(root)
+        }
+        btnExpand?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            showMissedNoticesPeekSheet(root, unreadList, authorsMap)
+        }
+
+        var startX = 0f
+        var startY = 0f
+        var isDragging = false
+
+        card.setOnTouchListener { v, event ->
+            // Let dismiss and expand child buttons handle their own touches
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                val loc = IntArray(2)
+                btnDismiss?.let { b ->
+                    b.getLocationOnScreen(loc)
+                    if (event.rawX >= loc[0] && event.rawX <= loc[0] + b.width &&
+                        event.rawY >= loc[1] && event.rawY <= loc[1] + b.height) {
+                        return@setOnTouchListener false
+                    }
+                }
+                btnExpand?.let { b ->
+                    b.getLocationOnScreen(loc)
+                    if (event.rawX >= loc[0] && event.rawX <= loc[0] + b.width &&
+                        event.rawY >= loc[1] && event.rawY <= loc[1] + b.height) {
+                        return@setOnTouchListener false
+                    }
+                }
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = event.rawX
+                    startY = event.rawY
+                    isDragging = false
+                    v.animate().scaleX(0.96f).scaleY(0.96f).setDuration(100L).start()
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - startX
+                    val dy = event.rawY - startY
+                    if (Math.abs(dx) > 14 || Math.abs(dy) > 14) {
+                        isDragging = true
+                        v.translationX = dx * 0.35f
+                        v.translationY = dy * 0.35f
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val dx = event.rawX - startX
+                    val dy = event.rawY - startY
+
+                    if (isDragging) {
+                        if (dy < -35) {
+                            // Slide up gesture: animate upward and smoothly expand the details sheet
+                            com.shuaib.classmate.utils.HapticHelper.mediumThud(v)
+                            v.animate()
+                                .translationY(-120f)
+                                .alpha(0f)
+                                .scaleX(0.92f)
+                                .scaleY(0.92f)
+                                .setDuration(200L)
+                                .withEndAction {
+                                    container.visibility = View.GONE
+                                    v.translationX = 0f
+                                    v.translationY = 0f
+                                    v.alpha = 1f
+                                    v.scaleX = 1f
+                                    v.scaleY = 1f
+                                }
+                                .start()
+                            showMissedNoticesPeekSheet(root, unreadList, authorsMap)
+                        } else if (dy > 45 || Math.abs(dx) > 65) {
+                            // Slide down or swipe away: collapse back to bottom bar
+                            com.shuaib.classmate.utils.HapticHelper.lightPop(v)
+                            dismissDynamicIsland(root)
+                        } else {
+                            // Rebound back
+                            v.animate().scaleX(1f).scaleY(1f).translationX(0f).translationY(0f).setDuration(180L).start()
+                        }
+                    } else {
+                        // Clean tap anywhere on the dynamic island: pulse and open details
+                        com.shuaib.classmate.utils.HapticHelper.lightPop(v)
+                        v.animate()
+                            .scaleX(0.94f)
+                            .scaleY(0.94f)
+                            .setDuration(80L)
+                            .withEndAction {
+                                v.animate().scaleX(1f).scaleY(1f).setDuration(120L).start()
+                                showMissedNoticesPeekSheet(root, unreadList, authorsMap)
+                            }
+                            .start()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    btnDismiss?.isPressed = false
+                    v.animate().scaleX(1f).scaleY(1f).translationX(0f).translationY(0f).setDuration(160L).start()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        container.visibility = View.VISIBLE
+        card.apply {
+            translationX = -100f
+            translationY = 120f
+            scaleX = 0.25f
+            scaleY = 0.25f
+            alpha = 0f
+            animate()
+                .translationX(0f)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .alpha(1f)
+                .setDuration(420L)
+                .setInterpolator(android.view.animation.OvershootInterpolator(1.3f))
+                .start()
+        }
+        com.shuaib.classmate.utils.HapticHelper.lightPop(card)
+        hasShownUnreadIslandThisSession = true
+    }
+
+    private fun dismissDynamicIsland(root: View) {
+        val container = root.findViewById<ViewGroup>(R.id.layoutDynamicIslandContainer) ?: return
+        val card = root.findViewById<View>(R.id.cardDynamicIsland) ?: return
+        card.animate()
+            .translationX(-100f)
+            .translationY(120f)
+            .scaleX(0.2f)
+            .scaleY(0.2f)
+            .alpha(0f)
+            .setDuration(260L)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                container.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun showMissedNoticesPeekSheet(
+        root: View,
+        unreadList: List<JSONObject>,
+        authorsMap: Map<String, JSONObject>
+    ) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val bottomSheet = com.google.android.material.bottomsheet.BottomSheetDialog(activity, R.style.Theme_ClassMate_BottomSheetDialog)
+        val sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_missed_notices, null, false)
+        bottomSheet.setContentView(sheetView)
+
+        val tvCount = sheetView.findViewById<TextView>(R.id.tvSheetCountBadge)
+        tvCount?.text = "${unreadList.size} new"
+
+        val btnClose = sheetView.findViewById<View>(R.id.btnSheetClose)
+        btnClose?.setOnClickListener {
+            bottomSheet.dismiss()
+        }
+
+        val rv = sheetView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvMissedNotices)
+        rv?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(activity)
+        rv?.adapter = MissedNoticesAdapter(unreadList, authorsMap) { clickedNotice ->
+            bottomSheet.dismiss()
+            dismissDynamicIsland(root)
+            showNoticeContent(clickedNotice)
+        }
+
+        val btnGoToFeed = sheetView.findViewById<View>(R.id.btnSheetGoToFeed)
+        btnGoToFeed?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            bottomSheet.dismiss()
+            dismissDynamicIsland(root)
+            (activity as? ClassMateAuthActivity)?.selectHomeTab(R.id.nav_notices)
+        }
+
+        val btnMarkAllRead = sheetView.findViewById<View>(R.id.btnSheetMarkAllRead)
+        btnMarkAllRead?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.lightPop(it)
+            val ids = unreadList.map { it.optString("id") }.filter { it.isNotBlank() }
+            if (ids.isNotEmpty()) {
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        ClassMateAuthApi.rpcText("mark_notices_read", JSONObject().put("target_ids", JSONArray(ids)))
+                    }
+                }
+                noticeReadSent.addAll(ids)
+                (activity as? ClassMateAuthActivity)?.setComposeBadge(com.shuaib.classmate.ui.ClassMateTab.NOTICES, null)
+            }
+            bottomSheet.dismiss()
+            dismissDynamicIsland(root)
+        }
+
+        bottomSheet.setOnShowListener {
+            val d = it as? com.google.android.material.bottomsheet.BottomSheetDialog
+            val internalSheet = d?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            internalSheet?.let { sheet ->
+                com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).apply {
+                    state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                    skipCollapsed = true
+                }
+            }
+        }
+
+        bottomSheet.show()
+    }
+
+    private inner class MissedNoticesAdapter(
+        private val notices: List<JSONObject>,
+        private val authors: Map<String, JSONObject>,
+        private val onNoticeClicked: (JSONObject) -> Unit
+    ) : androidx.recyclerview.widget.RecyclerView.Adapter<MissedNoticesAdapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+            val tvCategory: TextView = view.findViewById(R.id.tvPeekNoticeCategory)
+            val tvTime: TextView = view.findViewById(R.id.tvPeekNoticeTime)
+            val tvTitle: TextView = view.findViewById(R.id.tvPeekNoticeTitle)
+            val tvBody: TextView = view.findViewById(R.id.tvPeekNoticeBody)
+            val tvAuthor: TextView = view.findViewById(R.id.tvPeekNoticeAuthor)
+            val tvAttachmentBadge: TextView = view.findViewById(R.id.tvPeekNoticeAttachmentBadge)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_missed_notice_peek, parent, false)
+            return ViewHolder(v)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = notices[position]
+            val noticeId = item.optString("id")
+            val category = item.optString("category").ifBlank { "NOTICE" }.uppercase()
+            holder.tvCategory.text = category
+            holder.tvTime.text = noticeDate(item.optString("published_at"))
+            holder.tvTitle.text = item.optString("title").ifBlank { "Notice" }
+
+            val body = item.optString("body").trim()
+            if (body.isNotBlank()) {
+                holder.tvBody.visibility = View.VISIBLE
+                holder.tvBody.text = body
+            } else {
+                holder.tvBody.visibility = View.GONE
+            }
+
+            val author = authors[noticeId]?.optString("full_name")?.takeIf { it.isNotBlank() }
+                ?: authors[item.optString("author_id")]?.optString("full_name")?.takeIf { it.isNotBlank() }
+            holder.tvAuthor.text = if (author != null) "By $author" else "Class Notice"
+
+            val hasResource = item.optString("resource_id").isNotBlank() && item.optString("resource_id") != "null"
+            holder.tvAttachmentBadge.visibility = if (hasResource) View.VISIBLE else View.GONE
+
+            holder.itemView.setOnClickListener {
+                onNoticeClicked(item)
+            }
+        }
+
+        override fun getItemCount(): Int = notices.size
     }
 
 
@@ -4568,6 +5084,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun setupNotices(root: View) {
+        noticeTabVisitId++
 
 
 
@@ -4585,6 +5102,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         val header = root.v<View>(R.id.noticeHeaderPanel)
+        updateNoticeHeaderColors(root, false)
 
 
 
@@ -4846,43 +5364,39 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        if (noticeBatch != batchId() || noticeFeed.isEmpty()) restoreNoticeCache()
+        restoreNoticeCache()
+        renderNoticeFeed(root)
 
-
-
-        if (noticeBatch == batchId() && noticeFeed.isNotEmpty()) renderNoticeFeed(root)
-
-
-
-        if (ClassMateAcademicCache.online(activity)) loadNotices(root)
-
-
+        if (ClassMateAcademicCache.online(activity)) {
+            loadNotices(root)
+        } else {
+            root.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)?.apply {
+                stopShimmer()
+                visibility = View.GONE
+            }
+            if (noticeFeed.isEmpty()) {
+                restoreNoticeCache()
+                renderNoticeFeed(root)
+            }
+        }
 
         startNoticePoller(root)
-
-
-
+        setupSpeedDial(root)
     }
 
-
-
-
-
-
-
-    private fun loadNotices(root: View,preserveOlder: Boolean=false): Unit = launch(root) {
-
-
-
+    private fun loadNotices(root: View, preserveOlder: Boolean = false): Unit = launch(root) {
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
-
-
-
         val selectedBatch = batchId()
+        val shimmer = root.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
 
-
-
-        if (!ClassMateAcademicCache.online(activity)) { refresh.isRefreshing = false; renderNoticeFeed(root); return@launch }
+        if (!ClassMateAcademicCache.online(activity)) {
+            refresh.isRefreshing = false
+            shimmer?.stopShimmer()
+            shimmer?.visibility = View.GONE
+            restoreNoticeCache()
+            renderNoticeFeed(root)
+            return@launch
+        }
 
 
 
@@ -4906,22 +5420,16 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val shimmer = root.v<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
-
-
-
         if (noticeFeed.isEmpty() || noticeBatch != selectedBatch) {
-
-
-
-            shimmer.visibility = View.VISIBLE
-
-
-
-            shimmer.startShimmer()
-
-
-
+            restoreNoticeCache()
+            if (noticeFeed.isNotEmpty()) {
+                renderNoticeFeed(root)
+                shimmer?.stopShimmer()
+                shimmer?.visibility = View.GONE
+            } else {
+                shimmer?.visibility = View.VISIBLE
+                shimmer?.startShimmer()
+            }
         }
 
 
@@ -4978,24 +5486,26 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            val (engagement, authors, reads, previews, polls) = if (visible.isEmpty())
-
-                listOf(emptyList<JSONObject>(), emptyList(), emptyList(), emptyList(), emptyList())
-
-            else {
-
-                val details=ClassMateAuthApi.rpc("notice_feed_details",JSONObject().put("target_ids",JSONArray(visible.map { it.getString("id") })))
-
-                listOf("engagement","authors","reads","previews","polls").map { key -> rows(details.optJSONArray(key) ?: JSONArray()) }
-
+            val detailsMap: Map<String, List<JSONObject>> = if (visible.isEmpty()) {
+                emptyMap()
+            } else {
+                val details = ClassMateAuthApi.rpc("notice_feed_details", JSONObject().put("target_ids", JSONArray(visible.map { it.getString("id") })))
+                rows(details.optJSONArray("resources") ?: org.json.JSONArray()).forEach { noticeResources[it.getString("notice_id")] = it }
+                listOf("engagement", "authors", "reads", "previews", "polls", "attachments").associateWith { key ->
+                    rows(details.optJSONArray(key) ?: JSONArray())
+                }
             }
-
-
 
             if (!active(root) || request != noticeRequest || selectedBatch != batchId()) return@launch
 
+            val attachments = detailsMap["attachments"] ?: emptyList()
+            val previews = detailsMap["previews"] ?: emptyList()
+            val polls = detailsMap["polls"] ?: emptyList()
+            val engagement = detailsMap["engagement"] ?: emptyList()
+            val authors = detailsMap["authors"] ?: emptyList()
+            val reads = detailsMap["reads"] ?: emptyList()
 
-
+            attachments.groupBy { it.getString("notice_id") }.forEach { (id, atts) -> noticeAttachments[id] = atts }
             previews.groupBy { it.getString("notice_id") }.forEach { (id, readers) -> noticeReaderPreviews[id] = readers }
 
             polls.forEach { noticePolls[it.getString("notice_id")] = it }
@@ -5035,18 +5545,18 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         } catch (e: Exception) {
-
-
-
+            if (noticeFeed.isEmpty() || noticeBatch != selectedBatch) {
+                restoreNoticeCache()
+            }
+            if (active(root)) {
+                renderNoticeFeed(root)
+            }
             if (noticeFeed.isEmpty()) throw e
-
-
-
         } finally {
-
-
-
             refresh.isRefreshing = false
+            shimmer?.stopShimmer()
+            shimmer?.visibility = View.GONE
+            checkUnreadNoticesIsland(root)
 
 
 
@@ -5155,6 +5665,8 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+                    rows(details.optJSONArray("resources") ?: org.json.JSONArray()).forEach { noticeResources[it.getString("notice_id")] = it }
+                    rows(details.optJSONArray("attachments") ?: JSONArray()).groupBy { it.getString("notice_id") }.forEach { (id, atts) -> noticeAttachments[id] = atts }
                     rows(details.optJSONArray("engagement") ?: JSONArray()).forEach { noticeStates[it.getString("notice_id")]=it }
 
                     rows(details.optJSONArray("polls") ?: JSONArray()).forEach { noticePolls[it.getString("notice_id")]=it }
@@ -5212,81 +5724,98 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun saveNoticeCache() {
-
-
-
+        val bId = batchId().ifBlank {
+            ClassMateAcademicCache.home(activity)?.optString("batch").orEmpty().ifBlank {
+                ClassMateAuthApi.notificationIdentity()?.optString("batch_id").orEmpty()
+            }
+        }
+        if (bId.isBlank()) return
         fun mapJson(map: Map<String, JSONObject>) = JSONObject().apply { map.forEach { (id, value) -> put(id, value) } }
-
-
-
         val previews = JSONObject().apply { noticeReaderPreviews.forEach { (id, value) -> put(id, JSONArray(value)) } }
+        val pId = profile().optString("id").ifBlank { "default_user" }
 
+        val existingCachedFeed = runCatching {
+            val existingData = ClassMateAcademicCache.read(activity, pId, bId, "notices")
+                ?: ClassMateAcademicCache.read(activity, "default_user", bId, "notices")
+            rows(existingData?.optJSONArray("feed") ?: JSONArray())
+        }.getOrDefault(emptyList())
 
+        val combinedFeed = (noticeFeed + noticeOfflineTail + existingCachedFeed)
+            .distinctBy { it.optString("id") }
+            .sortedWith(compareByDescending<JSONObject> { it.optString("published_at").ifBlank { it.optString("created_at") } }.thenByDescending { it.optString("id") })
+            .take(150)
 
-        ClassMateAcademicCache.save(activity, profile().optString("id"), batchId(), "notices", JSONObject()
+        val attachmentsObj = JSONObject()
+        noticeAttachments.forEach { (k, list) -> attachmentsObj.put(k, JSONArray(list)) }
 
+        val cacheObj = JSONObject()
+            .put("feed", JSONArray(combinedFeed))
+            .put("has_more", noticeHasMore)
+            .put("states", mapJson(noticeStates))
+            .put("authors", mapJson(noticeAuthors))
+            .put("reads", mapJson(noticeReadCounts))
+            .put("polls", mapJson(noticePolls))
+            .put("resources", mapJson(noticeResources))
+            .put("attachments", attachmentsObj)
+            .put("previews", previews)
+            .put("saved_at", System.currentTimeMillis())
 
-
-            .put("feed", JSONArray((noticeFeed+noticeOfflineTail).distinctBy { it.optString("id") })).put("has_more",noticeHasMore).put("states", mapJson(noticeStates)).put("authors", mapJson(noticeAuthors))
-
-
-
-            .put("reads", mapJson(noticeReadCounts)).put("previews", previews))
-
-
-
+        ClassMateAcademicCache.save(activity, pId, bId, "notices", cacheObj)
+        ClassMateAcademicCache.save(activity, "default_user", bId, "notices", cacheObj)
     }
 
-
-
     private fun restoreNoticeCache() {
-
-
-
-        noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear(); noticePolls.clear()
-
-
-
-        noticeOfflineTail=emptyList(); noticeHasMore=false; noticeLoadingOlder=false; noticeOlderError=false
-
-
-
+        noticeFeed = emptyList(); noticeStates.clear(); noticeAuthors.clear(); noticeReadCounts.clear(); noticeReaderPreviews.clear(); noticePolls.clear(); noticeResources.clear(); noticeAttachments.clear()
+        noticeOfflineTail = emptyList(); noticeHasMore = false; noticeLoadingOlder = false; noticeOlderError = false
         noticeReadSent.clear(); translatingNoticeIds.clear()
 
+        val bId = batchId().ifBlank {
+            ClassMateAcademicCache.home(activity)?.optString("batch").orEmpty().ifBlank {
+                ClassMateAuthApi.notificationIdentity()?.optString("batch_id").orEmpty()
+            }
+        }
+        if (bId.isBlank()) return
+        noticeBatch = bId
 
+        val pId = profile().optString("id")
+        val data = ClassMateAcademicCache.read(activity, pId, bId, "notices")
+            ?: ClassMateAcademicCache.read(activity, "default_user", bId, "notices")
+            ?: run {
+                val allPrefs = activity.getSharedPreferences("classmate_academic_cache_${BuildConfig.CLASSMATE_ENV}", Context.MODE_PRIVATE).all
+                val matchingKey = if (bId.isNotBlank()) allPrefs.keys.firstOrNull { it.endsWith(":$bId:notices") } else null
+                    ?: allPrefs.keys.firstOrNull { it.endsWith(":notices") }
+                matchingKey?.let { key -> runCatching { JSONObject(allPrefs[key] as String) }.getOrNull() }
+            } ?: return
 
-        noticeBatch = batchId()
+        val cached = rows(data.optJSONArray("feed") ?: JSONArray())
+        if (!ClassMateAcademicCache.online(activity)) {
+            noticeFeed = cached
+            noticeOfflineTail = emptyList()
+            noticeHasMore = false
+        } else {
+            noticeFeed = cached.take(noticePageSize)
+            noticeOfflineTail = cached.drop(noticePageSize)
+            noticeHasMore = noticeOfflineTail.isNotEmpty() || data.optBoolean("has_more", cached.size >= noticePageSize)
+        }
 
+        fun restore(name: String, map: MutableMap<String, JSONObject>) {
+            val json = data.optJSONObject(name) ?: return
+            json.keys().forEach { id -> json.optJSONObject(id)?.let { map[id] = it } }
+        }
 
+        restore("states", noticeStates)
+        restore("authors", noticeAuthors)
+        restore("reads", noticeReadCounts)
+        restore("polls", noticePolls)
+        restore("resources", noticeResources)
 
-        val data = ClassMateAcademicCache.read(activity, profile().optString("id"), batchId(), "notices") ?: return
+        data.optJSONObject("attachments")?.let { json ->
+            json.keys().forEach { id -> noticeAttachments[id] = rows(json.optJSONArray(id) ?: JSONArray()) }
+        }
 
-
-
-        val cached=rows(data.optJSONArray("feed") ?: JSONArray())
-
-
-
-        noticeBatch = batchId(); noticeFeed = cached.take(noticePageSize); noticeOfflineTail=cached.drop(noticePageSize)
-
-
-
-        noticeHasMore=noticeOfflineTail.isNotEmpty() || (ClassMateAcademicCache.online(activity) && data.optBoolean("has_more",cached.size>=noticePageSize))
-
-
-
-        fun restore(name: String, map: MutableMap<String, JSONObject>) { val json = data.optJSONObject(name) ?: return; json.keys().forEach { id -> json.optJSONObject(id)?.let { map[id] = it } } }
-
-
-
-        restore("states", noticeStates); restore("authors", noticeAuthors); restore("reads", noticeReadCounts)
-
-
-
-        data.optJSONObject("previews")?.let { json -> json.keys().forEach { id -> noticeReaderPreviews[id] = rows(json.optJSONArray(id) ?: JSONArray()) } }
-
-
-
+        data.optJSONObject("previews")?.let { json ->
+            json.keys().forEach { id -> noticeReaderPreviews[id] = rows(json.optJSONArray(id) ?: JSONArray()) }
+        }
     }
 
 
@@ -5370,6 +5899,7 @@ internal class ClassMateAcademicScreensSupabase(
         val list = root.v<RecyclerView>(R.id.rvNotices)
 
         list.setItemViewCacheSize(12)
+        (list.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)?.supportsChangeAnimations = false
 
         if (list.layoutManager == null) list.layoutManager = com.shuaib.classmate.ui.SafeLinearLayoutManager(activity)
 
@@ -5795,11 +6325,28 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                text(card, R.id.tvLikeCount, state?.optLong("like_count")?.toString() ?: "0")
+                val likeCount = state?.optLong("like_count") ?: 0L
+                val isLiked = state?.optBoolean("is_liked") == true
+                card.findViewById<TextView>(R.id.tvLikeCount)?.apply {
+                    if (likeCount > 0) {
+                        text = compactCount(likeCount)
+                        setTextColor(activity.getColor(if (isLiked) R.color.cm_notice_like else R.color.cm_text_secondary))
+                        visibility = View.VISIBLE
+                    } else {
+                        visibility = View.GONE
+                    }
+                }
 
-
-
-                text(card, R.id.tvCommentCount, state?.optLong("comment_count")?.toString() ?: "0")
+                val commentCount = state?.optLong("comment_count") ?: 0L
+                card.findViewById<TextView>(R.id.tvCommentCount)?.apply {
+                    if (commentCount > 0) {
+                        text = compactCount(commentCount)
+                        setTextColor(activity.getColor(R.color.cm_text_secondary))
+                        visibility = View.VISIBLE
+                    } else {
+                        visibility = View.GONE
+                    }
+                }
 
 
 
@@ -5807,29 +6354,9 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                val rawReadCount = noticeReadCounts[noticeId]?.optLong("read_count") ?: 0L
-
-
-
-                val authorRead = (noticeReaderPreviews[noticeId].orEmpty()).any { it.optString("profile_id") == authorId } ||
-
-
-
-                    (noticeReadCounts[noticeId]?.optBoolean("read_by_me") == true && authorId == profile().optString("id"))
-
-
-
-                val effectiveSeen = (rawReadCount - (if (authorRead) 1 else 0)).coerceAtLeast(0)
-
-
-
+                val effectiveSeen = getEffectiveSeen(noticeId, authorId)
                 text(card, R.id.tvReadCount, seenLabel(effectiveSeen))
-
-
-
-                bindSeenAvatar(card, noticeId, authorId)
-
-
+                bindSeenAvatar(card, noticeId, authorId, effectiveSeen)
 
                 card.v<View>(R.id.btnReadReceipts).setOnClickListener {
 
@@ -5883,7 +6410,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                card.v<View>(R.id.btnComment).setOnClickListener { showNoticeComments(root, item) }
+                card.v<View>(R.id.btnComment).setOnClickListener { showNoticeComments(root, card, item) }
 
 
 
@@ -5937,31 +6464,40 @@ internal class ClassMateAcademicScreensSupabase(
                     val totalVotes = pollData.optInt("total_votes", 0)
                     val totalVoters = pollData.optInt("total_voters", 0)
 
-                    card.findViewById<TextView>(R.id.tvPollSubtext)?.text =
-                        (if (isMultiple) "Multiple choice" else "Single choice") + " • " + (if (isAnon) "Anonymous" else "Public")
-
-                    card.findViewById<TextView>(R.id.tvPollTotalVotes)?.text =
-                        "$totalVoters " + (if (totalVoters == 1) "person voted" else "people voted") +
-                            (if (totalVotes > totalVoters) " ($totalVotes total votes)" else "")
-
-                    val tvStatus = card.findViewById<TextView>(R.id.tvPollStatus)
                     val expiryStr = pollData.optString("expires_at")
-                    if (isClosed) {
-                        tvStatus?.text = "Final Results"
-                        tvStatus?.setTextColor(0xFFEF4444.toInt())
+                    val isExpired = if (expiryStr.isNotBlank() && expiryStr != "null") {
+                        val diff = runCatching { java.time.Instant.parse(expiryStr).toEpochMilli() - System.currentTimeMillis() }.getOrDefault(0L)
+                        diff <= 0
+                    } else false
+                    val hasEnded = isClosed || isExpired
+
+                    card.findViewById<TextView>(R.id.tvPollSubtext)?.text =
+                        (if (isMultiple) "Multiple choice" else "Single choice") + " • " +
+                        (if (isAnon) "Anonymous" else "Public")
+
+                    val tvPollVotes = card.findViewById<TextView>(R.id.tvPollTotalVotes)
+                    val baseVotesText = "$totalVoters " + (if (totalVoters == 1) "person voted" else "people voted") +
+                        (if (totalVotes > totalVoters) " ($totalVotes total votes)" else "")
+                    val votesSummary = if (hasEnded) {
+                        "$baseVotesText • Poll ended"
                     } else if (expiryStr.isNotBlank() && expiryStr != "null") {
                         val diff = runCatching { java.time.Instant.parse(expiryStr).toEpochMilli() - System.currentTimeMillis() }.getOrDefault(0L)
-                        if (diff <= 0) {
-                            tvStatus?.text = "Closed"
-                            tvStatus?.setTextColor(0xFFEF4444.toInt())
-                        } else {
-                            val h = diff / 3600000L
-                            tvStatus?.text = if (h < 24) "Closes in ${h}h" else "Closes in ${h / 24}d"
-                            tvStatus?.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                        val h = diff / 3600000L
+                        val expiryText = if (h < 24) "Closes in ${h}h" else "Closes in ${h / 24}d"
+                        "$baseVotesText • $expiryText"
+                    } else {
+                        baseVotesText
+                    }
+                    tvPollVotes?.text = votesSummary
+
+                    val tvViewVotes = card.findViewById<TextView>(R.id.tvPollViewVotes)
+                    if (!isAnon) {
+                        tvViewVotes?.visibility = View.VISIBLE
+                        tvViewVotes?.setOnClickListener {
+                            showPollVotesSheet(root, pollData)
                         }
                     } else {
-                        tvStatus?.text = "Open"
-                        tvStatus?.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                        tvViewVotes?.visibility = View.GONE
                     }
 
                     val optionsList = card.findViewById<LinearLayout>(R.id.pollOptionsList)
@@ -6025,7 +6561,12 @@ internal class ClassMateAcademicScreensSupabase(
                             track.post { applyTrackWidth() }
                         }
 
-                        if (!isClosed) {
+                        if (hasEnded) {
+                            cardOption.setOnClickListener {
+                                com.shuaib.classmate.utils.HapticHelper.warning(activity)
+                                Toast.makeText(activity, "This poll has already ended", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
                             cardOption.setOnClickListener {
                                 it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                                 val pollId = pollData.optString("poll_id").ifBlank { pollData.optString("id") }
@@ -6108,8 +6649,6 @@ internal class ClassMateAcademicScreensSupabase(
                                     }
                                 }
                             }
-                        } else {
-                            cardOption.isClickable = false
                         }
 
                         optionsList.addView(optView)
@@ -6118,62 +6657,119 @@ internal class ClassMateAcademicScreensSupabase(
                     pollContainer?.visibility = View.GONE
                 }
 
-                card.findViewById<View>(R.id.imagePreviewContainer)?.visibility = View.GONE
+                // Attachment handling (Photos, Multi-image carousels, and Document attachments)
+                val attList = noticeAttachments[noticeId] ?: emptyList()
+                val imageAtts = attList.filter {
+                    val mime = it.optString("mime_type").lowercase()
+                    val fileName = it.optString("file_name").lowercase()
+                    mime.startsWith("image/") || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png") || fileName.endsWith(".webp")
+                }
+                val fileAtts = attList.filter { it !in imageAtts }
 
+                val previewContainer = card.findViewById<FrameLayout>(R.id.imagePreviewContainer)
+                if (imageAtts.isNotEmpty()) {
+                    previewContainer?.visibility = View.VISIBLE
+                    val ivPreview = card.findViewById<com.google.android.material.imageview.ShapeableImageView>(R.id.ivPreview)
+                    val carouselPager = card.findViewById<ViewPager2>(R.id.imageCarouselPager)
+                    val indicator = card.findViewById<TextView>(R.id.tvCarouselIndicator)
+                    val tapToView = card.findViewById<TextView>(R.id.tvTapToView)
 
+                    val imageUrls = imageAtts.map { att ->
+                        att.optString("url").ifBlank {
+                            val key = att.optString("storage_key")
+                            if (key.isNotBlank()) "${BuildConfig.CLASSMATE_URL}/storage/v1/object/public/notice-images/$key" else ""
+                        }
+                    }.filter { it.isNotBlank() }
 
-                card.v<View>(R.id.fileAttachmentContainer).visibility =
+                    if (imageUrls.size > 1) {
+                        ivPreview?.visibility = View.GONE
+                        carouselPager?.visibility = View.VISIBLE
+                        indicator?.visibility = View.VISIBLE
+                        indicator?.text = "1 / ${imageUrls.size}"
+                        tapToView?.visibility = View.VISIBLE
 
+                        carouselPager?.adapter = NoticeImageCarouselAdapter(imageUrls) { pos ->
+                            val intent = Intent(activity, ImageViewerActivity::class.java).apply {
+                                putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URLS, ArrayList(imageUrls))
+                                putExtra(ImageViewerActivity.EXTRA_INITIAL_POSITION, pos)
+                            }
+                            activity.startActivity(intent)
+                        }
+                        carouselPager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                            override fun onPageSelected(position: Int) {
+                                indicator?.text = "${position + 1} / ${imageUrls.size}"
+                            }
+                        })
+                    } else if (imageUrls.size == 1) {
+                        val singleUrl = imageUrls.first()
+                        ivPreview?.visibility = View.VISIBLE
+                        carouselPager?.visibility = View.GONE
+                        indicator?.visibility = View.GONE
+                        tapToView?.visibility = View.VISIBLE
 
-
-                    if (resourceId == null) View.GONE else View.VISIBLE
-
-
+                        ivPreview?.let { iv ->
+                            com.bumptech.glide.Glide.with(card)
+                                .load(singleUrl)
+                                .placeholder(R.drawable.bg_notice_modern_card)
+                                .centerCrop()
+                                .into(iv)
+                        }
+                        val openSingle = View.OnClickListener {
+                            val intent = Intent(activity, ImageViewerActivity::class.java).apply {
+                                putExtra(ImageViewerActivity.EXTRA_IMAGE_URL, singleUrl)
+                            }
+                            activity.startActivity(intent)
+                        }
+                        previewContainer?.setOnClickListener(openSingle)
+                        ivPreview?.setOnClickListener(openSingle)
+                    } else {
+                        previewContainer?.visibility = View.GONE
+                    }
+                } else {
+                    previewContainer?.visibility = View.GONE
+                }
 
                 if (resourceId != null) {
-
-
-
+                    card.v<View>(R.id.fileAttachmentContainer).visibility = View.VISIBLE
                     text(card, R.id.tvFileName, item.optString("title").removePrefix("Resource: "))
-
-
-
                     text(card, R.id.tvFileSize, "Tap to open protected file")
-
-
-
                     val ext = title.substringAfterLast('.', "").uppercase().takeIf { it.length in 2..5 } ?: "FILE"
-
-
-
                     text(card, R.id.tvFileExtension, ext)
-
-
-
-                    card.v<View>(R.id.fileAttachmentContainer).setOnClickListener {
-
-
-
-                        openFile(JSONObject().put("id", resourceId))
-
-
-
+                    val openAction = View.OnClickListener { openFile(JSONObject().put("id", resourceId)) }
+                    card.v<View>(R.id.fileAttachmentContainer).setOnClickListener(openAction)
+                    card.v<View>(R.id.btnOpenFile).setOnClickListener(openAction)
+                } else if (fileAtts.isNotEmpty()) {
+                    val firstDoc = fileAtts.first()
+                    val docName = firstDoc.optString("file_name").ifBlank { "Attachment" }
+                    val docSize = firstDoc.optLong("file_size", 0L)
+                    val formattedDocSize = if (docSize > 0) {
+                        if (docSize >= 1024 * 1024) String.format(java.util.Locale.ENGLISH, "%.1f MB", docSize / (1024.0 * 1024.0))
+                        else "${docSize / 1024} KB"
+                    } else "Tap to open file"
+                    val docExt = docName.substringAfterLast('.', "").uppercase().takeIf { it.length in 2..5 } ?: "FILE"
+                    val docUrl = firstDoc.optString("url").ifBlank {
+                        val key = firstDoc.optString("storage_key")
+                        if (key.isNotBlank()) "${BuildConfig.CLASSMATE_URL}/storage/v1/object/public/notice-images/$key" else ""
                     }
 
-
-
-                    card.v<View>(R.id.btnOpenFile).setOnClickListener {
-
-
-
-                        openFile(JSONObject().put("id", resourceId))
-
-
-
+                    card.v<View>(R.id.fileAttachmentContainer).visibility = View.VISIBLE
+                    text(card, R.id.tvFileName, docName)
+                    text(card, R.id.tvFileSize, formattedDocSize)
+                    text(card, R.id.tvFileExtension, docExt)
+                    val openDoc = View.OnClickListener {
+                        if (docUrl.isNotBlank()) {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(docUrl))
+                                activity.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(activity, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
-
-
-
+                    card.v<View>(R.id.fileAttachmentContainer).setOnClickListener(openDoc)
+                    card.v<View>(R.id.btnOpenFile).setOnClickListener(openDoc)
+                } else {
+                    card.v<View>(R.id.fileAttachmentContainer).visibility = View.GONE
                 }
 
 
@@ -6188,28 +6784,14 @@ internal class ClassMateAcademicScreensSupabase(
 
                         (profile().optString("role") == "teacher" || profile().optBoolean("is_cr")))
 
-
+                val isNoticePinned = noticeStates[item.optString("id")]?.optBoolean("is_pinned") == true || item.optBoolean("is_pinned")
+                card.findViewById<TextView>(R.id.tvPinnedBadge)?.visibility = if (isNoticePinned) View.VISIBLE else View.GONE
 
                 card.v<View>(R.id.btnOptions).apply {
-
-
-
                     visibility = View.VISIBLE
-
-
-
-                    isEnabled = canManage
-
-
-
-                    alpha = if (canManage) 1f else 0.45f
-
-
-
-                    setOnClickListener { if (canManage) showNoticeActions(root, item) }
-
-
-
+                    isEnabled = true
+                    alpha = 1f
+                    setOnClickListener { showNoticeActions(root, item, card) }
                 }
 
 
@@ -6321,32 +6903,41 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val rows=buildList {
-
-
+        val rows = buildList {
+            var lastSectionTitle: String? = null
 
             filtered.forEach { item ->
+                val id = item.getString("id")
+                val rawDate = item.optString("published_at").ifBlank { item.optString("created_at") }
+                val localDate = noticeLocalDate(rawDate)
+                val sectionTitle = noticeDateSectionTitle(localDate)
 
+                if (search.isBlank() && sectionTitle != lastSectionTitle) {
+                    val isFirstSection = (lastSectionTitle == null)
+                    lastSectionTitle = sectionTitle
+                    add(ClassMateNoticeRow("date_section:$sectionTitle", R.layout.item_notice_date_header, sectionTitle) { view ->
+                        view.findViewById<TextView>(R.id.tvDateHeaderTitle)?.text = sectionTitle
+                        val dp = view.resources.displayMetrics.density
+                        if (isFirstSection) {
+                            view.setPadding(0, 0, 0, (12 * dp).toInt())
+                        } else {
+                            view.setPadding(0, (3 * dp).toInt(), 0, (15 * dp).toInt())
+                        }
+                    })
+                }
 
-
-                val id=item.getString("id")
-
-
-
-                val signature=listOf(item.toString(),noticeStates[id]?.toString(),noticeReadCounts[id]?.toString(),
+                val signature = listOf(
+                    item.toString(),
+                    noticeStates[id]?.toString(),
+                    noticeReadCounts[id]?.toString(),
                     noticePolls[id]?.toString(),
-                    noticeReaderPreviews[id]?.joinToString { it.toString() },noticeTranslations[id]?.toString(),
+                    noticeAttachments[id]?.joinToString { it.optString("id") + ":" + it.optString("storage_key") },
+                    noticeReaderPreviews[id]?.joinToString { it.toString() },
+                    noticeTranslations[id]?.toString(),
+                    id in translatedNotices, id in translatingNoticeIds, id in expandedNoticeIds, search, profile().optString("role"), profile().optBoolean("is_cr")
+                ).joinToString("\n")
 
-
-
-                    id in translatedNotices,id in translatingNoticeIds,id in expandedNoticeIds,search,profile().optString("role"),profile().optBoolean("is_cr")).joinToString("\n")
-
-
-
-                add(ClassMateNoticeRow("notice:$id",R.layout.item_notice_modern,signature) { bindNotice(it,item) })
-
-
-
+                add(ClassMateNoticeRow("notice:$id", R.layout.item_notice_modern, signature) { bindNotice(it, item) })
             }
 
 
@@ -6365,16 +6956,19 @@ internal class ClassMateAcademicScreensSupabase(
 
         val adapter=(list.adapter as? ClassMateNoticeRows) ?: ClassMateNoticeRows().also { list.adapter=it }
 
-
-
         adapter.submitList(rows) {
-
-
-
+            val scrollTargetId = pendingNoticeScrollId
+            if (!scrollTargetId.isNullOrBlank()) {
+                val targetPos = rows.indexOfFirst { it.key.equals("notice:$scrollTargetId", ignoreCase = true) }
+                if (targetPos >= 0) {
+                    pendingNoticeScrollId = null
+                    highlightedNoticeId = scrollTargetId
+                    list.postDelayed({
+                        (list.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(targetPos, (40 * activity.resources.displayMetrics.density).toInt())
+                    }, 150)
+                }
+            }
             list.post { if(active(root) && list.scrollState==RecyclerView.SCROLL_STATE_IDLE) markVisibleNoticesRead(root,list) }
-
-
-
         }
 
 
@@ -6387,14 +6981,58 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+    private fun parseNoticeInstant(value: String): Instant? = runCatching {
+        if (value.isBlank()) return@runCatching null
+        val clean = if (value.contains(' ') && !value.contains('T')) {
+            val parts = value.trim().split(" ")
+            if (parts.size >= 2) "${parts[0]}T${parts[1]}" else value
+        } else value
+        runCatching { Instant.parse(clean) }
+            .getOrElse {
+                runCatching { java.time.OffsetDateTime.parse(clean).toInstant() }
+                    .getOrElse { java.time.ZonedDateTime.parse(clean).toInstant() }
+            }
+    }.getOrNull()
+
+    private fun noticeLocalDate(value: String): LocalDate? = runCatching {
+        parseNoticeInstant(value)?.atZone(ZoneId.systemDefault())?.toLocalDate()
+    }.getOrNull()
+
+    private fun noticeDateSectionTitle(date: LocalDate?): String {
+        if (date == null) return "OLDER NOTICES"
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(date, today)
+        return when {
+            daysBetween == 0L -> "TODAY"
+            daysBetween == 1L -> "YESTERDAY"
+            daysBetween in 2..6 -> date.format(DateTimeFormatter.ofPattern("EEEE", java.util.Locale.ENGLISH)).uppercase()
+            date.year == today.year -> date.format(DateTimeFormatter.ofPattern("dd MMMM", java.util.Locale.ENGLISH)).uppercase()
+            else -> date.format(DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH)).uppercase()
+        }
+    }
+
     private fun noticeDate(value: String): String = runCatching {
+        val instant = parseNoticeInstant(value) ?: return@runCatching value.replace('T', ' ').take(16)
+        val zonedDateTime = instant.atZone(ZoneId.systemDefault())
+        val localDate = zonedDateTime.toLocalDate()
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(localDate, today)
+        val timeStr = zonedDateTime.format(DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.ENGLISH))
 
-
-
-        noticeDateFormatter.format(Instant.parse(value))
-
-
-
+        when {
+            daysBetween == 0L -> {
+                val diffMinutes = java.time.Duration.between(instant, Instant.now()).toMinutes()
+                when {
+                    diffMinutes < 1 -> "Just now"
+                    diffMinutes < 60 -> "${diffMinutes}m ago · $timeStr"
+                    else -> "Today, $timeStr"
+                }
+            }
+            daysBetween == 1L -> "Yesterday, $timeStr"
+            daysBetween in 2..6 -> "${zonedDateTime.format(DateTimeFormatter.ofPattern("EEE", java.util.Locale.ENGLISH))}, $timeStr"
+            localDate.year == today.year -> zonedDateTime.format(DateTimeFormatter.ofPattern("dd MMM, hh:mm a", java.util.Locale.ENGLISH))
+            else -> zonedDateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH))
+        }
     }.getOrElse { value.replace('T', ' ').take(16) }
 
 
@@ -6663,102 +7301,140 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private fun bindSeenAvatar(card: View, noticeId: String, authorId: String = "") {
-
-
-
-        val group = card.v<android.widget.FrameLayout>(R.id.seenAvatars)
-
-
-
+    private fun getEffectiveSeen(noticeId: String, authorId: String = ""): Long {
+        val rawReadCount = noticeReadCounts[noticeId]?.optLong("read_count") ?: 0L
         val adminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
+        val myProfileId = profile().optString("id")
+        val previews = noticeReaderPreviews[noticeId].orEmpty()
+            .filterNot { adminReceiptsOff && it.optString("profile_id") == myProfileId }
+        return maxOf(rawReadCount, previews.size.toLong())
+    }
 
-
+    private fun bindSeenAvatar(card: View, noticeId: String, authorId: String = "", effectiveSeen: Long = -1L) {
+        val group = card.findViewById<android.widget.FrameLayout>(R.id.seenAvatars) ?: return
+        val myProfileId = profile().optString("id")
+        val adminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
+        val myCurrentAvatar = profile().optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: ownGoogleAvatar.orEmpty()
 
         val readers = noticeReaderPreviews[noticeId].orEmpty()
+            .filterNot { adminReceiptsOff && it.optString("profile_id") == myProfileId }
+            .take(3)
 
+        val totalCount = if (effectiveSeen >= 0L) effectiveSeen else getEffectiveSeen(noticeId, authorId)
 
+        if (totalCount <= 0L && readers.isEmpty()) {
+            group.tag = null
+            group.removeAllViews()
+            group.visibility = View.GONE
+            return
+        }
 
-            .filterNot { it.optString("profile_id") == authorId || (adminReceiptsOff && it.optString("profile_id") == profile().optString("id")) }
-
-
-
-            .take(if (activity.resources.configuration.screenWidthDp < 360) 3 else 4)
-
-
-
-        val fingerprint=readers.joinToString { it.toString() }
-
-
-
-        if(group.tag==fingerprint) return
-
-
-
-        group.tag=fingerprint
-
-
-
+        val readerFingerprint = readers.joinToString(",") { 
+            val av = if (it.optString("profile_id") == myProfileId && myCurrentAvatar.isNotBlank()) myCurrentAvatar else it.optString("avatar_url")
+            "${it.optString("profile_id")}:$av"
+        }
+        val fingerprint = "$noticeTabVisitId-$noticeId-$totalCount-$adminReceiptsOff-$readerFingerprint"
+        if (group.tag == fingerprint) return
+        group.tag = fingerprint
         group.removeAllViews()
-
-
-
-        group.visibility = if (readers.isEmpty()) View.GONE else View.VISIBLE
-
-
 
         fun dp(n: Int) = (n * activity.resources.displayMetrics.density).toInt()
 
+        val avatarOverlap = 14
+        val avatarSize = 22
+        val avatarsCount = minOf(readers.size, totalCount.toInt())
 
-
-        group.layoutParams = group.layoutParams.apply { width = dp(22 + (readers.size - 1).coerceAtLeast(0) * 14); height = dp(22) }
-
-
-
-        readers.forEachIndexed { index, reader ->
-
-
-
+        // 1. Up to 3 circular profile pictures
+        readers.take(avatarsCount).forEachIndexed { index, reader ->
             val image = de.hdodenhof.circleimageview.CircleImageView(activity).apply {
-
-
-
-                borderWidth = dp(1); borderColor = activity.getColor(R.color.cm_surface)
-
-
-
+                borderWidth = dp(1)
+                borderColor = activity.getColor(R.color.cm_surface)
                 contentDescription = reader.optString("reader_name")
-
-
-
                 setImageResource(R.drawable.ic_default_avatar)
+            }
+            group.addView(image, android.widget.FrameLayout.LayoutParams(dp(avatarSize), dp(avatarSize)).apply {
+                marginStart = dp(index * avatarOverlap)
+            })
 
-
-
+            val readerAvatar = if (reader.optString("profile_id") == myProfileId && myCurrentAvatar.isNotBlank()) {
+                myCurrentAvatar
+            } else {
+                reader.optString("avatar_url")
             }
 
-
-
-            group.addView(image, android.widget.FrameLayout.LayoutParams(dp(22), dp(22)).apply { marginStart = dp(index * 14) })
-
-
-
-            reader.optString("avatar_url").takeIf { it.startsWith("https://") }?.let {
-
-
-
-                com.bumptech.glide.Glide.with(card).load(it).placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(image)
-
-
-
+            if (readerAvatar.startsWith("https://")) {
+                com.bumptech.glide.Glide.with(card)
+                    .load(readerAvatar)
+                    .override(dp(avatarSize), dp(avatarSize))
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.ic_default_avatar)
+                    .error(R.drawable.ic_default_avatar)
+                    .into(image)
             }
-
-
-
         }
 
+        // 2. White circular overflow badge: only shown when totalCount > 3 and there are remaining readers beyond those shown
+        val remainingCount = (totalCount - avatarsCount).coerceAtLeast(0)
+        val showBadge = totalCount > 3 && remainingCount > 0
 
+        if (showBadge) {
+            val counterBadge = android.widget.TextView(activity).apply {
+                textSize = if (remainingCount > 99) 8f else 9.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                gravity = android.view.Gravity.CENTER
+                setTextColor(0xFF0F172A.toInt())
+                val shape = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(0xFFFFFFFF.toInt())
+                    setStroke(dp(1), 0x33000000.toInt())
+                }
+                background = shape
+                elevation = (2 * activity.resources.displayMetrics.density)
 
+                // Smooth count-up animation rising from 0 to remainingCount on tab visit
+                val animator = android.animation.ValueAnimator.ofInt(0, remainingCount.toInt()).apply {
+                    duration = 450L
+                    interpolator = android.view.animation.DecelerateInterpolator()
+                    addUpdateListener { va ->
+                        val curr = va.animatedValue as Int
+                        val countText = if (curr > 999) {
+                            "+${curr / 1000}k"
+                        } else if (curr > 99) {
+                            "+99"
+                        } else {
+                            "+$curr"
+                        }
+                        text = countText
+                    }
+                }
+                animator.start()
+            }
+
+            val badgeMarginStart = avatarsCount * avatarOverlap
+            group.addView(counterBadge, android.widget.FrameLayout.LayoutParams(dp(avatarSize), dp(avatarSize)).apply {
+                marginStart = dp(badgeMarginStart)
+            })
+
+            val totalWidth = badgeMarginStart + avatarSize
+            group.layoutParams = group.layoutParams.apply {
+                width = dp(totalWidth)
+                height = dp(avatarSize)
+            }
+            group.visibility = View.VISIBLE
+        } else {
+            // totalCount <= 3: no overflow badge, only avatars shown
+            if (avatarsCount > 0) {
+                val totalWidth = (avatarsCount - 1) * avatarOverlap + avatarSize
+                group.layoutParams = group.layoutParams.apply {
+                    width = dp(totalWidth)
+                    height = dp(avatarSize)
+                }
+                group.visibility = View.VISIBLE
+            } else {
+                group.visibility = View.GONE
+            }
+        }
     }
 
 
@@ -6888,84 +7564,36 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         val myProfileId = profile().optString("id")
-
-
-
         val isAdminReceiptsOff = profile().optString("role") == "admin" && !appPrefs.isNoticeReadReceiptsEnabled()
-
-
-
-
-
-
+        val myAvatar = profile().optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: ownGoogleAvatar.orEmpty()
 
         // Optimistically apply read state immediately to UI and cache so badge and seen counts update with 0ms lag
-
-
-
         newIds.forEach { id ->
-
-
-
             if (!isAdminReceiptsOff) {
-
-
-
                 val previews = noticeReaderPreviews[id].orEmpty()
-
-
-
-                if (previews.none { it.optString("profile_id") == myProfileId }) {
-
-
-
-                    noticeReaderPreviews[id] = (listOf(JSONObject().put("profile_id", myProfileId)
-
-
-
-                        .put("reader_name", profile().optString("full_name")).put("avatar_url", ownGoogleAvatar ?: "")) + previews).take(4)
-
-
-
+                val filtered = previews.filterNot { it.optString("profile_id") == myProfileId }
+                val myEntry = JSONObject().apply {
+                    put("profile_id", myProfileId)
+                    put("reader_name", profile().optString("full_name").ifBlank { "ClassMate member" })
+                    put("avatar_url", myAvatar)
+                    put("read_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US).format(java.util.Date()))
                 }
-
-
-
+                noticeReaderPreviews[id] = (listOf(myEntry) + filtered).take(4)
+            } else {
+                noticeReaderPreviews[id]?.let { previews ->
+                    noticeReaderPreviews[id] = previews.filterNot { it.optString("profile_id") == myProfileId }
+                }
             }
-
-
 
             val count = noticeReadCounts.getOrPut(id) { JSONObject() }
-
-
-
             if (!count.optBoolean("read_by_me")) {
-
-
-
                 count.put("read_by_me", true)
-
-
-
                 if (!isAdminReceiptsOff) {
-
-
-
                     count.put("read_count", count.optLong("read_count") + 1)
-
-
-
                 }
-
-
-
             }
-
-
-
         }
-
-
 
         saveNoticeCache()
 
@@ -6995,15 +7623,9 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                text(view, R.id.tvReadCount,
-
-
-
-                    seenLabel(noticeReadCounts[id]?.optLong("read_count") ?: 0))
-
-
-
-                id?.let { bindSeenAvatar(view, it) }
+                val effective = if (id != null) getEffectiveSeen(id) else 0L
+                text(view, R.id.tvReadCount, seenLabel(effective))
+                id?.let { bindSeenAvatar(view, it, effectiveSeen = effective) }
 
 
 
@@ -7095,7 +7717,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        val totalReadCount = noticeReadCounts[noticeId]?.optLong("read_count") ?: 0L
+        val totalReadCount = getEffectiveSeen(noticeId)
 
 
 
@@ -7183,7 +7805,17 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        text(card, R.id.tvLikeCount, compactCount(state.optLong("like_count")))
+        val newLikeCount = state.optLong("like_count")
+        val tvLike = card.findViewById<TextView>(R.id.tvLikeCount)
+        if (tvLike != null) {
+            if (newLikeCount > 0) {
+                tvLike.text = compactCount(newLikeCount)
+                tvLike.setTextColor(activity.getColor(if (enabled) R.color.cm_notice_like else R.color.cm_text_secondary))
+                tvLike.visibility = View.VISIBLE
+            } else {
+                tvLike.visibility = View.GONE
+            }
+        }
 
 
 
@@ -7443,26 +8075,375 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private fun showNoticeActions(root: View, notice: JSONObject) {
+    private fun showNoticeActions(root: View, notice: JSONObject, card: View) {
+        val noticeId = notice.optString("id")
+        val state = noticeStates[noticeId]
+        val isPinned = state?.optBoolean("is_pinned") == true || notice.optBoolean("is_pinned")
+        val canManage = profile().optString("role") == "admin" ||
+            (notice.optString("author_id") == profile().optString("id") &&
+                (profile().optString("role") == "teacher" || profile().optBoolean("is_cr")))
 
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(activity, R.style.Theme_ClassMate_BottomSheetDialog)
+        val dp = { n: Int -> (n * activity.resources.displayMetrics.density).toInt() }
 
+        val sheetRoot = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(14), dp(20), dp(24))
+            setBackgroundColor(activity.getColor(R.color.cm_surface))
+        }
 
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(activity).setBackground(noticeDialogSurface()).setTitle("Manage notice")
+        // Drag Handle
+        val handle = View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(4)).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(14)
+            }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(2).toFloat()
+                setColor(activity.getColor(R.color.cm_text_muted))
+            }
+        }
+        sheetRoot.addView(handle)
 
+        // Header Title
+        val tvTitle = TextView(activity).apply {
+            text = "Notice options"
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(activity.getColor(R.color.cm_text_primary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(2) }
+        }
+        sheetRoot.addView(tvTitle)
 
+        // Subtitle (Notice title truncated)
+        val noticeTitle = notice.optString("title").trim()
+        if (noticeTitle.isNotBlank()) {
+            val tvSubtitle = TextView(activity).apply {
+                text = noticeTitle
+                textSize = 12.5f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(activity.getColor(R.color.cm_text_secondary))
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+            }
+            sheetRoot.addView(tvSubtitle)
+        } else {
+            (tvTitle.layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(12)
+        }
 
-            .setItems(arrayOf("Edit title and message", "Delete notice")) { _, option ->
+        // Divider
+        val divider = View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { bottomMargin = dp(6) }
+            setBackgroundColor(activity.getColor(R.color.cm_border))
+        }
+        sheetRoot.addView(divider)
 
+        fun addActionRow(
+            iconRes: Int,
+            title: String,
+            desc: String,
+            isDestructive: Boolean = false,
+            onClick: () -> Unit
+        ) {
+            val row = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                    topMargin = dp(4)
+                    bottomMargin = dp(4)
+                }
+                setPadding(dp(10), dp(10), dp(10), dp(10))
+                val outValue = android.util.TypedValue()
+                activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+                setBackgroundResource(outValue.resourceId)
+                isClickable = true
+                isFocusable = true
+            }
 
+            val iconColor = if (isDestructive) activity.getColor(R.color.cm_cancel_red) else activity.getColor(R.color.cm_primary)
+            val iconBg = android.widget.FrameLayout(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                    marginEnd = dp(14)
+                }
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(if (isDestructive) 0x1AE11D48.toInt() else 0x1A2563EB.toInt())
+                }
+            }
+            val ivIcon = ImageView(activity).apply {
+                layoutParams = android.widget.FrameLayout.LayoutParams(dp(20), dp(20), android.view.Gravity.CENTER)
+                setImageResource(iconRes)
+                setColorFilter(iconColor)
+            }
+            iconBg.addView(ivIcon)
+            row.addView(iconBg)
 
-                if (option == 0) editNotice(root, notice) else deleteNotice(root, notice)
+            val textCol = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            }
+            val tvRowTitle = TextView(activity).apply {
+                text = title
+                textSize = 14.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(if (isDestructive) activity.getColor(R.color.cm_cancel_red) else activity.getColor(R.color.cm_text_primary))
+            }
+            val tvRowDesc = TextView(activity).apply {
+                text = desc
+                textSize = 11.5f
+                setTextColor(activity.getColor(R.color.cm_text_secondary))
+            }
+            textCol.addView(tvRowTitle)
+            textCol.addView(tvRowDesc)
+            row.addView(textCol)
 
+            row.setOnClickListener {
+                dialog.dismiss()
+                onClick()
+            }
+            sheetRoot.addView(row)
+        }
 
+        // Action 1: Pin / Unpin
+        val pinIcon = if (isPinned) R.drawable.ic_pin_filled else R.drawable.ic_pin_outline
+        val pinText = if (isPinned) "Unpin notice" else "Pin notice"
+        val pinDesc = if (isPinned) "Restore to chronological order" else "Keep at the top of notice feed"
+        addActionRow(pinIcon, pinText, pinDesc) {
+            togglePinNotice(root, notice, !isPinned)
+        }
 
-            }.show()
+        // Action 2: Reminder
+        addActionRow(R.drawable.ic_notice_reminder_outline, "Set reminder", "Notify me before class or assignment") {
+            showReminderOptions(root, card, notice)
+        }
 
+        // Action 3: Edit (if allowed)
+        if (canManage) {
+            addActionRow(R.drawable.ic_edit, "Edit title and message", "Update notice text or attachments") {
+                editNotice(root, notice)
+            }
+        }
 
+        // Action 4: Delete (if allowed)
+        if (canManage) {
+            addActionRow(R.drawable.ic_delete, "Delete notice", "Permanently remove from class feed", isDestructive = true) {
+                deleteNotice(root, notice)
+            }
+        }
 
+        dialog.setContentView(sheetRoot)
+        (sheetRoot.parent as? View)?.setBackgroundResource(android.R.color.transparent)
+        dialog.show()
+    }
+
+    private fun togglePinNotice(root: View, notice: JSONObject, newPinned: Boolean) {
+        val noticeId = notice.optString("id")
+        if (noticeId.isBlank()) return
+        val profileId = profile().optString("id")
+        if (profileId.isBlank()) return
+
+        val state = noticeStates.getOrPut(noticeId) { JSONObject() }
+        val oldPinned = state.optBoolean("is_pinned")
+        state.put("is_pinned", newPinned)
+        renderNoticeFeed(root)
+
+        val list = root.findViewById<RecyclerView>(R.id.rvNotices)
+        list?.postDelayed({
+            if (newPinned) {
+                list.smoothScrollToPosition(0)
+            } else {
+                val targetIndex = noticeVisibleIds.indexOfFirst { it == noticeId }
+                if (targetIndex >= 0) {
+                    list.smoothScrollToPosition(targetIndex)
+                }
+            }
+        }, 120L)
+
+        launch(root) {
+            runCatching {
+                val row = JSONObject()
+                    .put("profile_id", profileId)
+                    .put("notice_id", noticeId)
+                    .put("liked", state.optBoolean("is_liked"))
+                    .put("pinned", newPinned)
+                state.optString("reminder_at").takeIf { it.isNotBlank() && it != "null" }?.let {
+                    row.put("reminder_at", it)
+                }
+                ClassMateAuthApi.upsert("notice_reactions", row)
+                saveNoticeCache()
+                Toast.makeText(activity, if (newPinned) "📌 Notice pinned" else "Notice unpinned", Toast.LENGTH_SHORT).show()
+            }.onFailure { e ->
+                state.put("is_pinned", oldPinned)
+                renderNoticeFeed(root)
+                Toast.makeText(activity, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showPollVotesSheet(root: View, pollData: JSONObject) {
+        val pollId = pollData.optString("poll_id").ifBlank { pollData.optString("id") }
+        if (pollId.isBlank()) return
+
+        val pollQuestion = pollData.optString("question", "Poll Votes")
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(activity, R.style.Theme_ClassMate_BottomSheetDialog)
+
+        val dp = { n: Int -> (n * activity.resources.displayMetrics.density).toInt() }
+
+        val sheetRoot = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(24))
+            setBackgroundColor(activity.getColor(R.color.cm_surface))
+        }
+
+        val handle = View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(4)).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(16)
+            }
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(2).toFloat()
+                setColor(activity.getColor(R.color.cm_text_muted))
+            }
+        }
+        sheetRoot.addView(handle)
+
+        val tvTitle = TextView(activity).apply {
+            text = pollQuestion
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(activity.getColor(R.color.cm_text_primary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) }
+        }
+        sheetRoot.addView(tvTitle)
+
+        val tvSub = TextView(activity).apply {
+            text = "Loading voters…"
+            textSize = 12.5f
+            setTextColor(activity.getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
+        }
+        sheetRoot.addView(tvSub)
+
+        val scroll = android.widget.ScrollView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+            isFillViewport = true
+        }
+        val contentLayout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+        scroll.addView(contentLayout)
+        sheetRoot.addView(scroll)
+
+        dialog.setContentView(sheetRoot)
+        dialog.show()
+
+        launch(root) {
+            try {
+                val res = ClassMateAuthApi.rpc("get_poll_voters", JSONObject().put("target_poll", pollId))
+                val optionsArr = res.optJSONArray("data") ?: res.optJSONArray("voters") ?: JSONArray()
+
+                contentLayout.removeAllViews()
+                var totalVotersCount = 0
+
+                for (i in 0 until optionsArr.length()) {
+                    val opt = optionsArr.getJSONObject(i)
+                    val optText = opt.optString("option_text")
+                    val votersArr = opt.optJSONArray("voters") ?: JSONArray()
+                    val votesCount = opt.optInt("votes_count", votersArr.length())
+                    totalVotersCount += votersArr.length()
+
+                    val optHeader = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                            topMargin = dp(if (i == 0) 0 else 16)
+                            bottomMargin = dp(8)
+                        }
+                    }
+                    val tvOptName = TextView(activity).apply {
+                        text = optText
+                        textSize = 14f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        setTextColor(activity.getColor(R.color.cm_text_primary))
+                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    }
+                    val tvBadge = TextView(activity).apply {
+                        text = "$votesCount " + (if (votesCount == 1) "vote" else "votes")
+                        textSize = 11.5f
+                        setTextColor(0xFF7C3AED.toInt())
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        setPadding(dp(8), dp(3), dp(8), dp(3))
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            cornerRadius = dp(12).toFloat()
+                            setColor(0x228B5CF6.toInt())
+                        }
+                    }
+                    optHeader.addView(tvOptName)
+                    optHeader.addView(tvBadge)
+                    contentLayout.addView(optHeader)
+
+                    if (votersArr.length() == 0) {
+                        val emptyTv = TextView(activity).apply {
+                            text = "No votes for this option yet."
+                            textSize = 12f
+                            setTextColor(activity.getColor(R.color.cm_text_muted))
+                            setPadding(dp(4), dp(4), dp(4), dp(10))
+                        }
+                        contentLayout.addView(emptyTv)
+                    } else {
+                        for (j in 0 until votersArr.length()) {
+                            val voter = votersArr.getJSONObject(j)
+                            val voterName = voter.optString("name", "Student")
+                            val avatarUrl = voter.optString("avatar_url")
+                            val studentId = voter.optString("student_id")
+
+                            val row = LinearLayout(activity).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = android.view.Gravity.CENTER_VERTICAL
+                                setPadding(dp(4), dp(6), dp(4), dp(6))
+                                layoutParams = LinearLayout.LayoutParams(-1, -2)
+                            }
+                            val ivAvatar = de.hdodenhof.circleimageview.CircleImageView(activity).apply {
+                                layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(12) }
+                                borderWidth = dp(1)
+                                borderColor = activity.getColor(R.color.cm_notice_premium_stroke)
+                                setImageResource(R.drawable.ic_default_avatar)
+                            }
+                            if (avatarUrl.startsWith("https://")) {
+                                com.bumptech.glide.Glide.with(activity).load(avatarUrl).placeholder(R.drawable.ic_default_avatar).into(ivAvatar)
+                            }
+                            val textCol = LinearLayout(activity).apply {
+                                orientation = LinearLayout.VERTICAL
+                                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                            }
+                            val tvName = TextView(activity).apply {
+                                text = voterName
+                                textSize = 13.5f
+                                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                setTextColor(activity.getColor(R.color.cm_text_primary))
+                            }
+                            textCol.addView(tvName)
+                            if (studentId.isNotBlank()) {
+                                val tvId = TextView(activity).apply {
+                                    text = "ID: $studentId"
+                                    textSize = 11.5f
+                                    setTextColor(activity.getColor(R.color.cm_text_secondary))
+                                }
+                                textCol.addView(tvId)
+                            }
+                            row.addView(ivAvatar)
+                            row.addView(textCol)
+                            contentLayout.addView(row)
+                        }
+                    }
+                }
+
+                tvSub.text = "$totalVotersCount total " + (if (totalVotersCount == 1) "vote" else "votes") + " recorded"
+            } catch (e: Exception) {
+                tvSub.text = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
+            }
+        }
     }
 
 
@@ -7687,14 +8668,29 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private fun showNoticeComments(root: View, notice: JSONObject) {
-
-
-
-        ClassMateComments.show(activity,notice,changed={ if(active(root)) loadNotices(root) })
-
-
-
+    private fun showNoticeComments(root: View, card: View? = null, notice: JSONObject) {
+        val noticeId = notice.getString("id")
+        ClassMateComments.show(
+            activity = activity,
+            notice = notice,
+            onCountChanged = { count ->
+                val state = noticeStates.getOrPut(noticeId) { JSONObject() }
+                state.put("comment_count", count)
+                if (card != null) {
+                    val tvComment = card.findViewById<TextView>(R.id.tvCommentCount)
+                    if (tvComment != null) {
+                        if (count > 0) {
+                            tvComment.text = compactCount(count)
+                            tvComment.setTextColor(activity.getColor(R.color.cm_text_secondary))
+                            tvComment.visibility = View.VISIBLE
+                        } else {
+                            tvComment.visibility = View.GONE
+                        }
+                    }
+                }
+            },
+            changed = { if (active(root)) loadNotices(root) }
+        )
     }
 
 
@@ -9519,9 +10515,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         loadLibrary(root)
-
-
-
+        setupSpeedDial(root)
     }
 
 
@@ -9655,30 +10649,20 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun loadLibrary(root: View): Unit = launch(root) {
-
-
-
         if (librarySnapshot == null && libraryLoadingRoot === root) return@launch
-
-
-
         if (librarySnapshot == null) libraryLoadingRoot = root
-
-
-
         val refresh = root.v<SwipeRefreshLayout>(R.id.swipeRefresh)
-
-
-
         val shimmer = root.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
-
-
-
         val scroll = root.v<View>(R.id.nestedScrollView)
-
         val selectedBatch = batchId()
 
-        val isFirst = (librarySnapshot == null || librarySnapshot?.batchId != selectedBatch) && !refresh.isRefreshing
+        // Fast restore from persistent offline cache if memory is cold
+        if (librarySnapshot == null || librarySnapshot?.batchId != selectedBatch) {
+            restoreLibraryCache(selectedBatch)?.let { librarySnapshot = it }
+        }
+
+        val cachedSnap = librarySnapshot?.takeIf { it.batchId == selectedBatch }
+        val isFirst = cachedSnap == null && !refresh.isRefreshing
 
         if (isFirst) {
             shimmer?.visibility = View.VISIBLE
@@ -9690,88 +10674,35 @@ internal class ClassMateAcademicScreensSupabase(
             scroll.visibility = View.VISIBLE
         }
 
-
-
         try {
-
-
-
-            val snapshot = librarySnapshot?.takeIf { it.batchId == selectedBatch } ?: run {
-
-
-
-                val semesters = ClassMateAuthApi.rows("semesters",
-
-
-
-                    "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1")
-
-
-
-                val semester = semesters.optJSONObject(0)?.optString("id")
-
-
-
-                coroutineScope {
-
-
-
-                    val offeringsJob = async { if (semester == null) emptyList() else rows(
-
-
-
-                        ClassMateAuthApi.rows("semester_courses",
-
-
-
-                            "select=id,course_id&semester_id=eq.$semester")) }
-
-
-
-                    val coursesJob = async { rows(ClassMateCourses.catalog(selectedBatch))
-
-
-
-                        .associateBy { it.getString("id") } }
-
-
-
-                    val filesJob = async { rows(ClassMateAuthApi.rows("file_metadata",
-
-
-
-                        "select=id,title,file_type,category,size_bytes,created_at,semester_course_id,link_url" +
-
-
-
-                            "&batch_id=eq.$selectedBatch&status=eq.active&order=created_at.desc&limit=100")) }
-
-
-
-                    val favoritesJob = async { rows(ClassMateAuthApi.rows("file_favorites",
-
-
-
-                        "select=file_id&profile_id=eq.${profile().getString("id")}"))
-
-
-
-                        .map { it.getString("file_id") }.toMutableSet() }
-
-
-
-                    LibrarySnapshot(selectedBatch, offeringsJob.await(), coursesJob.await(),
-
-
-
-                        filesJob.await(), favoritesJob.await()).also { librarySnapshot = it }
-
-
-
+            val snapshot = if (!ClassMateAcademicCache.online(activity)) {
+                cachedSnap ?: restoreLibraryCache(selectedBatch) ?: LibrarySnapshot(selectedBatch, emptyList(), emptyMap(), emptyList(), mutableSetOf())
+            } else {
+                runCatching {
+                    val semesters = ClassMateAuthApi.rows("semesters",
+                        "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1")
+                    val semester = semesters.optJSONObject(0)?.optString("id")
+                    coroutineScope {
+                        val offeringsJob = async { if (semester == null) emptyList() else rows(
+                            ClassMateAuthApi.rows("semester_courses",
+                                "select=id,course_id&semester_id=eq.$semester")) }
+                        val coursesJob = async { rows(ClassMateCourses.catalog(selectedBatch))
+                            .associateBy { it.getString("id") } }
+                        val filesJob = async { rows(ClassMateAuthApi.rows("file_metadata",
+                            "select=id,title,file_type,category,size_bytes,created_at,semester_course_id,link_url" +
+                                "&batch_id=eq.$selectedBatch&status=eq.active&order=created_at.desc&limit=100")) }
+                        val favoritesJob = async { rows(ClassMateAuthApi.rows("file_favorites",
+                            "select=file_id&profile_id=eq.${profile().getString("id")}"))
+                            .map { it.getString("file_id") }.toMutableSet() }
+                        LibrarySnapshot(selectedBatch, offeringsJob.await(), coursesJob.await(),
+                            filesJob.await(), favoritesJob.await()).also {
+                            librarySnapshot = it
+                            saveLibraryCache(it)
+                        }
+                    }
+                }.getOrElse {
+                    cachedSnap ?: restoreLibraryCache(selectedBatch) ?: LibrarySnapshot(selectedBatch, emptyList(), emptyMap(), emptyList(), mutableSetOf())
                 }
-
-
-
             }
 
 
@@ -9846,11 +10777,14 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            text(root, R.id.tvLibrarySubtitle,
-
-
-
-                "${files.size} ${if (files.size == 1) "file" else "files"} this semester")
+            val isOnline = ClassMateAcademicCache.online(activity)
+            val subView = root.findViewById<TextView>(R.id.tvLibrarySubtitle)
+            if (!isOnline) {
+                subView?.visibility = View.VISIBLE
+                subView?.text = "Offline · Last synced"
+            } else {
+                subView?.visibility = View.GONE
+            }
 
 
 
@@ -10369,6 +11303,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private var highlightedNoticeId: String? = null
+    private var pendingNoticeScrollId: String? = null
 
 
 
@@ -10518,13 +11453,23 @@ internal class ClassMateAcademicScreensSupabase(
 
         val id = item.optString("id").takeIf { it.isNotBlank() } ?: return
 
+        val resourceId = item.optString("resource_id").takeIf { it.isNotBlank() && it != "null" }
+        val resObj = noticeResources[id]
+        val body = item.optString("body")
+        val bodySlugMatch = Regex("""https://classmatebd\.vercel\.app/r/([a-zA-Z0-9_\-]+)""").find(body)
+        val bodySlug = bodySlugMatch?.groupValues?.getOrNull(1)
+        val slug = resObj?.optString("slug")?.takeIf { it.isNotBlank() }
+            ?: bodySlug
+            ?: resourceId
 
+        val title = (if (slug != null) resObj?.optString("title")?.takeIf { it.isNotBlank() } else null)
+            ?: item.optString("title").takeIf { it.isNotBlank() } ?: "Notice"
 
-        val title = item.optString("title").takeIf { it.isNotBlank() } ?: "Notice"
-
-
-
-        val shareUrl = "https://classmatebd.vercel.app/n/$id"
+        val shareUrl = if (slug != null) {
+            "https://classmatebd.vercel.app/r/$slug"
+        } else {
+            "https://classmatebd.vercel.app/n/$id"
+        }
 
 
 
@@ -10573,137 +11518,41 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     fun openDirectNotice(noticeId: String) = launch(activity.window.decorView) {
-
-
-
         val cleanId = noticeId.trim().lowercase()
-
-
-
         if (cleanId.isBlank()) return@launch
 
-
-
-
-
-
-
         val authAct = activity as? ClassMateAuthActivity
-
-
-
         authAct?.selectHomeTab(R.id.nav_notices)
 
-
-
-
-
-
-
         expandedNoticeIds.add(cleanId)
-
-
-
         highlightedNoticeId = cleanId
-
-
-
-
-
-
+        pendingNoticeScrollId = cleanId
 
         val existing = noticeFeed.any { it.optString("id").equals(cleanId, ignoreCase = true) }
-
-
-
-        if (!existing) {
-
-
-
+        if (!existing && ClassMateAcademicCache.online(activity)) {
             val fetched = runCatching {
-
-
-
                 ClassMateAuthApi.rpc("get_public_notice", JSONObject().put("target_identifier", cleanId))
-
-
-
             }.getOrNull()
-
-
-
             val data = fetched?.optJSONObject("data") ?: fetched
-
-
-
             if (data != null && data.has("id")) {
-
-
-
                 noticeFeed = (listOf(data) + noticeFeed).distinctBy { it.optString("id") }
-
-
-
+                saveNoticeCache()
             }
-
-
-
         }
-
-
-
-
-
-
 
         val root = tabRoots[R.id.nav_notices]
-
-
-
         if (root != null) {
-
-
-
             renderNoticeFeed(root)
-
-
-
             val rv = root.findViewById<RecyclerView>(R.id.rvNotices)
-
-
-
             val adapter = rv?.adapter as? ClassMateNoticeRows
-
-
-
-            val targetPos = adapter?.currentList?.indexOfFirst { it.key == "notice:$cleanId" } ?: -1
-
-
-
+            val targetPos = adapter?.currentList?.indexOfFirst { it.key.equals("notice:$cleanId", ignoreCase = true) } ?: -1
             if (targetPos >= 0 && rv != null) {
-
-
-
+                pendingNoticeScrollId = null
                 rv.postDelayed({
-
-
-
-                    rv.smoothScrollToPosition(targetPos)
-
-
-
-                }, 200)
-
-
-
+                    (rv.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(targetPos, (40 * activity.resources.displayMetrics.density).toInt())
+                }, 150)
             }
-
-
-
         }
-
-
-
     }
 
 
@@ -11141,12 +11990,28 @@ internal class ClassMateAcademicScreensSupabase(
             if (!photo.isNullOrBlank()) {
                 com.bumptech.glide.Glide.with(activity)
                     .load(photo)
+                    .circleCrop()
                     .placeholder(R.drawable.ic_default_avatar)
                     .into(heroAvatar)
             } else {
                 heroAvatar.setImageResource(R.drawable.ic_default_avatar)
             }
         }
+
+        val onAvatarAction = View.OnClickListener {
+            val authActivity = activity as? ClassMateAuthActivity
+            if (authActivity != null) {
+                val hasAvatar = !photo.isNullOrBlank()
+                com.shuaib.classmate.utils.ClassMateProfileAvatarManager.showAvatarOptionsSheet(
+                    authActivity,
+                    hasExistingAvatar = hasAvatar,
+                    onChooseGallery = { authActivity.pickProfilePhoto() },
+                    onRemoveAvatar = { authActivity.removeProfilePhoto() }
+                )
+            }
+        }
+        heroAvatar?.setOnClickListener(onAvatarAction)
+        root.findViewById<View>(R.id.btnHeroChangeAvatar)?.setOnClickListener(onAvatarAction)
 
         // Student identity details
         val fullName = account.optString("full_name").ifBlank { "ClassMate Student" }
@@ -11247,7 +12112,8 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            text(root, R.id.tvSwitchBatchBadge, effectiveBatch.ifBlank { "MBSTU" })
+            val shortBatch = effectiveBatch.split("·").firstOrNull()?.trim().orEmpty().ifBlank { effectiveBatch }
+            text(root, R.id.tvSwitchBatchBadge, shortBatch.ifBlank { "MBSTU" })
 
 
 
@@ -12028,45 +12894,17 @@ internal class ClassMateAcademicScreensSupabase(
 
 
                 switch.setOnCheckedChangeListener { _, checked ->
-
-
-
                     prefs.setNoticeReadReceiptsEnabled(checked)
-
-
-
                     status.text = if (checked) "Recording your reads on notices" else "Silent mode — your reads are not recorded"
-
-
-
+                    noticeReadSent.clear()
+                    noticeTabVisitId++
                     scope.launch {
-
-
-
                         runCatching {
-
-
-
                             ClassMateAuthApi.rpc("save_owner_preferences", JSONObject().put("target_read_receipts", checked))
-
-
-
                         }
-
-
-
                     }
-
-
-
                 }
-
-
-
             }
-
-
-
         }
 
 
@@ -12224,41 +13062,9 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         if (r2StorageRow != null) {
-
-
-
-            val canViewR2 = initialCanManage || isAdmin || isCr || isTeacher
-
-
-
-            r2StorageRow.visibility = if (canViewR2) View.VISIBLE else View.GONE
-
-
-
-            r2StorageDivider?.visibility = if (canViewR2) View.VISIBLE else View.GONE
-
-
-
-            if (canViewR2) {
-
-
-
-                r2StorageRow.setOnClickListener {
-
-
-
-                    com.shuaib.classmate.ui.R2StorageDialog.show(activity)
-
-
-
-                }
-
-
-
-            }
-
-
-
+            // Keep Cloudflare R2 internal storage quota hidden from the profile screen to keep it clean and minimal
+            r2StorageRow.visibility = View.GONE
+            r2StorageDivider?.visibility = View.GONE
         }
 
 

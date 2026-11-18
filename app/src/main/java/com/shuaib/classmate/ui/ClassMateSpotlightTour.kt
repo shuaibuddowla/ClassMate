@@ -36,9 +36,8 @@ object ClassMateSpotlightTour {
     private const val PREF_KEY_LAST_SEEN_VERSION = "tour_last_seen_version"
 
     fun shouldShow(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val lastSeenVersion = prefs.getInt(PREF_KEY_LAST_SEEN_VERSION, 0)
-        return BuildConfig.VERSION_CODE > lastSeenVersion
+        // Disabled for now as requested by user
+        return false
     }
 
     fun markSeen(context: Context) {
@@ -95,9 +94,9 @@ object ClassMateSpotlightTour {
             TourStep(
                 targetViewId = R.id.classmate_home_compose_nav,
                 fallbackFinder = { act -> act.findViewById(R.id.classmate_home_nav) },
-                badgeText = "Streamlined 4 Tabs",
-                title = "Notices, Polls, Courses & Student ID",
-                description = "Navigate seamlessly: Timetable, official department Notices with interactive live polls, semester Course library, and Settings with your digital NFC Student ID.",
+                badgeText = "5 High-Frequency Tabs",
+                title = "Timetable, Notices, Chat, Courses & Profile",
+                description = "Navigate seamlessly: Timetable, official department Notices with interactive live polls, real-time cohort Chat, semester Course library, and Profile with your digital NFC Student ID.",
                 isCircle = false
             )
         )

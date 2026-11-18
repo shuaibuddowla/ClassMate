@@ -20,15 +20,15 @@ export function scopesFor(date: string, events: Row[]) {
       .map((e) => e.scope),
   );
 }
-export function busKind(date: string, events: Row[]) {
+export function busKind(date: string, events: Row[], weekendDays: number[] = [4, 5]) {
   const scopes = scopesFor(date, events);
   if (scopes.has("university")) return "closed";
   if (scopes.has("working_day")) return "office_open";
-  return [4, 5].includes(parseDate(date).getDay()) ? "closed" : "office_open";
+  return (weekendDays && weekendDays.length ? weekendDays : [4, 5]).includes(parseDate(date).getDay()) ? "closed" : "office_open";
 }
-export function classesClosed(date: string, events: Row[]) {
+export function classesClosed(date: string, events: Row[], weekendDays: number[] = [4, 5]) {
   const scopes = scopesFor(date, events);
-  return scopes.has("classes") || busKind(date, events) === "closed";
+  return scopes.has("classes") || busKind(date, events, weekendDays) === "closed";
 }
 export function monthCells(year: number, month: number) {
   const offset = new Date(year, month, 1).getDay(),

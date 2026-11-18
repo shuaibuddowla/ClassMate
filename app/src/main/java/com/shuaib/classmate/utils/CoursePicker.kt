@@ -42,7 +42,7 @@ object CoursePicker {
                 onCourseSelected(courses[position])
             }
         }
-    }, { Toast.makeText(context, "Could not load courses: ${it.message}", Toast.LENGTH_LONG).show() })
+    }, { Toast.makeText(context, NetworkErrorSanitizer.sanitize(it), Toast.LENGTH_LONG).show() })
 
     fun showAddCourseDialog(
         context: Context,
@@ -54,8 +54,8 @@ object CoursePicker {
         val binding = DialogAddCourseBinding.inflate(android.view.LayoutInflater.from(context))
         binding.tvCourseScope.text = "${com.shuaib.classmate.models.Batch.formatName(batchId)}  •  ${SemesterManager.formatDisplay(semesterId)}"
         val v2Catalog = ArchiveLibraryRepository.usesSupabaseCatalog
-        val categories = if (v2Catalog) listOf("Theory Course", "Lab Course")
-        else listOf("Regular Course", "Lab Course", "Syllabus")
+        val categories = if (v2Catalog) listOf("Theory Course", "Practical / Lab Course")
+        else listOf("Regular Course", "Practical / Lab Course", "Syllabus")
         binding.dropdownCourseType.setAdapter(ArrayAdapter(context, R.layout.item_course_dropdown, categories))
         binding.dropdownCourseType.setText(categories.first(), false)
         binding.dropdownCourseType.setDropDownBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.bg_course_dropdown_popup))
@@ -125,7 +125,7 @@ object CoursePicker {
                     return@setOnClickListener
                 }
                 val type = when (binding.dropdownCourseType.text.toString()) {
-                    "Lab Course" -> "lab"
+                    "Lab Course", "Practical / Lab Course", "Practical Course" -> "lab"
                     "Syllabus" -> "syllabus"
                     else -> "regular"
                 }

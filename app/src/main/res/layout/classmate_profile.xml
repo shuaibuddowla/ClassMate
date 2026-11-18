@@ -1,93 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/swipeProfile"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/cm_background">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeProfile"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollProfile"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:paddingTop="84dp"
+        android:paddingBottom="24dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="12dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="16dp"
             android:paddingBottom="24dp"
             android:clipToPadding="false">
 
-            <!-- Profile Screen Header (Aligned with Timetable/Notices/Courses) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="top"
-                android:layout_marginBottom="14dp">
-
-                <FrameLayout
-                    android:id="@+id/btnHamburgerMenu"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginTop="3dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:contentDescription="Menu">
-
-                    <ImageView
-                        android:layout_width="23dp"
-                        android:layout_height="23dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_hamburger_menu"
-                        app:tint="@color/cm_text_primary" />
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tvProfileHeaderTitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="38dp"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center_vertical"
-                        android:text="Profile"
-                        android:textSize="23sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/cm_text_primary"
-                        android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                        android:includeFontPadding="false" />
-
-                    <TextView
-                        android:id="@+id/tvProfileHeaderSubtitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Identity, academic batch and app preferences"
-                        android:textSize="11.5sp"
-                        android:textColor="@color/cm_text_secondary"
-                        android:layout_marginTop="-2dp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- 1. Expressive Hero Student Identity Card -->
+            <!-- ============================================== -->
+            <!-- 1. MATERIAL 3 HERO IDENTITY CARD               -->
+            <!-- ============================================== -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardHeroProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="22dp"
                 app:cardBackgroundColor="@color/cm_surface"
                 app:cardCornerRadius="24dp"
                 app:cardElevation="0dp"
@@ -98,164 +49,213 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="18dp">
+                    android:gravity="center_horizontal"
+                    android:paddingStart="20dp"
+                    android:paddingTop="24dp"
+                    android:paddingEnd="20dp"
+                    android:paddingBottom="20dp">
 
-                    <!-- Top Row: Avatar + Details + Edit Button -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <!-- Avatar with Camera Badge Overlay & Perfect Blur Halo -->
+                    <FrameLayout
+                        android:layout_width="116dp"
+                        android:layout_height="116dp"
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
+
+                        <!-- Perfect Soft Blur / Glow Circle Halo Ring -->
+                        <View
+                            android:layout_width="114dp"
+                            android:layout_height="114dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_avatar_glow_circle"
+                            android:importantForAccessibility="no" />
+
+                        <!-- 100% Mathematically Perfect Circular Blue Outliner Ring -->
+                        <View
+                            android:id="@+id/ivHeroAvatarRing"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_avatar_blue_ring"
+                            android:importantForAccessibility="no" />
+
+                        <!-- 100% Mathematically Perfect Circle Avatar Photo (Unclipped) -->
+                        <de.hdodenhof.circleimageview.CircleImageView
+                            android:id="@+id/ivHeroAvatar"
+                            android:layout_width="90dp"
+                            android:layout_height="90dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_default_avatar"
+                            android:clickable="true"
+                            android:focusable="true"
+                            app:civ_border_width="0dp" />
+
+                        <!-- Camera Edit Badge Button -->
+                        <FrameLayout
+                            android:id="@+id/btnHeroChangeAvatar"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_gravity="bottom|end"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="6dp"
+                            android:background="@drawable/bg_avatar_camera_badge"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="Change profile photo"
+                            android:elevation="4dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_camera"
+                                app:tint="@android:color/white"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
+                    </FrameLayout>
+
+                    <!-- Student Full Name (Uncut, bold typography) -->
+                    <TextView
+                        android:id="@+id/tvHeroName"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/cm_text_primary"
+                        android:fontFamily="@font/plus_jakarta_sans_extrabold"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:maxLines="2"
+                        tools:text="Mohammad Shuaib-Ud-Dowla" />
+
+                    <!-- Student ID & University / Hometown -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <TextView
+                            android:id="@+id/tvHeroStudentId"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="13sp"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textStyle="bold"
+                            tools:text="CE25045" />
+
+                        <TextView
+                            android:id="@+id/tvHeroHometown"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="13sp"
+                            android:textColor="@color/cm_text_secondary"
+                            tools:text=" · MBSTU" />
+                    </LinearLayout>
+
+                    <!-- Role Badge & Blood Group Pill Row -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical">
 
-                        <!-- Avatar Container -->
-                        <FrameLayout
-                            android:layout_width="64dp"
-                            android:layout_height="64dp">
-
-                            <com.google.android.material.imageview.ShapeableImageView
-                                android:id="@+id/ivHeroAvatar"
-                                android:layout_width="64dp"
-                                android:layout_height="64dp"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/ic_default_avatar"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                                app:strokeWidth="2dp"
-                                app:strokeColor="@color/cm_primary" />
-                        </FrameLayout>
-
-                        <!-- Student Information -->
-                        <LinearLayout
-                            android:layout_width="0dp"
+                        <TextView
+                            android:id="@+id/tvHeroRoleBadge"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="3.5dp"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.04"
+                            android:background="@drawable/bg_r2_status_pill"
+                            android:textColor="@color/cm_primary"
+                            tools:text="ADMIN" />
 
-                            <TextView
-                                android:id="@+id/tvHeroName"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textSize="18sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/cm_text_primary"
-                                android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                                android:includeFontPadding="false"
-                                android:maxLines="1"
-                                android:ellipsize="end"
-                                tools:text="Mohammad Shuaib" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <TextView
-                                    android:id="@+id/tvHeroStudentId"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:textSize="12.5sp"
-                                    android:textColor="@color/cm_text_secondary"
-                                    tools:text="CE25045" />
-
-                                <TextView
-                                    android:id="@+id/tvHeroHometown"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:textSize="12.5sp"
-                                    android:textColor="@color/cm_text_secondary"
-                                    tools:text=" · Tangail" />
-                            </LinearLayout>
-
-                            <!-- Role and Blood Group Badges -->
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <TextView
-                                    android:id="@+id/tvHeroRoleBadge"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:paddingHorizontal="9dp"
-                                    android:paddingVertical="2dp"
-                                    android:textSize="10sp"
-                                    android:textStyle="bold"
-                                    android:letterSpacing="0.04"
-                                    android:background="@drawable/bg_r2_status_pill"
-                                    android:textColor="@color/cm_primary"
-                                    tools:text="ADMIN" />
-
-                                <TextView
-                                    android:id="@+id/tvHeroBloodBadge"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:paddingHorizontal="8dp"
-                                    android:paddingVertical="2dp"
-                                    android:textSize="10sp"
-                                    android:textStyle="bold"
-                                    android:background="@drawable/bg_status_pill_active"
-                                    android:textColor="#D97706"
-                                    android:visibility="gone"
-                                    tools:visibility="visible"
-                                    tools:text="🩸 B+" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <!-- Quick Edit Profile Action -->
-                        <FrameLayout
-                            android:id="@+id/btnHeroEditProfile"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/bg_notice_search_icon_button"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:contentDescription="Edit Profile">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:layout_gravity="center"
-                                android:src="@drawable/ic_edit"
-                                app:tint="@color/cm_text_primary" />
-                        </FrameLayout>
+                        <TextView
+                            android:id="@+id/tvHeroBloodBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="3.5dp"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:background="@drawable/bg_blood_badge_pill"
+                            android:textColor="#E11D48"
+                            android:visibility="gone"
+                            tools:visibility="visible"
+                            tools:text="🩸 A+" />
                     </LinearLayout>
 
-                    <!-- Embedded Batch Banner inside Hero Card -->
+                    <!-- Interactive Batch Chip Button -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:id="@+id/btnHeroBatch"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="12dp"
                         android:background="@drawable/bg_segmented_container"
                         android:paddingHorizontal="14dp"
-                        android:paddingVertical="10dp"
+                        android:paddingVertical="8dp"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:orientation="horizontal"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
                             android:src="@drawable/ic_academic_cap"
                             app:tint="@color/cm_primary"
                             android:importantForAccessibility="no" />
 
                         <TextView
                             android:id="@+id/tvHeroBatchTitle"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="10dp"
+                            android:layout_marginStart="8dp"
                             android:textSize="12.5sp"
                             android:textStyle="bold"
                             android:textColor="@color/cm_text_primary"
                             android:singleLine="true"
-                            android:ellipsize="end"
-                            tools:text="CSE 22 · Session 24-25" />
+                            tools:text="CSE Batch 22 · Session 24-25" />
+
+                        <ImageView
+                            android:id="@+id/ivHeroBatchChevron"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_muted"
+                            android:visibility="gone"
+                            tools:visibility="visible"
+                            android:importantForAccessibility="no" />
                     </LinearLayout>
+
+                    <!-- Edit Profile Action Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHeroEditProfile"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="14dp"
+                        android:text="Edit Personal Info"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="16dp"
+                        app:cornerRadius="12dp"
+                        app:icon="@drawable/ic_edit"
+                        app:iconSize="15dp"
+                        app:iconGravity="textStart"
+                        app:backgroundTint="#122563EB"
+                        app:iconTint="@color/cm_primary"
+                        android:textColor="@color/cm_primary" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -265,18 +265,19 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Academic &amp; Batch"
-                android:textColor="@color/cm_primary"
-                android:textSize="12.5sp"
+                android:text="ACADEMIC &amp; BATCH"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="11.5sp"
                 android:textStyle="bold"
+                android:letterSpacing="0.05"
                 android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="6dp"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="22dp"
                 app:cardBackgroundColor="@color/cm_surface"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
@@ -288,7 +289,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- Switch Active Batch (Integrated M3 List Tile) -->
+                    <!-- Switch Active Batch -->
                     <LinearLayout
                         android:id="@+id/btnSwitchBatch"
                         android:layout_width="match_parent"
@@ -301,22 +302,28 @@
                         android:clickable="true"
                         android:focusable="true">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#208B5CF6"
-                            android:src="@drawable/ic_academic_cap"
-                            app:tint="#8B5CF6"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#152563EB">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_academic_cap"
+                                app:tint="@color/cm_primary"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical"
-                            android:layout_marginStart="14dp">
+                            android:layout_marginStart="14dp"
+                            android:layout_marginEnd="8dp">
 
                             <TextView
                                 android:id="@+id/tvSwitchBatchTitle"
@@ -324,7 +331,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Switch Active Batch"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -334,7 +341,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Active workspace and notice scope"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <!-- Batch badge chip on trailing edge -->
@@ -342,12 +349,12 @@
                             android:id="@+id/tvSwitchBatchBadge"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:maxWidth="130dp"
+                            android:maxWidth="110dp"
                             android:paddingHorizontal="10dp"
                             android:paddingVertical="4dp"
                             android:background="@drawable/bg_segmented_container"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="11.5sp"
+                            android:textSize="12sp"
                             android:textStyle="bold"
                             android:singleLine="true"
                             android:maxLines="1"
@@ -358,12 +365,11 @@
                             android:id="@+id/ivSwitchBatchChevron"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginStart="6dp"
                             android:src="@drawable/ic_chevron_right"
                             app:tint="@color/cm_text_secondary"
                             android:importantForAccessibility="no" />
                     </LinearLayout>
-
 
                     <!-- Batch Administration (CR/Admin/Teacher Only) -->
                     <View
@@ -371,7 +377,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp"
+                        android:layout_marginStart="70dp"
                         android:visibility="gone" />
 
                     <LinearLayout
@@ -387,15 +393,20 @@
                         android:clickable="true"
                         android:focusable="true">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#2010B981"
-                            android:src="@drawable/ic_nav_manage_grid"
-                            app:tint="#10B981"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#1510B981">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_nav_manage_grid"
+                                app:tint="#10B981"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -410,7 +421,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Batch Administration"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -420,7 +431,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Manage timetable, members and batch settings"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -437,7 +448,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp"
+                        android:layout_marginStart="70dp"
                         android:visibility="gone" />
 
                     <LinearLayout
@@ -453,15 +464,20 @@
                         android:clickable="true"
                         android:focusable="true">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#2010B981"
-                            android:src="@drawable/ic_rfid_signal"
-                            app:tint="#10B981"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#150EA5E9">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_rfid_signal"
+                                app:tint="#0EA5E9"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -476,7 +492,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Manage Attendance"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -486,7 +502,76 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Live RFID station, card registration &amp; exports"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/cm_text_secondary"
+                            android:importantForAccessibility="no" />
+                    </LinearLayout>
+
+                    <!-- Batch Fund (Treasury & Accounts) -->
+                    <View
+                        android:id="@+id/dividerProfileFund"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/cm_border"
+                        android:layout_marginStart="70dp" />
+
+                    <LinearLayout
+                        android:id="@+id/cardProfileFund"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_settings_icon"
+                            android:backgroundTint="#158B5CF6">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_fund_wallet"
+                                app:tint="#8B5CF6"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="14dp">
+
+                            <TextView
+                                android:id="@+id/tvFundTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Batch Fund"
+                                android:textColor="@color/cm_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvFundSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Treasury balance, collections &amp; expenses"
+                                android:textColor="@color/cm_text_secondary"
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -506,18 +591,19 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Preferences"
-                android:textColor="@color/cm_primary"
-                android:textSize="12.5sp"
+                android:text="PREFERENCES"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="11.5sp"
                 android:textStyle="bold"
+                android:letterSpacing="0.05"
                 android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="6dp"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="22dp"
                 app:cardBackgroundColor="@color/cm_surface"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="0dp"
@@ -544,16 +630,21 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
-                            <ImageView
-                                android:id="@+id/ivThemeIcon"
-                                android:layout_width="38dp"
-                                android:layout_height="38dp"
-                                android:padding="9dp"
+                            <FrameLayout
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
                                 android:background="@drawable/bg_settings_icon"
-                                android:backgroundTint="#206366F1"
-                                android:src="@drawable/ic_dark_mode"
-                                app:tint="#6366F1"
-                                android:importantForAccessibility="no" />
+                                android:backgroundTint="#156366F1">
+
+                                <ImageView
+                                    android:id="@+id/ivThemeIcon"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/ic_dark_mode"
+                                    app:tint="#6366F1"
+                                    android:importantForAccessibility="no" />
+                            </FrameLayout>
 
                             <LinearLayout
                                 android:layout_width="0dp"
@@ -567,7 +658,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="Theme Appearance"
                                     android:textColor="@color/cm_text_primary"
-                                    android:textSize="14.5sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -575,9 +666,9 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="Comfortable dark palette"
+                                    android:text="Following device system settings"
                                     android:textColor="@color/cm_text_secondary"
-                                    android:textSize="11.5sp" />
+                                    android:textSize="12sp" />
                             </LinearLayout>
                         </LinearLayout>
 
@@ -585,7 +676,7 @@
                         <LinearLayout
                             android:id="@+id/themeSegmentedControl"
                             android:layout_width="match_parent"
-                            android:layout_height="42dp"
+                            android:layout_height="44dp"
                             android:layout_marginTop="12dp"
                             android:background="@drawable/bg_segmented_container"
                             android:padding="3.5dp"
@@ -603,8 +694,8 @@
 
                                 <ImageView
                                     android:id="@+id/ivThemeLightIcon"
-                                    android:layout_width="15dp"
-                                    android:layout_height="15dp"
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
                                     android:src="@drawable/ic_sun"
                                     app:tint="@color/cm_text_secondary"
                                     android:importantForAccessibility="no" />
@@ -615,7 +706,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
                                     android:text="Light"
-                                    android:textSize="12sp"
+                                    android:textSize="12.5sp"
                                     android:textColor="@color/cm_text_secondary" />
                             </LinearLayout>
 
@@ -631,8 +722,8 @@
 
                                 <ImageView
                                     android:id="@+id/ivThemeDarkIcon"
-                                    android:layout_width="15dp"
-                                    android:layout_height="15dp"
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
                                     android:src="@drawable/ic_dark_mode"
                                     app:tint="@color/cm_text_secondary"
                                     android:importantForAccessibility="no" />
@@ -643,7 +734,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
                                     android:text="Dark"
-                                    android:textSize="12sp"
+                                    android:textSize="12.5sp"
                                     android:textColor="@color/cm_text_secondary" />
                             </LinearLayout>
 
@@ -659,8 +750,8 @@
 
                                 <ImageView
                                     android:id="@+id/ivThemeSystemIcon"
-                                    android:layout_width="15dp"
-                                    android:layout_height="15dp"
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
                                     android:src="@drawable/ic_monitor"
                                     app:tint="@color/cm_text_secondary"
                                     android:importantForAccessibility="no" />
@@ -671,7 +762,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
                                     android:text="System"
-                                    android:textSize="12sp"
+                                    android:textSize="12.5sp"
                                     android:textColor="@color/cm_text_secondary" />
                             </LinearLayout>
                         </LinearLayout>
@@ -682,7 +773,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp" />
+                        android:layout_marginStart="70dp" />
 
                     <!-- Push Notifications (Material 3 Toggle Row) -->
                     <LinearLayout
@@ -694,15 +785,20 @@
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="12dp">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#20F59E0B"
-                            android:src="@drawable/ic_bell_outline"
-                            app:tint="#F59E0B"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#15F59E0B">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_bell_outline"
+                                app:tint="#F59E0B"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -722,7 +818,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="Push Notifications"
                                     android:textColor="@color/cm_text_primary"
-                                    android:textSize="14.5sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -732,8 +828,8 @@
                                     android:text="ACTIVE"
                                     android:textColor="#10B981"
                                     android:background="@drawable/bg_status_pill_active"
-                                    android:paddingHorizontal="7dp"
-                                    android:paddingVertical="1.5dp"
+                                    android:paddingHorizontal="8dp"
+                                    android:paddingVertical="2dp"
                                     android:textSize="9.5sp"
                                     android:textStyle="bold"
                                     android:layout_marginStart="8dp" />
@@ -746,7 +842,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Instant updates for notices and class schedules"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <com.google.android.material.materialswitch.MaterialSwitch
@@ -762,7 +858,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp"
+                        android:layout_marginStart="70dp"
                         android:visibility="gone" />
 
                     <LinearLayout
@@ -775,15 +871,20 @@
                         android:paddingVertical="12dp"
                         android:visibility="gone">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#2006B6D4"
-                            android:src="@drawable/ic_eye_outline"
-                            app:tint="#06B6D4"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#1506B6D4">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_eye_outline"
+                                app:tint="#06B6D4"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -797,7 +898,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Notice Read Receipts"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -807,7 +908,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Recording your reads on notices"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <com.google.android.material.materialswitch.MaterialSwitch
@@ -821,17 +922,18 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ============================================== -->
-            <!-- SECTION 3: STORAGE & SYSTEM                    -->
+            <!-- SECTION 3: SYSTEM & STORAGE                    -->
             <!-- ============================================== -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Storage &amp; System"
-                android:textColor="@color/cm_primary"
-                android:textSize="12.5sp"
+                android:text="SYSTEM &amp; STORAGE"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="11.5sp"
                 android:textStyle="bold"
+                android:letterSpacing="0.05"
                 android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="6dp"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.card.MaterialCardView
@@ -860,15 +962,20 @@
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="12dp">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#2064748B"
-                            android:src="@drawable/ic_storage"
-                            app:tint="#64748B"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#1564748B">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_storage"
+                                app:tint="#64748B"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -882,7 +989,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Offline Cache &amp; Data"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -890,9 +997,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Cached notices and offline resources"
+                                android:text="Cached timetable, notices and offline resources"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <!-- Clear Cache Pill Action -->
@@ -905,21 +1012,20 @@
                             android:background="@drawable/bg_notice_search_icon_button"
                             android:text="Clear"
                             android:textColor="@color/cm_primary"
-                            android:textSize="12sp"
+                            android:textSize="12.5sp"
                             android:textStyle="bold"
                             android:clickable="true"
                             android:focusable="true" />
                     </LinearLayout>
 
-                    <!-- Cloudflare R2 Storage (Admin & CR only) -->
+                    <!-- Preserved Cloudflare R2 Storage (Hidden by default to avoid clutter) -->
                     <View
                         android:id="@+id/dividerR2Storage"
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp"
-                        android:visibility="gone"
-                        tools:visibility="visible" />
+                        android:layout_marginStart="70dp"
+                        android:visibility="gone" />
 
                     <LinearLayout
                         android:id="@+id/layoutR2Storage"
@@ -932,17 +1038,22 @@
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
-                        android:visibility="gone"
-                        tools:visibility="visible">
+                        android:visibility="gone">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="8.5dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:src="@drawable/ic_cloud"
-                            app:tint="@color/cm_primary"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#152563EB">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_cloud"
+                                app:tint="@color/cm_primary"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -962,7 +1073,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="Cloudflare R2 Storage"
                                     android:textColor="@color/cm_text_primary"
-                                    android:textSize="14.5sp"
+                                    android:textSize="15sp"
                                     android:textStyle="bold" />
 
                                 <TextView
@@ -986,7 +1097,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Bucket storage &amp; file quota"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -1002,9 +1113,9 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp" />
+                        android:layout_marginStart="70dp" />
 
-                    <!-- Check for Updates -->
+                    <!-- App Version & Updates -->
                     <LinearLayout
                         android:id="@+id/layoutCheckUpdates"
                         android:layout_width="match_parent"
@@ -1017,15 +1128,20 @@
                         android:clickable="true"
                         android:focusable="true">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#202563EB"
-                            android:src="@drawable/ic_download_outline"
-                            app:tint="#2563EB"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#152563EB">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_download_outline"
+                                app:tint="#2563EB"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -1039,7 +1155,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="App Version &amp; Updates"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -1047,9 +1163,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="1.1.30 (31)"
+                                android:text="1.1.44 (44)"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -1065,7 +1181,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp" />
+                        android:layout_marginStart="70dp" />
 
                     <!-- Automatic Updates Toggle -->
                     <LinearLayout
@@ -1077,15 +1193,20 @@
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="12dp">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#202563EB"
-                            android:src="@drawable/ic_refresh"
-                            app:tint="#2563EB"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#152563EB">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_refresh"
+                                app:tint="#2563EB"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -1099,16 +1220,17 @@
                                 android:layout_height="wrap_content"
                                 android:text="Automatic Updates"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
+                                android:id="@+id/tvAutoUpdatesSub"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Check for new releases in background"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <com.google.android.material.materialswitch.MaterialSwitch
@@ -1123,7 +1245,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp" />
+                        android:layout_marginStart="70dp" />
 
                     <!-- Wi-Fi Only Toggle -->
                     <LinearLayout
@@ -1135,15 +1257,20 @@
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="12dp">
 
-                        <ImageView
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:padding="9dp"
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#202563EB"
-                            android:src="@drawable/ic_wifi"
-                            app:tint="#2563EB"
-                            android:importantForAccessibility="no" />
+                            android:backgroundTint="#152563EB">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_wifi"
+                                app:tint="#2563EB"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -1157,16 +1284,17 @@
                                 android:layout_height="wrap_content"
                                 android:text="Download on Wi-Fi Only"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
+                                android:id="@+id/tvWifiOnlySub"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Save mobile cellular data"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <com.google.android.material.materialswitch.MaterialSwitch
@@ -1181,7 +1309,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/cm_border"
-                        android:layout_marginStart="68dp" />
+                        android:layout_marginStart="70dp" />
 
                     <!-- About Developer -->
                     <LinearLayout
@@ -1197,17 +1325,17 @@
                         android:focusable="true">
 
                         <FrameLayout
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:background="@drawable/bg_settings_icon"
-                            android:backgroundTint="#206366F1">
+                            android:backgroundTint="#156366F1">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_gravity="center"
                                 android:text="&lt;/&gt;"
-                                android:textSize="14sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold"
                                 android:textColor="#6366F1" />
                         </FrameLayout>
@@ -1224,7 +1352,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="About Developer"
                                 android:textColor="@color/cm_text_primary"
-                                android:textSize="14.5sp"
+                                android:textSize="15sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -1233,7 +1361,7 @@
                                 android:layout_marginTop="2dp"
                                 android:text="Mohammad Shuaib-Ud-Dowla · MBSTU"
                                 android:textColor="@color/cm_text_secondary"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
                         </LinearLayout>
 
                         <ImageView
@@ -1248,14 +1376,14 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- ============================================== -->
-            <!-- SECTION 4: ACCOUNT DESTRUCTIVE ACTION          -->
+            <!-- SECTION 4: ACCOUNT ACTION (M3 Sign Out)        -->
             <!-- ============================================== -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLogout"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:layout_marginBottom="16dp"
                 android:text="Sign Out of ClassMate"
                 android:textColor="@color/cm_cancel_red"
@@ -1268,7 +1396,7 @@
                 app:iconTint="@color/cm_cancel_red"
                 app:iconGravity="textStart" />
 
-            <!-- Floating Navigation Bar Inset Spacer -->
+            <!-- Floating Navigation Bar Spacer -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="110dp"
@@ -1276,4 +1404,55 @@
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- Locked, Constant, Transparent Profile Header -->
+    <LinearLayout
+        android:id="@+id/profileHeaderLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp"
+        android:background="@android:color/transparent"
+        android:elevation="0dp">
+
+        <FrameLayout
+            android:id="@+id/btnHamburgerMenu"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="3dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Menu">
+
+            <ImageView
+                android:id="@+id/ivHamburgerMenu"
+                android:layout_width="23dp"
+                android:layout_height="23dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_hamburger_menu"
+                app:tint="@color/cm_text_primary" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvProfileHeaderTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginTop="3dp"
+            android:layout_marginStart="4dp"
+            android:gravity="center_vertical"
+            android:text="Profile"
+            android:textSize="23sp"
+            android:textStyle="bold"
+            android:textColor="@color/cm_text_primary"
+            android:fontFamily="@font/plus_jakarta_sans_extrabold"
+            android:includeFontPadding="false" />
+    </LinearLayout>
+
+</FrameLayout>

@@ -47,7 +47,81 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+private val JakartaBold by lazy { FontFamily(Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold)) }
+private val JakartaExtraBold by lazy { FontFamily(Font(R.font.plus_jakarta_sans_extrabold, FontWeight.ExtraBold)) }
+
 internal object ClassMateHamburgerSheet {
+    private var activeActivityRef: java.lang.ref.WeakReference<AppCompatActivity>? = null
+    private var cachedComposeView: ComposeView? = null
+    private var isSheetVisible by mutableStateOf(false)
+    private var currentParams by mutableStateOf<SheetParams?>(null)
+
+    private class SheetParams(
+        val activity: AppCompatActivity,
+        val scope: CoroutineScope,
+        val batchId: () -> String,
+        val batchLabel: () -> String,
+        val profile: () -> JSONObject
+    )
+
+    fun warmUp(activity: AppCompatActivity) {
+        val decorView = activity.window.decorView as? ViewGroup ?: return
+        if (cachedComposeView != null && activeActivityRef?.get() === activity) return
+        ensureAttached(activity, decorView)
+    }
+
+    private fun ensureAttached(activity: AppCompatActivity, decorView: ViewGroup) {
+        cachedComposeView?.let { oldView ->
+            (oldView.parent as? ViewGroup)?.removeView(oldView)
+        }
+        activeActivityRef = java.lang.ref.WeakReference(activity)
+
+        val cv = ComposeView(activity).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
+            setContent {
+                val params = currentParams
+                val visible = isSheetVisible && params != null && activeActivityRef?.get() === activity
+                if (visible && params != null) {
+                    val isDark = com.shuaib.classmate.utils.ThemeColors.isDark(activity)
+                    val colorScheme = if (isDark) {
+                        darkColorScheme(
+                            surface = colorResource(R.color.cm_surface),
+                            onSurface = colorResource(R.color.cm_text_primary),
+                            surfaceVariant = colorResource(R.color.cm_surface_elevated),
+                            onSurfaceVariant = colorResource(R.color.cm_text_secondary),
+                            background = colorResource(R.color.cm_bg),
+                            onBackground = colorResource(R.color.cm_text_primary),
+                            primary = colorResource(R.color.cm_primary)
+                        )
+                    } else {
+                        lightColorScheme(
+                            surface = colorResource(R.color.cm_surface),
+                            onSurface = colorResource(R.color.cm_text_primary),
+                            surfaceVariant = colorResource(R.color.cm_surface_light),
+                            onSurfaceVariant = colorResource(R.color.cm_text_secondary),
+                            background = colorResource(R.color.cm_bg),
+                            onBackground = colorResource(R.color.cm_text_primary),
+                            primary = colorResource(R.color.cm_primary)
+                        )
+                    }
+                    MaterialTheme(colorScheme = colorScheme) {
+                        ClassMateHamburgerModalSheet(
+                            activity = params.activity,
+                            scope = params.scope,
+                            batchId = params.batchId,
+                            batchLabel = params.batchLabel,
+                            profile = params.profile,
+                            onDismiss = {
+                                isSheetVisible = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        cachedComposeView = cv
+        decorView.addView(cv)
+    }
 
     fun show(
         activity: AppCompatActivity,
@@ -57,53 +131,11 @@ internal object ClassMateHamburgerSheet {
         profile: () -> JSONObject
     ) {
         val decorView = activity.window.decorView as? ViewGroup ?: return
-        var composeView: ComposeView? = null
-
-        val onDismiss: () -> Unit = {
-            composeView?.let { cv ->
-                decorView.removeView(cv)
-                composeView = null
-            }
+        if (cachedComposeView == null || activeActivityRef?.get() !== activity) {
+            ensureAttached(activity, decorView)
         }
-
-        composeView = ComposeView(activity).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
-            setContent {
-                val isDark = com.shuaib.classmate.utils.ThemeColors.isDark(activity)
-                val colorScheme = if (isDark) {
-                    darkColorScheme(
-                        surface = colorResource(R.color.cm_surface),
-                        onSurface = colorResource(R.color.cm_text_primary),
-                        surfaceVariant = colorResource(R.color.cm_surface_elevated),
-                        onSurfaceVariant = colorResource(R.color.cm_text_secondary),
-                        background = colorResource(R.color.cm_bg),
-                        onBackground = colorResource(R.color.cm_text_primary),
-                        primary = colorResource(R.color.cm_primary)
-                    )
-                } else {
-                    lightColorScheme(
-                        surface = colorResource(R.color.cm_surface),
-                        onSurface = colorResource(R.color.cm_text_primary),
-                        surfaceVariant = colorResource(R.color.cm_surface_light),
-                        onSurfaceVariant = colorResource(R.color.cm_text_secondary),
-                        background = colorResource(R.color.cm_bg),
-                        onBackground = colorResource(R.color.cm_text_primary),
-                        primary = colorResource(R.color.cm_primary)
-                    )
-                }
-                MaterialTheme(colorScheme = colorScheme) {
-                    ClassMateHamburgerModalSheet(
-                        activity = activity,
-                        scope = scope,
-                        batchId = batchId,
-                        batchLabel = batchLabel,
-                        profile = profile,
-                        onDismiss = onDismiss
-                    )
-                }
-            }
-        }
-        decorView.addView(composeView)
+        currentParams = SheetParams(activity, scope, batchId, batchLabel, profile)
+        isSheetVisible = true
     }
 }
 
@@ -127,7 +159,10 @@ private fun ClassMateHamburgerModalSheet(
     val isServerOwner = remember(p) { p.optBoolean("is_server_owner") }
     val isCr = remember(p) { p.optBoolean("is_cr") }
     val isTeacher = role == "teacher"
-    val currentBatch = remember(batchLabel) { batchLabel().ifBlank { "MBSTU" } }
+    val instShort = remember(p) { com.shuaib.classmate.activities.ClassMateAcademicCache.institutionShortName(activity) }
+    val instName = remember(p) { com.shuaib.classmate.activities.ClassMateAcademicCache.institutionName(activity) }
+    val hasTransit = remember(p) { com.shuaib.classmate.activities.ClassMateAcademicCache.hasBusTransit(activity) }
+    val currentBatch = remember(batchLabel) { batchLabel().ifBlank { instShort } }
     val avatarUrl = remember(p) {
         val fromProfile = p.optString("avatar_url").takeUnless { it.isBlank() || it.equals("null", true) }
             ?: p.optString("photo_url").takeUnless { it.isBlank() || it.equals("null", true) }
@@ -138,8 +173,8 @@ private fun ClassMateHamburgerModalSheet(
             ?: FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()?.takeUnless { it.isBlank() }
     }
 
-    val jakartaBold = remember { FontFamily(Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold)) }
-    val jakartaExtraBold = remember { FontFamily(Font(R.font.plus_jakarta_sans_extrabold, FontWeight.ExtraBold)) }
+    val jakartaBold = JakartaBold
+    val jakartaExtraBold = JakartaExtraBold
 
     val configuration = LocalConfiguration.current
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -267,9 +302,10 @@ private fun ClassMateHamburgerModalSheet(
                 fun dismissAndRun(action: () -> Unit) {
                     view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     coroutineScope.launch {
-                        sheetState.hide()
-                    }.invokeOnCompletion {
-                        if (!sheetState.isVisible) {
+                        try {
+                            sheetState.hide()
+                        } catch (_: Exception) {
+                        } finally {
                             onDismiss()
                             action()
                         }
@@ -287,23 +323,25 @@ private fun ClassMateHamburgerModalSheet(
                     modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
                 )
 
-                DrawerMenuItem(
-                    title = "MBSTU Bus Transit",
-                    subtitle = "Live bus radar, schedule & routes",
-                    iconRes = R.drawable.ic_bus_filled,
-                    iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
-                    jakartaBold = jakartaBold,
-                    isDark = isDark,
-                    onClick = {
-                        dismissAndRun {
-                            val intent = Intent(activity, ClassMateTransitActivity::class.java).apply {
-                                putExtra("EXTRA_BATCH_ID", batchId())
-                                putExtra("EXTRA_ROLE", role)
+                if (hasTransit) {
+                    DrawerMenuItem(
+                        title = "$instShort Bus Transit",
+                        subtitle = "Live bus radar, schedule & routes",
+                        iconRes = R.drawable.ic_bus_filled,
+                        iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                        jakartaBold = jakartaBold,
+                        isDark = isDark,
+                        onClick = {
+                            dismissAndRun {
+                                val intent = Intent(activity, ClassMateTransitActivity::class.java).apply {
+                                    putExtra("EXTRA_BATCH_ID", batchId())
+                                    putExtra("EXTRA_ROLE", role)
+                                }
+                                activity.startActivity(intent)
                             }
-                            activity.startActivity(intent)
                         }
-                    }
-                )
+                    )
+                }
 
                 DrawerMenuItem(
                     title = "Teachers Directory",
@@ -463,8 +501,9 @@ private fun ClassMateHamburgerModalSheet(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Footer Version
+                val companionTag = "$instName · Student Companion"
                 Text(
-                    text = "ClassMate v${BuildConfig.VERSION_NAME} · MBSTU Student Companion",
+                    text = "ClassMate v${BuildConfig.VERSION_NAME} · $companionTag",
                     fontSize = 11.5.sp,
                     color = colorResource(R.color.cm_text_muted),
                     modifier = Modifier.align(Alignment.CenterHorizontally)

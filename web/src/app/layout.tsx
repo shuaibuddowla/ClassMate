@@ -29,11 +29,11 @@ export const metadata: Metadata = {
   authors: [{ name: "Mohammad Shuaib-Ud-Dowla" }],
   creator: "Mohammad Shuaib-Ud-Dowla",
   publisher: "ClassMate",
-  alternates: {
-    canonical: "/",
-  },
   verification: {
     google: "N1jaz91POPN5mOXCtWpSiuQUC1Z5dIon3079aDpR1SE",
+  },
+  alternates: {
+    canonical: "./",
   },
   openGraph: {
     type: "website",
@@ -89,6 +89,17 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "WebSite",
+      "@id": "https://classmatebd.vercel.app/#website",
+      "name": "ClassMate",
+      "alternateName": ["ClassMate MBSTU", "MBSTU ClassMate", "ClassMate Smart Campus"],
+      "url": "https://classmatebd.vercel.app",
+      "inLanguage": "en-US",
+      "publisher": {
+        "@id": "https://classmatebd.vercel.app/#organization",
+      },
+    },
+    {
       "@type": "WebApplication",
       "@id": "https://classmatebd.vercel.app/#webapp",
       "name": "ClassMate",
@@ -107,16 +118,32 @@ const jsonLd = {
         "ratingValue": "4.9",
         "ratingCount": "128",
         "bestRating": "5",
-        "worstRating": "1"
+        "worstRating": "1",
       },
       "screenshot": "https://classmatebd.vercel.app/logo.png",
+      "author": {
+        "@type": "Person",
+        "name": "Mohammad Shuaib-Ud-Dowla",
+        "url": "https://shuaibuddowla.github.io",
+      },
     },
     {
       "@type": "EducationalOrganization",
       "@id": "https://classmatebd.vercel.app/#organization",
       "name": "ClassMate (MBSTU)",
+      "alternateName": "ClassMate",
       "url": "https://classmatebd.vercel.app",
       "logo": "https://classmatebd.vercel.app/logo.png",
+      "founder": {
+        "@type": "Person",
+        "name": "Mohammad Shuaib-Ud-Dowla",
+        "url": "https://shuaibuddowla.github.io",
+      },
+      "sameAs": [
+        "https://github.com/shuaibuddowla",
+        "https://shuaibuddowla.github.io",
+        "https://facebook.com/shuaibuddowla",
+      ],
     },
   ],
 };

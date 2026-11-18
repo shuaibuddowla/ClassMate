@@ -24,7 +24,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="68dp"
+                android:paddingTop="58dp"
                 android:paddingBottom="100dp"
                 android:scrollbars="vertical"
                 android:overScrollMode="never"
@@ -83,7 +83,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="68dp"
+                android:paddingTop="58dp"
                 android:visibility="gone"
                 app:shimmer_auto_start="true"
                 app:shimmer_base_alpha="0.4"
@@ -110,7 +110,8 @@
                 android:gravity="center"
                 android:orientation="vertical"
                 android:paddingHorizontal="24dp"
-                android:paddingTop="68dp"
+                android:paddingTop="58dp"
+                android:paddingBottom="100dp"
                 android:visibility="gone">
 
                 <LinearLayout
@@ -252,6 +253,7 @@
                         android:contentDescription="Menu">
 
                         <ImageView
+                            android:id="@+id/ivHamburgerMenu"
                             android:layout_width="23dp"
                             android:layout_height="23dp"
                             android:layout_gravity="center"
@@ -290,6 +292,7 @@
                             android:maxLines="1"
                             android:textColor="@color/cm_text_secondary"
                             android:textSize="11.5sp"
+                            android:visibility="gone"
                             tools:text="12 updates · Pull to refresh" />
                     </LinearLayout>
 
@@ -349,6 +352,7 @@
                         android:focusable="true">
 
                         <ImageView
+                            android:id="@+id/ivNoticeSearch"
                             android:layout_width="19dp"
                             android:layout_height="19dp"
                             android:layout_gravity="center"
@@ -377,4 +381,6 @@
 
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <include layout="@layout/layout_speed_dial" />
 </FrameLayout>

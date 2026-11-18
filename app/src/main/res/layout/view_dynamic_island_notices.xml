@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layoutDynamicIslandContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom|center_horizontal"
+    android:layout_marginBottom="94dp"
+    android:paddingHorizontal="16dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:elevation="22dp"
+    android:visibility="gone"
+    tools:visibility="visible">
+
+    <!-- The Fluid Dynamic Island Capsule -->
+    <LinearLayout
+        android:id="@+id/cardDynamicIsland"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_dynamic_island_pill"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="10dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:outlineProvider="background"
+        android:elevation="14dp">
+
+        <!-- Glowing Unread Bell Icon with Count Badge -->
+        <FrameLayout
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="10dp">
+
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_dynamic_island_icon">
+
+                <ImageView
+                    android:id="@+id/ivDynamicIslandBell"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_notice"
+                    app:tint="#FFFFFF"
+                    android:importantForAccessibility="no" />
+            </FrameLayout>
+
+            <!-- Small Unread Counter Badge -->
+            <TextView
+                android:id="@+id/tvDynamicIslandCountBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:minWidth="18dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/bg_dynamic_island_badge"
+                android:gravity="center"
+                android:paddingHorizontal="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="9.5sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                tools:text="3" />
+        </FrameLayout>
+
+        <!-- Message Info Text Stack -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginEnd="12dp">
+
+            <TextView
+                android:id="@+id/tvDynamicIslandTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:textColor="@color/cm_dynamic_island_title"
+                android:textSize="13sp"
+                tools:text="3 Missed Notices" />
+
+            <TextView
+                android:id="@+id/tvDynamicIslandSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:maxWidth="160dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/cm_dynamic_island_subtitle"
+                android:textSize="11.5sp"
+                tools:text="Swipe up or tap to peek" />
+        </LinearLayout>
+
+        <!-- Upward Arrow Expand Button -->
+        <FrameLayout
+            android:id="@+id/btnDynamicIslandExpand"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_dynamic_island_action_btn"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="4dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_chevron_up"
+                app:tint="@color/cm_dynamic_island_action_icon"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <!-- Quick Dismiss Cross Button -->
+        <FrameLayout
+            android:id="@+id/btnDynamicIslandDismiss"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_close"
+                app:tint="@color/cm_dynamic_island_dismiss_icon"
+                android:contentDescription="Dismiss" />
+        </FrameLayout>
+
+    </LinearLayout>
+</FrameLayout>

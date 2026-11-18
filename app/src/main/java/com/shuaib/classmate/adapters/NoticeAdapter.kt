@@ -549,7 +549,17 @@ class NoticeAdapter(
             }
             binding.btnShare.setOnClickListener {
                 HapticHelper.lightPop(it)
-                val shareUrl = "https://classmatebd.vercel.app/n/${notice.id}"
+                val body = notice.content.ifBlank { notice.body }
+                val bodySlugMatch = Regex("""https://classmatebd\.vercel\.app/r/([a-zA-Z0-9_\-]+)""").find(body)
+                val bodySlug = bodySlugMatch?.groupValues?.getOrNull(1)
+                val isResourceNotice = notice.isResource || notice.pdfId.isNotBlank() || bodySlug != null
+                val slug = bodySlug ?: notice.pdfId.takeIf { it.isNotBlank() }
+
+                val shareUrl = if (isResourceNotice && slug != null) {
+                    "https://classmatebd.vercel.app/r/$slug"
+                } else {
+                    "https://classmatebd.vercel.app/n/${notice.id}"
+                }
                 val shareText = "${notice.title}\n$shareUrl"
                 val sendIntent = android.content.Intent().apply {
                     action = android.content.Intent.ACTION_SEND
@@ -613,13 +623,15 @@ class NoticeAdapter(
                 binding.tvLikeCount.setTextColor(actionMuted)
             }
             binding.tvLikeCount.text = compactCount(engagement.likeCount)
+            binding.tvLikeCount.isVisible = engagement.likeCount > 0
 
             // Comment Pill (Disabled)
             binding.btnComment.visibility = View.GONE
             binding.btnComment.backgroundTintList = null
             binding.ivCommentIcon.setColorFilter(actionMuted)
-            binding.tvCommentCount.text = "0"
+            binding.tvCommentCount.text = compactCount(engagement.commentCount)
             binding.tvCommentCount.setTextColor(actionMuted)
+            binding.tvCommentCount.isVisible = engagement.commentCount > 0
 
             // Reminder Pill
             binding.btnReminder.backgroundTintList = null

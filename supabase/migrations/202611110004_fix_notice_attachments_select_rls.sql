@@ -1,0 +1,22 @@
+-- 1. Allow anon to read recently created notice_attachments so storage insert policy can verify the storage_key
+DROP POLICY IF EXISTS "anyone can verify recent attachments for upload" ON public.notice_attachments;
+CREATE POLICY "anyone can verify recent attachments for upload"
+ON public.notice_attachments FOR SELECT
+TO anon, authenticated
+USING (created_at > now() - interval '2 hours');
+
+-- 2. Storage policy for notice-images
+DROP POLICY IF EXISTS "publishers upload their notice images" ON storage.objects;
+CREATE POLICY "publishers upload their notice images"
+ON storage.objects FOR INSERT
+TO anon, authenticated
+WITH CHECK (
+  bucket_id = 'notice-images'
+  AND (
+    EXISTS (
+      SELECT 1 FROM public.notice_attachments a
+      WHERE a.storage_key = storage.objects.name
+        AND a.created_at > now() - interval '2 hours'
+    )
+  )
+);

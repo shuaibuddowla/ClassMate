@@ -7,7 +7,7 @@ import androidx.work.*
 import com.shuaib.classmate.R
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import java.io.File
-import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class LibraryUploadWorker(
     appContext: Context,
@@ -22,6 +22,13 @@ class LibraryUploadWorker(
             return Result.success()
         }
 
+        try {
+            ClassMateAuthApi.attach(applicationContext)
+            if (ClassMateAuthApi.hasSavedSession()) {
+                ClassMateAuthApi.restoreSession()
+            }
+        } catch (_: Exception) {}
+
         var hasTransientError = false
 
         for (task in tasks) {
@@ -35,7 +42,6 @@ class LibraryUploadWorker(
             showProgressNotification(notifId, task.title, 0, 0, task.sizeBytes)
 
             try {
-                ClassMateAuthApi.attach(applicationContext)
                 var lastProgressUpdate = 0L
 
                 ClassMateAuthApi.uploadResource(
@@ -61,25 +67,46 @@ class LibraryUploadWorker(
 
                 LibraryUploadManager.completeTask(applicationContext, task.id)
                 showCompletedNotification(notifId, task.title)
-            } catch (e: IOException) {
-                val msg = e.message.orEmpty()
-                if (msg.startsWith("400") || msg.startsWith("401") || msg.startsWith("403") ||
-                    msg.startsWith("404") || msg.startsWith("422") || msg.contains("exceeds limit")
-                ) {
+            } catch (e: Throwable) {
+                val msg = e.message ?: "Upload failed"
+                if (isFatalError(e)) {
                     LibraryUploadManager.failTask(applicationContext, task.id, msg)
                     showFailedNotification(notifId, task.title, msg)
                 } else {
-                    hasTransientError = true
-                    LibraryUploadManager.notifyWaitingForNetwork(task.id, task.title)
-                    showWaitingNotification(notifId, task.title)
+                    val retryCount = LibraryUploadManager.recordRetry(applicationContext, task.id, msg)
+                    if (retryCount >= 5) {
+                        val fatalMsg = "Upload stopped after 5 failed attempts: $msg"
+                        LibraryUploadManager.failTask(applicationContext, task.id, fatalMsg)
+                        showFailedNotification(notifId, task.title, fatalMsg)
+                    } else {
+                        hasTransientError = true
+                        LibraryUploadManager.notifyWaitingForNetwork(task.id, task.title)
+                        showWaitingNotification(notifId, task.title)
+                        break // Pause queue on network disconnect so other files aren't burned while offline
+                    }
                 }
-            } catch (e: Exception) {
-                LibraryUploadManager.failTask(applicationContext, task.id, e.message)
-                showFailedNotification(notifId, task.title, e.message ?: "Upload error")
             }
         }
 
         return if (hasTransientError) Result.retry() else Result.success()
+    }
+
+    private fun isFatalError(e: Throwable): Boolean {
+        if (e is IllegalArgumentException || e is IllegalStateException) return true
+        val msg = e.message.orEmpty()
+        if (msg.contains("Session expired", ignoreCase = true)) return true
+        if (msg.contains("Selected file unavailable", ignoreCase = true)) return true
+        if (msg.contains("exceeds limit", ignoreCase = true) || msg.contains("between 1 byte and 500 MB", ignoreCase = true)) return true
+
+        val httpCodeRegex = Regex("""(?:HTTP\s+|:\s*|^)(\d{3})""", RegexOption.IGNORE_CASE)
+        val match = httpCodeRegex.find(msg)
+        if (match != null) {
+            val code = match.groupValues[1].toIntOrNull()
+            if (code != null && code in 400..499 && code != 408 && code != 429) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun showProgressNotification(notifId: Int, title: String, percent: Int, uploaded: Long, total: Long) {
@@ -133,18 +160,23 @@ class LibraryUploadWorker(
         const val CHANNEL_ID = "classmate_library_uploads"
         const val UNIQUE_WORK_NAME = "LibraryUploadWorker"
 
-        fun enqueue(context: Context) {
+        fun enqueue(context: Context, immediate: Boolean = false) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
             val request = OneTimeWorkRequestBuilder<LibraryUploadWorker>()
                 .setConstraints(constraints)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    15,
+                    TimeUnit.SECONDS
+                )
                 .build()
 
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                if (immediate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request
             )
         }

@@ -4,7 +4,7 @@
     <com.google.android.material.card.MaterialCardView android:id="@+id/cardRoot"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:clickable="false" android:focusable="false" app:cardCornerRadius="20dp"
-        app:cardElevation="0dp" app:cardBackgroundColor="@android:color/transparent"
+        app:cardElevation="2dp" app:cardBackgroundColor="@android:color/transparent"
         app:strokeColor="@color/cm_notice_premium_stroke" app:strokeWidth="1dp">
         <LinearLayout android:id="@+id/noticeCardSurface" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:background="@drawable/bg_notice_premium_general"
@@ -12,51 +12,62 @@
             android:paddingTop="14dp" android:paddingBottom="2dp"
             android:clipChildren="false" android:clipToPadding="false">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:gravity="top" android:orientation="horizontal">
-                <View android:id="@+id/noticeAccent" android:layout_width="4dp" android:layout_height="22dp"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_notice_premium_accent" />
-                <TextView android:id="@+id/tvTitle" android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:layout_marginStart="10dp" android:layout_marginEnd="8dp"
-                    android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="18sp" android:textStyle="bold"
-                    app:autoSizeTextType="uniform"
-                    app:autoSizeMinTextSize="12sp"
-                    app:autoSizeMaxTextSize="18sp"
-                    app:autoSizeStepGranularity="1sp" />
-                <ImageView android:id="@+id/ivNoticeIllustration" android:layout_width="36dp"
-                    android:layout_height="36dp" android:alpha="0.95" android:importantForAccessibility="no"
-                    android:scaleType="fitCenter" android:src="@drawable/ic_notice_megaphone_art" />
-                <ImageView android:id="@+id/btnOptions" android:layout_width="44dp" android:layout_height="44dp"
-                    android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true"
-                    android:focusable="true" android:contentDescription="Edit or delete notice" android:padding="12dp"
-                    android:src="@drawable/ic_more_vert" app:tint="@color/cm_text_secondary" android:visibility="gone" />
+                android:gravity="center_vertical" android:orientation="horizontal">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <View android:id="@+id/noticeAccent"
+                        android:layout_width="4dp"
+                        android:layout_height="match_parent"
+                        android:minHeight="22dp"
+                        android:layout_marginTop="2dp"
+                        android:layout_marginBottom="2dp"
+                        android:background="@drawable/bg_notice_premium_accent" />
+                    <TextView android:id="@+id/tvTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:includeFontPadding="false"
+                        android:textColor="@color/cm_text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="12sp"
+                        app:autoSizeMaxTextSize="18sp"
+                        app:autoSizeStepGranularity="1sp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/ivNoticeIllustration"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginEnd="4dp"
+                    android:alpha="0.95"
+                    android:importantForAccessibility="no"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_notice_megaphone_art" />
+                <ImageView android:id="@+id/btnOptions"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Edit or delete notice"
+                    android:padding="6dp"
+                    android:src="@drawable/ic_more_vert"
+                    app:tint="@color/cm_text_secondary"
+                    android:visibility="gone" />
             </LinearLayout>
             <TextView android:id="@+id/tvPreview" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:layout_marginEnd="4dp" android:includeFontPadding="false"
                 android:lineSpacingExtra="3dp" android:maxLines="5" android:ellipsize="end"
                 android:textColor="@color/cm_text_primary" android:textSize="15sp" />
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-                <TextView android:id="@+id/tvMeta" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:includeFontPadding="false"
-                    android:drawableStart="@drawable/ic_notice_date_small" android:drawablePadding="6dp"
-                    android:drawableTint="@color/cm_text_secondary" android:maxLines="1" android:ellipsize="end"
-                    android:textColor="@color/cm_text_secondary" android:textSize="11sp" />
-                <TextView android:id="@+id/btnTranslate" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:gravity="center_vertical" android:drawableStart="@drawable/ic_translate_small"
-                    android:drawablePadding="5dp" android:text="Translate" android:textSize="11sp"
-                    android:textColor="@color/cm_primary" android:background="@drawable/bg_btn_translate"
-                    android:clickable="true" android:focusable="true"
-                    android:paddingHorizontal="6dp" android:paddingVertical="3dp" />
-            </LinearLayout>
 
             <!-- Interactive Material 3 Expressive Poll Container -->
             <LinearLayout android:id="@+id/pollContainer"
@@ -84,15 +95,25 @@
                 <LinearLayout
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:gravity="center_vertical" android:orientation="horizontal"
-                    android:layout_marginTop="4dp">
+                    android:layout_marginTop="6dp">
                     <TextView android:id="@+id/tvPollTotalVotes"
                         android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp" />
-                    <TextView android:id="@+id/tvPollStatus"
+                        android:textSize="11.5sp"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView android:id="@+id/tvPollViewVotes"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:textColor="@color/cm_text_secondary" android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:text="View votes ›"
+                        android:textColor="#EF4444"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="3dp"
+                        android:visibility="gone"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -156,56 +177,101 @@
                         app:tint="@color/cm_notice_premium_resource" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Notice Metadata (Date, Translate, Pinned) positioned under file container -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView android:id="@+id/tvMeta" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:drawableStart="@drawable/ic_notice_date_small" android:drawablePadding="6dp"
+                    android:drawableTint="@color/cm_text_secondary" android:maxLines="1" android:ellipsize="end"
+                    android:textColor="@color/cm_text_secondary" android:textSize="11sp" />
+                <TextView android:id="@+id/btnTranslate" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center_vertical" android:drawableStart="@drawable/ic_translate_small"
+                    android:drawablePadding="5dp" android:text="Translate" android:textSize="11sp"
+                    android:textColor="@color/cm_primary" android:background="@drawable/bg_btn_translate"
+                    android:clickable="true" android:focusable="true"
+                    android:paddingHorizontal="6dp" android:paddingVertical="3dp" />
+                <TextView android:id="@+id/tvPinnedBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center_vertical"
+                    android:text="📌 Pinned"
+                    android:textSize="11sp"
+                    android:textColor="@color/cm_text_secondary"
+                    android:visibility="gone" />
+            </LinearLayout>
+
             <View android:layout_width="match_parent" android:layout_height="1dp"
-                android:layout_marginTop="4dp" android:background="@color/cm_notice_premium_stroke" android:alpha="0.6" />
+                android:layout_marginTop="2dp" android:background="@color/cm_notice_premium_stroke" android:alpha="0.6" />
             <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
                 android:gravity="center_vertical" android:orientation="horizontal"
                 android:clipChildren="false" android:clipToPadding="false">
-                <FrameLayout android:id="@+id/btnReminder" android:layout_width="44dp" android:layout_height="48dp"
-                    android:background="@null" android:clickable="true"
-                    android:focusable="true" android:contentDescription="Set notice reminder">
-                    <ImageView android:id="@+id/ivReminderIcon" android:layout_width="20dp" android:layout_height="20dp"
-                        android:layout_gravity="center" android:src="@drawable/ic_notice_reminder_outline" app:tint="@color/cm_text_secondary" />
-                </FrameLayout>
-                <LinearLayout android:id="@+id/btnReadReceipts" android:layout_width="0dp" android:layout_height="48dp"
-                    android:layout_weight="1" android:clickable="true" android:focusable="true"
-                    android:background="?attr/selectableItemBackground" android:gravity="center_vertical" android:orientation="horizontal">
-                    <FrameLayout android:id="@+id/seenAvatars" android:layout_width="24dp" android:layout_height="20dp"
-                        android:layout_marginEnd="4dp" android:visibility="gone">
-                        <de.hdodenhof.circleimageview.CircleImageView android:id="@+id/ivSeenMeAvatar"
-                            android:layout_width="20dp" android:layout_height="20dp"
-                            android:layout_gravity="start|center_vertical" android:contentDescription="Your view" />
-                    </FrameLayout>
-                    <TextView android:id="@+id/tvReadCount" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                        android:ellipsize="end" android:maxLines="1" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
-                </LinearLayout>
+
+                <!-- Left-aligned Social Actions (Like, Comment, Share) with comfortably expanded spacing, no bubble/ripple -->
                 <LinearLayout android:id="@+id/btnLike" android:layout_width="wrap_content" android:layout_height="48dp"
                     android:background="@null" android:clickable="true" android:focusable="true"
                     android:clipChildren="false" android:clipToPadding="false"
-                    android:contentDescription="Like notice" android:gravity="center_vertical" android:minWidth="48dp"
-                    android:orientation="horizontal" android:paddingStart="10dp" android:paddingEnd="8dp">
+                    android:contentDescription="Like notice" android:gravity="center_vertical"
+                    android:orientation="horizontal" android:paddingStart="0dp" android:paddingEnd="8dp">
                     <ImageView android:id="@+id/ivLikeIcon" android:layout_width="20dp" android:layout_height="20dp"
                         android:src="@drawable/ic_heart_outline" app:tint="@color/cm_text_secondary" />
                     <TextView android:id="@+id/tvLikeCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
+                        android:layout_marginStart="5dp" android:textColor="@color/cm_text_secondary" android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
+                        android:visibility="gone" />
                 </LinearLayout>
+
                 <LinearLayout android:id="@+id/btnComment" android:layout_width="wrap_content" android:layout_height="48dp"
                     android:background="@null" android:clickable="true" android:focusable="true"
                     android:clipChildren="false" android:clipToPadding="false"
-                    android:contentDescription="Open comments" android:gravity="center_vertical" android:minWidth="48dp"
+                    android:contentDescription="Open comments" android:gravity="center_vertical"
                     android:orientation="horizontal" android:paddingStart="8dp" android:paddingEnd="8dp">
                     <ImageView android:layout_width="20dp" android:layout_height="20dp"
                         android:src="@drawable/ic_comment_outline" app:tint="@color/cm_text_secondary" />
                     <TextView android:id="@+id/tvCommentCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp" android:textColor="@color/cm_text_secondary" android:textSize="12sp" />
+                        android:layout_marginStart="5dp" android:textColor="@color/cm_text_secondary" android:textSize="12sp"
+                        android:fontFamily="sans-serif-medium" android:includeFontPadding="false"
+                        android:visibility="gone" />
                 </LinearLayout>
-                <FrameLayout android:id="@+id/btnShare" android:layout_width="44dp" android:layout_height="48dp"
+
+                <FrameLayout android:id="@+id/btnShare" android:layout_width="38dp" android:layout_height="48dp"
                     android:background="@null" android:clickable="true" android:focusable="true"
                     android:clipChildren="false" android:clipToPadding="false"
                     android:contentDescription="Share notice">
                     <ImageView android:id="@+id/ivShareIcon" android:layout_width="20dp" android:layout_height="20dp"
                         android:layout_gravity="center" android:src="@drawable/ic_share" app:tint="@color/cm_text_secondary" />
                 </FrameLayout>
+
+                <!-- Retained hidden stub for backward compatibility -->
+                <FrameLayout android:id="@+id/btnReminder" android:layout_width="0dp" android:layout_height="0dp"
+                    android:visibility="gone">
+                    <ImageView android:id="@+id/ivReminderIcon" android:layout_width="0dp" android:layout_height="0dp" />
+                </FrameLayout>
+
+                <!-- Spacer pushing Read Receipts to far right -->
+                <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+
+                <!-- Read Receipts: 2 Profile Avatars + +N Count Badge on far right -->
+                <LinearLayout android:id="@+id/btnReadReceipts" android:layout_width="wrap_content" android:layout_height="48dp"
+                    android:clickable="true" android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center_vertical|end" android:orientation="horizontal"
+                    android:paddingStart="6dp" android:paddingEnd="0dp"
+                    android:clipChildren="false" android:clipToPadding="false">
+                    <FrameLayout android:id="@+id/seenAvatars" android:layout_width="wrap_content" android:layout_height="24dp"
+                        android:clipChildren="false" android:clipToPadding="false"
+                        android:visibility="gone" />
+                    <TextView android:id="@+id/tvReadCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:visibility="gone" />
+                </LinearLayout>
             </LinearLayout>
             <!-- IDs retained for the older adapter; this Supabase card presents no tag or pin UI. -->
             <LinearLayout android:layout_width="0dp" android:layout_height="0dp"

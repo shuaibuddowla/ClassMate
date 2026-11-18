@@ -6,9 +6,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.DayOfWeek
 import java.time.LocalDate
 
-internal class ClassMateCalendarData(private val context: Context, private val user: () -> String) {
+internal class ClassMateCalendarData(
+    private val context: Context,
+    private val weekendDays: () -> Set<DayOfWeek> = { ClassMateAcademicCache.weekendDays(context) },
+    private val isRu: () -> Boolean = { false },
+    private val user: () -> String
+) {
     private val refreshMutex = Mutex()
     fun snapshot(year: Int) = ClassMateAcademicCache.read(context, user(), "university", "calendar_$year")
     fun events(year: Int): List<JSONObject> {
@@ -27,12 +33,17 @@ internal class ClassMateCalendarData(private val context: Context, private val u
     }
     fun kindFor(date: LocalDate): String {
         val today = events(date.year).filter { includes(it, date) }
-        return ClassMateBusDays.kindFor(date, calendarHoliday = today.any { it.optString("scope") == "university" },
-            calendarWorkingDay = today.any { it.optString("scope") == "working_day" })
+        return ClassMateBusDays.kindFor(
+            date,
+            calendarHoliday = today.any { it.optString("scope") == "university" },
+            calendarWorkingDay = today.any { it.optString("scope") == "working_day" },
+            weekendDays = weekendDays(),
+            isRu = isRu()
+        )
     }
     fun classClosure(date: LocalDate): String? {
         val matching = events(date.year).filter { includes(it, date) }
-        if (!ClassMateCalendarRules.classesClosed(date, matching.map { it.getString("scope") }.toSet())) return null
+        if (!ClassMateCalendarRules.classesClosed(date, matching.map { it.getString("scope") }.toSet(), weekendDays = weekendDays(), isRu = isRu())) return null
         return matching.filter { it.getString("scope") in setOf("classes", "university") }
             .map { it.getString("title") }.distinct().joinToString(" · ").ifBlank { "Weekly holiday" }
     }

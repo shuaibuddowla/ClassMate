@@ -2,7 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PublicPage, { supportEmail } from "@/components/public-page";
 
-export const metadata: Metadata = { title: "Terms of Service | ClassMate", description: "Terms for using ClassMate’s academic and community services." };
+export const metadata: Metadata = {
+  title: "Terms of Service | ClassMate",
+  description: "Terms for using ClassMate’s academic and community services.",
+  alternates: {
+    canonical: "https://classmatebd.vercel.app/terms",
+  },
+};
 
 export default function TermsPage() {
   return <PublicPage policy title="Terms of Service" lead="Please read these terms before using ClassMate’s web or Android services.">

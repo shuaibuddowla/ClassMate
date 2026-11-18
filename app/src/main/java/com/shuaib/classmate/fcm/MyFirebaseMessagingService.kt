@@ -50,21 +50,30 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val body = remoteMessage.notification?.body ?: remoteMessage.data["body"]
         val type = remoteMessage.data["type"] ?: "notice"
 
+        val noticeId = remoteMessage.data["record_id"]
+            ?: remoteMessage.data["noticeId"]
+            ?: remoteMessage.data["notice_id"]
+
         // Only show notification if we actually have content to show
         if (title != null && body != null) {
-            sendNotification(title, body, type)
+            sendNotification(title, body, type, noticeId)
         }
     }
 
-    private fun sendNotification(title: String, messageBody: String, type: String) {
+    private fun sendNotification(title: String, messageBody: String, type: String, noticeId: String? = null) {
         if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         // Intent to open MainActivity
         val target = if (BuildConfig.CLASSMATE_AUTH_ENABLED) ClassMateAuthActivity::class.java
             else MainActivity::class.java
         val intent = Intent(this, target).apply {
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra("OPEN_TAB", "notices")
+            if (!noticeId.isNullOrBlank()) {
+                putExtra("TARGET_NOTICE_ID", noticeId)
+                putExtra("noticeId", noticeId)
+                putExtra("record_id", noticeId)
+            }
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -75,17 +84,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val channelId = "classmate_notifications"
         val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         
+        val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(this, title, isForNotification = true)
+        val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(this, messageBody, isForNotification = true)
+
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_classmate_notification)
             .setColor(android.graphics.Color.parseColor("#3B82F6"))
-            .setContentTitle(title)
-            .setContentText(messageBody)
+            .setContentTitle(formattedTitle)
+            .setContentText(formattedBody)
             .setAutoCancel(true)
             .setSound(defaultSoundUri)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(messageBody))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody))
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(type.hashCode(), notificationBuilder.build())

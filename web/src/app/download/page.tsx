@@ -35,12 +35,67 @@ export const metadata: Metadata = {
   },
 };
 
+const downloadJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://classmatebd.vercel.app/download#app",
+      "name": "ClassMate Android App",
+      "operatingSystem": "Android 7.0 and up",
+      "applicationCategory": "EducationalApplication",
+      "downloadUrl": "https://classmatebd.vercel.app/download/android",
+      "installUrl": "https://classmatebd.vercel.app/download",
+      "softwareVersion": "1.1.26",
+      "fileFormat": "application/vnd.android.package-archive",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "BDT",
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Mohammad Shuaib-Ud-Dowla",
+        "url": "https://shuaibuddowla.github.io",
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "ClassMate",
+        "url": "https://classmatebd.vercel.app",
+        "logo": "https://classmatebd.vercel.app/logo.png",
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://classmatebd.vercel.app",
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Download Android App",
+          "item": "https://classmatebd.vercel.app/download",
+        },
+      ],
+    },
+  ],
+};
+
 export default function DownloadPage() {
   return (
-    <PublicPage
-      title="Download ClassMate for Android"
-      lead="Install the native Android app for instant attendance updates, live routine alerts, bus tracking, and offline notices."
-    >
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(downloadJsonLd) }}
+      />
+      <PublicPage
+        title="Download ClassMate for Android"
+        lead="Install the native Android app for instant attendance updates, live routine alerts, bus tracking, and offline notices."
+      >
       <section style={{ textAlign: "center", margin: "24px 0 36px" }}>
         <a
           href="/download/android"
@@ -124,5 +179,6 @@ export default function DownloadPage() {
         </p>
       </section>
     </PublicPage>
+    </>
   );
 }

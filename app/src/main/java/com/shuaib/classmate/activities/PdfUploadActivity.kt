@@ -196,7 +196,7 @@ class PdfUploadActivity : AppCompatActivity() {
                 append(description.trim())
                 append("\n\n")
             }
-            append("A new learning resource for $subject was added to the Library. Open Library to view or download it.")
+            append("A new resource has been shared for $subject. Open the file below.")
         }
         lifecycleScope.launch {
             val result = runCatching {
@@ -482,11 +482,8 @@ class PdfUploadActivity : AppCompatActivity() {
             if (description.isNotBlank()) {
                 append(description)
                 append("\n\n")
-            } else {
-                append("A new learning resource has been shared for **$subject**.")
-                append("\n\n")
             }
-            append("🔗 **Quick Access:** Open the attachment container below to view or download the file.")
+            append("A new resource has been shared for $subject. Open the file below.")
         }
 
         val uid = auth.currentUser?.uid.orEmpty()

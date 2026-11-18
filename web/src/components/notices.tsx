@@ -28,6 +28,8 @@ import {
   CalendarDays,
   Share2,
   BarChart2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
@@ -35,10 +37,21 @@ import { dhakaToday, formatStamp, parseDate, dateKey } from "@/lib/calendar";
 import type { Context } from "./app";
 import { Avatar, Confirm, Empty, ErrorBox, Form, Modal, Skeleton } from "./ui";
 import { Comments } from "./notice-comments";
+
+export interface NoticeAttachmentItem {
+  id: string;
+  url: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey?: string;
+}
+
 type Page = {
   entries: Row[];
   details: Row;
   attachments?: Record<string, { id: string; url: string; fileName: string; sizeBytes: number }>;
+  attachmentsList?: Record<string, NoticeAttachmentItem[]>;
   hasMore: boolean;
 };
 export function Notices({
@@ -157,16 +170,27 @@ export function Notices({
         noticeIds.length
           ? rpc("notice_feed_details", {
               target_ids: noticeIds,
+            }).catch((err) => {
+              console.warn("notice_feed_details error:", err);
+              return {};
             })
           : {},
         noticeIds.length
           ? (async () => {
               try {
+                // First try default schema (which now has classmate.notice_attachments view)
                 const res = await supabase()
                   .from("notice_attachments")
                   .select("id,notice_id,storage_key,file_name,mime_type,size_bytes")
                   .in("notice_id", noticeIds);
-                return (res.data || []) as any[];
+                if (res.data && res.data.length > 0) return res.data as any[];
+                // Fallback to explicit public schema
+                const resPublic = await supabase()
+                  .schema("public")
+                  .from("notice_attachments")
+                  .select("id,notice_id,storage_key,file_name,mime_type,size_bytes")
+                  .in("notice_id", noticeIds);
+                return (resPublic.data || []) as any[];
               } catch {
                 return [] as any[];
               }
@@ -174,39 +198,62 @@ export function Notices({
           : Promise.resolve([]),
       ]);
 
+      const allAtts = [
+        ...((details as any)?.attachments || []),
+        ...((attachmentsData as any[]) || []),
+      ];
+
+      const seenAttIds = new Set<string>();
+      const attachmentsListMap: Record<string, NoticeAttachmentItem[]> = {};
       const attachmentMap: Record<
         string,
         { id: string; url: string; fileName: string; sizeBytes: number }
       > = {};
-      if (attachmentsData && attachmentsData.length > 0) {
-        const keys = attachmentsData.map((a: Row) => a.storage_key);
-        try {
-          const signed = await supabase()
-            .storage.from("notice-images")
-            .createSignedUrls(keys, 3600);
-          const urlByPath: Record<string, string> = {};
-          if (signed?.data) {
-            for (const item of signed.data) {
-              if (item?.path && item?.signedUrl) {
-                urlByPath[item.path] = item.signedUrl;
-              }
-            }
+
+      for (const a of allAtts) {
+        if (!a || !a.id || seenAttIds.has(a.id) || !a.notice_id || !a.storage_key) continue;
+        seenAttIds.add(a.id);
+        const { data: urlData } = supabase().storage.from("notice-images").getPublicUrl(a.storage_key);
+        const url = urlData?.publicUrl || "";
+        if (!url) continue;
+
+        const item: NoticeAttachmentItem = {
+          id: a.id,
+          url,
+          fileName: a.file_name || "Attachment",
+          mimeType: a.mime_type || "image/jpeg",
+          sizeBytes: Number(a.size_bytes || 0),
+          storageKey: a.storage_key,
+        };
+
+        const nid = String(a.notice_id).trim();
+        const keys = Array.from(new Set([nid, nid.toLowerCase(), nid.toUpperCase()]));
+        for (const k of keys) {
+          if (!attachmentsListMap[k]) {
+            attachmentsListMap[k] = [];
           }
-          for (const a of attachmentsData) {
-            const url = urlByPath[a.storage_key];
-            if (url) {
-              attachmentMap[a.notice_id] = {
-                id: a.id,
-                url,
-                fileName: a.file_name,
-                sizeBytes: a.size_bytes,
-              };
-            }
+          if (!attachmentsListMap[k].some((existing) => existing.id === item.id)) {
+            attachmentsListMap[k].push(item);
           }
-        } catch (_) {}
+
+          if (!attachmentMap[k]) {
+            attachmentMap[k] = {
+              id: a.id,
+              url,
+              fileName: item.fileName,
+              sizeBytes: item.sizeBytes,
+            };
+          }
+        }
       }
 
-      return { entries, details, attachments: attachmentMap, hasMore: entries.length === 10 };
+      return {
+        entries,
+        details,
+        attachments: attachmentMap,
+        attachmentsList: attachmentsListMap,
+        hasMore: entries.length === 10,
+      };
     },
     getNextPageParam: (last) =>
       last.hasMore ? last.entries.at(-1) : undefined,
@@ -223,8 +270,12 @@ export function Notices({
           }
         : undefined;
     },
-    initialDataUpdatedAt: () =>
-      readAcademic(ctx.user, ctx.batch, "notices")?.syncedAt || 0,
+    initialDataUpdatedAt: () => {
+      const cached = readAcademic(ctx.user, ctx.batch, "notices");
+      // Force network refresh if cached data does not have attachmentsList
+      if (!cached?.data?.[0]?.attachmentsList) return 0;
+      return cached?.syncedAt || 0;
+    },
   });
   useEffect(() => {
     if (feed.data && navigator.onLine)
@@ -271,6 +322,10 @@ export function Notices({
     feed.data?.pages.reduce((acc, p) => {
       return { ...acc, ...(p.attachments || {}) };
     }, {} as Record<string, { id: string; url: string; fileName: string; sizeBytes: number }>) || {};
+  const attachmentsList =
+    feed.data?.pages.reduce((acc, p) => {
+      return { ...acc, ...(p.attachmentsList || {}) };
+    }, {} as Record<string, NoticeAttachmentItem[]>) || {};
   const refresh = () =>
     qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch] });
   async function reaction(n: Row, change: Row) {
@@ -377,6 +432,7 @@ export function Notices({
               batch={ctx.batch}
               search={search}
               poll={details.polls?.find((x: Row) => x.notice_id === n.id)}
+              resource={details.resources?.find((x: Row) => x.notice_id === n.id)}
               onVote={handleVote}
               state={
                 details.engagement?.find((x: Row) => x.notice_id === n.id) || {}
@@ -400,7 +456,12 @@ export function Notices({
                     ? permissions.data?.courses[n.semester_course_id]
                     : permissions.data?.general))
               }
-              attachment={attachments[n.id]}
+              attachment={attachments[n.id] || attachments[String(n.id).toLowerCase()]}
+              attachmentsList={
+                attachmentsList[n.id] ||
+                attachmentsList[String(n.id).toLowerCase()] ||
+                (attachments[n.id] ? [{ ...attachments[n.id], mimeType: "image/jpeg" }] : [])
+              }
               onEdit={() => setEditing(n)}
               onDelete={() => setDeleting(n)}
               onOpenDetail={() => setDetailNotice(n)}
@@ -533,7 +594,13 @@ export function Notices({
       {detailNotice && (
         <NoticeDetailModal
           notice={detailNotice}
-          attachment={attachments[detailNotice.id]}
+          resource={details.resources?.find((x: Row) => x.notice_id === detailNotice.id)}
+          attachment={attachments[detailNotice.id] || attachments[String(detailNotice.id).toLowerCase()]}
+          attachmentsList={
+            attachmentsList[detailNotice.id] ||
+            attachmentsList[String(detailNotice.id).toLowerCase()] ||
+            (attachments[detailNotice.id] ? [{ ...attachments[detailNotice.id], mimeType: "image/jpeg" }] : [])
+          }
           close={() => setDetailNotice(null)}
         />
       )}{" "}
@@ -606,8 +673,8 @@ function NoticeComposer({
       setImageError("Only JPG, PNG, or WebP images are supported.");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setImageError("Choose an image smaller than 10 MB.");
+    if (file.size > 100 * 1024 * 1024) {
+      setImageError("Choose an image smaller than 100 MB.");
       return;
     }
     setImageFile(file);
@@ -992,15 +1059,31 @@ function truncateSafely(str: string, maxLen: number): string {
 export function NoticeImageLightbox({
   src,
   fileName,
+  images,
+  initialIndex = 0,
   onClose,
 }: {
-  src: string;
+  src?: string;
   fileName?: string;
+  images?: Array<{ url: string; fileName?: string }>;
+  initialIndex?: number;
   onClose: () => void;
 }) {
+  const allImages = images && images.length > 0 ? images : src ? [{ url: src, fileName }] : [];
+  const [index, setIndex] = useState(
+    Math.max(0, Math.min(initialIndex, allImages.length - 1))
+  );
+
+  const current = allImages[index] || { url: src || "", fileName };
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") {
+        setIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+      } else if (e.key === "ArrowRight") {
+        setIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     const prevOverflow = document.body.style.overflow;
@@ -1009,7 +1092,7 @@ export function NoticeImageLightbox({
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [onClose]);
+  }, [onClose, allImages.length]);
 
   return (
     <div
@@ -1060,13 +1143,14 @@ export function NoticeImageLightbox({
             whiteSpace: "nowrap",
             maxWidth: "70vw",
           }}
-          title={fileName}
+          title={current.fileName}
         >
-          {fileName || "Notice Attachment"}
+          {current.fileName || "Notice Attachment"}
+          {allImages.length > 1 ? ` (${index + 1} of ${allImages.length})` : ""}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <a
-            href={src}
+            href={current.url}
             target="_blank"
             rel="noopener noreferrer"
             title="Open original"
@@ -1114,11 +1198,72 @@ export function NoticeImageLightbox({
           justifyContent: "center",
           padding: "68px 16px 24px",
           boxSizing: "border-box",
+          position: "relative",
         }}
       >
+        {allImages.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
+              }}
+              style={{
+                position: "absolute",
+                left: "20px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "rgba(255, 255, 255, 0.18)",
+                border: "none",
+                borderRadius: "50%",
+                width: "44px",
+                height: "44px",
+                color: "white",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                zIndex: 3,
+                transition: "background 0.2s",
+              }}
+              title="Previous photo"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
+              }}
+              style={{
+                position: "absolute",
+                right: "20px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "rgba(255, 255, 255, 0.18)",
+                border: "none",
+                borderRadius: "50%",
+                width: "44px",
+                height: "44px",
+                color: "white",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                zIndex: 3,
+                transition: "background 0.2s",
+              }}
+              title="Next photo"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </>
+        )}
+
         <img
-          src={src}
-          alt={fileName || "Notice attachment"}
+          key={current.url}
+          src={current.url}
+          alt={current.fileName || "Notice attachment"}
           onClick={(e) => e.stopPropagation()}
           style={{
             maxWidth: "96vw",
@@ -1135,6 +1280,222 @@ export function NoticeImageLightbox({
   );
 }
 
+export function NoticeAttachmentsView({
+  attachments,
+  onImageClick,
+  inModal = false,
+}: {
+  attachments: NoticeAttachmentItem[];
+  onImageClick?: (item: NoticeAttachmentItem, index: number, allImages: NoticeAttachmentItem[]) => void;
+  inModal?: boolean;
+}) {
+  if (!attachments || attachments.length === 0) return null;
+
+  const docs = attachments.filter(
+    (a) =>
+      a.mimeType === "application/pdf" ||
+      a.fileName?.toLowerCase().endsWith(".pdf")
+  );
+  const images = attachments.filter(
+    (a) =>
+      a.mimeType?.startsWith("image/") ||
+      !a.fileName?.toLowerCase().endsWith(".pdf")
+  );
+
+  return (
+    <div className="notice-attachments-container" style={{ marginTop: "12px", marginBottom: "12px" }}>
+      {/* PDF / Document Attachments */}
+      {docs.map((doc) => (
+        <div
+          key={doc.id}
+          className="notice-attachment-doc-card"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            padding: "10px 14px",
+            marginBottom: "8px",
+            borderRadius: "12px",
+            border: "1px solid var(--border)",
+            background: "var(--card)",
+            maxWidth: inModal ? "100%" : "520px",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "8px",
+                background: "rgba(239, 68, 68, 0.12)",
+                color: "#ef4444",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                fontWeight: 700,
+                fontSize: "11px",
+              }}
+            >
+              PDF
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={doc.fileName}
+              >
+                {doc.fileName}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "1px" }}>
+                {doc.sizeBytes > 1048576
+                  ? `${(doc.sizeBytes / 1048576).toFixed(1)} MB`
+                  : `${Math.round(doc.sizeBytes / 1024)} KB`}
+              </div>
+            </div>
+          </div>
+          <a
+            href={doc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="secondary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              fontSize: "12px",
+              textDecoration: "none",
+              flexShrink: 0,
+            }}
+          >
+            <span>Open</span>
+            <ExternalLink size={13} />
+          </a>
+        </div>
+      ))}
+
+      {/* Image Attachments */}
+      {images.length === 1 && (
+        <div
+          className="notice-attachment-wrapper"
+          style={{
+            borderRadius: "12px",
+            overflow: "hidden",
+            border: "1px solid var(--border)",
+            background: "rgba(0,0,0,0.06)",
+            maxWidth: inModal ? "100%" : "520px",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img
+            src={images[0].url}
+            alt={images[0].fileName || "Notice attachment"}
+            style={{
+              width: "100%",
+              maxHeight: inModal ? "480px" : "360px",
+              objectFit: inModal ? "contain" : "cover",
+              display: "block",
+              cursor: "pointer",
+            }}
+            onClick={() => onImageClick?.(images[0], 0, images)}
+            loading="lazy"
+          />
+          <div
+            style={{
+              padding: "8px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              color: "var(--muted)",
+              background: "var(--card)",
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
+              {images[0].fileName}
+            </span>
+            <span>
+              {images[0].sizeBytes > 1048576
+                ? `${(images[0].sizeBytes / 1048576).toFixed(1)} MB`
+                : `${Math.round(images[0].sizeBytes / 1024)} KB`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {images.length > 1 && (
+        <div
+          className="notice-attachment-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: images.length === 2 ? "1fr 1fr" : "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "8px",
+            maxWidth: inModal ? "100%" : "520px",
+            borderRadius: "12px",
+            overflow: "hidden",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {images.map((img, idx) => (
+            <div
+              key={img.id || idx}
+              style={{
+                position: "relative",
+                height: inModal ? "220px" : "180px",
+                borderRadius: "10px",
+                overflow: "hidden",
+                border: "1px solid var(--border)",
+                cursor: "pointer",
+                background: "rgba(0,0,0,0.06)",
+              }}
+              onClick={() => onImageClick?.(img, idx, images)}
+            >
+              <img
+                src={img.url}
+                alt={img.fileName || `Attachment ${idx + 1}`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                  transition: "transform 0.2s ease",
+                }}
+                loading="lazy"
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: "4px 8px",
+                  background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+                  color: "white",
+                  fontSize: "11px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {img.fileName}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NoticeCard({
   notice: n,
   ctx,
@@ -1143,7 +1504,9 @@ function NoticeCard({
   read,
   previews,
   attachment,
+  attachmentsList,
   poll,
+  resource,
   onVote,
   editable,
   search,
@@ -1163,7 +1526,9 @@ function NoticeCard({
   read: Row;
   previews: Row[];
   attachment?: { id: string; url: string; fileName: string; sizeBytes: number };
+  attachmentsList?: NoticeAttachmentItem[];
   poll?: Row;
+  resource?: Row;
   onVote?: (pollId: string, optionId: string) => Promise<void>;
   editable: boolean;
   search: string;
@@ -1176,7 +1541,10 @@ function NoticeCard({
   onDelete: () => void;
   markRead: () => void;
 }) {
-  const [zoomAttachment, setZoomAttachment] = useState<string | null>(null);
+  const [lightboxState, setLightboxState] = useState<{
+    images: Array<{ url: string; fileName?: string }>;
+    initialIndex: number;
+  } | null>(null);
   const [copiedShare, setCopiedShare] = useState(false);
   const [expanded, setExpanded] = useState(false),
     [menu, setMenu] = useState(false),
@@ -1365,60 +1733,28 @@ function NoticeCard({
             onVote={(optId) => onVote?.(poll.poll_id || poll.id, optId)}
           />
         )}
-        {attachment?.url && (
-          <div
-            className="notice-attachment-wrapper"
-            style={{
-              marginTop: "12px",
-              marginBottom: "12px",
-              borderRadius: "12px",
-              overflow: "hidden",
-              border: "1px solid var(--border)",
-              background: "rgba(0,0,0,0.06)",
-              maxWidth: "520px",
+        {((attachmentsList && attachmentsList.length > 0) || attachment?.url) && (
+          <NoticeAttachmentsView
+            attachments={
+              attachmentsList && attachmentsList.length > 0
+                ? attachmentsList
+                : attachment
+                ? [{ ...attachment, mimeType: "image/jpeg" }]
+                : []
+            }
+            onImageClick={(item, index, allImages) => {
+              setLightboxState({
+                images: allImages.map((img) => ({ url: img.url, fileName: img.fileName })),
+                initialIndex: index,
+              });
             }}
-          >
-            <img
-              src={attachment.url}
-              alt={attachment.fileName || "Notice attachment"}
-              style={{
-                width: "100%",
-                maxHeight: "340px",
-                objectFit: "cover",
-                display: "block",
-                cursor: "pointer",
-              }}
-              onClick={() => setZoomAttachment(attachment.url)}
-              loading="lazy"
-            />
-            <div
-              style={{
-                padding: "8px 12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontSize: "12px",
-                color: "var(--muted)",
-                background: "var(--card)",
-                borderTop: "1px solid var(--border)",
-              }}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
-                {attachment.fileName}
-              </span>
-              <span>
-                {attachment.sizeBytes > 1048576
-                  ? `${(attachment.sizeBytes / 1048576).toFixed(1)} MB`
-                  : `${Math.round(attachment.sizeBytes / 1024)} KB`}
-              </span>
-            </div>
-          </div>
+          />
         )}
-        {zoomAttachment && (
+        {lightboxState && (
           <NoticeImageLightbox
-            src={zoomAttachment}
-            fileName={attachment?.fileName}
-            onClose={() => setZoomAttachment(null)}
+            images={lightboxState.images}
+            initialIndex={lightboxState.initialIndex}
+            onClose={() => setLightboxState(null)}
           />
         )}
         <div className="timestamp">
@@ -1467,14 +1803,14 @@ function NoticeCard({
         {n.resource_id && (
           <button
             className="quick-file"
-            onClick={() =>
-              openFile(n.resource_id).catch(() =>
-                alert("This file is unavailable or your access has changed."),
-              )
-            }
+            onClick={() => {
+              const bodySlugMatch = n.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(n.body) : null;
+              const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : n.resource_id);
+              window.open(`/r/${slug}`, "_blank");
+            }}
           >
             <FileText size={18} />
-            Open resource <ExternalLink size={14} />
+            {resource?.title ? resource.title : "Open resource"} <ExternalLink size={14} />
           </button>
         )}
         {!poll && (
@@ -1585,12 +1921,21 @@ function NoticeCard({
             title="Share notice"
             onClick={async (e) => {
               e.stopPropagation();
-              const shareUrl = `https://classmatebd.vercel.app/n/${n.id}`;
+              const bodySlugMatch = n.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(n.body) : null;
+              const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : n.resource_id);
+              const shareUrl = n.resource_id
+                ? `https://classmatebd.vercel.app/r/${slug}`
+                : `https://classmatebd.vercel.app/n/${n.id}`;
+              const shareTitle = (n.resource_id && resource?.title) ? resource.title : (n.title || "Notice");
+              const shareText = n.resource_id
+                ? `${shareTitle}\n${shareUrl}`
+                : (n.title || "Notice");
+
               if (typeof navigator !== "undefined" && navigator.share) {
                 try {
                   await navigator.share({
-                    title: n.title,
-                    text: n.title,
+                    title: shareTitle,
+                    text: shareText,
                     url: shareUrl,
                   });
                   return;
@@ -1897,15 +2242,22 @@ function ReaderList({
 
 export function NoticeDetailModal({
   notice,
+  resource,
   attachment,
+  attachmentsList,
   close,
 }: {
   notice: Row;
+  resource?: Row;
   attachment?: { id: string; url: string; fileName: string; sizeBytes: number };
+  attachmentsList?: NoticeAttachmentItem[];
   close: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [zoomLightbox, setZoomLightbox] = useState(false);
+  const [lightboxState, setLightboxState] = useState<{
+    images: Array<{ url: string; fileName?: string }>;
+    initialIndex: number;
+  } | null>(null);
 
   const copyNotice = () => {
     const text = `${notice.title || ""}\n\n${notice.body || ""}`.trim();
@@ -1949,43 +2301,23 @@ export function NoticeDetailModal({
             </div>
           )}
 
-          {attachment?.url && (
-            <div
-              className="notice-detail-attachment-preview"
-              style={{
-                marginTop: "14px",
-                marginBottom: "14px",
-                borderRadius: "12px",
-                overflow: "hidden",
-                border: "1px solid var(--border)",
+          {((attachmentsList && attachmentsList.length > 0) || attachment?.url) && (
+            <NoticeAttachmentsView
+              attachments={
+                attachmentsList && attachmentsList.length > 0
+                  ? attachmentsList
+                  : attachment
+                  ? [{ ...attachment, mimeType: "image/jpeg" }]
+                  : []
+              }
+              inModal
+              onImageClick={(item, index, allImages) => {
+                setLightboxState({
+                  images: allImages.map((img) => ({ url: img.url, fileName: img.fileName })),
+                  initialIndex: index,
+                });
               }}
-            >
-              <img
-                src={attachment.url}
-                alt={attachment.fileName || "Notice attachment"}
-                style={{ width: "100%", maxHeight: "450px", objectFit: "contain", background: "black", cursor: "pointer" }}
-                onClick={() => setZoomLightbox(true)}
-                title="Click to view full screen"
-              />
-              <div
-                style={{
-                  padding: "8px 12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "12px",
-                  color: "var(--muted)",
-                  background: "var(--card)",
-                  borderTop: "1px solid var(--border)",
-                }}
-              >
-                <span>{attachment.fileName}</span>
-                <span>
-                  {attachment.sizeBytes > 1048576
-                    ? `${(attachment.sizeBytes / 1048576).toFixed(1)} MB`
-                    : `${Math.round(attachment.sizeBytes / 1024)} KB`}
-                </span>
-              </div>
-            </div>
+            />
           )}
 
           {notice.resource_id && (
@@ -1994,10 +2326,12 @@ export function NoticeDetailModal({
                 <FileText size={22} style={{ color: "var(--primary)" }} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                    Attached Resource
+                    {resource?.title || "Attached Resource"}
                   </div>
                   <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
-                    Available in batch library
+                    {resource?.course_code ? `${resource.course_code} · ` : ""}
+                    {resource?.file_type ? resource.file_type.toUpperCase() : "Resource"}
+                    {resource?.size_bytes ? ` · ${Math.ceil(resource.size_bytes / 1024)} KB` : ""}
                   </small>
                 </div>
               </div>
@@ -2005,13 +2339,13 @@ export function NoticeDetailModal({
                 type="button"
                 className="secondary"
                 style={{ padding: "6px 14px", fontSize: "0.8rem" }}
-                onClick={() =>
-                  openFile(notice.resource_id).catch(() =>
-                    alert("This file is unavailable or your access has changed."),
-                  )
-                }
+                onClick={() => {
+                  const bodySlugMatch = notice.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(notice.body) : null;
+                  const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : notice.resource_id);
+                  window.open(`/r/${slug}`, "_blank");
+                }}
               >
-                Open <ExternalLink size={14} style={{ marginLeft: 4 }} />
+                View Resource <ExternalLink size={14} style={{ marginLeft: 4 }} />
               </button>
             </div>
           )}
@@ -2029,12 +2363,21 @@ export function NoticeDetailModal({
             type="button"
             className="notice-detail-copy-btn"
             onClick={async () => {
-              const shareUrl = `https://classmatebd.vercel.app/n/${notice.id}`;
+              const bodySlugMatch = notice.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(notice.body) : null;
+              const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : notice.resource_id);
+              const shareUrl = notice.resource_id
+                ? `https://classmatebd.vercel.app/r/${slug}`
+                : `https://classmatebd.vercel.app/n/${notice.id}`;
+              const shareTitle = (notice.resource_id && resource?.title) ? resource.title : (notice.title || "Notice");
+              const shareText = notice.resource_id
+                ? `${shareTitle}\n${shareUrl}`
+                : (notice.title || "Notice");
+
               if (typeof navigator !== "undefined" && navigator.share) {
                 try {
                   await navigator.share({
-                    title: notice.title || "Notice",
-                    text: notice.title || "Notice",
+                    title: shareTitle,
+                    text: shareText,
                     url: shareUrl,
                   });
                   return;
@@ -2065,11 +2408,11 @@ export function NoticeDetailModal({
           </button>
         </div>
       </div>
-      {zoomLightbox && attachment?.url && (
+      {lightboxState && (
         <NoticeImageLightbox
-          src={attachment.url}
-          fileName={attachment.fileName}
-          onClose={() => setZoomLightbox(false)}
+          images={lightboxState.images}
+          initialIndex={lightboxState.initialIndex}
+          onClose={() => setLightboxState(null)}
         />
       )}
     </Modal>

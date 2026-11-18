@@ -74,6 +74,10 @@ export async function buildStudentCardMetadata(id: string): Promise<Metadata> {
     return {
       title: "ClassMate Smart ID · Unregistered Card",
       description: "ClassMate NFC Student Smart ID card for Mawlana Bhashani Science and Technology University.",
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 
@@ -84,6 +88,9 @@ export async function buildStudentCardMetadata(id: string): Promise<Metadata> {
   return {
     title: `${name}${roll} · ClassMate Smart ID`,
     description: `${dept} · Batch ${student.batch_name || "Campus"} · MBSTU Verified Student Identity Card`,
+    alternates: {
+      canonical: `https://classmatebd.vercel.app/c/${id}`,
+    },
     openGraph: {
       title: `${name}${roll} · ClassMate Smart ID`,
       description: `${dept} · Batch ${student.batch_name || "Campus"}`,
@@ -121,8 +128,36 @@ export function StudentCardView({
   const waNumber = cleanPhone.replace(/^\+/, "");
   const hasPhone = cleanPhone.length >= 7 && cleanPhone.toLowerCase() !== "null";
 
+  const studentJsonLd = student
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        "@id": `https://classmatebd.vercel.app/c/${id}#profile`,
+        name: `${student.full_name || "Student"} - ClassMate Smart ID`,
+        url: `https://classmatebd.vercel.app/c/${id}`,
+        mainEntity: {
+          "@type": "Person",
+          name: student.full_name || "MBSTU Student",
+          identifier: student.roll,
+          image: student.avatar_url,
+          affiliation: {
+            "@type": "EducationalOrganization",
+            name: "Mawlana Bhashani Science and Technology University",
+            alternateName: "MBSTU",
+          },
+        },
+      }
+    : null;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-emerald-500/30">
+    <>
+      {studentJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(studentJsonLd) }}
+        />
+      )}
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 font-sans selection:bg-emerald-500/30">
       {/* Background ambient glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-600/10 blur-[130px] rounded-full" />
@@ -348,5 +383,6 @@ export function StudentCardView({
         </p>
       </footer>
     </div>
+    </>
   );
 }

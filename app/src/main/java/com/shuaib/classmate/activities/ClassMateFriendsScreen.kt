@@ -384,8 +384,33 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         swipeRefresh.setOnRefreshListener { load(true) }
         input.doAfterTextChanged { load(true,true) }
         retry.setOnClickListener { load(offset==0) }
+        var friendsDownTravel = 0
+        var friendsUpTravel = 0
+        val fDensity = activity.resources.displayMetrics.density
+        val fHideThreshold = (20 * fDensity).toInt()
+        val fShowThreshold = (16 * fDensity).toInt()
+
         list.addOnScrollListener(object: RecyclerView.OnScrollListener() {
-            override fun onScrolled(view: RecyclerView,dx: Int,dy: Int) {
+            override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
+                val atTop = !view.canScrollVertically(-1)
+                val authAct = activity as? ClassMateAuthActivity
+                if (atTop) {
+                    friendsDownTravel = 0
+                    friendsUpTravel = 0
+                    authAct?.setNavigationShown(true)
+                } else if (dy > 0) {
+                    friendsUpTravel = 0
+                    friendsDownTravel += dy
+                    if (friendsDownTravel >= fHideThreshold) {
+                        authAct?.setNavigationShown(false)
+                    }
+                } else if (dy < 0) {
+                    friendsDownTravel = 0
+                    friendsUpTravel += (-dy)
+                    if (friendsUpTravel >= fShowThreshold) {
+                        authAct?.setNavigationShown(true)
+                    }
+                }
                 if(dy>0 && (view.layoutManager as LinearLayoutManager).findLastVisibleItemPosition()>=adapter.itemCount-8) load(false)
             }
         })

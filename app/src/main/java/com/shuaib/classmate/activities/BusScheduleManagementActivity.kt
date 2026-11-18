@@ -47,6 +47,12 @@ class BusScheduleManagementActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!ClassMateAcademicCache.hasBusTransit(this)) {
+            com.shuaib.classmate.ui.ClassMateNoticeDialog.showUnconfiguredDialog(this, "Bus Schedule") {
+                finish()
+            }
+            return
+        }
         binding = ActivityBusScheduleManagementBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

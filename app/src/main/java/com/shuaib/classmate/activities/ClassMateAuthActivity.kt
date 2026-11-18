@@ -213,29 +213,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     fun setComposeBadge(tab: com.shuaib.classmate.ui.ClassMateTab, badge: com.shuaib.classmate.ui.NavBadge?) {
-
-
-
         if (badge == null) {
-
-
-
             composeBadgeMap.remove(tab)
-
-
-
+            findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.removeBadge(tab.id)
         } else {
-
-
-
             composeBadgeMap[tab] = badge
-
-
-
+            findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.let { nav ->
+                val b = nav.getOrCreateBadge(tab.id)
+                b.isVisible = true
+                b.backgroundColor = androidx.core.content.ContextCompat.getColor(this, R.color.cm_unread_dot)
+                when (badge) {
+                    is com.shuaib.classmate.ui.NavBadge.Count -> b.number = badge.count
+                    is com.shuaib.classmate.ui.NavBadge.Dot -> b.clearNumber()
+                }
+            }
         }
-
-
-
     }
 
 
@@ -537,6 +529,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
 
             }
+
+
 
 
 
@@ -1030,7 +1024,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-    private var profile: JSONObject? = null
+    internal var profile: JSONObject? = null
 
 
 
@@ -1635,6 +1629,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+    private val avatarImagePicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            uploadProfilePhoto(uri)
+        }
+    }
+
     private val googleLauncher = registerForActivityResult(
 
 
@@ -1804,11 +1806,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-        if (intent.getStringExtra("OPEN_TAB") == "notices") selectedTab = R.id.nav_notices
-
-
-
-        else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
+        val initialNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
+            ?: intent.getStringExtra("noticeId")
+            ?: intent.getStringExtra("notice_id")
+            ?: intent.getStringExtra("record_id")
+        if (intent.getStringExtra("OPEN_TAB") == "notices" || !initialNoticeId.isNullOrBlank()) {
+            selectedTab = R.id.nav_notices
+        } else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
 
 
 
@@ -1851,7 +1855,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 showHome(); renderHomeTab(selectedTab)
                 maybeTriggerSpotlightTour()
 
-
+                if (!initialNoticeId.isNullOrBlank()) {
+                    window.decorView.postDelayed({
+                        if (::academicScreens.isInitialized) {
+                            academicScreens.openDirectNotice(initialNoticeId)
+                        }
+                    }, 450)
+                }
 
                 if (intent.getBooleanExtra("OPEN_RFID_ATTENDANCE", false)) {
 
@@ -2366,9 +2376,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private fun signOut() {
-
-
-
         profileValidated=false
 
 
@@ -2859,14 +2866,81 @@ class ClassMateAuthActivity : AppCompatActivity() {
         return true
     }
 
+    fun pickProfilePhoto() {
+        avatarImagePicker.launch("image/*")
+    }
+
+    fun uploadProfilePhoto(uri: android.net.Uri) {
+        val uid = userId.ifBlank { profile?.optString("id").orEmpty() }
+        if (uid.isBlank()) {
+            android.widget.Toast.makeText(this, "Profile not ready for upload", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val progressDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Uploading photo")
+            .setMessage("Optimizing and saving to your profile...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
+        lifecycleScope.launch {
+            val result = com.shuaib.classmate.utils.ClassMateProfileAvatarManager.uploadAvatar(this@ClassMateAuthActivity, uri, uid)
+            progressDialog.dismiss()
+            result.onSuccess { (url, updated) ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Profile photo updated!", android.widget.Toast.LENGTH_SHORT).show()
+                if (updated.optString("id") == uid) {
+                    profile = updated
+                    ClassMateAcademicCache.saveHome(this@ClassMateAuthActivity, updated, selectedBatchId, selectedBatchLabel)
+                }
+                if (homeShown && selectedTab == R.id.nav_profile) {
+                    renderHomeTab(selectedTab)
+                }
+            }.onFailure { err ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Upload failed: ${err.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun removeProfilePhoto() {
+        val progressDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Removing photo")
+            .setMessage("Clearing profile picture...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
+        lifecycleScope.launch {
+            val result = com.shuaib.classmate.utils.ClassMateProfileAvatarManager.removeAvatar()
+            progressDialog.dismiss()
+            result.onSuccess { updated ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Profile photo removed", android.widget.Toast.LENGTH_SHORT).show()
+                val uid = userId.ifBlank { profile?.optString("id").orEmpty() }
+                if (updated.optString("id") == uid) {
+                    profile = updated
+                    ClassMateAcademicCache.saveHome(this@ClassMateAuthActivity, updated, selectedBatchId, selectedBatchLabel)
+                }
+                if (homeShown && selectedTab == R.id.nav_profile) {
+                    renderHomeTab(selectedTab)
+                }
+            }.onFailure { err ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Failed to remove photo: ${err.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun maybeTriggerSpotlightTour() {
         if (studentBanDialog?.isShowing == true) return
-        if (com.shuaib.classmate.ui.ClassMateSpotlightTour.shouldShow(this)) {
+        val currentPhoto = profile?.optString("avatar_url").takeUnless { it.isNullOrBlank() || it == "null" }
+            ?: com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(this)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+        if (currentPhoto.isNullOrBlank() && com.shuaib.classmate.utils.ClassMateProfileAvatarManager.shouldPrompt(this)) {
             window.decorView.postDelayed({
                 if (!isFinishing && !isDestroyed && homeShown && studentBanDialog?.isShowing != true) {
-                    com.shuaib.classmate.ui.ClassMateSpotlightTour.start(this)
+                    com.shuaib.classmate.utils.ClassMateProfileAvatarManager.promptAddProfilePhoto(this) {
+                        pickProfilePhoto()
+                    }
                 }
-            }, 800)
+            }, 1200)
         }
     }
 
@@ -3540,7 +3614,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
 
-            view.setPadding(0, statusBars.top, 0, 0)
+            view.setPadding(0, 0, 0, 0)
+            academicScreens.onStatusBarInset(statusBars.top)
 
             insets
 
@@ -3709,7 +3784,17 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+        val blurBackdrop = findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)
+        blurBackdrop?.attachBehindView(homeHost)
+
         val composeNav = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.classmate_home_compose_nav)
+        composeNav?.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+            val navH = bottom - top
+            if (navH > 0 && blurBackdrop?.layoutParams?.height != navH) {
+                blurBackdrop?.layoutParams?.height = navH
+                blurBackdrop?.requestLayout()
+            }
+        }
 
 
 
@@ -3728,65 +3813,47 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
 
             val visibleTabs = androidx.compose.runtime.remember {
-
                 listOf(
-
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
-
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
-
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
-
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
-
                 )
-
             }
 
 
 
+            val fromProfile = profile?.optString("avatar_url").takeUnless { it.isNullOrBlank() || it.equals("null", true) }
+                ?: profile?.optString("photo_url").takeUnless { it.isNullOrBlank() || it.equals("null", true) }
+            val fromGoogle = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(this)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            val fromFirebase = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            val userAvatarUrl = fromProfile ?: fromGoogle ?: fromFirebase
+            val userName = profile?.optString("full_name").orEmpty()
+
             com.shuaib.classmate.ui.ClassMateFloatingNavigationBar(
-
                 selectedTab = composeSelectedTab,
-
                 onTabSelected = { tab ->
-
                     composeNavVisible = true
-
                     composeSelectedTab = tab
-
                     selectedTab = tab.id
-
-                    composeBadgeMap.remove(tab)
-
-                    homeHost.post {
-
-                        renderHomeTab(tab.id)
-
+                    if (nav.menu.findItem(tab.id) != null && nav.selectedItemId != tab.id) {
+                        nav.selectedItemId = tab.id
                     }
-
+                    composeBadgeMap.remove(tab)
+                    renderHomeTab(tab.id)
                 },
-
                 visibleTabs = visibleTabs,
-
                 batchTabTitle = if (isTeacher) "Students" else "Batch",
-
                 badges = composeBadgeMap,
-
                 isVisible = composeNavVisible,
-
+                userAvatarUrl = userAvatarUrl,
+                userName = userName,
                 onTabLongClick = { tab ->
-
                     showTabQuickActionsDialog(tab)
-
                 },
-
                 onQuickActionRequest = { tab ->
-
                     getQuickActionsForTab(tab)
-
                 }
-
             )
 
 
@@ -3859,7 +3926,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         } }
-
 
 
         nav.setOnItemSelectedListener { item ->
@@ -4206,52 +4272,38 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+    fun setNavigationShown(show: Boolean) {
+        if (::academicScreens.isInitialized) academicScreens.setNavigationShown(show)
+    }
+
     private fun renderHomeTab(tab: Int) {
-
-
-
         if (!homeShown) return
 
-
-
         composeNavVisible = true
-
+        selectedTab = tab
         if (::academicScreens.isInitialized) academicScreens.setNavigationShown(true)
 
-
+        if (tab == R.id.nav_friends) {
+            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark
+        }
 
         composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.fromId(tab) ?: com.shuaib.classmate.ui.ClassMateTab.TIMETABLE
-
-
-
         composeBadgeMap.remove(composeSelectedTab)
 
-
-
         findViewById<GlassBottomNavView>(R.id.classmate_home_nav).apply {
-
-
-
+            removeBadge(tab)
             animate().cancel()
-
-
-
             translationY = 0f
-
-
-
             alpha = 1f
-
-
-
+            if (menu.findItem(tab)?.isVisible == true && selectedItemId != tab) {
+                selectedItemId = tab
+            }
             val visibleItems = (0 until menu.size()).map { menu.getItem(it) }.filter { it.isVisible }
-
-
-
-            post { updateActiveTab(visibleItems.indexOfFirst { it.itemId == tab }, visibleItems.size) }
-
-
-
+            val tabIdx = visibleItems.indexOfFirst { it.itemId == tab }
+            if (tabIdx >= 0) {
+                post { updateActiveTab(tabIdx, visibleItems.size) }
+            }
         }
 
 
@@ -6669,21 +6721,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val openTab = intent.getStringExtra("OPEN_TAB")
+        val targetNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
+            ?: intent.getStringExtra("noticeId")
+            ?: intent.getStringExtra("notice_id")
+            ?: intent.getStringExtra("record_id")
 
-
-
-        if (openTab == "notices") {
-
-
-
+        if (openTab == "notices" || !targetNoticeId.isNullOrBlank()) {
             selectedTab = R.id.nav_notices
-
-
-
             renderHomeTab(selectedTab)
-
-
-
+            if (!targetNoticeId.isNullOrBlank()) {
+                window.decorView.postDelayed({
+                    if (::academicScreens.isInitialized) {
+                        academicScreens.openDirectNotice(targetNoticeId)
+                    }
+                }, 400)
+            }
         } else if (openTab in setOf("library", "courses")) {
 
 
@@ -8291,9 +8343,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 renderHomeTab(selectedTab)
-                if (com.shuaib.classmate.ui.ClassMateSpotlightTour.shouldShow(this)) {
-                    com.shuaib.classmate.ui.ClassMateSpotlightTour.start(this)
-                }
+                maybeTriggerSpotlightTour()
 
             }
 

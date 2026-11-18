@@ -33,6 +33,8 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         val expectedProject = android.net.Uri.parse(BuildConfig.CLASSMATE_URL).host?.substringBefore('.')
         if (inputData.getString("project_ref") != expectedProject) return Result.success()
         var identity = ClassMateAuthApi.notificationIdentity()
+
+
         val release = inputData.getString("kind") == "app_update"
         val blood = inputData.getString("kind") == "blood_request"
         val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update")
@@ -88,6 +90,9 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     "Tap to review the latest update.", UpdateActionActivity.ACTION_PROMPT, notificationId = 3902)
             } else {
                 val key = inputData.getString("record_id") ?: id.toString()
+                val targetNoticeId = inputData.getString("record_id")
+                    ?: inputData.getString("noticeId")
+                    ?: inputData.getString("notice_id")
                 val intent = when {
                     attendance -> Intent(context, ClassMateAuthActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -101,13 +106,24 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     fund -> Intent(context,com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java).apply {
                         putExtra("batch_id", inputData.getString("batch_id") ?: identity.optString("batch_id"))
                     }
-                    else -> Intent(context,ClassMateAuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra("OPEN_TAB","notices")
+                    else -> Intent(context,ClassMateAuthActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("OPEN_TAB","notices")
+                        if (!targetNoticeId.isNullOrBlank()) {
+                            putExtra("TARGET_NOTICE_ID", targetNoticeId)
+                            putExtra("noticeId", targetNoticeId)
+                            putExtra("record_id", targetNoticeId)
+                        }
+                    }
                 }
                 val pending = PendingIntent.getActivity(context,key.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                val body = inputData.getString("body") ?: "New class update available"
+                val rawTitle = inputData.getString("title") ?: "ClassMate update"
+                val rawBody = inputData.getString("body") ?: "New class update available"
+                val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawTitle, isForNotification = true)
+                val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawBody, isForNotification = true)
                 val builder = NotificationCompat.Builder(context,channel).setSmallIcon(R.drawable.ic_classmate_notification)
-                    .setColor(0xFF3B82F6.toInt()).setContentTitle(inputData.getString("title") ?: "ClassMate update")
-                    .setContentText(body).setStyle(NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending)
+                    .setColor(0xFF3B82F6.toInt()).setContentTitle(formattedTitle)
+                    .setContentText(formattedBody).setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody)).setContentIntent(pending)
                     .setPriority(NotificationCompat.PRIORITY_HIGH).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                     .setOnlyAlertOnce(true).setAutoCancel(true)
                 if(blood) {

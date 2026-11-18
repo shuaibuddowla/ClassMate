@@ -10,11 +10,13 @@
     android:background="@color/cm_background">
 
             <!-- ═══════════════════════════════════════════════════ -->
-            <!-- APP BRAND HEADER (WhatsApp / Messenger Style)         -->
+            <!-- APP BRAND HEADER (Notices Style Floating Header)       -->
             <!-- ═══════════════════════════════════════════════════ -->
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/timetableHeaderLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@android:color/transparent"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="2dp"
                 android:paddingBottom="6dp">
@@ -40,6 +42,7 @@
                         android:contentDescription="Menu">
 
                         <ImageView
+                            android:id="@+id/ivHamburgerMenu"
                             android:layout_width="23dp"
                             android:layout_height="23dp"
                             android:layout_gravity="center"
@@ -53,31 +56,19 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:baselineAligned="true"
-                        android:layout_marginStart="3dp">
+                        android:layout_marginStart="4dp">
 
                         <TextView
                             android:id="@+id/tvBrandTitle"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="3dp"
+                            android:gravity="center_vertical"
                             android:fontFamily="@font/plus_jakarta_sans_extrabold"
                             android:includeFontPadding="false"
-                            android:letterSpacing="-0.03"
-                            android:text="classmate"
+                            android:text="Timetable"
                             android:textColor="@color/cm_text_primary"
-                            android:textSize="31sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvBrandAccentDot"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="@font/plus_jakarta_sans_extrabold"
-                            android:includeFontPadding="false"
-                            android:letterSpacing="-0.03"
-                            android:text="."
-                            android:textColor="@color/cm_primary"
-                            android:textSize="31sp"
+                            android:textSize="23sp"
                             android:textStyle="bold" />
 
                     </LinearLayout>
@@ -223,11 +214,17 @@
 
             </LinearLayout>
 
+    <FrameLayout
+        android:id="@+id/timetableContentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipChildren="false">
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="match_parent">
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
@@ -839,4 +836,10 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <include layout="@layout/layout_speed_dial" />
+
+    <include layout="@layout/view_dynamic_island_notices" />
+
+    </FrameLayout>
 </LinearLayout>

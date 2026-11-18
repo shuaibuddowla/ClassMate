@@ -54,7 +54,11 @@ Deno.serve(async (request) => {
       // pushes are constrained to the verified batch tag.
       delete payload.included_segments;
       delete payload.filters;
-      payload.filters = [{field: "tag", key: "batchId", relation: "=", value: batchId}];
+      payload.filters = [
+        {field: "tag", key: "batchId", relation: "=", value: batchId},
+        {operator: "OR"},
+        {field: "tag", key: "batch_" + batchId, relation: "=", value: "true"}
+      ];
     }
 
     const appId = Deno.env.get("ONESIGNAL_APP_ID");
