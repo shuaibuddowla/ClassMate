@@ -1,12 +1,12 @@
 {
-  "versionCode": 45,
-  "versionName": "1.1.45",
+  "versionCode": 46,
+  "versionName": "1.1.46",
   "minSupportedVersionCode": 0,
-  "apkUrl": "https://github.com/shuaibuddowla/ClassMate/releases/download/v1.1.45/classmate-1.1.45.apk",
-  "apkSize": 53798312,
-  "sha256": "946d61dfa196803d11d6be55149d397450f22b4492f4f10ff9962e5e2020ad63",
+  "apkUrl": "https://github.com/shuaibuddowla/ClassMate/releases/download/v1.1.46/classmate-1.1.46.apk",
+  "apkSize": 53798298,
+  "sha256": "efdb558759c1c8c07aca8e7a1e32f285949370e2f1c486638a6f3bdbe1eee500",
   "mandatory": false,
-  "releaseDate": "2026-11-18T09:30:00Z",
+  "releaseDate": "2026-11-18T09:35:00Z",
   "releaseNotes": [
     "Batch Fund & Dues Tracker Redesign: Compact, modern UI with 8dp spacing system and resolved button layout clipping",
     "Single-Source Split Counts: Explicit student contribution counts in Dues Tracker without duplicate labels",

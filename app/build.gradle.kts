@@ -56,7 +56,7 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        val appVersionCode = 45
+        val appVersionCode = 46
         versionCode = appVersionCode
         versionName = "1.1.$appVersionCode"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
