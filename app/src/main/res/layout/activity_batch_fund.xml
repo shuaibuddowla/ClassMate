@@ -34,375 +34,587 @@
             android:layout_height="match_parent"
             android:fillViewport="true">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <!-- Hero Card -->
-            <FrameLayout
-                android:id="@+id/heroCard"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_fund_hero"
-                android:padding="22dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginEnd="60dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Current Balance"
-                        android:textColor="#99F6E4"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.05" />
-
-                    <TextView
-                        android:id="@+id/tvCurrentBalance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="৳ 0"
-                        android:textColor="#FFFFFF"
-                        android:textSize="32sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="6dp" />
-
-                    <TextView
-                        android:id="@+id/tvBalanceStats"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Total Collected: ৳ 0 • Total Spent: ৳ 0"
-                        android:textColor="#D1FAE5"
-                        android:textSize="12sp"
-                        android:layout_marginTop="10dp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    android:layout_gravity="end|center_vertical"
-                    android:src="@drawable/ic_fund_wallet"
-                    app:tint="#5EEAD4"
-                    android:alpha="0.85"
-                    android:contentDescription="Wallet" />
-            </FrameLayout>
-
-            <!-- 4 Action Tiles Grid -->
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="14dp">
-
-                <!-- Tile 1: Add Fund -->
-                <LinearLayout
-                    android:id="@+id/tileAddFund"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:background="@drawable/bg_fund_tile_cyan"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:layout_marginEnd="6dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_badge_pill"
-                        android:backgroundTint="#0284C7">
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_add"
-                            app:tint="#FFFFFF"
-                            android:contentDescription="Add Fund" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Add Fund"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Record new deposit/expense"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-
-                <!-- Tile 2: View Ledger -->
-                <LinearLayout
-                    android:id="@+id/tileViewLedger"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:background="@drawable/bg_fund_tile_orange"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:layout_marginStart="6dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_badge_pill"
-                        android:backgroundTint="#D97706">
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_fund_ledger"
-                            app:tint="#FFFFFF"
-                            android:contentDescription="View Ledger" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="View Ledger"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Filter &amp; full history"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="12dp">
-
-                <!-- Tile 3: Payers -->
-                <LinearLayout
-                    android:id="@+id/tilePayers"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:background="@drawable/bg_fund_tile_green"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:layout_marginEnd="6dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_badge_pill"
-                        android:backgroundTint="#16A34A">
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_users"
-                            app:tint="#FFFFFF"
-                            android:contentDescription="Payers" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Payers"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Who paid and who hasn't"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-
-                <!-- Tile 4: Summary -->
-                <LinearLayout
-                    android:id="@+id/tileSummary"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:background="@drawable/bg_fund_tile_purple"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="16dp"
-                    android:layout_marginStart="6dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_badge_pill"
-                        android:backgroundTint="#7C3AED">
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_fund_chart"
-                            app:tint="#FFFFFF"
-                            android:contentDescription="Summary" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Summary"
-                        android:textColor="@color/cm_text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Quick overview &amp; stats"
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="11sp"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Recent Activity Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="22dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Recent Activity"
-                    android:textColor="@color/cm_text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/btnSeeAllActivity"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="See All ›"
-                    android:textColor="@color/cm_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:padding="4dp"
-                    android:clickable="true"
-                    android:focusable="true" />
-            </LinearLayout>
-
-            <!-- Modern Empty Activity placeholder -->
-            <include
-                android:id="@+id/emptyStateOverview"
-                layout="@layout/view_empty_state"
-                android:visibility="gone" />
-
-            <!-- Shimmer Placeholder for Recent Activity -->
-            <include
-                android:id="@+id/shimmerRecentActivity"
-                layout="@layout/shimmer_fund_list"
-                android:visibility="gone" />
-
-            <!-- Recent Activity List Container -->
-            <LinearLayout
-                android:id="@+id/recentActivityContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="8dp" />
+                android:padding="16dp">
 
-            <!-- Bottom Card: Batch Fund Description -->
-            <LinearLayout
-                android:id="@+id/cardBottomDesc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:background="@drawable/bg_fund_card"
-                android:padding="16dp"
-                android:gravity="center_vertical"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="32dp">
-
-                <FrameLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@drawable/bg_badge_pill"
-                    android:backgroundTint="#CCFBF1">
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_fund_wallet"
-                        app:tint="#0F766E"
-                        android:contentDescription="Batch Fund Info" />
-                </FrameLayout>
-
+                <!-- Modern Hero Card (Treasury & Ongoing Campaign Status) -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:id="@+id/heroCard"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:orientation="vertical"
-                    android:layout_marginStart="14dp">
+                    android:background="@drawable/bg_fund_hero"
+                    android:padding="20dp"
+                    android:elevation="2dp">
+
+                    <!-- Top Label & Live Treasury Indicator -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="TOTAL BATCH BALANCE"
+                            android:textColor="#99F6E4"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.08" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_badge_pill"
+                            android:backgroundTint="#26FFFFFF"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="3dp"
+                            android:paddingBottom="3dp">
+
+                            <View
+                                android:layout_width="6dp"
+                                android:layout_height="6dp"
+                                android:background="@drawable/bg_badge_pill"
+                                android:backgroundTint="#34D399"
+                                android:layout_marginEnd="5dp" />
+
+                            <TextView
+                                android:id="@+id/tvTreasuryStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Live Treasury"
+                                android:textColor="#E0F2FE"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Big Balance Display -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:id="@+id/tvCurrentBalance"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="৳ 0"
+                            android:textColor="#FFFFFF"
+                            android:textSize="34sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:src="@drawable/ic_fund_wallet"
+                            app:tint="#5EEAD4"
+                            android:alpha="0.85"
+                            android:contentDescription="Wallet" />
+                    </LinearLayout>
+
+                    <!-- ONGOING CAMPAIGN EMBEDDED CARD -->
+                    <LinearLayout
+                        android:id="@+id/cardHeroOngoingCampaign"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#26042F2D"
+                        android:padding="14dp"
+                        android:layout_marginTop="16dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:id="@+id/tvHeroCampaignTag"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="ACTIVE CAMPAIGN: ORIENTATION"
+                                android:textColor="#CCFBF1"
+                                android:textSize="11.5sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.05" />
+
+                            <TextView
+                                android:id="@+id/tvHeroCampaignRatio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="29 / 58 Paid"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <!-- Progress Bar -->
+                        <ProgressBar
+                            android:id="@+id/pbHeroCampaign"
+                            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:layout_marginTop="8dp"
+                            android:max="100"
+                            android:progress="50"
+                            android:progressTint="#2DD4BF"
+                            android:progressBackgroundTint="#33FFFFFF" />
+
+                        <!-- Bottom detail row -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp">
+
+                            <TextView
+                                android:id="@+id/tvHeroCampaignCollected"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="৳ 28,000 Collected"
+                                android:textColor="#E0F2FE"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tvHeroCampaignDues"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="29 Unpaid ›"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:background="@drawable/bg_badge_pill"
+                                android:backgroundTint="#40EF4444"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:paddingTop="3dp"
+                                android:paddingBottom="3dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Hidden fields for backward compatibility -->
+                    <TextView
+                        android:id="@+id/tvHeroCollected"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/tvHeroSpent"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/tvBalanceStats"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <LinearLayout
+                        android:id="@+id/layoutCrQuickActions"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <View
+                        android:id="@+id/btnQuickDeposit"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <View
+                        android:id="@+id/btnQuickExpense"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <!-- EXPLICIT PRIMARY ACTIONS: Add Fund & Record Actions -->
+                <LinearLayout
+                    android:id="@+id/layoutMainActions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="14dp">
+
+                    <!-- Button: Add Fund (Deposit) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAddFundPrimary"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:text="Add Fund"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:textColor="#FFFFFF"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:icon="@drawable/ic_add"
+                        app:iconTint="#FFFFFF"
+                        app:iconSize="18dp"
+                        app:iconPadding="6dp"
+                        app:iconGravity="textStart"
+                        app:backgroundTint="#0D9488"
+                        app:cornerRadius="16dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:layout_marginEnd="5dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                    <!-- Button: Record Expense -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRecordExpensePrimary"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:text="Record Expense"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:textColor="@color/cm_text_primary"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:icon="@drawable/ic_fund_outflow"
+                        app:iconTint="@color/cm_text_primary"
+                        app:iconSize="18dp"
+                        app:iconPadding="6dp"
+                        app:iconGravity="textStart"
+                        app:backgroundTint="@color/cm_surface"
+                        app:strokeColor="@color/cm_border"
+                        app:strokeWidth="1dp"
+                        app:cornerRadius="16dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:layout_marginStart="5dp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                </LinearLayout>
+
+                <!-- Dues Tracker Feature Banner -->
+                <LinearLayout
+                    android:id="@+id/cardPayersBanner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_fund_card"
+                    android:padding="16dp"
+                    android:layout_marginTop="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <FrameLayout
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#DCFCE7">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_users"
+                            app:tint="#16A34A"
+                            android:contentDescription="Dues Tracker" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dues Tracker"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvPayersBannerSubtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Orientation: 29 Paid • 29 Unpaid"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="12sp"
+                            android:layout_marginTop="2dp" />
+
+                        <!-- Hidden to satisfy existing binding without duplicate chip -->
+                        <TextView
+                            android:id="@+id/tvPayersActivePill"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_secondary"
+                        android:contentDescription="Open Dues Tracker" />
+                </LinearLayout>
+
+                <!-- Secondary Hub: Ledger & Analytics Cards -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+
+                    <!-- Card 1: Fund Ledger -->
+                    <LinearLayout
+                        android:id="@+id/cardLedgerHub"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_fund_card"
+                        android:padding="14dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:layout_marginEnd="6dp">
+
+                        <FrameLayout
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/bg_badge_pill"
+                            android:backgroundTint="#FEF3C7">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_fund_ledger"
+                                app:tint="#D97706"
+                                android:contentDescription="Ledger" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Fund Ledger"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold"
+                            android:layout_marginTop="10dp" />
+
+                        <TextView
+                            android:id="@+id/tvLedgerCountSubtitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Full history &amp; filters"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <!-- Card 2: Analytics / Summary -->
+                    <LinearLayout
+                        android:id="@+id/cardSummaryHub"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:background="@drawable/bg_fund_card"
+                        android:padding="14dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:layout_marginStart="6dp">
+
+                        <FrameLayout
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/bg_badge_pill"
+                            android:backgroundTint="#EDE9FE">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_fund_chart"
+                                app:tint="#7C3AED"
+                                android:contentDescription="Analytics" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Analytics"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold"
+                            android:layout_marginTop="10dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Breakdown &amp; stats"
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="11.5sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Hidden legacy tile views for backward compatibility -->
+                <View
+                    android:id="@+id/tileAddFund"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+                <View
+                    android:id="@+id/tileViewLedger"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+                <View
+                    android:id="@+id/tilePayers"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+                <View
+                    android:id="@+id/tileSummary"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+
+                <!-- Recent Activity Section -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="22dp">
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="Batch Fund"
+                        android:layout_weight="1"
+                        android:text="Recent Activity"
                         android:textColor="@color/cm_text_primary"
-                        android:textSize="15sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tvFundDescription"
+                        android:id="@+id/btnSeeAllActivity"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Used for mess, events, jersey, and other batch expenses."
-                        android:textColor="@color/cm_text_secondary"
-                        android:textSize="12sp"
-                        android:layout_marginTop="3dp" />
+                        android:text="See All ›"
+                        android:textColor="@color/cm_primary"
+                        android:textSize="13.5sp"
+                        android:textStyle="bold"
+                        android:padding="4dp"
+                        android:clickable="true"
+                        android:focusable="true" />
                 </LinearLayout>
 
-                <ImageView
-                    android:id="@+id/ivEditDescHint"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_edit"
-                    app:tint="@color/cm_text_secondary"
-                    android:alpha="0.6"
-                    android:visibility="gone"
-                    android:contentDescription="Edit" />
-            </LinearLayout>
+                <!-- Empty Activity placeholder -->
+                <include
+                    android:id="@+id/emptyStateOverview"
+                    layout="@layout/view_empty_state"
+                    android:visibility="gone" />
 
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+                <!-- Shimmer Placeholder for Recent Activity -->
+                <include
+                    android:id="@+id/shimmerRecentActivity"
+                    layout="@layout/shimmer_fund_list"
+                    android:visibility="gone" />
+
+                <!-- Recent Activity List Container -->
+                <LinearLayout
+                    android:id="@+id/recentActivityContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp" />
+
+                <!-- Bottom Card: Batch Fund Description & Transparency -->
+                <LinearLayout
+                    android:id="@+id/cardBottomDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_fund_card"
+                    android:padding="16dp"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginBottom="32dp">
+
+                    <FrameLayout
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#CCFBF1">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_fund_wallet"
+                            app:tint="#0F766E"
+                            android:contentDescription="Batch Fund Info" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Batch Fund Purpose"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvFundDescription"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Used for mess, events, jersey, and other batch expenses."
+                            android:textColor="@color/cm_text_secondary"
+                            android:textSize="12sp"
+                            android:layout_marginTop="3dp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/ivEditDescHint"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_edit"
+                        app:tint="@color/cm_text_secondary"
+                        android:alpha="0.6"
+                        android:visibility="gone"
+                        android:contentDescription="Edit" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </LinearLayout>
-

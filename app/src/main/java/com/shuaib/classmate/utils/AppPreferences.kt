@@ -142,4 +142,13 @@ class AppPreferences(context: Context) {
             .putString("groq_model", model)
             .apply()
     }
+
+    fun hasRequestedNotificationPermission(): Boolean =
+        prefs.getBoolean("has_requested_notification_permission", false)
+
+    fun setHasRequestedNotificationPermission(requested: Boolean) {
+        prefs.edit()
+            .putBoolean("has_requested_notification_permission", requested)
+            .apply()
+    }
 }
