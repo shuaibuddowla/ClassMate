@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item type="id" name="nav_transit" />
+    <item type="id" name="tag_header_scrolled_state" />
+    <item type="id" name="tag_header_collapsed_state" />
+    <item type="id" name="tag_floating_nav_bound" />
+    <item type="id" name="tag_view_holder_cache" />
 </resources>

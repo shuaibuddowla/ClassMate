@@ -80,10 +80,21 @@ object NoticeTextFormatter {
         }
     }
 
+    fun preprocessWhatsApp(raw: String): String {
+        var text = raw
+        // Normalize bullet points
+        text = text.replace(Regex("(?m)^(\\s*)[•-]\\s+"), "$1* ")
+        // Convert single tilde strikethrough to double tildes: ~text~ -> ~~text~~
+        text = text.replace(Regex("(?<=(?:^|[\\s(\\[{\"'`]))~([^~\\n]+?)~(?=(?:$|[\\s)\\]}'\",.!?`]))"), "~~$1~~")
+        // Convert single asterisk bold to double asterisks: *text* -> **text** (if not already **)
+        text = text.replace(Regex("(?<=(?:^|[\\s(\\[{\"'`]))\\*([^\\*\\s\\n](?:[^\\*\\n]*?[^\\*\\s\\n])?)\\*(?=(?:$|[\\s)\\]}'\",.!?`]))"), "**$1**")
+        return text
+    }
+
     fun format(context: Context, rawText: String): CharSequence {
         init(context)
         val formatter = markwon ?: return rawText
-        return if (rawText.isBlank()) "" else formatter.toMarkdown(rawText)
+        return if (rawText.isBlank()) "" else formatter.toMarkdown(preprocessWhatsApp(rawText))
     }
 
     /**
@@ -112,6 +123,7 @@ object NoticeTextFormatter {
         text = text.replace(Regex("\\*([^\\*]+)\\*"), "$1")
         text = text.replace(Regex("_([^_]+)_"), "$1")
         text = text.replace(Regex("~~([^~]+)~~"), "$1")
+        text = text.replace(Regex("~([^~]+)~"), "$1")
         // List bullets
         text = text.replace(Regex("^\\s*[-*\\u2022]\\s+", RegexOption.MULTILINE), "")
         // Numbered lists: 1. item -> item

@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "Privacy Policy | ClassMate",
   description:
     "How ClassMate handles account identity, automated RFID attendance, academic schedules, notifications, and campus community information.",
+  alternates: {
+    canonical: "https://classmatebd.vercel.app/privacy",
+  },
 };
 
 export default function PrivacyPage() {

@@ -90,8 +90,48 @@ export default function Manage({
     queryFn: () => rpc("system_health"),
     refetchInterval: 60_000,
   });
+  const assignableTeachers = useQuery({
+    queryKey: [ctx.user, ctx.batch, "assignable_teachers"],
+    enabled: Boolean(ctx.batch && (ctx.owner || ctx.profile.is_cr)),
+    queryFn: () => rpc<Row[]>("assignable_teachers", { target_batch: ctx.batch }),
+  });
   const refresh = () => qc.invalidateQueries({ queryKey: [ctx.user] });
-  const courseAction = (c: Row = {}) =>
+  const promptSelectRunningSemester = () => {
+    setAction({
+      title: "Set Running Semester",
+      name: "publish_semester",
+      fields: [
+        {
+          name: "target_semester",
+          label: "Choose running semester for your batch",
+          required: true,
+          options: (semesters.data || []).map((s) => ({
+            value: s.id,
+            label: `Semester ${s.semester_number} (${s.status === "completed" ? "Completed" : "Draft"})`,
+          })),
+        },
+      ],
+    });
+  };
+
+  const courseAction = (c: Row = {}) => {
+    if (!c.offering_id && !activeSemester) {
+      promptSelectRunningSemester();
+      return;
+    }
+    const initialCourseType = c.course_type || (/lab|practical|sessional/i.test(c.course_title || "") ? "lab" : "theory");
+    const primaryTeacherId = (c.assigned_teachers?.[0]?.id || c.teacher_record_id || "") as string;
+    const coTeacher1Id = (c.assigned_teachers?.[1]?.id || "") as string;
+    const coTeacher2Id = (c.assigned_teachers?.[2]?.id || "") as string;
+
+    const teacherOptions = [
+      { value: "", label: "-- None / Select from Directory --" },
+      ...(assignableTeachers.data || []).map((t) => ({
+        value: t.id as string,
+        label: `${t.full_name} (${t.designation || "Faculty"}${t.department_code && t.department_code !== "cse" ? ` · ${String(t.department_code).toUpperCase()}` : ""})`,
+      })),
+    ];
+
     setAction({
       title: c.offering_id ? "Edit batch course" : "Add course",
       name: "save_batch_course",
@@ -99,7 +139,7 @@ export default function Manage({
       args: {
         target_batch: ctx.batch,
         target_offering: c.offering_id || null,
-        target_teacher_record: c.teacher_record_id || null,
+        target_teacher_record: primaryTeacherId || null,
         target_credit: c.credit || null,
         target_catalog_course: null,
       },
@@ -109,32 +149,66 @@ export default function Manage({
           label: "Course code",
           required: true,
           value: c.course_code,
+          placeholder: "e.g. FISH 1101 or CSE 1101",
         },
         {
           name: "target_title",
           label: "Course name",
           required: true,
           value: c.course_title,
+          placeholder: "e.g. Ichthyology or Data Structures",
+        },
+        {
+          name: "target_course_type",
+          label: "Course Type",
+          required: true,
+          value: initialCourseType,
+          options: [
+            { value: "theory", label: "Theory" },
+            { value: "lab", label: "Practical / Lab" },
+          ],
+        },
+        {
+          name: "target_teacher_record",
+          label: "Primary / Lead Teacher (Mandatory)",
+          required: true,
+          value: primaryTeacherId,
+          options: teacherOptions,
+        },
+        {
+          name: "target_co_teacher_1",
+          label: "Co-Teacher 2 (Optional for multi-teacher course)",
+          value: coTeacher1Id,
+          options: teacherOptions,
+        },
+        {
+          name: "target_co_teacher_2",
+          label: "Co-Teacher 3 (Optional)",
+          value: coTeacher2Id,
+          options: teacherOptions,
         },
         {
           name: "target_teacher_name",
-          label: "Teacher name (optional)",
+          label: "Custom / Visiting teacher name (Optional fallback)",
           value: c.teacher_name,
         },
       ],
     });
+  };
   const tabs = [["courses", "Courses", BookOpen]] as [
     string,
     string,
     typeof BookOpen,
   ][];
+  if (ctx.profile.is_cr || ctx.owner || ctx.profile.role === "admin") {
+    tabs.push(["overrides", "Batch overrides", UserCheck]);
+    tabs.push(["teachers", "Teacher directory", GraduationCap]);
+  }
   if (ctx.owner)
     tabs.push(
       ...([
+        ["people", "All Users & Roles", Users],
         ["catalog", "Shared catalog", BookOpen],
-        ["teachers", "Teachers", GraduationCap],
-        ["people", "People & approvals", Users],
-        ["overrides", "Batch overrides", UserCheck],
         ["structure", "Academic structure", Building],
         ["health", "System health", Activity],
       ] as [string, string, typeof BookOpen][]),
@@ -341,8 +415,7 @@ export default function Manage({
           </div>
           {ctx.courses.length === 0 && (
             <p className="card">
-              Start by adding your courses and teachers. Course names ending in
-              “Lab” are detected automatically.
+              Start by adding your courses and teachers. You can assign multiple instructors and mark courses as Theory or Practical / Lab.
             </p>
           )}
           <div className="course-grid">
@@ -352,7 +425,8 @@ export default function Manage({
                   <strong>{c.course_title}</strong>
                   <small>
                     {c.course_code} ·{" "}
-                    {c.teacher_name || "Teacher not yet configured"}
+                    {c.teacher_name || "Teacher not yet configured"} ·{" "}
+                    {c.course_type === "lab" || c.course_type === "practical" ? "Practical / Lab" : "Theory"}
                   </small>
                 </button>
                 <button
@@ -447,7 +521,7 @@ export default function Manage({
                 setAction({
                   title: "Register teacher",
                   name: "owner_create_teacher",
-                  args: { target_department: ctx.batchInfo.department_id },
+                  args: { target_department: ctx.batchInfo.department_id || ctx.profile.department_id },
                   fields: [
                     {
                       name: "target_name",
@@ -522,6 +596,24 @@ export default function Manage({
                 }
               >
                 Assign
+              </button>
+              <button
+                className="icon danger"
+                aria-label={`Delete ${t.full_name}`}
+                title="Delete teacher"
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${t.full_name} from the teacher directory? Linked courses will become unassigned.`)) return;
+                  try {
+                    await rpc("owner_delete_teacher", { target_record: t.id });
+                    await Promise.all([
+                      qc.invalidateQueries({ queryKey: [ctx.user, "teachers"] }),
+                      qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "batch-teacher-directory"] }),
+                      refresh(),
+                    ]);
+                  } catch (e) { setError(e); }
+                }}
+              >
+                <Trash2 size={17} />
               </button>
             </div>
           ))}
@@ -723,17 +815,35 @@ export default function Manage({
             label={action.fields.length ? "Save" : "Confirm"}
             submit={async (d) => {
               const args: Row = { ...action.args, ...d };
-              if (
-                action.name === "save_batch_course" &&
-                d.target_teacher_name !== action.teacherName
-              )
-                args.target_teacher_record = null;
+              if (action.name === "save_batch_course") {
+                const teachersList = [
+                  args.target_teacher_record,
+                  args.target_co_teacher_1,
+                  args.target_co_teacher_2,
+                ].filter((id) => Boolean(id) && typeof id === "string" && id.length > 10);
+
+                if (teachersList.length > 0) {
+                  args.target_teacher_record = teachersList[0];
+                  args.target_teacher_records = teachersList;
+                  const matchedNames = teachersList.map((id) => {
+                    const found = assignableTeachers.data?.find((t) => t.id === id);
+                    return found?.full_name;
+                  }).filter(Boolean);
+                  if (matchedNames.length > 0) {
+                    args.target_teacher_name = matchedNames.join(" · ");
+                  }
+                } else {
+                  args.target_teacher_record = null;
+                  args.target_teacher_records = null;
+                }
+              }
               for (const key of [
                 "target_offset",
                 "target_batch_number",
                 "target_session",
                 "corrected_session",
                 "target_initial_semester",
+                "target_credit",
               ])
                 if (key in args)
                   args[key] = key.endsWith("session")
@@ -750,6 +860,24 @@ export default function Manage({
               setAction(null);
             }}
           />
+          {action.name === "save_batch_course" && action.args?.target_offering && (
+            <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--border)" }}>
+              <button
+                type="button"
+                className="text-button danger"
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => {
+                  const offId = action.args?.target_offering;
+                  const course = ctx.courses.find((c) => c.offering_id === offId);
+                  setAction(null);
+                  if (course) setDeleting({ ...course, scope: "batch" });
+                }}
+              >
+                <Trash2 size={16} />
+                Delete course from batch
+              </button>
+            </div>
+          )}
         </Modal>
       )}
       {deleting && (
@@ -994,9 +1122,9 @@ function Overrides({
       fields: [
         {
           name: "target_student_id",
-          label: "Student ID (e.g. CE23045)",
+          label: "University Email or Student ID",
           required: true,
-          value: initial?.student_id || "",
+          value: initial?.email || initial?.student_id || "",
         },
         {
           name: "target_batch",
@@ -1019,6 +1147,7 @@ function Overrides({
     const q = search.toLowerCase();
     return (
       o.student_id?.toLowerCase().includes(q) ||
+      o.email?.toLowerCase().includes(q) ||
       o.profile_full_name?.toLowerCase().includes(q) ||
       o.reason?.toLowerCase().includes(q) ||
       o.department_code?.toLowerCase().includes(q) ||
@@ -1032,7 +1161,7 @@ function Overrides({
         <div>
           <h2>Batch overrides</h2>
           <small>
-            Pre-register students with dropped/repeated semesters to place them in the correct batch.
+            Pre-register students with dropped/repeated semesters using their institutional email or student ID.
           </small>
         </div>
         <button className="primary" onClick={() => openForm()}>
@@ -1043,7 +1172,7 @@ function Overrides({
       <label className="search">
         <Search size={18} />
         <input
-          placeholder="Search by student ID, batch, or reason"
+          placeholder="Search by email, student ID, batch, or reason"
           aria-label="Search overrides"
           value={search}
           maxLength={100}
@@ -1057,14 +1186,14 @@ function Overrides({
         <p className="card">
           {search
             ? "No overrides match your search."
-            : "No overrides registered yet. Students with dropped semesters can be pre-assigned to their new batch here before or after they sign in."}
+            : "No overrides registered yet. Students with dropped semesters can be pre-assigned to their new batch here using their university email or student ID."}
         </p>
       ) : (
         list.map((o) => (
           <div className="card person" key={o.id}>
             <span>
               <strong>
-                {o.student_id} → {o.department_code} Batch {o.batch_number}
+                {o.email && o.student_id ? `${o.student_id} (${o.email})` : (o.email || o.student_id)} → {o.batch_name || `${o.department_code || ""} Batch ${o.batch_number}`}
               </strong>
               <small>
                 {o.reason ? `Reason: ${o.reason} · ` : ""}
@@ -1090,12 +1219,12 @@ function Overrides({
       {deleting && (
         <Confirm
           title="Delete batch override?"
-          body={`Remove the override for student ${deleting.student_id}? If this student signs in again, they will fall back to their email-derived batch.`}
+          body={`Remove the override for student ${deleting.email || deleting.student_id}? If this student signs in again, they will fall back to their email-derived batch.`}
           close={() => setDeleting(null)}
           action={async () => {
             try {
               await rpc("delete_batch_override", {
-                target_student_id: deleting.student_id,
+                target_student_id: deleting.email || deleting.student_id,
                 target_override_id: deleting.id,
               });
               await refresh();

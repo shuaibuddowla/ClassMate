@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -27,7 +27,6 @@ import {
   toBengaliDigits,
 } from "@/lib/transit-data";
 import { supabase, rpc, rows, type Row } from "@/lib/api";
-import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import StudentAttendanceDashboard from "./student-attendance";
 import { useAcademic } from "@/lib/queries";
 import {
@@ -273,13 +272,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     [mbstuLiveSynced, setMbstuLiveSynced] = useState<boolean>(false),
     [editing, setEditing] = useState<Row | null>(null),
     [event, setEvent] = useState<Row | null>(null),
-    [deleting, setDeleting] = useState<Row | null>(null),
-    [teacherAttendance, setTeacherAttendance] = useState<{
-      slotId: string;
-      sessionId?: string;
-      courseTitle: string;
-      courseCode?: string;
-    } | null>(null);
+    [deleting, setDeleting] = useState<Row | null>(null);
   const qc = useQueryClient();
 
   const attendanceSessions = useQuery({
@@ -496,6 +489,12 @@ export function Schedule({ ctx }: { ctx: Context }) {
   const buses = useAcademic<Row[]>(ctx.user, ctx.batch, "buses", () =>
     rows("bus_schedules", { active: true }, "*", "departure_time"),
   );
+  const directoryTeachers = useAcademic<Row[]>(
+    ctx.user,
+    ctx.batch,
+    "directory-teachers",
+    () => rpc<Row[]>("batch_teachers_directory", { target_batch: ctx.batch }),
+  );
   const details = useAcademic<Row[]>(
     ctx.user,
     ctx.batch,
@@ -536,9 +535,14 @@ export function Schedule({ ctx }: { ctx: Context }) {
       return Object.fromEntries(permissions);
     },
   });
-  const kind = busKind(date, events),
+  const weekendDays = ((ctx.batchInfo?.institution as Row)?.weekend_days as number[]) || [4, 5];
+  const hasTransit = Boolean(
+    (ctx.batchInfo?.institution as Row)?.has_bus_transit ??
+    ((ctx.batchInfo?.departments as Row)?.code !== "fisheries" && !ctx.profile?.email?.toLowerCase().endsWith("@ru.ac.bd"))
+  );
+  const kind = busKind(date, events, weekendDays),
     day = parseDate(date).getDay(),
-    closed = classesClosed(date, events);
+    closed = classesClosed(date, events, weekendDays);
 
   const isTeacherViewer = ctx.profile.role === "teacher";
   const showAttendance = false;
@@ -554,12 +558,13 @@ export function Schedule({ ctx }: { ctx: Context }) {
   });
   const teacherGreeting = teacherGreetingQuery.data || defaultTeacherGreeting();
 
-  const rawRoutineEntries = (routine.data || []).filter((s) => s.day_of_week === day);
-  const teacherAssignedEntries = isTeacherViewer
-    ? rawRoutineEntries.filter((s) => Boolean(editable.data?.[s.semester_course_id]))
-    : rawRoutineEntries;
+  const filteredRoutineSlots = useMemo(() => {
+    const raw = routine.data || [];
+    if (!isTeacherViewer) return raw;
+    return raw.filter((s) => ctx.courses.some((c) => c.offering_id === s.semester_course_id) || Boolean(editable.data?.[s.semester_course_id]));
+  }, [routine.data, isTeacherViewer, ctx.courses, editable.data]);
 
-  const entries = teacherAssignedEntries;
+  const entries = filteredRoutineSlots.filter((s) => s.day_of_week === day);
 
   const isSlotLive = (s: Row) => {
     if (mode !== "routine" || date !== dhakaToday() || closed) return false;
@@ -620,7 +625,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
         <div className="segment modes">
           {[
             ["routine", "Class Routine"],
-            ...(!isTeacherViewer ? [["bus", "Bus Schedule"]] : []),
+            ...(!isTeacherViewer && hasTransit ? [["bus", "Bus Schedule"]] : []),
             ["calendar", "Calendar"],
           ].map(([id, label]) => (
             <button
@@ -649,7 +654,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
               <button
                 key={d}
                 aria-pressed={d === date}
-                className={`day ${d === date ? "selected" : ""} ${classesClosed(d, events) ? "closed" : ""}`}
+                className={`day ${d === date ? "selected" : ""} ${classesClosed(d, events, weekendDays) ? "closed" : ""}`}
                 onClick={() => setDate(d)}
               >
                 <small>{weekdays[parseDate(d).getDay()]}</small>
@@ -680,7 +685,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
             date={date}
             setDate={setDate}
             events={events}
-            routineSlots={routine.data || []}
+            routineSlots={filteredRoutineSlots}
+            weekendDays={weekendDays}
           />
           {/* Selected Date Class Routine & Events Sync */}
           <div className="card calendar-selected-day-card">
@@ -690,9 +696,9 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   {parseDate(date).toLocaleDateString("en", { weekday: "long" }).toUpperCase()} · {date}
                 </span>
                 <h3>
-                  {classesClosed(date, events)
+                  {classesClosed(date, events, weekendDays)
                     ? "Classes Closed"
-                    : `${(routine.data || []).filter((s) => s.day_of_week === parseDate(date).getDay()).length} Classes Scheduled`}
+                    : `${filteredRoutineSlots.filter((s) => s.day_of_week === parseDate(date).getDay()).length} Classes Scheduled`}
                 </h3>
               </div>
               <button
@@ -702,13 +708,13 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 Open in Timetable →
               </button>
             </div>
-            {classesClosed(date, events) ? (
+            {classesClosed(date, events, weekendDays) ? (
               <p className="calendar-selected-day-note">
                 {events.filter((e) => e.start_date <= date && e.end_date >= date && ["university", "classes"].includes(e.scope)).map((e) => e.title).join(" · ") || "University weekly holiday"}
               </p>
             ) : (
               <div className="calendar-mini-routine">
-                {(routine.data || [])
+                {filteredRoutineSlots
                   .filter((s) => s.day_of_week === parseDate(date).getDay())
                   .map((s) => (
                     <div key={s.id} className="calendar-mini-slot">
@@ -717,7 +723,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                       {s.room && s.room !== "null" && <small>Room {s.room}</small>}
                     </div>
                   ))}
-                {(routine.data || []).filter((s) => s.day_of_week === parseDate(date).getDay()).length === 0 && (
+                {filteredRoutineSlots.filter((s) => s.day_of_week === parseDate(date).getDay()).length === 0 && (
                   <p className="calendar-selected-day-note">No classes scheduled on {parseDate(date).toLocaleDateString("en", { weekday: "long" })}.</p>
                 )}
               </div>
@@ -815,7 +821,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   )
                   .map((e) => e.title)
                   .join(" · ") || "University weekly holiday";
-              const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
+              const isWeekendDay = weekendDays.includes(parseDate(date).getDay());
               const anim = getTimetableAnimation(holidayTitle, isWeekendDay);
               return (
                 <Empty
@@ -851,7 +857,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
                 </>
               ) : (mode === "bus" ? Object.keys(mbstuSchedules).length === 0 : sortedEntries.length === 0) ? (
                 (() => {
-                  const isWeekendDay = [4, 5].includes(parseDate(date).getDay());
+                  const isWeekendDay = weekendDays.includes(parseDate(date).getDay());
                   const anim =
                     mode === "routine"
                       ? getTimetableAnimation(
@@ -1150,11 +1156,11 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             <div className="period-course">
                               <h3>{s.course?.course_title || "Course"}</h3>
                               <p>
-                                {detail?.teacher_name &&
-                                detail.teacher_name !== "null" ? (
+                                {(s.teacher_name || detail?.teacher_name || s.course?.teacher_name) &&
+                                (s.teacher_name || detail?.teacher_name || s.course?.teacher_name) !== "null" ? (
                                   <span>
                                     <UserRound size={14} />
-                                    {detail.teacher_name}
+                                    {s.teacher_name || detail?.teacher_name || s.course?.teacher_name}
                                   </span>
                                 ) : null}
                                 {s.room && s.room !== "null" ? (
@@ -1175,8 +1181,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                   ? "Cancelled"
                                   : isLive
                                     ? "Live now"
-                                    : s.type === "lab"
-                                      ? "Lab"
+                                    : (s.type === "lab" || s.type === "practical" || s.course?.course_type === "lab" || s.course?.course_type === "practical")
+                                      ? "Practical / Lab"
                                       : "Class"}
                               </span>
                               <small className="period-duration">
@@ -1248,8 +1254,20 @@ export function Schedule({ ctx }: { ctx: Context }) {
                           .filter((c) => editable.data?.[c.offering_id])
                           .map((c) => ({
                             value: c.offering_id,
-                            label: c.course_title,
+                            label: `${c.course_code}: ${c.course_title}`,
                           })),
+                      },
+                      {
+                        name: "instructor",
+                        label: "Instructor for this class (Optional slot override)",
+                        value: editing.teacher_record_id || "",
+                        options: [
+                          { value: "", label: "-- Default (Course Assigned Teacher) --" },
+                          ...(directoryTeachers.data || []).map((t) => ({
+                            value: t.id as string,
+                            label: `${t.full_name} (${t.designation || "Faculty"}${t.department_code ? ` · ${String(t.department_code).toUpperCase()}` : ""})`,
+                          })),
+                        ],
                       },
                       {
                         name: "day",
@@ -1296,6 +1314,15 @@ export function Schedule({ ctx }: { ctx: Context }) {
                   if (d.start >= d.end)
                     throw new Error("End time must be after start time.");
                   const targetDay = d.day !== undefined ? Number(d.day) : (editing.day_of_week ?? day);
+                  let slotTeacherRecord: string | null = null;
+                  let slotTeacherName: string | null = null;
+                  if (d.instructor) {
+                    const matched = (directoryTeachers.data || []).find((t) => t.id === d.instructor);
+                    if (matched) {
+                      slotTeacherRecord = matched.id;
+                      slotTeacherName = matched.full_name;
+                    }
+                  }
                   await rpc("save_routine_slot", {
                     target_id: editing.id || null,
                     target_semester_course: d.course,
@@ -1303,6 +1330,8 @@ export function Schedule({ ctx }: { ctx: Context }) {
                     target_start: d.start,
                     target_end: d.end,
                     target_room: d.room,
+                    target_teacher_record: slotTeacherRecord,
+                    target_teacher_name: slotTeacherName,
                   });
                 }
                 await invalidate();
@@ -1410,18 +1439,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
           }}
         />
       )}
-      {teacherAttendance && (
-        <AttendanceTeacherModal
-          slotId={teacherAttendance.slotId}
-          sessionId={teacherAttendance.sessionId}
-          courseTitle={teacherAttendance.courseTitle}
-          courseCode={teacherAttendance.courseCode}
-          onClose={() => {
-            setTeacherAttendance(null);
-            attendanceSessions.refetch();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1432,6 +1449,7 @@ function CalendarPanel({
   setDate,
   events,
   routineSlots = [],
+  weekendDays = [4, 5],
 }: {
   month: Date;
   setMonth: (d: Date) => void;
@@ -1439,6 +1457,7 @@ function CalendarPanel({
   setDate: (d: string) => void;
   events: Row[];
   routineSlots?: Row[];
+  weekendDays?: number[];
 }) {
   const count = events.filter(
     (e) =>
@@ -1504,15 +1523,15 @@ function CalendarPanel({
           return d ? (
             <button
               key={d}
-              className={`date-cell ${date === d ? "selected" : classesClosed(d, events) ? "closed" : ""}`}
+              className={`date-cell ${date === d ? "selected" : classesClosed(d, events, weekendDays) ? "closed" : ""}`}
               aria-pressed={date === d}
-              aria-label={`${d}${classesClosed(d, events) ? ", closed" : ""}`}
+              aria-label={`${d}${classesClosed(d, events, weekendDays) ? ", closed" : ""}`}
               onClick={() => setDate(d)}
             >
               <strong>{parseDate(d).getDate()}</strong>
               {(() => {
                 const dayOfWeek = parseDate(d).getDay();
-                const isClosed = classesClosed(d, events);
+                const isClosed = classesClosed(d, events, weekendDays);
                 const hasClasses = !isClosed && routineSlots.some((s) => s.day_of_week === dayOfWeek);
                 return (
                   <span className="dots">

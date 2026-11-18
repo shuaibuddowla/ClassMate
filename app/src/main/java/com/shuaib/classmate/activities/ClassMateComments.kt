@@ -27,6 +27,7 @@ internal object ClassMateComments {
     fun show(
         activity: AppCompatActivity,
         notice: JSONObject,
+        onCountChanged: ((Long) -> Unit)? = null,
         changed: () -> Unit
     ) {
         val bottomSheet = BottomSheetDialog(activity, R.style.Theme_ClassMate_BottomSheetDialog)
@@ -423,6 +424,7 @@ internal object ClassMateComments {
                     } else {
                         tvCommentCountBadge.visibility = View.GONE
                     }
+                    onCountChanged?.invoke(totalComments.toLong())
                 } catch (e: Exception) {
                     if (bottomSheet.isShowing) {
                         Toast.makeText(activity, "Failed to load comments", Toast.LENGTH_SHORT).show()
@@ -463,6 +465,9 @@ internal object ClassMateComments {
             }
         }
 
+        bottomSheet.setOnDismissListener {
+            changed()
+        }
         bottomSheet.show()
         loadComments()
     }

@@ -3,6 +3,15 @@ import path from "node:path";
 const config: NextConfig = {
   outputFileTracingRoot: path.resolve(process.cwd()),
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/card/:id",
+        destination: "/c/:id",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
@@ -14,6 +23,14 @@ const config: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(self), microphone=(), geolocation=(self)",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
           },
         ],
       },

@@ -1,13 +1,35 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { rpc } from "@/lib/api";
-import { compareStudentRolls } from "@/lib/attendance-excel";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { rpc, supabase, type Row } from "@/lib/api";
+import {
+  downloadCourseMatrixExcel,
+  compareStudentRolls,
+  detectMajorityRollPrefix,
+  compareStudentsWithReaddLast,
+} from "@/lib/attendance-excel";
 import { type Context } from "./app";
-import { AttendanceTeacherModal } from "./attendance-teacher-modal";
 import { ErrorBox, Skeleton } from "./ui";
-import { Download, FileSpreadsheet, Calendar, Users, ChevronRight } from "lucide-react";
+import {
+  Radio,
+  FileSpreadsheet,
+  Calendar,
+  Users,
+  ChevronRight,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Search,
+  Check,
+  X,
+  Sparkles,
+  Download,
+  AlertCircle,
+  Square,
+  CheckSquare,
+} from "lucide-react";
 
 interface SessionInfo {
   session_id: string;
@@ -23,6 +45,8 @@ interface SessionInfo {
 
 interface TeacherCourse {
   semester_course_id: string;
+  batch_id: string;
+  batch_label: string;
   course_code: string;
   course_title: string;
   course_type: string;
@@ -32,31 +56,34 @@ interface TeacherCourse {
   enrolled_students: number;
   average_percentage: number;
   sessions: SessionInfo[];
+  has_live_session: boolean;
 }
 
-interface MatrixStudent {
+interface RosterStudent {
   student_id: string;
-  roll: string;
   full_name: string;
-  records: Record<string, "present" | "absent">;
-  present_count: number;
-  total_sessions: number;
-  percentage: number;
+  roll_number: string;
+  status: "present" | "absent";
+  marked_at?: string | null;
+  method?: string | null;
+  confidence?: string | null;
+  rfid_card_uid?: string | null;
   is_readd?: boolean;
 }
 
-interface MatrixResponse {
-  semester_course_id: string;
-  course_code: string;
-  course_title: string;
-  sessions: Array<{
-    session_id: string;
-    started_at: string;
-    date: string;
-    status: string;
-    room: string | null;
-  }>;
-  students: MatrixStudent[];
+interface FullSessionSummary {
+  session_id: string;
+  routine_slot_id?: string;
+  semester_course_id?: string;
+  batch_id?: string;
+  course_code?: string;
+  course_title?: string;
+  status: "open" | "closed";
+  started_at: string;
+  closed_at?: string | null;
+  present_count: number;
+  total_enrolled: number;
+  roster: RosterStudent[];
 }
 
 function healthColor(pct: number): string {
@@ -66,386 +93,831 @@ function healthColor(pct: number): string {
 }
 
 export default function TeacherAttendanceDashboard({ ctx }: { ctx: Context }) {
+  const qc = useQueryClient();
+
+  // State: selected course for Level 2 (Course view)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"sessions" | "roster">("sessions");
-  const [rosterSortBy, setRosterSortBy] = useState<"roll" | "risk">("roll");
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [inspectSession, setInspectSession] = useState<{
-    sessionId: string;
-    slotId: string;
-    courseTitle: string;
-    courseCode: string;
-  } | null>(null);
 
-  const menuRef = useRef<HTMLDivElement>(null);
+  // State: active session for Level 3 (Fullscreen view)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false);
-      }
-    };
-    if (showExportMenu) {
-      document.addEventListener("mousedown", handleOutsideClick);
-    }
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [showExportMenu]);
+  // Loading & export states
+  const [exportingCourseId, setExportingCourseId] = useState<string | null>(null);
+  const [startingSession, setStartingSession] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Fetch overview for all courses
-  const overviewQuery = useQuery({
-    queryKey: [ctx.user, ctx.batch, "teacher-attendance-overview"],
-    queryFn: () =>
-      rpc<any[]>("teacher_course_attendance_overview", {
-        target_batch: ctx.batch,
-      }),
+  // Determine batches to query (all batches assigned to this teacher)
+  const targetBatches = useMemo(() => {
+    if (ctx.batches && ctx.batches.length > 0) return ctx.batches;
+    if (ctx.batch) return [{ id: ctx.batch, batch_number: ctx.batchInfo?.batch_number || 0 }];
+    return [];
+  }, [ctx.batches, ctx.batch, ctx.batchInfo]);
+
+  // Query courses across all batches in parallel
+  const allCoursesQuery = useQuery({
+    queryKey: [ctx.user, targetBatches.map((b) => b.id).join(","), "teacher-all-courses-attendance"],
+    queryFn: async () => {
+      if (!targetBatches.length) return [];
+      const results = await Promise.all(
+        targetBatches.map(async (b) => {
+          try {
+            const raw = await rpc<any[]>("teacher_course_attendance_overview", {
+              target_batch: b.id,
+            });
+            const deptCode = b.departments?.code ? String(b.departments.code).toUpperCase() + " " : "";
+            const batchLabel = `${deptCode}Batch ${b.batch_number}`;
+            if (!Array.isArray(raw)) return [];
+            return raw.map((c: any) => ({
+              semester_course_id: c.semester_course_id || c.offering_id || "",
+              batch_id: b.id,
+              batch_label: batchLabel,
+              course_code: c.course_code || "",
+              course_title: c.course_title || "",
+              course_type: (c.course_type || "theory").toLowerCase(),
+              credit: typeof c.credit === "number" ? c.credit : 3.0,
+              teacher_name: c.teacher_name || "Instructor",
+              total_sessions: typeof c.total_sessions === "number" ? c.total_sessions : (c.sessions?.length || 0),
+              enrolled_students: c.enrolled_students ?? c.total_enrolled ?? 0,
+              average_percentage: c.average_percentage ?? c.avg_percentage ?? 0,
+              sessions: Array.isArray(c.sessions) ? c.sessions : [],
+              has_live_session: Array.isArray(c.sessions) && c.sessions.some((s: any) => s.status === "open"),
+            }));
+          } catch (e) {
+            console.error("Failed fetching overview for batch", b.id, e);
+            return [];
+          }
+        })
+      );
+      return results.flat();
+    },
+    refetchInterval: 15_000,
   });
 
-  const courses: TeacherCourse[] = useMemo(() => {
-    const raw = overviewQuery.data;
-    if (!Array.isArray(raw)) return [];
-    return raw.map((c: any) => ({
-      semester_course_id: c.semester_course_id || c.offering_id || "",
-      course_code: c.course_code || "",
-      course_title: c.course_title || "",
-      course_type: (c.course_type || "theory").toLowerCase(),
-      credit: typeof c.credit === "number" ? c.credit : 3.0,
-      teacher_name: c.teacher_name || "Instructor",
-      total_sessions: typeof c.total_sessions === "number" ? c.total_sessions : (c.sessions?.length || 0),
-      enrolled_students: c.enrolled_students ?? c.total_enrolled ?? 0,
-      average_percentage: c.average_percentage ?? c.avg_percentage ?? 0,
-      sessions: Array.isArray(c.sessions) ? c.sessions : [],
-    }));
-  }, [overviewQuery.data]);
+  const courses: TeacherCourse[] = allCoursesQuery.data || [];
 
+  // Active course selected for Level 2
   const activeCourse = useMemo(() => {
-    if (!courses.length) return null;
-    return courses.find((c) => c.semester_course_id === selectedCourseId) || courses[0];
+    if (!selectedCourseId) return null;
+    return courses.find((c) => c.semester_course_id === selectedCourseId) || null;
   }, [courses, selectedCourseId]);
 
-  // Fetch matrix only if Roster tab is open
-  const matrixQuery = useQuery({
-    queryKey: [activeCourse?.semester_course_id, "course-attendance-matrix"],
-    queryFn: () =>
-      rpc<MatrixResponse>("course_attendance_matrix", {
-        target_semester_course: activeCourse!.semester_course_id,
-      }),
-    enabled: !!activeCourse && activeTab === "roster",
-  });
-
-  // Export handlers
-  const handleExportMatrix = async () => {
-    if (!activeCourse) return;
+  // Handle Export Semester Matrix Excel
+  const handleExportSemesterExcel = async (semesterCourseId: string) => {
     try {
-      setExporting(true);
-      setShowExportMenu(false);
-      const { downloadCourseMatrixExcel } = await import("@/lib/attendance-excel");
-      await downloadCourseMatrixExcel(activeCourse.semester_course_id);
+      setExportingCourseId(semesterCourseId);
+      setActionError(null);
+      await downloadCourseMatrixExcel(semesterCourseId);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Matrix export failed");
+      setActionError(err instanceof Error ? err.message : "Semester export failed");
     } finally {
-      setExporting(false);
+      setExportingCourseId(null);
     }
   };
 
-  const handleExportLatestSession = async () => {
-    if (!activeCourse || !activeCourse.sessions.length) {
-      alert("No sessions recorded to export.");
+  // Handle Start Attendance Session (Ad-Hoc / Direct)
+  const handleStartSession = async (semesterCourseId: string) => {
+    try {
+      setStartingSession(true);
+      setActionError(null);
+      const res = await rpc<{ session_id: string; session_secret: string; status: string }>(
+        "start_adhoc_attendance_session",
+        { target_semester_course: semesterCourseId }
+      );
+      if (res && res.session_id) {
+        await allCoursesQuery.refetch();
+        setActiveSessionId(res.session_id);
+      }
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Failed to start attendance session");
+    } finally {
+      setStartingSession(false);
+    }
+  };
+
+  // ==========================================
+  // LEVEL 3: FULLSCREEN LIVE ATTENDANCE DASHBOARD
+  // ==========================================
+  if (activeSessionId) {
+    return (
+      <FullscreenSessionDashboard
+        sessionId={activeSessionId}
+        onBack={() => {
+          setActiveSessionId(null);
+          allCoursesQuery.refetch();
+        }}
+        onSessionClosed={() => {
+          allCoursesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  // ==========================================
+  // LEVEL 2: COURSE SESSIONS & SEMESTER EXPORT
+  // ==========================================
+  if (activeCourse) {
+    const liveSession = activeCourse.sessions.find((s) => s.status === "open");
+    const pastSessions = activeCourse.sessions.filter((s) => s.status !== "open");
+    const isExporting = exportingCourseId === activeCourse.semester_course_id;
+
+    return (
+      <div className="attendance-teacher-section">
+        {/* Navigation & Header */}
+        <div className="course-attendance-header card">
+          <div className="course-header-top">
+            <button
+              type="button"
+              className="text-button back-to-courses-btn"
+              onClick={() => setSelectedCourseId(null)}
+            >
+              <ArrowLeft size={16} />
+              <span>All Courses</span>
+            </button>
+            <span className="course-batch-pill">{activeCourse.batch_label}</span>
+          </div>
+
+          <div className="course-title-row">
+            <div>
+              <span className="course-code-badge">{activeCourse.course_code}</span>
+              <h1 className="course-main-title">{activeCourse.course_title}</h1>
+              <p className="course-meta-sub">
+                {activeCourse.total_sessions} classes held · {activeCourse.enrolled_students} enrolled students ·{" "}
+                <strong style={{ color: healthColor(activeCourse.average_percentage) }}>
+                  {activeCourse.average_percentage}% avg attendance
+                </strong>
+              </p>
+            </div>
+
+            {/* Top Right Actions */}
+            <div className="course-header-actions">
+              <button
+                type="button"
+                className="primary export-semester-btn"
+                disabled={isExporting}
+                onClick={() => handleExportSemesterExcel(activeCourse.semester_course_id)}
+                title="Export semester-wide attendance matrix (.xlsx)"
+              >
+                <FileSpreadsheet size={16} />
+                <span>{isExporting ? "Exporting..." : "Export Semester Excel (.xlsx)"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="secondary start-session-btn"
+                disabled={startingSession}
+                onClick={() => handleStartSession(activeCourse.semester_course_id)}
+              >
+                <Radio size={16} />
+                <span>{startingSession ? "Launching..." : "Start Attendance Session"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {actionError && <ErrorBox error={actionError} />}
+
+        {/* Ongoing Live Session Banner */}
+        {liveSession && (
+          <div className="live-session-banner-card card">
+            <div className="live-session-left">
+              <div className="live-pulsing-tag">
+                <span className="pulse-dot" />
+                <strong>LIVE ATTENDANCE IN PROGRESS</strong>
+              </div>
+              <h3>Active Classroom Session</h3>
+              <p>
+                Started at{" "}
+                {new Date(liveSession.started_at).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}{" "}
+                · Room: {liveSession.room || "Classroom"}
+              </p>
+            </div>
+
+            <div className="live-session-right">
+              <div className="live-stat-box">
+                <span className="live-stat-num">{liveSession.present_count}</span>
+                <span className="live-stat-label">/ {liveSession.total_count} Present</span>
+              </div>
+              <button
+                type="button"
+                className="primary open-live-btn"
+                onClick={() => setActiveSessionId(liveSession.session_id)}
+              >
+                <span>Open Live Dashboard (Fullscreen)</span>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Past Sessions List */}
+        <div className="sessions-section-title-row">
+          <h2>Recorded Class Sessions ({pastSessions.length})</h2>
+          <span className="sessions-hint">Click any session to view detailed roster or make adjustments</span>
+        </div>
+
+        {pastSessions.length === 0 && !liveSession ? (
+          <div className="card attendance-empty-state-card">
+            <Calendar size={32} />
+            <h3>No attendance sessions held yet</h3>
+            <p>Click "Start Attendance Session" above to launch live RFID scanning for this course.</p>
+          </div>
+        ) : (
+          <div className="past-sessions-grid">
+            {pastSessions.map((sess) => {
+              const dObj = new Date(sess.started_at);
+              const dateStr = !isNaN(dObj.getTime())
+                ? dObj.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Class Date";
+              const timeStr = !isNaN(dObj.getTime())
+                ? dObj.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                : "";
+
+              return (
+                <div
+                  key={sess.session_id}
+                  className="card past-session-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveSessionId(sess.session_id)}
+                >
+                  <div className="session-card-header">
+                    <span className="session-date-label">{dateStr}</span>
+                    <span className="session-room-badge">Room {sess.room || "Station"}</span>
+                  </div>
+
+                  <div className="session-card-body">
+                    <div className="session-time-row">
+                      <Clock size={14} />
+                      <span>{timeStr}</span>
+                    </div>
+
+                    <div className="session-turnout-row">
+                      <strong>{sess.present_count}</strong>
+                      <span>/ {sess.total_count} Present</span>
+                      <span
+                        className="session-pct-pill"
+                        style={{
+                          backgroundColor: `${healthColor(sess.percentage ?? 0)}15`,
+                          color: healthColor(sess.percentage ?? 0),
+                        }}
+                      >
+                        {sess.percentage ?? 0}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="session-card-footer">
+                    <span>Inspect Roster</span>
+                    <ChevronRight size={15} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // LEVEL 1: COURSES ACROSS ALL BATCHES
+  // ==========================================
+  return (
+    <div className="attendance-teacher-section">
+      <div className="page-heading">
+        <div>
+          <span className="eyebrow">TEACHING WORKSPACE</span>
+          <h1>Attendance Dashboard</h1>
+          <p>Select an assigned course to view session history, export semester matrices, or launch attendance.</p>
+        </div>
+        <Radio size={28} className="text-blue" />
+      </div>
+
+      {actionError && <ErrorBox error={actionError} />}
+      {allCoursesQuery.isError && (
+        <ErrorBox error={allCoursesQuery.error} retry={() => allCoursesQuery.refetch()} />
+      )}
+
+      {allCoursesQuery.isLoading ? (
+        <div className="attendance-loading">
+          <Skeleton />
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="card attendance-empty-state-card">
+          <Radio size={36} />
+          <h3>No assigned courses found</h3>
+          <p>
+            You are not currently assigned to any active courses in your batches. Contact your department administrator
+            to assign your courses.
+          </p>
+        </div>
+      ) : (
+        <div className="teacher-courses-grid">
+          {courses.map((c) => {
+            const isExporting = exportingCourseId === c.semester_course_id;
+
+            return (
+              <div
+                key={c.semester_course_id}
+                className={`card teacher-course-card ${c.has_live_session ? "has-live-session" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedCourseId(c.semester_course_id)}
+              >
+                {c.has_live_session && (
+                  <div className="course-live-banner">
+                    <span className="pulse-dot" />
+                    <span>LIVE ATTENDANCE RUNNING</span>
+                  </div>
+                )}
+
+                <div className="course-card-top">
+                  <span className="course-card-code">{c.course_code}</span>
+                  <span className="course-card-batch">{c.batch_label}</span>
+                </div>
+
+                <h3 className="course-card-title">{c.course_title}</h3>
+
+                <div className="course-card-metrics">
+                  <div className="metric-item">
+                    <span className="metric-num">{c.total_sessions}</span>
+                    <span className="metric-label">Classes Held</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-num">{c.enrolled_students}</span>
+                    <span className="metric-label">Students</span>
+                  </div>
+                  <div className="metric-item">
+                    <span
+                      className="metric-num"
+                      style={{ color: healthColor(c.average_percentage) }}
+                    >
+                      {c.total_sessions > 0 ? `${c.average_percentage}%` : "—"}
+                    </span>
+                    <span className="metric-label">Avg Attendance</span>
+                  </div>
+                </div>
+
+                <div className="course-card-bottom">
+                  <button
+                    type="button"
+                    className="icon export-course-mini-btn"
+                    title="Export Semester Excel (.xlsx)"
+                    disabled={isExporting}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportSemesterExcel(c.semester_course_id);
+                    }}
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>{isExporting ? "Exporting..." : "Export Excel"}</span>
+                  </button>
+
+                  <div className="course-card-enter">
+                    <span>View Sessions</span>
+                    <ChevronRight size={16} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// LEVEL 3: FULLSCREEN LIVE ATTENDANCE DASHBOARD
+// ==========================================
+export function FullscreenSessionDashboard({
+  sessionId,
+  onBack,
+  onSessionClosed,
+}: {
+  sessionId: string;
+  onBack: () => void;
+  onSessionClosed: () => void;
+}) {
+  const qc = useQueryClient();
+  const [summary, setSummary] = useState<FullSessionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<"all" | "present" | "absent">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [closing, setClosing] = useState(false);
+  const [togglingStudentId, setTogglingStudentId] = useState<string | null>(null);
+
+  const client = supabase();
+
+  // Fetch summary
+  const fetchSummary = async (isInitial = false) => {
+    try {
+      if (isInitial) setLoading(true);
+      const data = await rpc<FullSessionSummary>("get_session_summary", {
+        target_session: sessionId,
+      });
+      if (data) {
+        setSummary(data);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load session details");
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSummary(true);
+
+    // Realtime postgres changes on attendance_records for this session
+    const channel = client
+      .channel(`session:records:${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "classmate",
+          table: "attendance_records",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          fetchSummary(false);
+        }
+      )
+      .subscribe();
+
+    // Heartbeat poll every 2.5s while open to catch fast RFID swipes
+    const interval = setInterval(() => {
+      if (summary?.status === "open") {
+        fetchSummary(false);
+      }
+    }, 2500);
+
+    return () => {
+      clearInterval(interval);
+      client.removeChannel(channel);
+    };
+  }, [sessionId, summary?.status]);
+
+  // Handle Close Session
+  const handleCloseSession = async () => {
+    if (!window.confirm("Finish and close attendance session? This will lock attendance for this class and unlink the RFID reader.")) {
       return;
     }
     try {
-      setExporting(true);
-      setShowExportMenu(false);
-      const { downloadSessionExcel } = await import("@/lib/attendance-excel");
-      const latest = activeCourse.sessions[0];
-      const dateStr = new Date(latest.started_at).toISOString().split("T")[0];
-      await downloadSessionExcel(latest.session_id, activeCourse.course_code, dateStr);
+      setClosing(true);
+      await rpc("close_attendance_session", { target_session: sessionId });
+      await fetchSummary(false);
+      onSessionClosed();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Session export failed");
+      alert(err instanceof Error ? err.message : "Failed to close session");
     } finally {
-      setExporting(false);
+      setClosing(false);
     }
   };
 
-  if (overviewQuery.isError) {
-    return <ErrorBox error={overviewQuery.error} retry={() => overviewQuery.refetch()} />;
-  }
+  // Handle Safe Toggle Attendance Checklist Item
+  const handleToggleStudent = async (studentId: string, currentStatus: "present" | "absent") => {
+    try {
+      setTogglingStudentId(studentId);
+      const willBePresent = currentStatus !== "present";
+      const newStatus: "present" | "absent" = willBePresent ? "present" : "absent";
 
-  if (overviewQuery.isLoading) {
-    return (
-      <div className="attendance-loading">
-        <Skeleton />
-      </div>
-    );
-  }
+      // Optimistic UI update
+      setSummary((prev) => {
+        if (!prev) return prev;
+        const newRoster: RosterStudent[] = prev.roster.map((s) => {
+          if (s.student_id === studentId) {
+            return {
+              ...s,
+              status: newStatus,
+              method: willBePresent ? "manual" : "none",
+              marked_at: willBePresent ? new Date().toISOString() : null,
+            };
+          }
+          return s;
+        });
+        const newPresCount = newRoster.filter((s) => s.status === "present").length;
+        return {
+          ...prev,
+          present_count: newPresCount,
+          roster: newRoster,
+        };
+      });
 
-  if (courses.length === 0) {
-    return (
-      <div className="card attendance-empty-msg">
-        <p>No courses assigned to you in this batch, or attendance has not been enabled yet.</p>
-      </div>
-    );
-  }
+      // Call database toggle RPC
+      await rpc("toggle_student_attendance", {
+        target_session: sessionId,
+        target_student: studentId,
+        present: willBePresent,
+      });
 
-  // Sorted by natural roll number (CE25001...) with re-add students last, or lowest % first for the roster tab
-  const sortedStudents = [...(matrixQuery.data?.students || [])].sort((a, b) => {
-    if (rosterSortBy === "roll") {
-      const aReadd = Boolean(a.is_readd);
-      const bReadd = Boolean(b.is_readd);
-      if (aReadd !== bReadd) return aReadd ? 1 : -1;
-      return compareStudentRolls(a.roll, b.roll) || a.full_name.localeCompare(b.full_name);
+      // Refresh to confirm
+      await fetchSummary(false);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update attendance for student");
+      await fetchSummary(false);
+    } finally {
+      setTogglingStudentId(null);
     }
-    return (a.percentage - b.percentage) || compareStudentRolls(a.roll, b.roll);
-  });
+  };
 
-  const activeAvgColor = activeCourse ? healthColor(activeCourse.average_percentage) : "inherit";
+  // Sorted and filtered students
+  const majorityPfx = useMemo(() => {
+    return detectMajorityRollPrefix(summary?.roster.map((s) => s.roll_number) || []);
+  }, [summary?.roster]);
+
+  const displayedStudents = useMemo(() => {
+    if (!summary?.roster) return [];
+    let list = [...summary.roster];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (s) => s.roll_number.toLowerCase().includes(q) || s.full_name.toLowerCase().includes(q)
+      );
+    }
+
+    // Status filter
+    if (filterMode === "present") list = list.filter((s) => s.status === "present");
+    if (filterMode === "absent") list = list.filter((s) => s.status === "absent");
+
+    // Natural sort: roll numbers in natural order, re-add students at the bottom
+    return list.sort((a, b) =>
+      compareStudentsWithReaddLast(
+        { roll: a.roll_number, full_name: a.full_name, is_readd: a.is_readd },
+        { roll: b.roll_number, full_name: b.full_name, is_readd: b.is_readd },
+        majorityPfx
+      )
+    );
+  }, [summary?.roster, searchQuery, filterMode, majorityPfx]);
+
+  const totalEnrolled = summary?.total_enrolled || summary?.roster.length || 0;
+  const presentCount = summary?.present_count || summary?.roster.filter((s) => s.status === "present").length || 0;
+  const absentCount = Math.max(0, totalEnrolled - presentCount);
+  const percentage = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 0;
+  const isLive = summary?.status === "open";
 
   return (
-    <div className="attendance-teacher-section">
-      {/* 1. Course selector: horizontal tabs showing course code and title */}
-      <div className="segment modes attendance-course-tabs">
-        {courses.map((c) => {
-          const isSelected = activeCourse?.semester_course_id === c.semester_course_id;
-          return (
-            <button
-              key={c.semester_course_id}
-              type="button"
-              className={`attendance-course-tab-btn ${isSelected ? "selected" : ""}`}
-              onClick={() => setSelectedCourseId(c.semester_course_id)}
-            >
-              <strong className="course-code-tag">{c.course_code}</strong>
-              {c.course_title && (
-                <>
-                  <span className="course-title-sep">·</span>
-                  <span className="course-name-tag">{c.course_title}</span>
-                </>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeCourse && (
-        <div className="attendance-course-content">
-          {/* 2. Top numbers strip & single Export Excel button */}
-          <div className="attendance-teacher-top-strip">
-            <div className="attendance-summary-strip">
-              <span
-                className="attendance-big-pct"
-                style={{
-                  color: activeCourse.total_sessions > 0 ? activeAvgColor : "var(--muted)",
-                }}
-              >
-                {activeCourse.total_sessions > 0
-                  ? `${activeCourse.average_percentage}%`
-                  : "0%"}{" "}
-                avg
-              </span>
-              <span className="attendance-summary-sep">·</span>
-              <span className="attendance-summary-text">
-                {activeCourse.total_sessions} classes held
-              </span>
-              <span className="attendance-summary-sep">·</span>
-              <span className="attendance-summary-text">
-                {activeCourse.enrolled_students} students
-              </span>
+    <div className="fullscreen-attendance-dashboard" role="dialog" aria-modal="true">
+      {/* Top Navigation Bar */}
+      <header className="fullscreen-topbar">
+        <div className="fullscreen-topbar-left">
+          <button
+            type="button"
+            className="fullscreen-back-btn"
+            onClick={onBack}
+            aria-label="Back to sessions"
+          >
+            <ArrowLeft size={18} />
+            <div className="back-btn-text">
+              <strong>Back to Sessions</strong>
+              {isLive && <small>Session continues in background</small>}
             </div>
+          </button>
+        </div>
 
-            {/* One button: Export Excel with simple menu */}
-            <div className="attendance-export-wrapper" ref={menuRef}>
-              <button
-                className="secondary attendance-export-btn"
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                disabled={exporting}
-              >
-                <Download size={14} />
-                <span>{exporting ? "Exporting..." : "Export Excel"}</span>
-              </button>
-
-              {showExportMenu && (
-                <div className="attendance-export-menu">
-                  <button type="button" onClick={handleExportMatrix}>
-                    <FileSpreadsheet size={14} />
-                    <span>Semester Matrix (.xlsx)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportLatestSession}
-                    disabled={!activeCourse.sessions.length}
-                  >
-                    <FileSpreadsheet size={14} />
-                    <span>Latest Session (.xlsx)</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 3. Two plain text tabs: Sessions | Roster */}
-          <div className="segment modes attendance-subtabs">
-            <button
-              type="button"
-              className={activeTab === "sessions" ? "selected" : ""}
-              onClick={() => setActiveTab("sessions")}
-            >
-              Sessions
-            </button>
-            <button
-              type="button"
-              className={activeTab === "roster" ? "selected" : ""}
-              onClick={() => setActiveTab("roster")}
-            >
-              Roster
-            </button>
-          </div>
-
-          {/* TAB 1: SESSIONS */}
-          {activeTab === "sessions" && (
-            <div className="attendance-sessions-plain-list">
-              {activeCourse.sessions.length === 0 ? (
-                <div className="card attendance-empty-state-card">
-                  <div className="empty-state-icon-wrap">
-                    <Calendar size={28} />
-                  </div>
-                  <h3>No class sessions held yet</h3>
-                  <p>
-                    When attendance is taken from the Timetable, completed session records and student turnout will appear here.
-                  </p>
-                </div>
-              ) : (
-                activeCourse.sessions.map((sess) => {
-                  const dObj = new Date(sess.started_at);
-                  const dateStr = !isNaN(dObj.getTime())
-                    ? dObj.toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "";
-                  const timeStr = !isNaN(dObj.getTime())
-                    ? dObj.toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })
-                    : "";
-
-                  return (
-                    <div
-                      key={sess.session_id}
-                      className="attendance-plain-row card"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() =>
-                        setInspectSession({
-                          sessionId: sess.session_id,
-                          slotId: sess.routine_slot_id || "",
-                          courseTitle: activeCourse.course_title,
-                          courseCode: activeCourse.course_code,
-                        })
-                      }
-                    >
-                      <div className="session-left-meta">
-                        <span className="session-date-time">
-                          {dateStr} · {timeStr}
-                        </span>
-                        {sess.room && (
-                          <span className="session-room-tag">Room {sess.room}</span>
-                        )}
-                      </div>
-                      <div className="session-right-meta">
-                        <span className="session-counts-text">
-                          <strong>{sess.present_count}</strong> / {sess.total_count} present
-                        </span>
-                        {sess.status === "open" ? (
-                          <span className="session-live-tag">Live</span>
-                        ) : (
-                          <ChevronRight size={16} className="session-chevron" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: ROSTER */}
-          {activeTab === "roster" && (
-            <div className="attendance-roster-plain-section">
-              {matrixQuery.isLoading ? (
-                <div className="attendance-loading">
-                  <Skeleton />
-                </div>
-              ) : matrixQuery.isError ? (
-                <ErrorBox error={matrixQuery.error} retry={() => matrixQuery.refetch()} />
-              ) : sortedStudents.length === 0 ? (
-                <div className="card attendance-empty-state-card">
-                  <div className="empty-state-icon-wrap">
-                    <Users size={28} />
-                  </div>
-                  <h3>No student roster found</h3>
-                  <p>Students enrolled in this batch will appear here once verified.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="attendance-roster-sort-bar">
-                    <span className="roster-sort-label">Sort:</span>
-                    <button
-                      type="button"
-                      className={`roster-sort-btn ${rosterSortBy === "roll" ? "active" : ""}`}
-                      onClick={() => setRosterSortBy("roll")}
-                    >
-                      Roll (CE25001...)
-                    </button>
-                    <button
-                      type="button"
-                      className={`roster-sort-btn ${rosterSortBy === "risk" ? "active" : ""}`}
-                      onClick={() => setRosterSortBy("risk")}
-                    >
-                      At-Risk (Lowest %)
-                    </button>
-                  </div>
-                  <div className="attendance-roster-table card">
-                  {sortedStudents.map((st) => {
-                    const isEligible = st.percentage >= 75;
-                    const statusText = isEligible ? "Eligible" : "At Risk";
-                    const statusColor = healthColor(st.percentage);
-
-                    return (
-                      <div key={st.student_id} className="attendance-roster-row">
-                        <span className="roster-roll">{st.roll || "—"}</span>
-                        <span className="roster-name">{st.full_name}</span>
-                        <span className="roster-pct" style={{ color: statusColor }}>
-                          {st.percentage}%
-                        </span>
-                        <span className="roster-status" style={{ color: statusColor }}>
-                          {statusText}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+        <div className="fullscreen-topbar-center">
+          <div className="fullscreen-course-badge-row">
+            <span className="course-code-tag">{summary?.course_code || "COURSE"}</span>
+            <span className="course-title-tag">{summary?.course_title || "Attendance Session"}</span>
+            {isLive ? (
+              <span className="live-status-pill">
+                <span className="pulse-dot" />
+                <span>LIVE RFID ATTENDANCE</span>
+              </span>
+            ) : (
+              <span className="closed-status-pill">CLOSED SESSION</span>
             )}
-            </div>
+          </div>
+        </div>
+
+        <div className="fullscreen-topbar-right">
+          {isLive && (
+            <button
+              type="button"
+              className="finish-session-btn danger"
+              disabled={closing}
+              onClick={handleCloseSession}
+            >
+              <CheckCircle2 size={16} />
+              <span>{closing ? "Closing..." : "Finish & Close Attendance Session"}</span>
+            </button>
           )}
         </div>
-      )}
+      </header>
 
-      {/* Session Modal */}
-      {inspectSession && (
-        <AttendanceTeacherModal
-          sessionId={inspectSession.sessionId}
-          slotId={inspectSession.slotId}
-          courseTitle={inspectSession.courseTitle}
-          courseCode={inspectSession.courseCode}
-          onClose={() => {
-            setInspectSession(null);
-            overviewQuery.refetch();
-            if (activeTab === "roster") matrixQuery.refetch();
-          }}
-        />
-      )}
+      {/* Main Container */}
+      <main className="fullscreen-main-content">
+        {/* Statistics Bar */}
+        <div className="fullscreen-stats-row">
+          <div className="fullscreen-stat-card">
+            <span className="stat-label">Total Enrolled</span>
+            <strong className="stat-value">{totalEnrolled}</strong>
+          </div>
+
+          <div className="fullscreen-stat-card present-card">
+            <span className="stat-label">Present</span>
+            <strong className="stat-value text-green">{presentCount}</strong>
+          </div>
+
+          <div className="fullscreen-stat-card absent-card">
+            <span className="stat-label">Absent</span>
+            <strong className="stat-value text-muted">{absentCount}</strong>
+          </div>
+
+          <div className="fullscreen-stat-card pct-card">
+            <span className="stat-label">Attendance Rate</span>
+            <strong className="stat-value" style={{ color: healthColor(percentage) }}>
+              {percentage}%
+            </strong>
+          </div>
+        </div>
+
+        {/* Toolbar: Search & Filters */}
+        <div className="fullscreen-toolbar">
+          <div className="fullscreen-search-box">
+            <Search size={16} />
+            <input
+              type="search"
+              placeholder="Search by student name or roll..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search student roster"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="icon clear-search-btn"
+                onClick={() => setSearchQuery("")}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="fullscreen-filter-tabs">
+            <button
+              type="button"
+              className={filterMode === "all" ? "active" : ""}
+              onClick={() => setFilterMode("all")}
+            >
+              All ({totalEnrolled})
+            </button>
+            <button
+              type="button"
+              className={filterMode === "present" ? "active" : ""}
+              onClick={() => setFilterMode("present")}
+            >
+              Present ({presentCount})
+            </button>
+            <button
+              type="button"
+              className={filterMode === "absent" ? "active" : ""}
+              onClick={() => setFilterMode("absent")}
+            >
+              Absent ({absentCount})
+            </button>
+          </div>
+        </div>
+
+        {/* Checklist Table */}
+        {loading ? (
+          <div className="fullscreen-loading">
+            <Skeleton />
+          </div>
+        ) : error ? (
+          <ErrorBox error={error} retry={() => fetchSummary(true)} />
+        ) : (
+          <div className="checklist-table-container card">
+            <table className="checklist-table" aria-label="Student Attendance Checklist">
+              <thead>
+                <tr>
+                  <th style={{ width: "60px", textAlign: "center" }}>Check</th>
+                  <th style={{ width: "160px" }}>Student ID / Roll</th>
+                  <th>Student Name</th>
+                  <th style={{ width: "130px" }}>Status</th>
+                  <th style={{ width: "200px" }}>Method / Scanned At</th>
+                  <th style={{ width: "100px", textAlign: "right" }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "32px", color: "var(--muted)" }}>
+                      No students matching the current filter.
+                    </td>
+                  </tr>
+                ) : (
+                  displayedStudents.map((s) => {
+                    const isPresent = s.status === "present";
+                    const isPending = togglingStudentId === s.student_id;
+                    const isRfid = s.method === "rfid";
+
+                    return (
+                      <tr
+                        key={s.student_id}
+                        className={`checklist-row ${isPresent ? "row-present" : "row-absent"}`}
+                        onClick={() => handleToggleStudent(s.student_id, s.status)}
+                      >
+                        {/* Checkbox */}
+                        <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className={`checklist-checkbox-btn ${isPresent ? "checked" : ""}`}
+                            disabled={isPending}
+                            onClick={() => handleToggleStudent(s.student_id, s.status)}
+                            aria-label={`Mark ${s.full_name} as ${isPresent ? "absent" : "present"}`}
+                          >
+                            {isPresent ? <CheckSquare size={20} /> : <Square size={20} />}
+                          </button>
+                        </td>
+
+                        {/* Roll */}
+                        <td>
+                          <span className="student-roll-code">{s.roll_number || "—"}</span>
+                        </td>
+
+                        {/* Name */}
+                        <td>
+                          <span className="student-name-text">{s.full_name}</span>
+                        </td>
+
+                        {/* Status badge */}
+                        <td>
+                          {isPresent ? (
+                            <span className="status-badge present-badge">
+                              <Check size={13} />
+                              <span>Present</span>
+                            </span>
+                          ) : (
+                            <span className="status-badge absent-badge">
+                              <X size={13} />
+                              <span>Absent</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Method & Timestamp */}
+                        <td>
+                          {isPresent ? (
+                            <div className="method-pill-group">
+                              {isRfid ? (
+                                <span className="rfid-method-tag" title="Scanned via hardware RFID card">
+                                  <Radio size={13} />
+                                  <span>RFID Card</span>
+                                </span>
+                              ) : (
+                                <span className="manual-method-tag" title="Teacher checklist manual mark">
+                                  <Check size={13} />
+                                  <span>Manual</span>
+                                </span>
+                              )}
+                              {s.marked_at && (
+                                <span className="marked-time-tag">
+                                  {new Date(s.marked_at).toLocaleTimeString("en-US", {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: "var(--muted)" }}>—</span>
+                          )}
+                        </td>
+
+                        {/* Quick action button */}
+                        <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className={`mini-toggle-btn ${isPresent ? "toggle-unmark" : "toggle-mark"}`}
+                            disabled={isPending}
+                            onClick={() => handleToggleStudent(s.student_id, s.status)}
+                          >
+                            {isPending ? "..." : isPresent ? "Mark Absent" : "Mark Present"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -61,14 +61,20 @@ export async function edge(name: string, body: Row) {
         ? "Could not reach ClassMate AI. Check your connection and try again."
         : "Could not complete the file request. Check your access and try again.";
     if (error.context instanceof Response) {
-      const text = await error.context.text();
-      if (text && text.length < 400) {
-        try {
-          message =
-            JSON.parse(text).message || JSON.parse(text).error || message;
-        } catch {
-          message = text;
+      try {
+        const text = await error.context.clone().text();
+        if (text && text.length < 400) {
+          try {
+            const parsed = JSON.parse(text);
+            message = parsed.message || parsed.error || message;
+          } catch {
+            if (text.trim() && !text.includes("<html")) {
+              message = text.trim();
+            }
+          }
         }
+      } catch {
+        // Ignore clone errors
       }
     }
     throw new Error(message);

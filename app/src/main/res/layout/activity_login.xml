@@ -60,7 +60,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="An app built for CSE-22, MBSTU"
+                android:text="Your University Academic Companion"
                 android:textColor="@color/cm_text_disabled"
                 android:textSize="14sp"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -479,7 +479,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="Dept. of CSE, MBSTU"
+                android:text="ClassMate • Academic Platform"
                 android:textColor="@color/cm_text_disabled"
                 android:textSize="12sp"
                 android:textStyle="bold" />

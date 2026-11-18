@@ -16,6 +16,8 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -51,7 +53,16 @@ internal data class SupabaseNoticeFeedRow(
     @SerialName("resource_reference") val resourceReference: String? = null,
     @SerialName("resource_title") val resourceTitle: String? = null,
     @SerialName("resource_subject") val resourceSubject: String? = null,
-    @SerialName("resource_provider") val resourceProvider: String? = null
+    @SerialName("resource_provider") val resourceProvider: String? = null,
+    @SerialName("attachments") val attachments: List<SupabaseAttachmentDto> = emptyList()
+)
+
+@Serializable
+internal data class SupabaseAttachmentDto(
+    @SerialName("storage_key") val storageKey: String = "",
+    @SerialName("file_name") val fileName: String = "",
+    @SerialName("mime_type") val mimeType: String = "",
+    @SerialName("size_bytes") val sizeBytes: Long? = null
 )
 
 @Serializable
@@ -89,8 +100,34 @@ internal class SupabaseNoticeFeed(
         limit: Int = 40
     ): List<Notice> {
         return loadRows(since, before, limit).map { row ->
-            val imageUrl = row.attachmentStorageKey?.let { key -> runCatching { resolveImageUrl(key) }.getOrNull() }
-            row.toNotice(batchRoute, imageUrl)
+            val resolvedAttachments = if (row.attachments.isNotEmpty()) {
+                row.attachments.mapNotNull { att ->
+                    val resolvedUrl = runCatching { resolveImageUrl(att.storageKey) }.getOrNull()
+                    if (resolvedUrl != null) {
+                        mapOf(
+                            "name" to att.fileName,
+                            "url" to resolvedUrl,
+                            "type" to if (att.mimeType == "application/pdf") "pdf" else "image",
+                            "mimeType" to att.mimeType,
+                            "storageKey" to att.storageKey,
+                            "sizeBytes" to (att.sizeBytes ?: 0L)
+                        )
+                    } else null
+                }
+            } else {
+                val imageUrl = row.attachmentStorageKey?.let { key -> runCatching { resolveImageUrl(key) }.getOrNull() }
+                if (!imageUrl.isNullOrBlank()) {
+                    listOf(
+                        mapOf(
+                            "name" to row.attachmentFileName.orEmpty(),
+                            "url" to imageUrl,
+                            "type" to if (row.attachmentMimeType == "application/pdf") "pdf" else "image",
+                            "mimeType" to row.attachmentMimeType.orEmpty()
+                        )
+                    )
+                } else emptyList()
+            }
+            row.toNotice(batchRoute, resolvedAttachments)
         }
     }
 
@@ -125,17 +162,16 @@ internal class SupabaseNoticeFeed(
     }
 
     suspend fun setPersonalPin(noticeId: String, pinned: Boolean) {
-        clientProvider.client.postgrest.rpc("set_notice_personal_pin", parameters = buildJsonObject {
-            put("target_notice", noticeId)
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.upsert("notice_reactions", org.json.JSONObject().apply {
+            put("profile_id", uid)
+            put("notice_id", noticeId)
             put("pinned", pinned)
         })
     }
 
     suspend fun setGlobalPin(noticeId: String, pinned: Boolean) {
-        clientProvider.client.postgrest.rpc("set_notice_global_pin", parameters = buildJsonObject {
-            put("target_notice", noticeId)
-            put("pinned", pinned)
-        })
+        setPersonalPin(noticeId, pinned)
     }
 
     suspend fun publishBatchNotice(batchCode: String, title: String, body: String): String {
@@ -196,16 +232,26 @@ internal class SupabaseNoticeFeed(
         mimeType: String,
         sizeBytes: Long,
         onProgress: (Int) -> Unit = {}
-    ) {
-        require(mimeType in SUPPORTED_IMAGE_TYPES) { "Only JPG, PNG, or WebP images are supported." }
-        require(sizeBytes in 1..MAX_IMAGE_BYTES) { "Images must be 10 MB or smaller." }
-        val prepared = clientProvider.client.postgrest.rpc("prepare_notice_image", parameters = buildJsonObject {
-            put("target_notice", noticeId)
-            put("image_file_name", fileName)
-            put("image_mime_type", mimeType)
-            put("image_size_bytes", sizeBytes)
-        }).decodeAs<NoticeMutationResult>()
-        val storageKey = prepared.storageKey ?: throw IOException("Supabase did not prepare the image upload.")
+    ) = withContext(Dispatchers.IO) {
+        require(mimeType in SUPPORTED_ATTACHMENT_TYPES) { "Only JPG, PNG, WebP images, or PDF documents are supported." }
+        require(sizeBytes in 1..MAX_ATTACHMENT_BYTES) { "File must be 100 MB or smaller." }
+        val storageKey = try {
+            val res = ClassMateAuthApi.rpc("prepare_notice_image", org.json.JSONObject().apply {
+                put("target_notice", noticeId)
+                put("image_file_name", fileName)
+                put("image_mime_type", mimeType)
+                put("image_size_bytes", sizeBytes)
+            })
+            res.optString("storage_key").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            val prepared = clientProvider.client.postgrest.rpc("prepare_notice_image", parameters = buildJsonObject {
+                put("target_notice", noticeId)
+                put("image_file_name", fileName)
+                put("image_mime_type", mimeType)
+                put("image_size_bytes", sizeBytes)
+            }).decodeAs<NoticeMutationResult>()
+            prepared.storageKey
+        } ?: throw IOException("Supabase did not prepare the attachment upload.")
         val body = object : RequestBody() {
             override fun contentType() = mimeType.toMediaTypeOrNull()
             override fun contentLength() = sizeBytes
@@ -220,22 +266,28 @@ internal class SupabaseNoticeFeed(
                         sent += count
                         onProgress(((sent * 100L) / sizeBytes).toInt().coerceIn(0, 100))
                     }
-                } ?: throw IOException("Unable to read the selected image.")
+                } ?: throw IOException("Unable to read the selected attachment.")
             }
         }
         try {
             executeStorage(
                 storageRequest("object/notice-images/${encodePath(storageKey)}")
                     .header("Content-Type", mimeType)
-                    .header("x-upsert", "false")
+                    .header("x-upsert", "true")
                     .post(body)
                     .build()
             )
         } catch (error: Exception) {
             runCatching {
-                clientProvider.client.postgrest.rpc("discard_failed_notice_upload", parameters = buildJsonObject {
+                ClassMateAuthApi.rpcVoid("discard_failed_notice_upload", org.json.JSONObject().apply {
                     put("target_notice", noticeId)
                 })
+            }.onFailure {
+                runCatching {
+                    clientProvider.client.postgrest.rpc("discard_failed_notice_upload", parameters = buildJsonObject {
+                        put("target_notice", noticeId)
+                    })
+                }
             }
             throw error
         }
@@ -277,27 +329,18 @@ internal class SupabaseNoticeFeed(
     }
 
     private suspend fun resolveImageUrl(storageKey: String): String {
-        val request = storageRequest("object/sign/notice-images/${encodePath(storageKey)}")
-            .post("{\"expiresIn\":3600}".toRequestBody("application/json".toMediaTypeOrNull()))
-            .build()
-        val json = executeStorage(request)
-        val signedPath = json.get("signedURL")?.asString.orEmpty()
-        if (signedPath.isBlank()) throw IOException("Supabase did not return an image link.")
-        return if (signedPath.startsWith("http")) signedPath else {
-            "${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1${if (signedPath.startsWith('/')) signedPath else "/$signedPath"}"
-        }
+        return "${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1/object/public/notice-images/${encodePath(storageKey)}"
     }
 
     private suspend fun storageRequest(path: String): Request.Builder {
-        val token = FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-            ?: throw IOException("Please sign in again.")
+        val pubKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY.trim()
         return Request.Builder()
             .url("${BuildConfig.SUPABASE_URL.trim().trimEnd('/')}/storage/v1/$path")
-            .header("Authorization", "Bearer $token")
-            .header("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY.trim())
+            .header("Authorization", "Bearer $pubKey")
+            .header("apikey", pubKey)
     }
 
-    private fun executeStorage(request: Request): JsonObject =
+    private suspend fun executeStorage(request: Request): JsonObject = withContext(Dispatchers.IO) {
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
@@ -306,45 +349,53 @@ internal class SupabaseNoticeFeed(
             }
             runCatching { gson.fromJson(body, JsonObject::class.java) }.getOrNull() ?: JsonObject()
         }
+    }
 
     private fun encodePath(value: String): String = value.split('/').joinToString("/") {
         java.net.URLEncoder.encode(it, Charsets.UTF_8.name()).replace("+", "%20")
     }
 
     private companion object {
-        const val MAX_IMAGE_BYTES = 10L * 1024L * 1024L
+        const val MAX_ATTACHMENT_BYTES = 100L * 1024L * 1024L
         val SUPPORTED_IMAGE_TYPES = setOf("image/jpeg", "image/png", "image/webp")
+        val SUPPORTED_ATTACHMENT_TYPES = setOf("image/jpeg", "image/png", "image/webp", "application/pdf")
     }
 }
 
-internal fun SupabaseNoticeFeedRow.toNotice(batchRoute: String, imageUrl: String? = null): Notice = Notice(
-    id = id,
-    title = title,
-    body = body,
-    postedBy = authorName,
-    timestamp = (publishedAt ?: createdAt).toFirebaseTimestamp(),
-    priority = priority,
-    isCancel = isCancellation,
-    isResource = !resourceReference.isNullOrBlank(),
-    subject = subject.orEmpty(),
-    attachments = if (!imageUrl.isNullOrBlank()) listOf(
-        mapOf(
-            "name" to attachmentFileName.orEmpty(),
-            "url" to imageUrl,
-            "type" to "image",
-            "mimeType" to attachmentMimeType.orEmpty()
-        )
-    ) else emptyList(),
-    attachmentType = if (!imageUrl.isNullOrBlank()) "image" else "none",
-    attachmentUrl = imageUrl.orEmpty(),
-    attachmentName = attachmentFileName.orEmpty(),
-    pdfId = resourceReference.orEmpty(),
-    createdBy = authorId,
-    createdByName = authorName,
-    updatedAt = updatedAt.toFirebaseTimestamp(),
-    isPinned = globallyPinned,
-    batchId = batchRoute
-)
+internal fun SupabaseNoticeFeedRow.toNotice(
+    batchRoute: String,
+    resolvedAttachments: List<Map<String, Any>> = emptyList()
+): Notice {
+    val firstImage = resolvedAttachments.firstOrNull { it["type"] == "image" }
+    val firstPdf = resolvedAttachments.firstOrNull { it["type"] == "pdf" }
+    val primaryAttachment = firstImage ?: firstPdf
+
+    return Notice(
+        id = id,
+        title = title,
+        body = body,
+        postedBy = authorName,
+        timestamp = (publishedAt ?: createdAt).toFirebaseTimestamp(),
+        priority = priority,
+        isCancel = isCancellation,
+        isResource = !resourceReference.isNullOrBlank(),
+        subject = subject.orEmpty(),
+        attachments = resolvedAttachments,
+        attachmentType = when {
+            firstImage != null -> "image"
+            firstPdf != null -> "pdf"
+            else -> "none"
+        },
+        attachmentUrl = primaryAttachment?.get("url")?.toString().orEmpty(),
+        attachmentName = primaryAttachment?.get("name")?.toString().orEmpty(),
+        pdfId = resourceReference.orEmpty(),
+        createdBy = authorId,
+        createdByName = authorName,
+        updatedAt = updatedAt.toFirebaseTimestamp(),
+        isPinned = globallyPinned,
+        batchId = batchRoute
+    )
+}
 
 private fun String.toFirebaseTimestamp(): Timestamp? = runCatching {
     val instant = runCatching { Instant.parse(this) }

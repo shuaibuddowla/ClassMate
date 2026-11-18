@@ -18,10 +18,14 @@ Deno.serve(request=>withWebCors(request,async request=>{
  if(request.method!=='POST')return Response.json({message:'Method not allowed'},{status:405});
  const authorization=request.headers.get('authorization')||'';
  const url=Deno.env.get('SUPABASE_URL')||'';
- const caller=createClient(url,Deno.env.get('SUPABASE_ANON_KEY')||'',{db:{schema:'classmate'},global:{headers:{Authorization:authorization}},auth:{persistSession:false}});
- const {data:auth,error:authError}=await caller.auth.getUser(authorization.replace(/^Bearer /i,''));
+ const anonKey=Deno.env.get('SB_PUBLISHABLE_KEY')||Deno.env.get('SUPABASE_ANON_KEY')||'';
+ const serviceKey=Deno.env.get('SB_SECRET_KEY')||Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
+ const admin=createClient(url,serviceKey,{auth:{persistSession:false}});
+ const jwt=authorization.replace(/^Bearer /i,'');
+ const {data:auth,error:authError}=await admin.auth.getUser(jwt);
  if(authError||!auth.user)return Response.json({message:'Please sign in again.'},{status:401});
- const service=createClient(url,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'',{db:{schema:'classmate'},auth:{persistSession:false}});
+ const caller=createClient(url,anonKey,{db:{schema:'classmate'},global:{headers:{Authorization:authorization}},auth:{persistSession:false}});
+ const service=createClient(url,serviceKey,{db:{schema:'classmate'},auth:{persistSession:false}});
  const deadline=Date.now()+75_000;
  const call=async(client:typeof caller,name:string,args:Record<string,unknown>={})=>{
   const {data,error}=await client.rpc(name,args);if(error)throw new Error(error.message);return data;

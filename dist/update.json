@@ -1,0 +1,20 @@
+{
+  "versionCode": 46,
+  "versionName": "1.1.46",
+  "minSupportedVersionCode": 0,
+  "apkUrl": "https://github.com/shuaibuddowla/ClassMate/releases/download/v1.1.46/classmate-1.1.46.apk",
+  "apkSize": 53798298,
+  "sha256": "efdb558759c1c8c07aca8e7a1e32f285949370e2f1c486638a6f3bdbe1eee500",
+  "mandatory": false,
+  "releaseDate": "2026-11-18T09:35:00Z",
+  "releaseNotes": [
+    "Batch Fund & Dues Tracker Redesign: Compact, modern UI with 8dp spacing system and resolved button layout clipping",
+    "Single-Source Split Counts: Explicit student contribution counts in Dues Tracker without duplicate labels",
+    "Multi-Deposit Transparency: Clear labeling of total amounts and deposit counts for classmates who deposited multiple times",
+    "Relative Date Formatting: Friendly dates (Today, Yesterday, or 18 Nov 2026) across fund transactions",
+    "Notice Feed Alignment: Centered date badge positioning between notice cards and aligned Today pill",
+    "Resilient Notice Attachments: Fixed photo and PDF upload pipeline with real-time percentage progress and instant CDN delivery",
+    "Smart Notification Permission Prompt: Informative rationale bottom sheet explaining critical updates (urgent notices, class schedules, and batch funds)",
+    "Direct System Notification Settings: One-tap routing to app notification settings if permissions were previously denied"
+  ]
+}

@@ -107,11 +107,20 @@ class MainActivity : AppCompatActivity() {
     private var resettingChildBackStack = false
     private val attachedRecyclerScrollListeners = mutableMapOf<RecyclerView, RecyclerView.OnScrollListener>()
 
+    private var userDismissedNotificationPromptThisLaunch = false
+    private var notificationPromptSheet: com.google.android.material.bottomsheet.BottomSheetDialog? = null
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (!isGranted) {
-            showPermissionRationaleDialog()
+        appPrefs.setHasRequestedNotificationPermission(true)
+        if (isGranted) {
+            notificationPromptSheet?.dismiss()
+            notificationPromptSheet = null
+            Toast.makeText(this, "Notifications enabled! You'll stay updated.", Toast.LENGTH_SHORT).show()
+        } else {
+            val btnAllow = notificationPromptSheet?.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAllowNotifications)
+            btnAllow?.text = "Open Settings & Enable"
         }
     }
 
@@ -612,6 +621,12 @@ class MainActivity : AppCompatActivity() {
         WidgetUpdater.refresh(this)
         refreshUnreadNoticeBadge()
         handleNotificationRouting()
+        if (isNotificationPermissionGranted()) {
+            notificationPromptSheet?.dismiss()
+            notificationPromptSheet = null
+        } else if (notificationPromptSheet?.isShowing != true && !userDismissedNotificationPromptThisLaunch) {
+            checkNotificationPermission()
+        }
     }
 
     private fun applySystemBars() {
@@ -779,27 +794,112 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                if (!shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
+    private fun isNotificationPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()
         }
     }
 
-    private fun showPermissionRationaleDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Notification Permission Needed")
-            .setMessage("ClassMate needs permission to show you important notices.")
-            .setPositiveButton("OK") { _, _ ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun checkNotificationPermission() {
+        if (isFinishing || isDestroyed) return
+        if (userDismissedNotificationPromptThisLaunch) return
+        if (isNotificationPermissionGranted()) {
+            notificationPromptSheet?.dismiss()
+            notificationPromptSheet = null
+            return
+        }
+        showNotificationPermissionSheet()
+    }
+
+    private fun showNotificationPermissionSheet() {
+        if (isFinishing || isDestroyed) return
+        if (notificationPromptSheet?.isShowing == true) return
+
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(
+            this,
+            R.style.Theme_ClassMate_BottomSheetDialog
+        )
+        val view = layoutInflater.inflate(R.layout.dialog_notification_permission, null, false)
+        dialog.setContentView(view)
+
+        dialog.setOnShowListener {
+            val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            if (bottomSheet != null) {
+                val behavior = com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet)
+                behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                behavior.skipCollapsed = true
+            }
+        }
+
+        val btnAllow = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAllowNotifications)
+        val btnLater = view.findViewById<View>(R.id.btnDismissNotificationPrompt)
+
+        val isPermanentlyDenied = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            appPrefs.hasRequestedNotificationPermission() && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            !androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()
+        }
+
+        if (isPermanentlyDenied) {
+            btnAllow?.text = "Open Settings & Enable"
+        } else {
+            btnAllow?.text = "Allow Notifications"
+        }
+
+        btnAllow?.setOnClickListener {
+            HapticHelper.lightPop(it)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val needsSettings = appPrefs.hasRequestedNotificationPermission() &&
+                    !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+                if (needsSettings) {
+                    openNotificationSettings()
+                } else {
                     requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+            } else {
+                openNotificationSettings()
             }
-            .setNegativeButton("No Thanks", null)
-            .show()
+        }
+
+        btnLater?.setOnClickListener {
+            HapticHelper.lightPop(it)
+            userDismissedNotificationPromptThisLaunch = true
+            dialog.dismiss()
+        }
+
+        dialog.setOnDismissListener {
+            notificationPromptSheet = null
+        }
+
+        notificationPromptSheet = dialog
+        dialog.show()
+    }
+
+    private fun openNotificationSettings() {
+        try {
+            val intent = Intent().apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    action = android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                    putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                } else {
+                    action = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                    data = android.net.Uri.fromParts("package", packageName, null)
+                }
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.fromParts("package", packageName, null)
+                }
+                startActivity(intent)
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

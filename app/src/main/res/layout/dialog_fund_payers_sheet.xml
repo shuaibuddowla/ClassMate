@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogPayersRoot"
     android:layout_width="match_parent"
-    android:layout_height="640dp"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_bottom_sheet"
+    android:clipToPadding="false"
     android:padding="20dp">
 
     <!-- Handle bar -->
@@ -15,10 +17,11 @@
         android:background="#CBD5E1"
         android:layout_marginBottom="14dp" />
 
+    <!-- Sheet Header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Payers Tracker"
+        android:text="Dues Tracker"
         android:textColor="@color/cm_text_primary"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -27,19 +30,23 @@
         android:id="@+id/tvPayersSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Track all batchmates' contributions &amp; dues by collection title."
+        android:text="Track batchmates' contributions &amp; dues by campaign."
         android:textColor="@color/cm_text_secondary"
-        android:textSize="13sp"
+        android:textSize="12.5sp"
         android:layout_marginTop="2dp" />
 
-    <!-- Collection Filter Chips (Horizontally Scrollable) -->
+    <!-- Collection Filter Chips (Horizontally Scrollable with Fade Edge) -->
     <HorizontalScrollView
         android:id="@+id/hsvPayersCollections"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
         android:scrollbars="none"
-        android:overScrollMode="never">
+        android:overScrollMode="never"
+        android:requiresFadingEdge="horizontal"
+        android:fadingEdgeLength="24dp"
+        android:clipToPadding="false"
+        android:paddingEnd="20dp">
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/chipGroupPayersCollections"
@@ -49,23 +56,174 @@
             app:selectionRequired="true" />
     </HorizontalScrollView>
 
-    <!-- Search Box -->
+    <!-- Campaign Summary Card (Visual Anchor) -->
+    <LinearLayout
+        android:id="@+id/cardCampaignSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_fund_card"
+        android:padding="14dp"
+        android:layout_marginTop="10dp">
+
+        <!-- Top row: Campaign Title & Secondary Copy Unpaid Button (Neutral/Teal) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvSheetCampaignTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Orientation"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="15.5sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCopyUnpaid"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:text="Copy Unpaid"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                app:icon="@drawable/ic_copy"
+                app:iconSize="13dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="17dp"
+                android:textColor="#0D9488"
+                app:iconTint="#0D9488"
+                app:backgroundTint="#CCFBF1"
+                app:strokeColor="#99F6E4"
+                app:strokeWidth="1dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Stats row: Paid vs Unpaid -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tvSheetPaidStat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="29 of 58 Paid"
+                android:textColor="#16A34A"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSheetUnpaidStat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="৳ 28,000 Collected"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Progress bar -->
+        <ProgressBar
+            android:id="@+id/pbSheetCampaign"
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progress="50"
+            android:progressTint="#10B981"
+            android:progressBackgroundTint="#E2E8F0" />
+    </LinearLayout>
+
+    <!-- Unified Search Box with 16dp rounded corners -->
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilPayersSearch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         app:boxBackgroundMode="outline"
-        app:startIconDrawable="@drawable/ic_search_modern">
+        app:boxCornerRadiusTopStart="16dp"
+        app:boxCornerRadiusTopEnd="16dp"
+        app:boxCornerRadiusBottomStart="16dp"
+        app:boxCornerRadiusBottomEnd="16dp"
+        app:boxStrokeColor="@color/cm_border"
+        app:startIconDrawable="@drawable/ic_search_modern"
+        app:startIconTint="@color/cm_text_secondary"
+        app:endIconMode="clear_text">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etPayersSearch"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="46dp"
             android:hint="Search by name or student ID"
             android:singleLine="true"
             android:textSize="13sp"
             android:textColor="@color/cm_text_primary" />
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Segmented Filter Pills (Unpaid / Paid / All) -->
+    <LinearLayout
+        android:id="@+id/layoutPayersFilterTabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tabPayersUnpaid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Unpaid"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tabPayersPaid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Paid"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tabPayersAll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="All"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:clickable="true"
+            android:focusable="true" />
+    </LinearLayout>
 
     <!-- Shimmer Skeleton Loading -->
     <include
@@ -82,7 +240,9 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="10dp">
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:paddingBottom="36dp">
 
         <LinearLayout
             android:id="@+id/payersItemsContainer"

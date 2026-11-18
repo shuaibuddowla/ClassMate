@@ -36,6 +36,9 @@ import {
   ArrowLeft,
   ChevronRight,
   Bus,
+  CircleHelp,
+  GraduationCap,
+  ShieldAlert,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -51,6 +54,7 @@ import { useAcademic } from "@/lib/queries";
 import { Notices, NoticeDetailModal } from "./notices";
 import { Library } from "./library";
 import { Friends } from "./friends";
+import { TeachersDirectory } from "./teachers-directory";
 import { Profile, ProfileForm } from "./profile";
 import { enablePush, removePush, restorePush, syncPushIdentity } from "@/lib/push";
 const ClassMateAI = lazy(() => import("./classmate-ai"));
@@ -163,6 +167,7 @@ function SessionApp() {
   const [user, setUser] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [profile, setProfile] = useState<Row | null>(null),
+    [activeBan, setActiveBan] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null),
     [stage, setStage] = useState(""),
     [pushError, setPushError] = useState<unknown>(null),
@@ -172,6 +177,13 @@ function SessionApp() {
     [mobileLandingStep, setMobileLandingStep] = useState<"overview" | "signin">("overview");
   const qc = useQueryClient();
   const activeUser = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || !profile) return;
+    let live = true;
+    const refreshBan = () => rpc<Row | null>("active_student_ban").then((value) => { if (live) setActiveBan(value); }).catch(() => {});
+    const timer = window.setInterval(refreshBan, 5000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, [user, profile?.id]);
   useEffect(() => {
     const theme = localStorage.getItem("classmate:theme") || "light";
     setTheme(theme);
@@ -238,20 +250,31 @@ function SessionApp() {
           avatar_url: metadata.avatar_url || metadata.picture,
         };
         if (p.role === "student" && !p.department_id) {
-          const prefix = /^([a-z]+)[0-9]{2}[0-9]{3,4}@mbstu\.ac\.bd$/.exec(
-            String(p.email).toLowerCase(),
-          )?.[1];
-          if (prefix) {
-            const matches = (
-              await rows("departments", { is_active: true }, "id,email_prefix")
-            ).filter((d) => d.email_prefix === prefix);
-            if (matches.length === 1)
+          const emailLower = String(p.email || "").toLowerCase();
+          if (emailLower.endsWith("@ru.ac.bd")) {
+            const ruDepts = await rows("departments", { is_active: true, code: "fisheries" }, "id");
+            if (ruDepts.length === 1) {
               p = {
                 ...(await rpc<Row>("complete_student_onboarding", {
-                  selected_department: matches[0].id,
+                  selected_department: ruDepts[0].id,
                 })),
                 avatar_url: p.avatar_url,
               };
+            }
+          } else {
+            const prefix = /^([a-z]+)[0-9]{2}[0-9]{3,4}@[a-z0-9.-]+\.ac\.bd$/.exec(emailLower)?.[1];
+            if (prefix) {
+              const matches = (
+                await rows("departments", { is_active: true }, "id,email_prefix")
+              ).filter((d) => d.email_prefix === prefix);
+              if (matches.length === 1)
+                p = {
+                  ...(await rpc<Row>("complete_student_onboarding", {
+                    selected_department: matches[0].id,
+                  })),
+                  avatar_url: p.avatar_url,
+                };
+            }
           }
         }
         if (sessionStorage.getItem("classmate:sign-in-mode") === "teacher" && p.role !== "teacher") {
@@ -259,15 +282,12 @@ function SessionApp() {
           await client.auth.signOut({scope:"local"});
           throw new Error("This email is not approved as a teacher. Ask your administrator to approve your email and assign a course.");
         }
-        if (sessionStorage.getItem("classmate:sign-in-mode") === "student" && !p.email?.toLowerCase().endsWith("@mbstu.ac.bd")) {
-          sessionStorage.removeItem("classmate:sign-in-mode");
-          await client.auth.signOut({scope:"local"});
-          throw new Error("Student sign-in requires your @mbstu.ac.bd university email. Approved teachers should use Teacher sign-in.");
-        }
         sessionStorage.removeItem("classmate:sign-in-mode");
         if (!live) return;
         setUser(id);
         setProfile(p);
+        const ban = await rpc<Row | null>("active_student_ban").catch(() => null);
+        setActiveBan(ban);
         saveIdentity(p);
         const signed = new URL(location.href).searchParams.has("signedin");
         history.replaceState({}, "", location.pathname + location.hash);
@@ -353,7 +373,6 @@ function SessionApp() {
         options: {
           redirectTo: `${location.origin}/auth/callback`,
           queryParams: {
-            ...(roleMode === "student" ? { hd: "mbstu.ac.bd" } : {}),
             prompt: "select_account",
           },
         },
@@ -504,7 +523,7 @@ function SessionApp() {
                 <Lock size={12} aria-hidden="true" />
                 <span>
                   {roleMode === "student"
-                    ? "Requires @mbstu.ac.bd account"
+                    ? "Requires university Google account"
                     : "Requires verified mail account"}
                 </span>
               </p>
@@ -542,7 +561,7 @@ function SessionApp() {
                 </div>
 
                 {/* Eyebrow */}
-                <span className="mobile-overview-eyebrow">CAMPUS COMPANION • MBSTU</span>
+                <span className="mobile-overview-eyebrow">CAMPUS COMPANION</span>
 
                 {/* Headline */}
                 <h1 className="mobile-overview-headline">
@@ -665,7 +684,7 @@ function SessionApp() {
                   <Lock size={12} aria-hidden="true" />
                   <span>
                     {roleMode === "student"
-                      ? "Requires @mbstu.ac.bd account"
+                      ? "Requires university Google account"
                       : "Requires verified mail account"}
                   </span>
                 </p>
@@ -726,6 +745,19 @@ function SessionApp() {
       </main>
       </>
     );
+  if (activeBan)
+    return <main className="ban-gate" role="alertdialog" aria-modal="true" aria-labelledby="ban-title" aria-describedby="ban-reason">
+      <section className="ban-gate-card">
+        <div className="ban-gate-emblem"><ShieldAlert size={30} strokeWidth={1.8}/></div>
+        <span className="ban-gate-kicker">ACCOUNT ACCESS NOTICE</span>
+        <h1 id="ban-title">ClassMate access is paused</h1>
+        <p className="ban-gate-intro">Your account has a temporary restriction for this batch.</p>
+        <div className="ban-gate-reason"><span>REASON</span><p id="ban-reason">{activeBan.reason?.trim() || "No reason was provided. Please contact your batch representative for details."}</p></div>
+        <div className="ban-gate-return"><span>ACCESS EXPECTED TO RETURN</span><strong>{activeBan.ends_at ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dhaka" }).format(new Date(activeBan.ends_at)) + " (Bangladesh time)" : "When the restriction expires"}</strong></div>
+        <div className="ban-gate-help"><strong>Need a review?</strong><span>Contact your batch CR or a ClassMate administrator. They can review or remove the restriction.</span></div>
+        <div className="ban-gate-lock"><Lock size={15}/> This notice stays until access is restored.</div>
+      </section>
+    </main>;
   return (
     <>
       <AndroidInstallPopup />
@@ -737,6 +769,7 @@ function SessionApp() {
         theme={theme}
         setTheme={setTheme}
       />
+
       {pushError && (
         <div className="push-feedback" role="status">
           <ErrorBox error={pushError} />
@@ -939,6 +972,7 @@ function TabDeck({
           signOut={signOut}
         />
       );
+    if (value === "teachers") return <TeachersDirectory ctx={active} />;
     if (value === "manage")
       return (
         <Suspense fallback={<Skeleton />}>
@@ -980,7 +1014,7 @@ function TabDeck({
       );
     }
     if (value === "attendance") {
-      if (ctx.profile.role !== "teacher" || active.batchInfo?.attendance_enabled !== true) {
+      if (ctx.profile.role !== "teacher") {
         return <Schedule ctx={active} />;
       }
       return (
@@ -1138,6 +1172,10 @@ function Home({
     };
   }, [user, batch, qc]);
   const info = batches.data?.find((b) => b.id === batch) || {};
+  const hasBusTransit = Boolean(
+    (info as Row)?.institution?.has_bus_transit ??
+    ((info as Row)?.departments?.code !== "fisheries" && !profile?.email?.toLowerCase().endsWith("@ru.ac.bd"))
+  );
   useEffect(() => {
     let live = true;
     const navigate = async () => {
@@ -1174,6 +1212,8 @@ function Home({
           } else {
             setTab("timetable");
           }
+        } else if (targetTab === "transit" && !hasBusTransit) {
+          setTab("timetable");
         } else {
           setTab(targetTab);
         }
@@ -1236,30 +1276,49 @@ function Home({
       history.pushState({ classmateAttendance: true }, "", "/#attendance");
       setTab("admin-attendance");
     },
-    transit: () => {
+    transit: hasBusTransit ? () => {
       history.pushState({ classmateTransit: true }, "", "/#transit");
       setTab("transit");
-    },
+    } : undefined,
   };
   const isTeacher = profile.role === "teacher";
   const isAdmin = profile.role === "admin" || owner.data === true;
-  const desktopDestinations = [
-    ["timetable", "Timetable", CalendarDays],
-    ["transit", "Transit", Bus],
-    ...(isTeacher && info.attendance_enabled === true ? [["attendance", "Attendance", QrCode] as const] : []),
-    ...(isAdmin ? [["admin-attendance", "Manage Attendance", Radio] as const] : []),
-    ["notices", "Notices", Bell],
-    ["library", "Courses", BookOpen],
-    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
-    ["profile", "Settings", Settings],
-  ] as const;
-  const mobileDestinations = [
-    ["timetable", "Timetable", CalendarDays],
-    ["notices", "Notices", Bell],
-    ["friends", profile.role === "teacher" ? "Students" : "Batch", Users],
-    ["library", "Courses", BookOpen],
-    ["profile", "Settings", Settings],
-  ] as const;
+  const desktopDestinations = isTeacher
+    ? ([
+        ["timetable", "Timetable", CalendarDays],
+        ["attendance", "Attendance", Radio],
+        ["library", "Courses", BookOpen],
+        ["notices", "Notices", Bell],
+        ["friends", "Students", Users],
+        ["profile", "Settings", Settings],
+      ] as const)
+    : ([
+        ["timetable", "Timetable", CalendarDays],
+        ...(hasBusTransit ? [["transit", "Transit", Bus] as const] : []),
+        ...(isAdmin ? [["admin-attendance", "Manage Attendance", Radio] as const] : []),
+        ["notices", "Notices", Bell],
+        ["library", "Courses", BookOpen],
+        ["teachers", "Teachers", GraduationCap],
+        ["friends", "Batch", Users],
+        ["profile", "Settings", Settings],
+      ] as const);
+
+  const mobileDestinations = isTeacher
+    ? ([
+        ["timetable", "Timetable", CalendarDays],
+        ["attendance", "Attendance", Radio],
+        ["library", "Courses", BookOpen],
+        ["notices", "Notices", Bell],
+        ["friends", "Students", Users],
+        ["profile", "Settings", Settings],
+      ] as const)
+    : ([
+        ["timetable", "Timetable", CalendarDays],
+        ["notices", "Notices", Bell],
+        ["friends", "Batch", Users],
+        ["library", "Courses", BookOpen],
+        ["profile", "Settings", Settings],
+      ] as const);
   const select = (value: string) => {
     if (value === tab) return;
     setTab(value);
@@ -1282,7 +1341,7 @@ function Home({
     );
   };
   const navigationTab =
-    tab === "ai" || (!desktop && tab === "admin-attendance")
+    tab === "ai" || (!desktop && (tab === "admin-attendance" || tab === "teachers" || tab === "transit"))
       ? "profile"
       : desktop && tab === "notices"
       ? "timetable"

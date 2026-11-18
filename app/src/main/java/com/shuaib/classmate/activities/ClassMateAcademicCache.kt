@@ -21,6 +21,7 @@ internal object ClassMateAcademicCache {
         prefs(context).edit().putString("$user:$batch:$kind", data.toString()).apply()
     }
     fun home(context: Context): JSONObject? = read(context, "identity", "home", "profile")
+    fun institution(context: Context): JSONObject? = read(context, "identity", "home", "institution")
     fun renameCourse(context: Context, offeringIds: Set<String>, title: String, code: String) {
         val storage = prefs(context)
         val edit = storage.edit()
@@ -42,9 +43,56 @@ internal object ClassMateAcademicCache {
         }
         edit.apply()
     }
-    fun saveHome(context: Context, profile: JSONObject, batch: String, label: String) {
-        if (profile.optString("verification_status") == "active" && batch.isNotBlank())
+    fun saveHome(context: Context, profile: JSONObject, batch: String, label: String, institution: JSONObject? = null) {
+        if (profile.optString("verification_status") == "active" && batch.isNotBlank()) {
             save(context, "identity", "home", "profile", JSONObject().put("profile", profile).put("batch", batch).put("label", label))
+            val effectiveInst = institution ?: institution(context)
+            if (effectiveInst != null) {
+                save(context, "identity", "home", "institution", effectiveInst)
+            }
+        }
+    }
+    fun weekendDays(context: Context): Set<java.time.DayOfWeek> {
+        val inst = institution(context)
+        val arr = inst?.optJSONArray("weekend_days")
+        if (arr != null && arr.length() > 0) {
+            val days = mutableSetOf<java.time.DayOfWeek>()
+            for (i in 0 until arr.length()) {
+                val iso = arr.optInt(i)
+                if (iso in 1..7) days.add(java.time.DayOfWeek.of(iso))
+            }
+            if (days.isNotEmpty()) return days
+        }
+        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
+        return if (email.endsWith("@ru.ac.bd")) {
+            setOf(java.time.DayOfWeek.FRIDAY, java.time.DayOfWeek.SATURDAY)
+        } else {
+            setOf(java.time.DayOfWeek.THURSDAY, java.time.DayOfWeek.FRIDAY)
+        }
+    }
+    fun hasBusTransit(context: Context): Boolean {
+        val inst = institution(context)
+        if (inst != null) return inst.optBoolean("has_bus_transit", false)
+        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
+        return !email.endsWith("@ru.ac.bd")
+    }
+    fun hasAcademicCalendar(context: Context): Boolean {
+        val inst = institution(context)
+        if (inst != null) return inst.optBoolean("has_academic_calendar", false)
+        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
+        return !email.endsWith("@ru.ac.bd")
+    }
+    fun supportContactUrl(context: Context): String {
+        return institution(context)?.optString("support_contact_url").takeIf { !it.isNullOrBlank() }
+            ?: "https://facebook.com/shuaibuddowla"
+    }
+    fun institutionShortName(context: Context): String {
+        return institution(context)?.optString("short_name").takeIf { !it.isNullOrBlank() }
+            ?: if (home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase().endsWith("@ru.ac.bd")) "RU" else "MBSTU"
+    }
+    fun institutionName(context: Context): String {
+        return institution(context)?.optString("name").takeIf { !it.isNullOrBlank() }
+            ?: if (home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase().endsWith("@ru.ac.bd")) "University of Rajshahi" else "Mawlana Bhashani Science and Technology University"
     }
     fun invalidateSchedules(context: Context, user: String, batch: String) {
         // Keep the last successful sync usable if the next refresh fails or goes offline.

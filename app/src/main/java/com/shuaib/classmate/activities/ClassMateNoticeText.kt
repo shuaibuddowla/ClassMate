@@ -2,6 +2,7 @@ package com.shuaib.classmate.activities
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
 import android.text.Layout
 import android.text.Selection
@@ -14,6 +15,10 @@ import android.text.method.ArrowKeyMovementMethod
 import android.text.style.BackgroundColorSpan
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StrikethroughSpan
+import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
 import android.text.style.UnderlineSpan
 import android.view.MotionEvent
 import android.view.View
@@ -22,6 +27,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.doOnLayout
 import com.shuaib.classmate.R
+import com.shuaib.classmate.utils.ThemeColors
 import java.util.regex.Pattern
 import kotlin.math.hypot
 
@@ -29,6 +35,12 @@ internal object ClassMateNoticeText {
     const val MAX_PREVIEW_LINES = 5
     const val SUFFIX_MORE = "… see more"
     const val SUFFIX_LESS = "  see less"
+
+    val BOLD_PATTERN: Pattern = Pattern.compile("(?<=(?:^|[\\s(\\[{\"'`]))(?:\\*\\*|\\*)([^\\s\\*](?:[^\\*\n]*?[^\\s\\*])?)(?:\\*\\*|\\*)(?=(?:$|[\\s)\\]}'\",.!?`]))")
+    val ITALIC_PATTERN: Pattern = Pattern.compile("(?<=(?:^|[\\s(\\[{\"'`]))_([^\\s_](?:[^_\n]*?[^\\s_])?)_(?=(?:$|[\\s)\\]}'\",.!?`]))")
+    val STRIKE_PATTERN: Pattern = Pattern.compile("(?<=(?:^|[\\s(\\[{\"'`]))(?:~~|~)([^\\s~](?:[^~\n]*?[^\\s~])?)(?:~~|~)(?=(?:$|[\\s)\\]}'\",.!?`]))")
+    val MONO_PATTERN: Pattern = Pattern.compile("(?<=(?:^|[\\s(\\[{\"'`]))(?:```|`)([^\\s`\n](?:[^`\n]*?[^\\s`\n])?)(?:```|`)(?=(?:$|[\\s)\\]}'\",.!?`]))")
+    val BULLET_LINE_PATTERN: Pattern = Pattern.compile("(?m)^(\\s*)(?:[-*])\\s+")
 
     val WEB_URL_PATTERN: Pattern = Pattern.compile(
         "(?:https?://|www\\.)[a-zA-Z0-9+&@#/%?=~_|!:,.;-]*[a-zA-Z0-9+&@#/%=~_|-]|" +
@@ -77,9 +89,79 @@ internal object ClassMateNoticeText {
         }
     }
 
+    fun parseMarkup(context: Context, rawText: String, isForNotification: Boolean = false): SpannableStringBuilder {
+        if (rawText.isBlank()) return SpannableStringBuilder("")
+
+        // 1. Normalize bullet prefixes at start of lines (- or * followed by space)
+        val normalizedText = BULLET_LINE_PATTERN.matcher(rawText).replaceAll("$1• ")
+        val builder = SpannableStringBuilder(normalizedText)
+
+        // 2. Monospace: ```code``` or `code`
+        if (isForNotification) {
+            applyInlineMarkup(builder, MONO_PATTERN) {
+                listOf(
+                    TypefaceSpan("monospace"),
+                    RelativeSizeSpan(0.92f)
+                )
+            }
+        } else {
+            val isDark = ThemeColors.isDark(context)
+            val monoBgColor = if (isDark) 0xFF27272A.toInt() else 0xFFF4F4F5.toInt()
+            val monoTextColor = if (isDark) 0xFFE4E4E7.toInt() else 0xFF27272A.toInt()
+
+            applyInlineMarkup(builder, MONO_PATTERN) {
+                listOf(
+                    TypefaceSpan("monospace"),
+                    BackgroundColorSpan(monoBgColor),
+                    ForegroundColorSpan(monoTextColor),
+                    RelativeSizeSpan(0.92f)
+                )
+            }
+        }
+
+        // 3. Bold: *bold* or **bold**
+        applyInlineMarkup(builder, BOLD_PATTERN) {
+            listOf(StyleSpan(Typeface.BOLD))
+        }
+
+        // 4. Italic: _italic_
+        applyInlineMarkup(builder, ITALIC_PATTERN) {
+            listOf(StyleSpan(Typeface.ITALIC))
+        }
+
+        // 5. Strikethrough: ~strike~ or ~~strike~~
+        applyInlineMarkup(builder, STRIKE_PATTERN) {
+            listOf(StrikethroughSpan())
+        }
+
+        return builder
+    }
+
+    private fun applyInlineMarkup(
+        builder: SpannableStringBuilder,
+        pattern: Pattern,
+        createSpans: () -> List<Any>
+    ) {
+        var offset = 0
+        val matcher = pattern.matcher(builder)
+        while (offset < builder.length && matcher.find(offset)) {
+            val matchStart = matcher.start()
+            val matchEnd = matcher.end()
+            val content = matcher.group(1) ?: ""
+            builder.replace(matchStart, matchEnd, content)
+            val contentEnd = matchStart + content.length
+            for (span in createSpans()) {
+                builder.setSpan(span, matchStart, contentEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            offset = contentEnd
+            matcher.reset(builder)
+        }
+    }
+
     fun styled(view: TextView, text: String, query: String): SpannableStringBuilder {
-        val result = SpannableStringBuilder(text)
-        val matcher = WEB_URL_PATTERN.matcher(text)
+        val result = parseMarkup(view.context, text)
+        val textStr = result.toString()
+        val matcher = WEB_URL_PATTERN.matcher(textStr)
         val linkColor = view.context.getColor(R.color.cm_primary)
         while (matcher.find()) {
             val start = matcher.start()
@@ -107,8 +189,8 @@ internal object ClassMateNoticeText {
 
         if (query.isNotBlank()) {
             var from = 0
-            while (from < text.length) {
-                val found = text.indexOf(query, from, ignoreCase = true)
+            while (from < textStr.length) {
+                val found = textStr.indexOf(query, from, ignoreCase = true)
                 if (found < 0) break
                 result.setSpan(
                     BackgroundColorSpan(view.context.getColor(R.color.cm_search_highlight)),
@@ -293,20 +375,23 @@ internal object ClassMateNoticeText {
                     view.includeFontPadding, view.lineSpacingExtra, view.lineSpacingMultiplier
                 )
                 val targetLine = (MAX_PREVIEW_LINES - 1).coerceAtMost(layout.lineCount - 1)
-                val lineEnd = layout.getLineEnd(targetLine).coerceAtMost(body.length)
+                val lineEnd = layout.getLineEnd(targetLine).coerceAtMost(fullStyled.length)
 
                 fun makeCandidate(cutoff: Int): SpannableStringBuilder {
-                    var safeCutoff = cutoff.coerceIn(0, body.length)
-                    if (safeCutoff > 0 && Character.isHighSurrogate(body[safeCutoff - 1])) safeCutoff--
-                    val matcher = WEB_URL_PATTERN.matcher(body)
+                    var safeCutoff = cutoff.coerceIn(0, fullStyled.length)
+                    if (safeCutoff > 0 && Character.isHighSurrogate(fullStyled[safeCutoff - 1])) safeCutoff--
+                    val textStr = fullStyled.toString()
+                    val matcher = WEB_URL_PATTERN.matcher(textStr)
                     while (matcher.find()) {
                         if (safeCutoff in (matcher.start() + 1)..matcher.end()) {
                             safeCutoff = matcher.start()
                             break
                         }
                     }
-                    val prefix = body.take(safeCutoff).trimEnd()
-                    val candidate = SpannableStringBuilder(styled(view, prefix, query)).append(SUFFIX_MORE)
+                    while (safeCutoff > 0 && textStr[safeCutoff - 1].isWhitespace()) {
+                        safeCutoff--
+                    }
+                    val candidate = SpannableStringBuilder(fullStyled.subSequence(0, safeCutoff)).append(SUFFIX_MORE)
                     val toggleSpan = object : ClickableSpan() {
                         override fun onClick(widget: View) = onToggleExpand()
                         override fun updateDrawState(ds: TextPaint) {

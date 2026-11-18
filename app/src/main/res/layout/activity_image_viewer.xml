@@ -13,6 +13,13 @@
         android:layout_height="match_parent"
         android:scaleType="fitCenter" />
 
+    <!-- Full-screen multi-image carousel pager -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPagerImages"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <!-- Loading indicator while image is downloading -->
     <ProgressBar
         android:id="@+id/progressBarImage"

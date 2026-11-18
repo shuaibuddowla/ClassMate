@@ -246,7 +246,7 @@ export function Profile({
   const isDifferentBatch = Boolean(ctx.batch && ctx.profile.batch_id && ctx.batch !== ctx.profile.batch_id);
   const displayBatch = (ctx.profile.role === "student" && homeBatch) ? homeBatch : activeBatch;
 
-  const deptCode = displayBatch?.departments?.code?.toUpperCase() || "MBSTU";
+  const deptCode = displayBatch?.departments?.code?.toUpperCase() || (displayBatch?.institution?.short_name || "CAMPUS");
   const batchNum = displayBatch?.batch_number ? `Batch ${displayBatch.batch_number}` : "";
   const batchValue = batchNum ? `${deptCode} · ${batchNum}` : deptCode;
   const batchSession = displayBatch?.academic_session
@@ -509,26 +509,28 @@ export function Profile({
           </button>
         )}
 
-        <button
-          type="button"
-          className="settings-row"
-          onClick={() => {
-            if (ctx.transit) {
-              ctx.transit();
-            } else {
-              location.hash = "transit";
-            }
-          }}
-        >
-          <div className="setting-icon-box cyan">
-            <Bus size={18} />
-          </div>
-          <div className="settings-row-text">
-            <span>MBSTU Bus Transit</span>
-            <small>Live bus radar, stoppage routes &amp; schedules</small>
-          </div>
-          <ChevronRight size={18} className="chevron" />
-        </button>
+        {Boolean(ctx.transit) && (
+          <button
+            type="button"
+            className="settings-row"
+            onClick={() => {
+              if (ctx.transit) {
+                ctx.transit();
+              } else {
+                location.hash = "transit";
+              }
+            }}
+          >
+            <div className="setting-icon-box cyan">
+              <Bus size={18} />
+            </div>
+            <div className="settings-row-text">
+              <span>{((ctx.batchInfo?.institution as Row)?.short_name as string) || "Campus"} Bus Transit</span>
+              <small>Live bus radar, stoppage routes &amp; schedules</small>
+            </div>
+            <ChevronRight size={18} className="chevron" />
+          </button>
+        )}
 
         <div className="settings-row settings-batch-row">
           <div className="settings-batch-header">

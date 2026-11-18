@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/bg_doodle_tile_dark"
-    android:tileMode="repeat"
-    android:dither="true" />
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="@color/wa_wallpaper_bg" />
+    </item>
+    <item>
+        <bitmap
+            android:src="@drawable/bg_doodle_tile_dark"
+            android:tileMode="repeat"
+            android:dither="true" />
+    </item>
+</layer-list>

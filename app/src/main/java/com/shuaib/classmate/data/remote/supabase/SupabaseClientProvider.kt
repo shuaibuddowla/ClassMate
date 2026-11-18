@@ -27,10 +27,11 @@ class SupabaseClientProvider @Inject constructor(
 
         createSupabaseClient(url, publishableKey) {
             accessToken = {
-                firebaseAuth.currentUser
-                    ?.getIdToken(false)
-                    ?.await()
-                    ?.token
+                ClassMateAuthApi.accessToken
+                    ?: firebaseAuth.currentUser
+                        ?.getIdToken(false)
+                        ?.await()
+                        ?.token
             }
             install(Postgrest)
         }

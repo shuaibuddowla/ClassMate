@@ -7,6 +7,7 @@ import {
   Radio,
   Play,
   Square,
+  CheckSquare,
   Search,
   CreditCard,
   Users,
@@ -29,6 +30,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { downloadCourseMatrixExcel, isRecordPresent } from "@/lib/attendance-excel";
+import { FullscreenSessionDashboard } from "./teacher-attendance";
 
 interface StudentItem {
   student_id: string;
@@ -118,6 +120,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   const [matrixData, setMatrixData] = useState<MatrixData | null>(null);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [exportingCourseId, setExportingCourseId] = useState<string | null>(null);
+  const [inspectSessionId, setInspectSessionId] = useState<string | null>(null);
 
   // General error banner
   const [error, setError] = useState<string | null>(null);
@@ -177,15 +180,54 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
       if (err) throw err;
       if (data) {
         setCourses(data);
-        // Default select first course if none selected yet
-        if (data.length > 0 && !selectedCourseRoster) {
-          handleOpenCourseRoster(data[0]);
-        }
       }
     } catch (e: any) {
       console.error("Error fetching courses:", e);
     } finally {
       setCoursesLoading(false);
+    }
+  };
+
+  // Toggle single student attendance in matrix cell
+  const handleToggleMatrixCell = async (sessionId: string, studentId: string, currentPresent: boolean) => {
+    const willBePresent = !currentPresent;
+    setMatrixData((prev) => {
+      if (!prev) return prev;
+      const updatedStudents = prev.students.map((st) => {
+        if (st.student_id !== studentId) return st;
+        const newRecords = { ...(st.records || {}) };
+        if (willBePresent) {
+          newRecords[sessionId] = { status: "present", method: "manual" };
+        } else {
+          delete newRecords[sessionId];
+        }
+        const presCount = prev.sessions.filter((sess) => isRecordPresent(newRecords[sess.session_id])).length;
+        const total = prev.sessions.length || 1;
+        const pct = Math.round((presCount / total) * 100);
+        return {
+          ...st,
+          records: newRecords,
+          present_count: presCount,
+          percentage: pct,
+        };
+      });
+      return {
+        ...prev,
+        students: updatedStudents,
+      };
+    });
+
+    try {
+      await client.schema("classmate").rpc("toggle_student_attendance", {
+        target_session: sessionId,
+        target_student: studentId,
+        present: willBePresent,
+      });
+    } catch (err: any) {
+      alert(err.message || "Failed to update attendance");
+      if (selectedCourseRoster) {
+        fetchMatrix(selectedCourseRoster.semester_course_id);
+      }
     }
   };
 
@@ -260,6 +302,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
       });
       setTakeModalOpen(false);
       fetchCourses();
+      setInspectSessionId(data.session_id);
     } catch (e: any) {
       console.error("Failed to start session:", e);
       setError(e.message || "Failed to start attendance session");
@@ -435,6 +478,478 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
     });
   }, [students, cardFilter, rosterSearch]);
 
+  if (inspectSessionId) {
+    return (
+      <FullscreenSessionDashboard
+        sessionId={inspectSessionId}
+        onBack={() => {
+          setInspectSessionId(null);
+          fetchActiveDeviceState();
+          fetchCourses();
+          if (selectedCourseRoster) {
+            fetchMatrix(selectedCourseRoster.semester_course_id);
+          }
+        }}
+        onSessionClosed={() => {
+          fetchActiveDeviceState();
+          fetchCourses();
+          if (selectedCourseRoster) {
+            fetchMatrix(selectedCourseRoster.semester_course_id);
+          }
+        }}
+      />
+    );
+  }
+
+  if (selectedCourseRoster) {
+    const isCurrentCourseLive = activeSession?.course_code === selectedCourseRoster.course_code;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 900,
+          background: "var(--bg)",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 1400,
+            margin: "0 auto",
+            padding: "20px 20px 80px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+            boxSizing: "border-box",
+          }}
+        >
+          {/* Top Bar with Navigation, Course Info & Export */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: 16,
+              paddingBottom: 16,
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCourseRoster(null)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 14px",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back to Courses</span>
+                </button>
+
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    padding: "3px 10px",
+                    borderRadius: 8,
+                    background: "var(--blue-soft)",
+                    color: "var(--primary)",
+                  }}
+                >
+                  {selectedCourseRoster.course_code}
+                </span>
+
+                {isCurrentCourseLive && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: "rgba(16, 185, 129, 0.2)",
+                      color: "#10b981",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#10b981",
+                        boxShadow: "0 0 6px #10b981",
+                      }}
+                    />
+                    LIVE SESSION ACTIVE
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: "var(--text)", letterSpacing: "-0.02em" }}>
+                  {selectedCourseRoster.course_title}
+                </h1>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--muted)" }}>
+                  {matrixData?.sessions.length ?? selectedCourseRoster.total_sessions ?? 0} classes held ·{" "}
+                  {filteredMatrixStudents.length} students enrolled · Instructor: {selectedCourseRoster.teacher_name || "Instructor"} ·{" "}
+                  <strong
+                    style={{
+                      color:
+                        (selectedCourseRoster.average_percentage || 0) >= 75
+                          ? "var(--green)"
+                          : (selectedCourseRoster.average_percentage || 0) >= 60
+                          ? "#f59e0b"
+                          : "var(--red)",
+                    }}
+                  >
+                    {selectedCourseRoster.average_percentage || 0}% avg attendance
+                  </strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Actions: Live Session Jump & Export Excel */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {isCurrentCourseLive && activeSession && (
+                <button
+                  type="button"
+                  onClick={() => setInspectSessionId(activeSession.session_id)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "9px 16px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: "#10b981",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
+                  }}
+                >
+                  <Radio size={15} />
+                  <span>Open Live Session</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={(e) => handleExport(e, selectedCourseRoster.semester_course_id)}
+                disabled={exportingCourseId === selectedCourseRoster.semester_course_id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 18px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: exportingCourseId ? "wait" : "pointer",
+                  boxShadow: "var(--shadow)",
+                }}
+              >
+                <FileSpreadsheet size={16} color="var(--green)" />
+                <span>{exportingCourseId ? "Exporting..." : "Export Excel (.xlsx)"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search Box */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 420 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flex: 1,
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "8px 14px",
+              }}
+            >
+              <Search size={15} color="var(--muted)" />
+              <input
+                type="text"
+                placeholder="Search student roll or name..."
+                value={matrixSearch}
+                onChange={(e) => setMatrixSearch(e.target.value)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  width: "100%",
+                }}
+              />
+              {matrixSearch && (
+                <button
+                  onClick={() => setMatrixSearch("")}
+                  style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Single Matrix Table */}
+          {matrixLoading ? (
+            <div style={{ padding: "80px 0", textAlign: "center", color: "var(--muted)", fontSize: 14 }}>
+              Loading attendance matrix...
+            </div>
+          ) : !matrixData || !matrixData.sessions.length ? (
+            <div
+              style={{
+                padding: "60px 20px",
+                textAlign: "center",
+                color: "var(--muted)",
+                background: "var(--card)",
+                borderRadius: 16,
+                border: "1px dashed var(--border)",
+              }}
+            >
+              <Calendar size={32} style={{ margin: "0 auto 10px", opacity: 0.5 }} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
+                No Sessions Recorded Yet
+              </div>
+              <div style={{ fontSize: 13, marginTop: 6 }}>
+                Take an attendance session or tap RFID cards to populate the matrix.
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                overflowX: "auto",
+                border: "1px solid var(--border)",
+                borderRadius: 14,
+                background: "var(--card)",
+                boxShadow: "var(--shadow)",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  textAlign: "left",
+                  fontSize: 12.5,
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      background: "var(--surface)",
+                      borderBottom: "1px solid var(--border)",
+                      color: "var(--muted)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <th style={{ padding: "12px 14px", position: "sticky", left: 0, background: "var(--surface)", zIndex: 2 }}>
+                      Roll
+                    </th>
+                    <th style={{ padding: "12px 14px", position: "sticky", left: 85, background: "var(--surface)", zIndex: 2 }}>
+                      Student Name
+                    </th>
+                    {matrixData.sessions.map((sess) => {
+                      const isSessLive = sess.status === "open";
+                      return (
+                        <th key={sess.session_id} style={{ padding: "8px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => setInspectSessionId(sess.session_id)}
+                            style={{
+                              background: isSessLive ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.12)",
+                              border: isSessLive ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid rgba(59, 130, 246, 0.25)",
+                              color: isSessLive ? "#10b981" : "var(--primary)",
+                              borderRadius: 8,
+                              padding: "5px 10px",
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              transition: "all 0.15s ease",
+                            }}
+                            title="Click to view & edit this day's attendance in fullscreen"
+                          >
+                            <span>{sess.date}</span>
+                            <ExternalLink size={12} />
+                          </button>
+                        </th>
+                      );
+                    })}
+                    <th style={{ padding: "12px 14px", textAlign: "right" }}>%</th>
+                    <th style={{ padding: "12px 14px", textAlign: "center" }}>Eligibility</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMatrixStudents.map((st) => {
+                    const isCollegiate = st.percentage >= 75;
+                    const isNonCollegiate = st.percentage >= 60 && st.percentage < 75;
+
+                    return (
+                      <tr
+                        key={st.student_id}
+                        style={{
+                          borderBottom: "1px solid var(--border)",
+                          transition: "background 0.1s ease",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontWeight: 800,
+                            color: "var(--text)",
+                            position: "sticky",
+                            left: 0,
+                            background: "var(--card)",
+                            zIndex: 1,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span>{st.roll}</span>
+                            {st.is_readd && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 800,
+                                  padding: "1px 4px",
+                                  borderRadius: 4,
+                                  background: "rgba(245, 158, 11, 0.15)",
+                                  color: "#f59e0b",
+                                }}
+                              >
+                                RE-ADD
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontWeight: 600,
+                            color: "var(--text)",
+                            whiteSpace: "nowrap",
+                            position: "sticky",
+                            left: 85,
+                            background: "var(--card)",
+                            zIndex: 1,
+                          }}
+                        >
+                          {st.full_name}
+                        </td>
+
+                        {/* Presence Checkbox Cells */}
+                        {matrixData.sessions.map((sess) => {
+                          const rec = st.records ? st.records[sess.session_id] : null;
+                          const isPresent = isRecordPresent(rec);
+
+                          return (
+                            <td key={sess.session_id} style={{ padding: "6px 8px", textAlign: "center" }}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleMatrixCell(sess.session_id, st.student_id, isPresent)}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 6,
+                                  border: isPresent ? "1.5px solid rgba(16, 185, 129, 0.4)" : "1px solid var(--border)",
+                                  background: isPresent ? "rgba(16, 185, 129, 0.15)" : "var(--surface)",
+                                  color: isPresent ? "#10b981" : "var(--muted)",
+                                  cursor: "pointer",
+                                  transition: "all 0.12s ease",
+                                  padding: 0,
+                                }}
+                                title={`Click to mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`}
+                                aria-label={`Mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`}
+                              >
+                                {isPresent ? <CheckSquare size={16} /> : <Square size={16} />}
+                              </button>
+                            </td>
+                          );
+                        })}
+
+                        {/* Percentage */}
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            textAlign: "right",
+                            fontWeight: 800,
+                            color: isCollegiate
+                              ? "var(--green)"
+                              : isNonCollegiate
+                              ? "#f59e0b"
+                              : "var(--red)",
+                          }}
+                        >
+                          {st.percentage}%
+                        </td>
+
+                        {/* Collegiate Badge */}
+                        <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: "3px 9px",
+                              borderRadius: 999,
+                              background: isCollegiate
+                                ? "rgba(16, 185, 129, 0.15)"
+                                : isNonCollegiate
+                                ? "rgba(245, 158, 11, 0.15)"
+                                : "rgba(239, 68, 68, 0.15)",
+                              color: isCollegiate
+                                ? "#10b981"
+                                : isNonCollegiate
+                                ? "#f59e0b"
+                                : "#ef4444",
+                            }}
+                          >
+                            {isCollegiate ? "Collegiate" : isNonCollegiate ? "Non-Coll" : "Discoll"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -588,27 +1103,51 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
 
           {/* Live Session Toggle */}
           {activeSession ? (
-            <button
-              onClick={handleCloseSession}
-              disabled={stoppingSession}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "9px 16px",
-                borderRadius: 12,
-                border: "none",
-                background: "#ef4444",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: stoppingSession ? "not-allowed" : "pointer",
-                boxShadow: "0 2px 10px rgba(239, 68, 68, 0.3)",
-              }}
-            >
-              <Square size={15} fill="currentColor" />
-              <span>{stoppingSession ? "Closing..." : "Close Attendance"}</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setInspectSessionId(activeSession.session_id)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "#10b981",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
+                }}
+              >
+                <Radio size={15} />
+                <span>Open Live Dashboard (Fullscreen)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseSession}
+                disabled={stoppingSession}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "#ef4444",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: stoppingSession ? "not-allowed" : "pointer",
+                  boxShadow: "0 2px 10px rgba(239, 68, 68, 0.3)",
+                }}
+              >
+                <Square size={15} fill="currentColor" />
+                <span>{stoppingSession ? "Closing..." : "Close Attendance"}</span>
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => setTakeModalOpen(true)}
@@ -663,434 +1202,169 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
 
 
       {/* ========================================================================= */}
-      {/* 3. SUB-VIEW A: COURSES & MATRICES */}
+      {/* 3. SUB-VIEW A: COURSES GRID */}
       {/* ========================================================================= */}
       {activeView === "courses" && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 18,
-            alignItems: "start",
-          }}
-        >
-          {/* Left Column: Course Selector Rail */}
-          <div
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: 18,
-              padding: 16,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              boxShadow: "var(--shadow)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: "var(--text)" }}>
-                Course Offerings
-              </h2>
-              <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                {courses.length} courses
-              </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "var(--text)" }}>
+              Course Offerings
+            </h2>
+            <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>
+              {courses.length} courses registered
+            </span>
+          </div>
+
+          {coursesLoading ? (
+            <div style={{ padding: "60px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+              Loading courses...
             </div>
-
-            {coursesLoading ? (
-              <div style={{ padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-                Loading courses...
+          ) : courses.length === 0 ? (
+            <div
+              style={{
+                padding: "60px 20px",
+                textAlign: "center",
+                color: "var(--muted)",
+                background: "var(--card)",
+                borderRadius: 16,
+                border: "1px dashed var(--border)",
+              }}
+            >
+              <BookOpen size={32} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+                No active courses registered for this batch
               </div>
-            ) : courses.length === 0 ? (
-              <div style={{ padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-                No active courses registered for this batch.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {courses.map((course) => {
-                  const isSelected = selectedCourseRoster?.semester_course_id === course.semester_course_id;
-                  const isLiveCourse = activeSession?.course_code === course.course_code;
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {courses.map((course) => {
+                const isLiveCourse = activeSession?.course_code === course.course_code;
 
-                  return (
-                    <div
-                      key={course.semester_course_id}
-                      onClick={() => handleOpenCourseRoster(course)}
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 14,
-                        border: isSelected
-                          ? "1.5px solid var(--primary)"
-                          : "1px solid var(--border)",
-                        background: isSelected ? "var(--blue-soft)" : "var(--surface)",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span
-                            style={{
-                              fontSize: 12.5,
-                              fontWeight: 800,
-                              color: isSelected ? "var(--primary)" : "var(--text)",
-                            }}
-                          >
-                            {course.course_code}
-                          </span>
-                          {isLiveCourse && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                padding: "1px 6px",
-                                borderRadius: 6,
-                                background: "rgba(16, 185, 129, 0.2)",
-                                color: "#10b981",
-                              }}
-                            >
-                              LIVE
-                            </span>
-                          )}
-                        </div>
-
+                return (
+                  <div
+                    key={course.semester_course_id}
+                    onClick={() => handleOpenCourseRoster(course)}
+                    style={{
+                      background: "var(--card)",
+                      border: isLiveCourse ? "1.5px solid #10b981" : "1px solid var(--border)",
+                      borderRadius: 16,
+                      padding: 18,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      boxShadow: "var(--shadow)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.borderColor = "var(--primary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "none";
+                      e.currentTarget.style.borderColor = isLiveCourse ? "#10b981" : "var(--border)";
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span
                           style={{
                             fontSize: 12,
                             fontWeight: 800,
-                            color:
-                              (course.average_percentage || 0) >= 75
-                                ? "var(--green)"
-                                : (course.average_percentage || 0) >= 60
-                                ? "#f59e0b"
-                                : "var(--red)",
+                            padding: "3px 9px",
+                            borderRadius: 8,
+                            background: "var(--blue-soft)",
+                            color: "var(--primary)",
                           }}
                         >
-                          {course.average_percentage || 0}% avg
+                          {course.course_code}
                         </span>
+                        {isLiveCourse && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: "2px 7px",
+                              borderRadius: 6,
+                              background: "rgba(16, 185, 129, 0.2)",
+                              color: "#10b981",
+                            }}
+                          >
+                            LIVE
+                          </span>
+                        )}
                       </div>
 
-                      <div
+                      <span
                         style={{
                           fontSize: 13,
-                          fontWeight: 600,
+                          fontWeight: 800,
+                          color:
+                            (course.average_percentage || 0) >= 75
+                              ? "var(--green)"
+                              : (course.average_percentage || 0) >= 60
+                              ? "#f59e0b"
+                              : "var(--red)",
+                        }}
+                      >
+                        {course.average_percentage || 0}% avg
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          margin: 0,
                           color: "var(--text)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          lineHeight: 1.3,
                         }}
                       >
                         {course.course_title}
-                      </div>
+                      </h3>
+                      <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--muted)" }}>
+                        {course.teacher_name || "Instructor"}
+                      </p>
+                    </div>
 
-                      <div
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: 12,
+                        color: "var(--muted)",
+                        borderTop: "1px solid var(--border)",
+                        paddingTop: 10,
+                        marginTop: "auto",
+                      }}
+                    >
+                      <span>{course.total_sessions || 0} Sessions Held</span>
+                      <span
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
+                          color: "var(--primary)",
+                          fontWeight: 700,
+                          display: "inline-flex",
                           alignItems: "center",
-                          fontSize: 11.5,
-                          color: "var(--muted)",
-                          borderTop: "1px solid var(--border)",
-                          paddingTop: 6,
-                          marginTop: 2,
+                          gap: 4,
                         }}
                       >
-                        <span>{course.total_sessions || 0} Sessions Held</span>
-                        <span>{course.teacher_name || "Instructor"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Attendance Matrix & Roster Viewer */}
-          <div
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: 18,
-              padding: 18,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              boxShadow: "var(--shadow)",
-              minHeight: 460,
-            }}
-          >
-            {selectedCourseRoster ? (
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    flexWrap: "wrap",
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "var(--text)" }}>
-                        {selectedCourseRoster.course_code}: {selectedCourseRoster.course_title}
-                      </h2>
-                    </div>
-                    <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--muted)" }}>
-                      Full Attendance Matrix & Collegiate Tracking • {matrixData?.sessions.length || 0} Sessions Logged
-                    </p>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button
-                      onClick={(e) => handleExport(e, selectedCourseRoster.semester_course_id)}
-                      disabled={exportingCourseId === selectedCourseRoster.semester_course_id}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "7px 14px",
-                        borderRadius: 10,
-                        border: "1px solid var(--border)",
-                        background: "var(--surface)",
-                        color: "var(--text)",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: exportingCourseId ? "wait" : "pointer",
-                      }}
-                    >
-                      <FileSpreadsheet size={14} color="var(--green)" />
-                      <span>{exportingCourseId ? "Exporting..." : "Export Excel (.xlsx)"}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Filter and Search Bar inside Matrix */}
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flex: 1,
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      padding: "6px 12px",
-                    }}
-                  >
-                    <Search size={14} color="var(--muted)" />
-                    <input
-                      type="text"
-                      placeholder="Search student roll or name..."
-                      value={matrixSearch}
-                      onChange={(e) => setMatrixSearch(e.target.value)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        outline: "none",
-                        color: "var(--text)",
-                        fontSize: 12.5,
-                        width: "100%",
-                      }}
-                    />
-                    {matrixSearch && (
-                      <button
-                        onClick={() => setMatrixSearch("")}
-                        style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Matrix Grid Table */}
-                {matrixLoading ? (
-                  <div style={{ padding: "60px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-                    Loading attendance matrix...
-                  </div>
-                ) : !matrixData || !matrixData.sessions.length ? (
-                  <div
-                    style={{
-                      padding: "50px 20px",
-                      textAlign: "center",
-                      color: "var(--muted)",
-                      background: "var(--surface)",
-                      borderRadius: 14,
-                      border: "1px dashed var(--border)",
-                    }}
-                  >
-                    <Calendar size={28} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
-                      No Sessions Recorded Yet
-                    </div>
-                    <div style={{ fontSize: 12, marginTop: 4 }}>
-                      Start an attendance session or tap cards on ESP32-READER-01 to begin.
+                        <span>View Matrix</span>
+                        <ChevronRight size={14} />
+                      </span>
                     </div>
                   </div>
-                ) : (
-                  <div
-                    style={{
-                      overflowX: "auto",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      maxHeight: "520px",
-                    }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        textAlign: "left",
-                        fontSize: 12,
-                      }}
-                    >
-                      <thead>
-                        <tr
-                          style={{
-                            background: "var(--surface)",
-                            borderBottom: "1px solid var(--border)",
-                            color: "var(--muted)",
-                            fontWeight: 700,
-                          }}
-                        >
-                          <th style={{ padding: "10px 12px", position: "sticky", left: 0, background: "var(--surface)", zIndex: 2 }}>
-                            Roll
-                          </th>
-                          <th style={{ padding: "10px 12px", position: "sticky", left: 78, background: "var(--surface)", zIndex: 2 }}>
-                            Student Name
-                          </th>
-                          {matrixData.sessions.map((sess) => (
-                            <th key={sess.session_id} style={{ padding: "10px 8px", textAlign: "center", whiteSpace: "nowrap" }}>
-                              {sess.date}
-                            </th>
-                          ))}
-                          <th style={{ padding: "10px 12px", textAlign: "right" }}>%</th>
-                          <th style={{ padding: "10px 12px", textAlign: "center" }}>Eligibility</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredMatrixStudents.map((st) => {
-                          const isCollegiate = st.percentage >= 75;
-                          const isNonCollegiate = st.percentage >= 60 && st.percentage < 75;
-
-                          return (
-                            <tr
-                              key={st.student_id}
-                              style={{
-                                borderBottom: "1px solid var(--border)",
-                                transition: "background 0.1s ease",
-                              }}
-                            >
-                              <td
-                                style={{
-                                  padding: "9px 12px",
-                                  fontWeight: 800,
-                                  color: "var(--text)",
-                                  position: "sticky",
-                                  left: 0,
-                                  background: "var(--card)",
-                                  zIndex: 1,
-                                }}
-                              >
-                                {st.roll}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "9px 12px",
-                                  fontWeight: 600,
-                                  color: "var(--text)",
-                                  whiteSpace: "nowrap",
-                                  position: "sticky",
-                                  left: 78,
-                                  background: "var(--card)",
-                                  zIndex: 1,
-                                }}
-                              >
-                                {st.full_name}
-                              </td>
-
-                              {/* Presence Cells */}
-                              {matrixData.sessions.map((sess) => {
-                                const rec = st.records ? st.records[sess.session_id] : null;
-                                const isPresent = isRecordPresent(rec);
-
-                                return (
-                                  <td key={sess.session_id} style={{ padding: "6px 8px", textAlign: "center" }}>
-                                    <span
-                                      style={{
-                                        display: "inline-block",
-                                        width: 26,
-                                        height: 26,
-                                        lineHeight: "26px",
-                                        borderRadius: 6,
-                                        fontWeight: 800,
-                                        fontSize: 11,
-                                        background: isPresent ? "rgba(16, 185, 129, 0.18)" : "rgba(239, 68, 68, 0.08)",
-                                        color: isPresent ? "#10b981" : "var(--muted)",
-                                      }}
-                                    >
-                                      {isPresent ? "P" : "—"}
-                                    </span>
-                                  </td>
-                                );
-                              })}
-
-                              {/* Percentage */}
-                              <td
-                                style={{
-                                  padding: "9px 12px",
-                                  textAlign: "right",
-                                  fontWeight: 800,
-                                  color: isCollegiate
-                                    ? "var(--green)"
-                                    : isNonCollegiate
-                                    ? "#f59e0b"
-                                    : "var(--red)",
-                                }}
-                              >
-                                {st.percentage}%
-                              </td>
-
-                              {/* Collegiate Badge */}
-                              <td style={{ padding: "9px 12px", textAlign: "center" }}>
-                                <span
-                                  style={{
-                                    fontSize: 10.5,
-                                    fontWeight: 700,
-                                    padding: "2px 8px",
-                                    borderRadius: 999,
-                                    background: isCollegiate
-                                      ? "rgba(16, 185, 129, 0.15)"
-                                      : isNonCollegiate
-                                      ? "rgba(245, 158, 11, 0.15)"
-                                      : "rgba(239, 68, 68, 0.15)",
-                                    color: isCollegiate
-                                      ? "#10b981"
-                                      : isNonCollegiate
-                                      ? "#f59e0b"
-                                      : "#ef4444",
-                                  }}
-                                >
-                                  {isCollegiate ? "Collegiate" : isNonCollegiate ? "Non-Coll" : "Discoll"}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ padding: "60px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
-                Select a course on the left to inspect its attendance matrix.
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

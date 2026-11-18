@@ -1,6 +1,8 @@
 package com.shuaib.classmate.workers
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,9 @@ object LibraryUploadManager {
         val mimeType: String,
         val sizeBytes: Long,
         val category: String,
-        val createdAt: Long = System.currentTimeMillis()
+        val createdAt: Long = System.currentTimeMillis(),
+        val retryCount: Int = 0,
+        val lastError: String? = null
     )
 
     enum class Status {
@@ -75,7 +79,9 @@ object LibraryUploadManager {
                     mimeType = obj.getString("mime_type"),
                     sizeBytes = obj.getLong("size_bytes"),
                     category = obj.getString("category"),
-                    createdAt = obj.optLong("created_at", System.currentTimeMillis())
+                    createdAt = obj.optLong("created_at", System.currentTimeMillis()),
+                    retryCount = obj.optInt("retry_count", 0),
+                    lastError = if (obj.has("last_error") && !obj.isNull("last_error")) obj.getString("last_error") else null
                 ))
             }
             list
@@ -99,9 +105,40 @@ object LibraryUploadManager {
                 put("size_bytes", t.sizeBytes)
                 put("category", t.category)
                 put("created_at", t.createdAt)
+                put("retry_count", t.retryCount)
+                if (t.lastError != null) put("last_error", t.lastError)
             })
         }
         file.writeText(arr.toString())
+    }
+
+    fun hasPendingTasks(context: Context): Boolean {
+        return getPendingTasks(context).isNotEmpty()
+    }
+
+    @Synchronized
+    fun recordRetry(context: Context, taskId: String, error: String?): Int {
+        val tasks = getPendingTasks(context).toMutableList()
+        val index = tasks.indexOfFirst { it.id == taskId }
+        if (index == -1) return 0
+        val target = tasks[index]
+        val newCount = target.retryCount + 1
+        tasks[index] = target.copy(retryCount = newCount, lastError = error)
+        saveTasks(context, tasks)
+        return newCount
+    }
+
+    fun isOnline(context: Context): Boolean {
+        return runCatching {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val network = cm?.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(network) ?: return false
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }.getOrDefault(false)
+    }
+
+    fun triggerImmediateUpload(context: Context) {
+        LibraryUploadWorker.enqueue(context.applicationContext, immediate = true)
     }
 
     fun enqueueUpload(
@@ -127,6 +164,8 @@ object LibraryUploadManager {
             }
         } ?: error("Failed to read file from storage")
 
+        val actualSize = if (localFile.length() > 0) localFile.length() else sizeBytes
+
         val task = Task(
             id = taskId,
             filePath = localFile.absolutePath,
@@ -136,8 +175,10 @@ object LibraryUploadManager {
             courseName = courseName,
             title = title,
             mimeType = mimeType,
-            sizeBytes = sizeBytes,
-            category = category
+            sizeBytes = actualSize,
+            category = category,
+            createdAt = System.currentTimeMillis(),
+            retryCount = 0
         )
 
         synchronized(this) {
@@ -151,11 +192,11 @@ object LibraryUploadManager {
             title = title,
             percent = 0,
             uploadedBytes = 0L,
-            totalBytes = sizeBytes,
+            totalBytes = actualSize,
             status = Status.QUEUED
         )
 
-        LibraryUploadWorker.enqueue(context)
+        LibraryUploadWorker.enqueue(context, immediate = true)
         return taskId
     }
 

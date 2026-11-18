@@ -32,6 +32,8 @@ data class AppContextState(
     val v2SessionActive: Boolean = false,
     val v2GlobalAdmin: Boolean = false
 ) {
+    val isStudent: Boolean get() = role != "teacher"
+
     fun isGlobalSuperAdmin(): Boolean = role == "global_super_admin" || role == "global_superadmin"
 
     fun isSuperAdmin(): Boolean = isGlobalSuperAdmin() || role == "superadmin" || role == "super_admin"
@@ -106,6 +108,9 @@ object AppContextManager {
             managedBatchId = normalizeBatch(savedManagedBatch)
         )
         updateState(restored)
+        if (restored.batchId.isNotBlank()) {
+            updatePushNotificationBatchTag(restored.batchId)
+        }
 
         val currentAuthUid = FirebaseAuth.getInstance().currentUser?.uid
         if (!currentAuthUid.isNullOrBlank()) {

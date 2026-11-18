@@ -195,13 +195,14 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- SECTION 1: COURSES & ROUTINE -->
+                <!-- SECTION 1: BATCH & ACADEMIC MANAGEMENT (CR & Admin) -->
                 <TextView
+                    android:id="@+id/headerBatchManagement"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
                     android:letterSpacing="0.05"
-                    android:text="COURSES &amp; ROUTINE"
+                    android:text="BATCH &amp; ACADEMIC MANAGEMENT"
                     android:textColor="@color/cm_text_secondary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -211,77 +212,44 @@
                     layout="@layout/item_admin_action_card" />
 
                 <include
-                    android:id="@+id/tileTimetable"
-                    layout="@layout/item_admin_action_card" />
-
-                <include
-                    android:id="@+id/tileTeacherAssignments"
-                    layout="@layout/item_admin_action_card" />
-
-                <!-- SECTION 2: MEMBERS & PERMISSIONS -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="8dp"
-                    android:letterSpacing="0.05"
-                    android:text="MEMBERS &amp; PERMISSIONS"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <include
-                    android:id="@+id/tileStudentRoster"
-                    layout="@layout/item_admin_action_card" />
-
-                <include
-                    android:id="@+id/tileManageCr"
-                    layout="@layout/item_admin_action_card" />
-
-                <include
                     android:id="@+id/tileBatchOverrides"
                     layout="@layout/item_admin_action_card" />
-
-                <!-- SECTION 3: SEMESTER & PROGRESSION -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="8dp"
-                    android:letterSpacing="0.05"
-                    android:text="SEMESTER &amp; PROGRESSION"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
 
                 <include
                     android:id="@+id/tileActiveSemester"
                     layout="@layout/item_admin_action_card" />
 
-                <include
-                    android:id="@+id/tileCloneSemester"
-                    layout="@layout/item_admin_action_card" />
-
-                <!-- SECTION 4: SYSTEM & BATCH SETTINGS -->
-                <TextView
-                    android:id="@+id/headerSystemSection"
-                    android:layout_width="wrap_content"
+                <!-- SECTION 2: SYSTEM & USER ACCESS (Admins & Owners only) -->
+                <LinearLayout
+                    android:id="@+id/layoutAdminSection"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="8dp"
-                    android:letterSpacing="0.05"
-                    android:text="SYSTEM &amp; GLOBAL TOOLS"
-                    android:textColor="@color/cm_text_secondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:orientation="vertical">
 
-                <include
-                    android:id="@+id/tileCourseCatalog"
-                    layout="@layout/item_admin_action_card" />
+                    <TextView
+                        android:id="@+id/headerAdminSection"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="8dp"
+                        android:letterSpacing="0.05"
+                        android:text="USER ACCESS &amp; SYSTEM ROLES"
+                        android:textColor="@color/cm_text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
 
-                <include
-                    android:id="@+id/tileSystemHealth"
-                    layout="@layout/item_admin_action_card" />
+                    <include
+                        android:id="@+id/tileAllUsersRoles"
+                        layout="@layout/item_admin_action_card" />
+
+                    <include
+                        android:id="@+id/tileCourseCatalog"
+                        layout="@layout/item_admin_action_card" />
+
+                    <include
+                        android:id="@+id/tileSystemHealth"
+                        layout="@layout/item_admin_action_card" />
+                </LinearLayout>
 
             </LinearLayout>
         </ScrollView>

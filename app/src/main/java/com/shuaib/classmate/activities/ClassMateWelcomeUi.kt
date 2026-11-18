@@ -553,7 +553,7 @@ internal class ClassMateWelcomeUi(private val activity: Activity) {
             gravity = Gravity.CENTER_VERTICAL
         })
         val reqText = TextView(activity).apply {
-            text = "Requires @mbstu.ac.bd account"
+            text = "Requires university Google account"
             textSize = if (screenWdp < 375) 12.2f else 12.8f
             setTextColor(Color.parseColor("#536583"))
             gravity = Gravity.CENTER

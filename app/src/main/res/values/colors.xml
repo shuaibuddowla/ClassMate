@@ -2,12 +2,12 @@
 <resources>
     <!-- ClassMate semantic light palette - High contrast optimization -->
     <color name="cm_bg">#F1F5F9</color>
-    <color name="cm_bg_secondary">#E2E8F0</color>
+    <color name="cm_bg_secondary">#E5E7EB</color>
     <color name="cm_surface">#FFFFFF</color>
     <color name="cm_surface_elevated">#FFFFFF</color>
     <color name="cm_surface_glass">#F7FAFF</color>
     <color name="cm_card">#FFFFFF</color>
-    <color name="cm_card_alt">#E2E8F0</color>
+    <color name="cm_card_alt">#E5E7EB</color>
 
     <color name="cm_text_primary">#020617</color>
     <color name="cm_text_secondary">#0F172A</color>
@@ -51,12 +51,12 @@
     <color name="cm_period_cancel_bg">#FFF5F5</color>
     <color name="cm_period_cancel_border">#FECDD3</color>
     <color name="cm_notice_cancel_text">#B91C1C</color>
-    <color name="cm_notice_general_start">#E6FFFFFF</color>
-    <color name="cm_notice_general_end">#D8F5F1EB</color>
-    <color name="cm_notice_cancel_start">#E6FFF5F5</color>
-    <color name="cm_notice_cancel_end">#D8FFEBEB</color>
-    <color name="cm_notice_resource_start">#E6F5F2FF</color>
-    <color name="cm_notice_resource_end">#D8ECE5FF</color>
+    <color name="cm_notice_general_start">#F8FFFFFF</color>
+    <color name="cm_notice_general_end">#EDF9FAFC</color>
+    <color name="cm_notice_cancel_start">#F7FFF8F8</color>
+    <color name="cm_notice_cancel_end">#EEFFF1F2</color>
+    <color name="cm_notice_resource_start">#F7F9FCFB</color>
+    <color name="cm_notice_resource_end">#EEF0FDF7</color>
     <color name="cm_notice_screen_bg">#E5DDD5</color>
     <color name="cm_notice_premium_general">#8757E7</color>
     <color name="cm_notice_premium_cancel">#D65C70</color>
@@ -69,7 +69,7 @@
     <color name="wa_wallpaper_bg">#EFEAE2</color>
     <color name="wa_time_text">#667781</color>
     <color name="cm_notice_premium_resource">#12A981</color>
-    <color name="cm_notice_premium_stroke">#D2CAC0</color>
+    <color name="cm_notice_premium_stroke">#E5E7EB</color>
     <color name="cm_notice_summary">#F8FAFF</color>
     <color name="cm_notice_action">#EFFFFFFF</color>
     <color name="cm_notice_attachment">#F8FFFD</color>
@@ -91,7 +91,7 @@
     <color name="cm_file_other_bg">#EDE9FE</color>
     <color name="cm_file_other_text">#7C3AED</color>
 
-    <color name="cm_bottom_nav_bg">#E6FFFFFF</color>
+    <color name="cm_bottom_nav_bg">#F8FFFFFF</color>
     <color name="cm_bottom_nav_selected">#1F2563EB</color>
     <color name="cm_bottom_nav_icon_active">#1D4ED8</color>
     <color name="cm_bottom_nav_icon_inactive">#475569</color>
@@ -145,5 +145,40 @@
     <color name="cm_version_pill_installed_text">#475569</color>
     <color name="cm_version_card_bg">#F8FAFC</color>
     <color name="cm_changelog_bg">#F8FAFC</color>
-    <color name="cm_changelog_border">#E2E8F0</color>
+    <color name="cm_changelog_border">#E5E7EB</color>
+
+    <!-- Stream Chat UI Overrides matching ClassMate Theme -->
+    <color name="stream_ui_accent_blue">@color/cm_primary</color>
+    <color name="stream_ui_button_background_color">@color/cm_primary</color>
+    <color name="stream_ui_blue_alice">@color/cm_primary_soft</color>
+    <color name="stream_ui_bars_background">@color/cm_surface</color>
+    <color name="stream_ui_border">@color/cm_border</color>
+    <color name="stream_ui_text_color_primary">@color/cm_text_primary</color>
+    <color name="stream_ui_text_color_secondary">@color/cm_text_secondary</color>
+    <color name="stream_ui_text_color_hint">@color/cm_text_disabled</color>
+    <color name="stream_ui_search_input_background_outline_color">@color/cm_border</color>
+
+    <!-- Dynamic Island & Peek Sheet Theme Colors (Light) -->
+    <color name="cm_dynamic_island_bg">#FFFFFF</color>
+    <color name="cm_dynamic_island_stroke">#E5E7EB</color>
+    <color name="cm_dynamic_island_title">#0F172A</color>
+    <color name="cm_dynamic_island_subtitle">#64748B</color>
+    <color name="cm_dynamic_island_action_bg">#F1F5F9</color>
+    <color name="cm_dynamic_island_action_icon">#2563EB</color>
+    <color name="cm_dynamic_island_dismiss_icon">#64748B</color>
+
+    <color name="cm_peek_sheet_bg">#FFFFFF</color>
+    <color name="cm_peek_sheet_card_bg">#F8FAFC</color>
+    <color name="cm_peek_sheet_card_stroke">#E5E7EB</color>
+    <color name="cm_peek_sheet_title">#0F172A</color>
+    <color name="cm_peek_sheet_subtitle">#64748B</color>
+    <color name="cm_peek_sheet_item_title">#0F172A</color>
+    <color name="cm_peek_sheet_item_body">#475569</color>
+    <color name="cm_peek_sheet_item_meta">#64748B</color>
+    <color name="cm_peek_sheet_divider">#F1F5F9</color>
+
+    <!-- Date Header Styling (WhatsApp Style) -->
+    <color name="cm_date_header_bg">#F1F5F9</color>
+    <color name="cm_date_header_stroke">#E2E8F0</color>
+    <color name="cm_unread_dot">#2563EB</color>
 </resources>

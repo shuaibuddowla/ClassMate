@@ -235,6 +235,16 @@ class NoticeRepository private constructor(context: Context) {
         onProgress: (Int) -> Unit = {}
     ) = supabaseFeed.uploadNoticeImage(context, noticeId, uri, fileName, mimeType, sizeBytes, onProgress)
 
+    suspend fun uploadSupabaseNoticeAttachment(
+        context: Context,
+        noticeId: String,
+        uri: android.net.Uri,
+        fileName: String,
+        mimeType: String,
+        sizeBytes: Long,
+        onProgress: (Int) -> Unit = {}
+    ) = supabaseFeed.uploadNoticeImage(context, noticeId, uri, fileName, mimeType, sizeBytes, onProgress)
+
     suspend fun publishSupabaseClassCancellation(
         batchCode: String, offeringId: String, date: String, title: String, body: String
     ) = supabaseFeed.publishClassCancellation(batchCode, offeringId, date, title, body)

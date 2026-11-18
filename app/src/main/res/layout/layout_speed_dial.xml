@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Speed Dial Scrim Overlay -->
+    <View
+        android:id="@+id/fabSpeedDialScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#59000000"
+        android:elevation="12dp"
+        android:visibility="gone"
+        android:alpha="0"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Speed Dial Actions Container -->
+    <LinearLayout
+        android:id="@+id/layoutSpeedDialOptions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="166dp"
+        android:orientation="vertical"
+        android:gravity="end"
+        android:elevation="16dp"
+        android:visibility="gone"
+        android:clipChildren="false">
+
+        <!-- Option 1: Post Notice -->
+        <LinearLayout
+            android:id="@+id/btnSpeedDialPostNotice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_speed_dial_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="16dp"
+            android:paddingTop="9dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="9dp"
+            android:elevation="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:text="Post Notice"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13.5sp"
+                android:layout_marginEnd="10dp" />
+
+            <FrameLayout
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_speed_dial_icon_notice">
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_notice"
+                    app:tint="#FFFFFF" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Option 2: Add File -->
+        <LinearLayout
+            android:id="@+id/btnSpeedDialAddFile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_speed_dial_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="16dp"
+            android:paddingTop="9dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="9dp"
+            android:elevation="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:text="Add File"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13.5sp"
+                android:layout_marginEnd="10dp" />
+
+            <FrameLayout
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_speed_dial_icon_file">
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_file_generic"
+                    app:tint="#FFFFFF" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Option 3: Add Fund -->
+        <LinearLayout
+            android:id="@+id/btnSpeedDialAddFund"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_speed_dial_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="16dp"
+            android:paddingTop="9dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="9dp"
+            android:elevation="6dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                android:text="Add Fund"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13.5sp"
+                android:layout_marginEnd="10dp" />
+
+            <FrameLayout
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_speed_dial_icon_fund">
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_fund_wallet"
+                    app:tint="#FFFFFF" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Main Speed Dial FAB -->
+    <FrameLayout
+        android:id="@+id/btnSpeedDialFab"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="98dp"
+        android:background="@drawable/bg_speed_dial_main_fab"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="20dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/ivSpeedDialFabIcon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_add"
+            app:tint="@color/cm_on_primary" />
+    </FrameLayout>
+</merge>

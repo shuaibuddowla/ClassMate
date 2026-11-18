@@ -37,6 +37,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    {
+      url: `${baseUrl}/transit-preview`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
   ];
 
   try {
@@ -48,12 +54,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { data: notices } = await db
         .schema("classmate")
         .from("notices")
-        .select("id, published_at")
+        .select("id, title, body, published_at")
         .order("published_at", { ascending: false })
         .limit(60);
 
       if (notices && Array.isArray(notices)) {
-        const noticeEntries: MetadataRoute.Sitemap = notices.map((n) => ({
+        // Filter out blank or thin draft notices to prevent Soft 404 warnings from Googlebot
+        const validNotices = notices.filter(
+          (n) =>
+            n.id &&
+            n.title &&
+            n.title.trim().length > 0 &&
+            ((n.body && n.body.trim().length >= 20) || (n.title && n.title.trim().length >= 20))
+        );
+        const noticeEntries: MetadataRoute.Sitemap = validNotices.map((n) => ({
           url: `${baseUrl}/n/${n.id}`,
           lastModified: n.published_at ? new Date(n.published_at) : new Date(),
           changeFrequency: "weekly" as const,

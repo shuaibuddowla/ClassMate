@@ -1,15 +1,23 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="classmate_prefs.xml" />
+        <exclude domain="sharedpref" path="classmate_auth_production.xml" />
+        <exclude domain="sharedpref" path="classmate_auth_staging.xml" />
         <exclude domain="sharedpref" path="classmate_academic_cache_production.xml" />
+        <exclude domain="sharedpref" path="classmate_academic_cache_staging.xml" />
         <exclude domain="sharedpref" path="classmate_notification_identity_production.xml" />
         <exclude domain="sharedpref" path="classmate_notification_identity_staging.xml" />
-        <exclude domain="sharedpref" path="classmate_academic_cache_staging.xml" />
+        <exclude domain="database" path="classmate_academic.db" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="classmate_prefs.xml" />
+        <exclude domain="sharedpref" path="classmate_auth_production.xml" />
+        <exclude domain="sharedpref" path="classmate_auth_staging.xml" />
         <exclude domain="sharedpref" path="classmate_academic_cache_production.xml" />
+        <exclude domain="sharedpref" path="classmate_academic_cache_staging.xml" />
         <exclude domain="sharedpref" path="classmate_notification_identity_production.xml" />
         <exclude domain="sharedpref" path="classmate_notification_identity_staging.xml" />
-        <exclude domain="sharedpref" path="classmate_academic_cache_staging.xml" />
+        <exclude domain="database" path="classmate_academic.db" />
     </device-transfer>
 </data-extraction-rules>

@@ -109,7 +109,14 @@ class AdminPanelActivity : AppCompatActivity() {
         if (user.canPostNotices()) {
             binding.cardPostNotice.visibility = View.VISIBLE
             binding.cardPostNotice.applyClickAnimation {
-                startActivity(Intent(this, PostNoticeActivity::class.java))
+                val batchId = currentUser?.batchId.orEmpty().ifBlank {
+                    com.shuaib.classmate.activities.ClassMateAcademicCache.home(this)?.optString("batch").orEmpty()
+                        .ifBlank { com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.notificationIdentity()?.optString("batch_id").orEmpty() }
+                }
+                val intent = Intent(this, ClassMatePublishActivity::class.java).apply {
+                    putExtra("batch_id", batchId)
+                }
+                startActivity(intent)
                 overrideOpenTransition()
             }
         }

@@ -1,9 +1,11 @@
 package com.shuaib.classmate.ui
 
+import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -22,22 +24,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.bumptech.glide.Glide
 import com.shuaib.classmate.R
 
 /**
@@ -51,10 +52,10 @@ enum class ClassMateTab(
 ) {
     TIMETABLE(R.id.nav_timetable, "Timetable", R.drawable.ic_timetable_outline, R.drawable.ic_timetable),
     NOTICES(R.id.nav_notices, "Notices", R.drawable.ic_bell_outline, R.drawable.ic_notice),
-    COURSES(R.id.nav_pdf, "Courses", R.drawable.ic_library_outline, R.drawable.ic_library_filled),
+    COURSES(R.id.nav_pdf, "Courses", R.drawable.ic_academic_cap_outline, R.drawable.ic_academic_cap_filled),
     TRANSIT(R.id.nav_transit, "Transit", R.drawable.ic_bus_outline, R.drawable.ic_bus_filled),
     BATCH(R.id.nav_friends, "Batch", R.drawable.ic_batch_friends, R.drawable.ic_batch_friends_filled),
-    SETTINGS(R.id.nav_profile, "Settings", R.drawable.ic_nav_settings_outline, R.drawable.ic_nav_settings);
+    SETTINGS(R.id.nav_profile, "Profile", R.drawable.ic_profile_outline, R.drawable.ic_profile_modern);
 
     companion object {
         fun fromId(id: Int): ClassMateTab? = values().firstOrNull { it.id == id }
@@ -84,17 +85,16 @@ data class TabQuickAction(
 )
 
 /**
- * ClassMate Floating Pill Navigation Bar (Jetpack Compose).
+ * ClassMate Docked Icon-Only Bottom Navigation Bar (Instagram-Style).
  *
- * Features:
- * - Single continuous animated pill indicator physically sliding with spring physics
- * - Indicator hugs both icon AND label as one unified shape
- * - Tabler outline-to-filled morphing with smooth crossfade
- * - Press micro-interaction (scale down to 0.92 on press, spring back)
- * - Light haptic tick on selection
- * - Generic badges (dot or count)
- * - Frosted glass elevation with soft drop shadow and top specular highlight
- * - Auto-hide on scroll with spring exit/entry
+ * Characteristics:
+ * - Docked edge-to-edge flush with the screen bottom and system navigation bar
+ * - Minimal hairline top divider line
+ * - Icon-only presentation (zero text labels for a content-centric, clean aesthetic)
+ * - Micro-interaction tactile bounce physics on tab touch
+ * - Dynamic Profile Photo avatar on Profile tab with active ring indicator
+ * - Sub-icon vibrant red dot indicator for unread updates (Notices/Activity)
+ * - Auto-hide on scroll with smooth vertical transition
  * - Long-press quick actions sheet
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -107,20 +107,21 @@ fun ClassMateFloatingNavigationBar(
     batchTabTitle: String = "Batch",
     badges: Map<ClassMateTab, NavBadge> = emptyMap(),
     isVisible: Boolean = true,
+    userAvatarUrl: String? = null,
+    userName: String = "",
     onTabLongClick: ((ClassMateTab) -> Unit)? = null,
     onQuickActionRequest: ((ClassMateTab) -> List<TabQuickAction>)? = null,
     isDark: Boolean = isSystemInDarkTheme()
 ) {
     val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
 
-    // Accent and surface palette (Edge-to-Edge Frosted Glass)
+    // ClassMate brand accent palette: Vibrant primary blue for active tabs
     val activeColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF1D4ED8)
-    val inactiveColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-    val glassBg = if (isDark) Color(0xF50B1220) else Color(0xF8FFFFFF)
-    val glassBorder = if (isDark) Color(0x33475569) else Color(0x1F0F172A)
-    val indicatorColor = if (isDark) Color(0x3D3B82F6) else Color(0x241D4ED8)
-    val activeScale = 1.05f
+    val inactiveColor = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B)
+    // Real-time backdrop blur is provided by FrostedGlassBackdropView directly underneath
+    val barBg = Color.Transparent
+    val topBorderColor = if (isDark) Color(0x338696A0) else Color(0x1F000000)
+    val badgeDotColor = Color(0xFFE11D48)
 
     // Quick actions sheet state
     var quickActionTab by remember { mutableStateOf<ClassMateTab?>(null) }
@@ -129,172 +130,213 @@ fun ClassMateFloatingNavigationBar(
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Animated auto-hide on scroll
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = slideInVertically(
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-            initialOffsetY = { it }
-        ),
-        exit = slideOutVertically(
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-            targetOffsetY = { it }
-        ),
-        modifier = modifier
-    ) {
-        // Concept 1: Floating Island Architecture (14dp margins, 26dp rounded glass capsule)
-        Box(
+    Box(modifier = modifier) {
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .drawBehind {
+                    // Minimal, clean top border without any glowing gradient or lighting up in dark mode
+                    drawLine(
+                        color = if (isDark) Color(0x18FFFFFF) else Color(0x140F172A),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, 0f),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                },
+            color = barBg,
+            shadowElevation = 0.dp
         ) {
-            Surface(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
-                    .border(1.2.dp, glassBorder, RoundedCornerShape(26.dp)),
-                color = glassBg,
-                shape = RoundedCornerShape(26.dp),
-                shadowElevation = 14.dp
+                    .navigationBarsPadding()
             ) {
-                BoxWithConstraints(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.CenterStart
+                        .height(52.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val tabCount = visibleTabs.size.coerceAtLeast(1)
-                    val tabWidth = maxWidth / tabCount
-                    val selectedIndex = visibleTabs.indexOf(selectedTab).coerceAtLeast(0)
-                    val targetOffset = tabWidth * selectedIndex
+                    visibleTabs.forEach { tab ->
+                        val isSelected = tab == selectedTab
+                        val labelText = if (tab == ClassMateTab.BATCH) batchTabTitle else tab.defaultTitle
+                        val interactionSource = remember(tab) { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
 
-                    // Dynamic Morphing Fluid Pill with Damped Spring Physics (Concept 1)
-                    val animatedIndicatorOffset by animateDpAsState(
-                        targetValue = targetOffset,
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = 0.72f,
-                            stiffness = 380f
-                        ),
-                        label = "indicatorOffset"
-                    )
+                        // Micro-interaction tactile bounce
+                        val animatedScale by animateFloatAsState(
+                            targetValue = if (isPressed) 0.86f else 1.0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            ),
+                            label = "tabScale"
+                        )
 
-                    // Continuous Sliding Indicator Pill (Concept 1: Fluid Morphing Capsule)
-                    Box(
-                        modifier = Modifier
-                            .offset(x = animatedIndicatorOffset)
-                            .width(tabWidth)
-                            .fillMaxHeight()
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(indicatorColor)
-                            .border(1.dp, if (isDark) Color(0x403B82F6) else Color(0x331D4ED8), RoundedCornerShape(20.dp))
-                    )
+                        // Extra fast capsular outliner animation (40ms snappy response)
+                        val capsuleAlpha by animateFloatAsState(
+                            targetValue = if (isSelected) 1f else 0f,
+                            animationSpec = tween(durationMillis = 40, easing = FastOutSlowInEasing),
+                            label = "capsuleAlpha"
+                        )
 
-                    // Tab Items Row - Equal Horizontal Distribution
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        visibleTabs.forEach { tab ->
-                            val isSelected = tab == selectedTab
-                            val labelText = if (tab == ClassMateTab.BATCH) batchTabTitle else tab.defaultTitle
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .scale(animatedScale)
+                                .combinedClickable(
+                                    indication = null,
+                                    interactionSource = interactionSource,
+                                    onClick = {
+                                        if (!isSelected) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onTabSelected(tab)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        if (onTabLongClick != null) {
+                                            onTabLongClick.invoke(tab)
+                                        } else {
+                                            quickActionTab = tab
+                                        }
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val capsuleShape = RoundedCornerShape(percent = 50)
 
+                            val capsuleBgColor = if (isSelected) {
+                                if (isDark) Color(0xFF1B3354) else Color(0xFFE0EDFE)
+                            } else {
+                                if (isDark) Color(0xFF131D24) else Color(0xFFFFFFFF)
+                            }
+
+                            val capsuleBorderColor = if (isSelected) {
+                                if (isDark) Color(0x9960A5FA) else Color(0x661D4ED8)
+                            } else {
+                                if (isDark) Color(0x2BFFFFFF) else Color(0x1F0F172A)
+                            }
+
+                            // Clean Water Drop Elevated Capsule with zero glitter
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .combinedClickable(
-                                        indication = null, // Custom sliding indicator handles visual feedback
-                                        interactionSource = remember(tab) { MutableInteractionSource() },
-                                        onClick = {
-                                            if (!isSelected) {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                onTabSelected(tab)
-                                            }
-                                        },
-                                        onLongClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            if (onTabLongClick != null) {
-                                                onTabLongClick.invoke(tab)
-                                            } else {
-                                                quickActionTab = tab
-                                            }
+                                    .shadow(
+                                        elevation = if (isSelected) 2.5.dp else 1.5.dp,
+                                        shape = capsuleShape,
+                                        clip = false,
+                                        ambientColor = if (isDark) Color(0x66000000) else Color(0x1F0F172A),
+                                        spotColor = if (isSelected) {
+                                            if (isDark) Color(0x403B82F6) else Color(0x331D4ED8)
+                                        } else {
+                                            Color.Transparent
                                         }
+                                    )
+                                    .width(56.dp)
+                                    .height(36.dp)
+                                    .clip(capsuleShape)
+                                    .background(capsuleBgColor)
+                                    .border(
+                                        width = 1.dp,
+                                        color = capsuleBorderColor,
+                                        shape = capsuleShape
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    // Icon container with Badge
-                                    Box(contentAlignment = Alignment.TopEnd) {
+                                    if (tab == ClassMateTab.SETTINGS) {
+                                        // Profile Tab: Dynamic Instagram Avatar with Active Ring
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            if (isSelected) {
+                                                // Active Outer Ring
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .border(
+                                                            width = 1.5.dp,
+                                                            color = activeColor,
+                                                            shape = CircleShape
+                                                        )
+                                                )
+                                            }
+
+                                            // Circular Avatar Content
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(23.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isDark) Color(0xFF27272A) else Color(0xFFE4E4E7))
+                                                    .border(
+                                                        width = if (isSelected) 1.dp else 0.5.dp,
+                                                        color = if (isSelected) barBg else (if (isDark) Color(0x33FFFFFF) else Color(0x1F000000)),
+                                                        shape = CircleShape
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (!userAvatarUrl.isNullOrBlank()) {
+                                                    AndroidView(
+                                                        factory = { ctx ->
+                                                            ImageView(ctx).apply {
+                                                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                                            }
+                                                        },
+                                                        update = { imageView ->
+                                                            Glide.with(imageView.context)
+                                                                .load(userAvatarUrl)
+                                                                .circleCrop()
+                                                                .placeholder(R.drawable.bg_circle_avatar_placeholder)
+                                                                .error(R.drawable.bg_circle_avatar_placeholder)
+                                                                .into(imageView)
+                                                        },
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
+                                                } else {
+                                                    val initial = userName.trim().take(1).uppercase()
+                                                    if (initial.isNotBlank()) {
+                                                        Text(
+                                                            text = initial,
+                                                            color = if (isSelected) activeColor else inactiveColor,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                    } else {
+                                                        Icon(
+                                                            painter = painterResource(id = if (isSelected) tab.filledIcon else tab.outlineIcon),
+                                                            contentDescription = labelText,
+                                                            tint = if (isSelected) activeColor else inactiveColor,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Regular Tab: Clean 24dp Icon (Outline vs Filled)
                                         val iconRes = if (isSelected) tab.filledIcon else tab.outlineIcon
                                         Icon(
                                             painter = painterResource(id = iconRes),
                                             contentDescription = labelText,
                                             tint = if (isSelected) activeColor else inactiveColor,
-                                            modifier = Modifier.size(21.dp)
+                                            modifier = Modifier.size(24.dp)
                                         )
-
-                                        // Generic Badges (Dot or Count Bubble)
-                                        val badge = badges[tab]
-                                        if (badge != null && !isSelected) {
-                                            when (badge) {
-                                                is NavBadge.Dot -> {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .offset(x = 5.dp, y = (-2).dp)
-                                                            .size(7.dp)
-                                                            .background(Color(0xFFEF4444), CircleShape)
-                                                            .border(1.dp, glassBg, CircleShape)
-                                                    )
-                                                }
-                                                is NavBadge.Count -> {
-                                                    if (badge.count > 0) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .offset(x = 9.dp, y = (-4).dp)
-                                                                .height(16.dp)
-                                                                .widthIn(min = 16.dp)
-                                                                .background(Color(0xFFEF4444), RoundedCornerShape(8.dp))
-                                                                .border(1.5.dp, glassBg, RoundedCornerShape(8.dp))
-                                                                .padding(horizontal = 4.dp),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Text(
-                                                                text = if (badge.count > 99) "99+" else badge.count.toString(),
-                                                                color = Color.White,
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                lineHeight = 9.sp,
-                                                                textAlign = TextAlign.Center
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-
-                                    // Label: bold + accent when active, regular + muted when inactive
-                                    Text(
-                                        text = labelText,
-                                        color = if (isSelected) activeColor else inactiveColor,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        letterSpacing = (-0.1).sp
-                                    )
                                 }
+
+                            // Instagram-Style Notification Dot directly below without displacing vertical center
+                            val badge = badges[tab]
+                            if (badge != null && !isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 2.dp)
+                                        .size(4.5.dp)
+                                        .background(badgeDotColor, CircleShape)
+                                )
                             }
                         }
                     }
@@ -303,7 +345,7 @@ fun ClassMateFloatingNavigationBar(
         }
     }
 
-    // Stretch Addition 2: Long-Press Quick Actions Bottom Sheet
+    // Long-Press Quick Actions Bottom Sheet
     if (quickActionTab != null && quickActions.isNotEmpty()) {
         ModalBottomSheet(
             onDismissRequest = { quickActionTab = null },

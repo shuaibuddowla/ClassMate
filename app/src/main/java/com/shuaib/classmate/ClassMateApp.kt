@@ -7,6 +7,7 @@ import android.app.Application
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -37,6 +38,7 @@ import com.shuaib.classmate.chat.ChatNotificationHelper
 import com.shuaib.classmate.chat.ChatRepository
 import com.shuaib.classmate.data.FirestoreManager
 import com.shuaib.classmate.utils.AppConstants
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.AppPreferences
 import com.shuaib.classmate.utils.NotificationRouter
 import com.shuaib.classmate.utils.Obfuscator
@@ -85,6 +87,7 @@ class ClassMateApp : Application() {
         runCatching { UpdateCoordinator.schedule(this) }
             .onFailure { Log.e("ClassMateUpdate", "Could not schedule updates", it) }
         applyThemePreference(AppPreferences(this))
+        registerNetworkResumptionListener()
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
             val prefs = AppPreferences(this)
             prefs.setAutoMuteEnabled(false)
@@ -126,8 +129,15 @@ class ClassMateApp : Application() {
                 // Only initialize chat if online or already initialized
                 ChatRepository.init(this@ClassMateApp, uid, name, avatar)
 
-                // Save OneSignal ID
+                // Ensure OneSignal is linked to user ID and batch tags
                 try {
+                    OneSignal.login(uid)
+                    val currentBatch = AppContextManager.getManagedBatchId()
+                        .ifBlank { AppContextManager.getBatchId() }
+                    if (currentBatch.isNotBlank()) {
+                        OneSignal.User.addTag("batchId", currentBatch)
+                        OneSignal.User.addTag("batch_$currentBatch", "true")
+                    }
                     val playerId = OneSignal.User.pushSubscription.id
                     if (!playerId.isNullOrBlank()) {
                         saveOneSignalPlayerId(playerId)
@@ -300,8 +310,8 @@ class ClassMateApp : Application() {
     }
 
     private fun applyThemePreference(prefs: AppPreferences) {
-        // Respect the saved theme.
-        AppCompatDelegate.setDefaultNightMode(if (prefs.isDarkMode()) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO)
+        // Respect the saved theme across AppCompat and Android 13+ OS UiModeManager.
+        com.shuaib.classmate.utils.ThemeColors.applyThemeMode(this, prefs.getThemeMode())
     }
 
     private fun syncNotificationPreference(prefs: AppPreferences) {
@@ -342,6 +352,23 @@ class ClassMateApp : Application() {
                 ExistingWorkPolicy.KEEP,
                 offlineSyncRequest
             )
+        }
+    }
+
+    private fun registerNetworkResumptionListener() {
+        runCatching {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            cm?.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    super.onAvailable(network)
+                    if (com.shuaib.classmate.workers.LibraryUploadManager.hasPendingTasks(this@ClassMateApp)) {
+                        Log.d("ClassMateUpload", "Network reconnected: triggering pending uploads")
+                        com.shuaib.classmate.workers.LibraryUploadManager.triggerImmediateUpload(this@ClassMateApp)
+                    }
+                }
+            })
+        }.onFailure { e ->
+            Log.w("ClassMateUpload", "Could not register default network callback", e)
         }
     }
 

@@ -34,6 +34,7 @@ keystore.properties
 *.jks
 *.keystore
 service-account*.json
+serviceAccountKey.json
 app/release/
 release/
 web-staging/
@@ -75,4 +76,16 @@ classmate-react-native/
 
 *.pdf
 attendance_tracker_presentation.html
+
+# Root-level temp test screenshots, screen recordings, and scratch artifacts
+/*.png
+/*.jpg
+/*.jpeg
+/*.xml
+/*.mp4
+/*.docx
+/scratch_*/
+/.codex-attachments/
+/notification_previews/
+
 

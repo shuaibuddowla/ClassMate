@@ -9,13 +9,18 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
@@ -25,23 +30,27 @@ import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.request.transition.Transition
 import com.github.chrisbanes.photoview.PhotoView
 import com.shuaib.classmate.R
+import com.shuaib.classmate.databinding.ItemFullscreenImageBinding
 import java.io.File
 import java.io.FileOutputStream
 
 class ImageViewerActivity : AppCompatActivity() {
 
     private lateinit var photoView: PhotoView
+    private lateinit var viewPagerImages: ViewPager2
     private lateinit var progressBar: ProgressBar
+    private lateinit var tvImageTitle: TextView
     private lateinit var btnSave: LinearLayout
     private lateinit var btnShare: LinearLayout
 
-    private var imageUrl: String = ""
-    private var cachedBitmap: Bitmap? = null
+    private var imageUrls: ArrayList<String> = arrayListOf()
+    private var currentPosition: Int = 0
+    private val cachedBitmaps = mutableMapOf<Int, Bitmap>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Immersive full-screen: extend into status/nav bar areas
+        // Immersive full-screen
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -50,17 +59,30 @@ class ImageViewerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_image_viewer)
 
         photoView = findViewById(R.id.photoView)
+        viewPagerImages = findViewById(R.id.viewPagerImages)
         progressBar = findViewById(R.id.progressBarImage)
+        tvImageTitle = findViewById(R.id.tvImageTitle)
         btnSave = findViewById(R.id.btnSave)
         btnShare = findViewById(R.id.btnShare)
 
-        imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty()
+        val listExtra = intent.getStringArrayListExtra(EXTRA_IMAGE_URLS)
+        val singleExtra = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty()
+        currentPosition = intent.getIntExtra(EXTRA_INITIAL_POSITION, 0)
+
+        if (!listExtra.isNullOrEmpty()) {
+            imageUrls.addAll(listExtra)
+        } else if (singleExtra.isNotBlank()) {
+            imageUrls.add(singleExtra)
+        }
 
         // Close / back
         findViewById<android.widget.ImageButton>(R.id.btnClose).setOnClickListener { finish() }
 
-        // Load image into PhotoView with loading indicator
-        loadImage()
+        if (imageUrls.size > 1) {
+            setupMultiImageViewer()
+        } else {
+            setupSingleImageViewer(imageUrls.firstOrNull() ?: "")
+        }
 
         // Save to gallery
         btnSave.setOnClickListener { saveImageToGallery() }
@@ -69,11 +91,47 @@ class ImageViewerActivity : AppCompatActivity() {
         btnShare.setOnClickListener { shareImage() }
     }
 
-    private fun loadImage() {
+    private fun setupSingleImageViewer(url: String) {
+        photoView.visibility = View.VISIBLE
+        viewPagerImages.visibility = View.GONE
+        tvImageTitle.text = "Notice Image"
+        loadSingleImage(url)
+    }
+
+    private fun setupMultiImageViewer() {
+        photoView.visibility = View.GONE
+        viewPagerImages.visibility = View.VISIBLE
+        progressBar.visibility = View.GONE
+
+        updateTitle(currentPosition)
+
+        val adapter = FullscreenImagePagerAdapter(imageUrls) { pos, bmp ->
+            cachedBitmaps[pos] = bmp
+        }
+        viewPagerImages.adapter = adapter
+        viewPagerImages.setCurrentItem(currentPosition.coerceIn(0, imageUrls.size - 1), false)
+
+        viewPagerImages.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                currentPosition = position
+                updateTitle(position)
+                preloadBitmapForPosition(position)
+            }
+        })
+
+        preloadBitmapForPosition(currentPosition)
+    }
+
+    private fun updateTitle(position: Int) {
+        tvImageTitle.text = "Notice Image (${position + 1}/${imageUrls.size})"
+    }
+
+    private fun loadSingleImage(url: String) {
+        if (url.isBlank()) return
         progressBar.visibility = View.VISIBLE
 
         Glide.with(this)
-            .load(imageUrl)
+            .load(url)
             .listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(
                     e: GlideException?,
@@ -82,11 +140,7 @@ class ImageViewerActivity : AppCompatActivity() {
                     isFirstResource: Boolean
                 ): Boolean {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@ImageViewerActivity,
-                        "Failed to load image.",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@ImageViewerActivity, "Failed to load image.", Toast.LENGTH_SHORT).show()
                     return false
                 }
 
@@ -103,24 +157,31 @@ class ImageViewerActivity : AppCompatActivity() {
             })
             .into(photoView)
 
-        // Also pre-cache the bitmap for save/share operations
+        preloadBitmapForPosition(0)
+    }
+
+    private fun preloadBitmapForPosition(position: Int) {
+        if (position !in imageUrls.indices) return
+        val url = imageUrls[position]
         Glide.with(this)
             .asBitmap()
-            .load(imageUrl)
+            .load(url)
             .into(object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                    cachedBitmap = resource
+                    cachedBitmaps[position] = resource
                 }
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    cachedBitmap = null
+                    cachedBitmaps.remove(position)
                 }
             })
     }
 
-    // ─── Save to Gallery ───────────────────────────────────────────────────────
+    private fun getActiveBitmap(): Bitmap? {
+        return cachedBitmaps[currentPosition]
+    }
 
     private fun saveImageToGallery() {
-        val bmp = cachedBitmap
+        val bmp = getActiveBitmap()
         if (bmp == null) {
             Toast.makeText(this, "Image is still loading, please wait…", Toast.LENGTH_SHORT).show()
             return
@@ -132,7 +193,6 @@ class ImageViewerActivity : AppCompatActivity() {
             val fileName = "ClassMate_Notice_${System.currentTimeMillis()}.jpg"
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+ — use MediaStore (no permission needed)
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
@@ -148,26 +208,24 @@ class ImageViewerActivity : AppCompatActivity() {
                     values.clear()
                     values.put(MediaStore.Images.Media.IS_PENDING, 0)
                     resolver.update(uri, values, null, null)
-                    Toast.makeText(this, "✅ Image saved to Gallery!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "✓ Image saved to Gallery!", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Failed to save image.", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // Android 9 and below — write to Pictures directory
                 val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES + "/ClassMate")
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, fileName)
                 FileOutputStream(file).use { stream ->
                     bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream)
                 }
-                // Notify MediaScanner so the image appears in Gallery immediately
                 android.media.MediaScannerConnection.scanFile(
                     this,
                     arrayOf(file.absolutePath),
                     arrayOf("image/jpeg"),
                     null
                 )
-                Toast.makeText(this, "✅ Image saved to Gallery!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "✓ Image saved to Gallery!", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to save: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -176,10 +234,8 @@ class ImageViewerActivity : AppCompatActivity() {
         }
     }
 
-    // ─── Share Image ───────────────────────────────────────────────────────────
-
     private fun shareImage() {
-        val bmp = cachedBitmap
+        val bmp = getActiveBitmap()
         if (bmp == null) {
             Toast.makeText(this, "Image is still loading, please wait…", Toast.LENGTH_SHORT).show()
             return
@@ -188,7 +244,6 @@ class ImageViewerActivity : AppCompatActivity() {
         btnShare.isEnabled = false
 
         try {
-            // Write bitmap to app cache directory for sharing
             val cacheDir = File(cacheDir, "shared_images").apply { mkdirs() }
             val shareFile = File(cacheDir, "classmate_notice_share.jpg")
             FileOutputStream(shareFile).use { out ->
@@ -215,7 +270,77 @@ class ImageViewerActivity : AppCompatActivity() {
         }
     }
 
+    private inner class FullscreenImagePagerAdapter(
+        private val urls: List<String>,
+        private val onBitmapReady: (Int, Bitmap) -> Unit
+    ) : RecyclerView.Adapter<FullscreenImagePagerAdapter.ViewHolder>() {
+
+        inner class ViewHolder(val binding: ItemFullscreenImageBinding) :
+            RecyclerView.ViewHolder(binding.root)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val binding = ItemFullscreenImageBinding.inflate(
+                LayoutInflater.from(parent.context),
+                parent,
+                false
+            )
+            return ViewHolder(binding)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val url = urls[position]
+            val pv = holder.binding.fullscreenPhotoView
+            val pBar = holder.binding.fullscreenProgressBar
+            pBar.visibility = View.VISIBLE
+
+            Glide.with(holder.itemView.context)
+                .load(url)
+                .listener(object : RequestListener<Drawable> {
+                    override fun onLoadFailed(
+                        e: GlideException?,
+                        model: Any?,
+                        target: Target<Drawable>,
+                        isFirstResource: Boolean
+                    ): Boolean {
+                        pBar.visibility = View.GONE
+                        return false
+                    }
+
+                    override fun onResourceReady(
+                        resource: Drawable,
+                        model: Any,
+                        target: Target<Drawable>?,
+                        dataSource: DataSource,
+                        isFirstResource: Boolean
+                    ): Boolean {
+                        pBar.visibility = View.GONE
+                        return false
+                    }
+                })
+                .into(pv)
+
+            Glide.with(holder.itemView.context)
+                .asBitmap()
+                .load(url)
+                .into(object : CustomTarget<Bitmap>() {
+                    override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                        onBitmapReady(position, resource)
+                    }
+                    override fun onLoadCleared(placeholder: Drawable?) {}
+                })
+
+            // Allow zooming inside PhotoView without triggering ViewPager swipe while zoomed
+            pv.setOnScaleChangeListener { _, _, _ ->
+                viewPagerImages.isUserInputEnabled = (pv.scale <= 1.05f)
+            }
+        }
+
+        override fun getItemCount(): Int = urls.size
+    }
+
     companion object {
         const val EXTRA_IMAGE_URL = "imageUrl"
+        const val EXTRA_IMAGE_URLS = "imageUrls"
+        const val EXTRA_INITIAL_POSITION = "initialPosition"
     }
 }

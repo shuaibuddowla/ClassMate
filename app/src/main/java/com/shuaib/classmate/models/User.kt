@@ -33,6 +33,7 @@ data class User(
         return studentId.isNotBlank() && department.isNotBlank() && batchId.isNotBlank()
     }
 
+    val isStudent: Boolean get() = role != "teacher"
     fun isGlobalSuperAdmin(): Boolean = role == "global_super_admin" || role == "global_superadmin"
 
     fun isBatchAdmin(batch: String): Boolean {

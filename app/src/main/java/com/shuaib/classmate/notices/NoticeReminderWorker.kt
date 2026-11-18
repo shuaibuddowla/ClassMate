@@ -11,7 +11,9 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
+import com.shuaib.classmate.activities.ClassMateAuthActivity
 import com.shuaib.classmate.activities.MainActivity
 
 class NoticeReminderWorker(
@@ -43,17 +45,24 @@ class NoticeReminderWorker(
             )
         }
         
-        val intent = Intent(applicationContext, MainActivity::class.java)
+        val targetActivity = if (BuildConfig.CLASSMATE_AUTH_ENABLED) ClassMateAuthActivity::class.java else MainActivity::class.java
+        val intent = Intent(applicationContext, targetActivity)
             .putExtra("noticeId", noticeId)
+            .putExtra("TARGET_NOTICE_ID", noticeId)
+            .putExtra("record_id", noticeId)
             .putExtra("OPEN_TAB", "notices")
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pendingIntent = PendingIntent.getActivity(applicationContext, noticeId.hashCode(), intent, flags)
         
+        val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(applicationContext, title, isForNotification = true)
+        val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(applicationContext, body, isForNotification = true)
+
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_classmate_notification)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentTitle(formattedTitle)
+            .setContentText(formattedBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)

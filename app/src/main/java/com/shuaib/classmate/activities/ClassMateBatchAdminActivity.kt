@@ -44,16 +44,12 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
     private lateinit var tvStatCourses: TextView
 
     private lateinit var tileManageCourses: View
-    private lateinit var tileTimetable: View
-    private lateinit var tileTeacherAssignments: View
-    private lateinit var tileStudentRoster: View
-    private lateinit var tileManageCr: View
     private lateinit var tileBatchOverrides: View
     private lateinit var tileActiveSemester: View
-    private lateinit var tileCloneSemester: View
+    private lateinit var layoutAdminSection: View
+    private lateinit var tileAllUsersRoles: View
     private lateinit var tileCourseCatalog: View
     private lateinit var tileSystemHealth: View
-    private lateinit var headerSystemSection: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,16 +87,12 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
         tvStatCourses = findViewById(R.id.tvStatCourses)
 
         tileManageCourses = findViewById(R.id.tileManageCourses)
-        tileTimetable = findViewById(R.id.tileTimetable)
-        tileTeacherAssignments = findViewById(R.id.tileTeacherAssignments)
-        tileStudentRoster = findViewById(R.id.tileStudentRoster)
-        tileManageCr = findViewById(R.id.tileManageCr)
         tileBatchOverrides = findViewById(R.id.tileBatchOverrides)
         tileActiveSemester = findViewById(R.id.tileActiveSemester)
-        tileCloneSemester = findViewById(R.id.tileCloneSemester)
+        layoutAdminSection = findViewById(R.id.layoutAdminSection)
+        tileAllUsersRoles = findViewById(R.id.tileAllUsersRoles)
         tileCourseCatalog = findViewById(R.id.tileCourseCatalog)
         tileSystemHealth = findViewById(R.id.tileSystemHealth)
-        headerSystemSection = findViewById(R.id.headerSystemSection)
 
         if (batchLabel.isNotBlank()) {
             tvHeroBatchTitle.text = batchLabel
@@ -108,59 +100,15 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
     }
 
     private fun setupActionCards() {
-        // --- Section 1: Courses & Routine ---
+        // --- Section 1: Batch & Academic Management (CR & Admin) ---
         bindActionCard(
             cardView = tileManageCourses,
             title = "Manage Courses",
-            subtitle = "Add, edit and organize courses for this batch",
+            subtitle = "Add, edit and organize courses and teacher assignments",
             iconRes = R.drawable.ic_library_filled,
             accentColor = Color.parseColor("#3B82F6")
         ) {
             val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "courses")
-            startActivity(intent)
-        }
-
-        bindActionCard(
-            cardView = tileTimetable,
-            title = "Class Timetable & Schedule",
-            subtitle = "Configure weekly schedule, rooms, periods & timing",
-            iconRes = R.drawable.ic_timetable,
-            accentColor = Color.parseColor("#10B981")
-        ) {
-            startActivity(Intent(this, TimetableManagementActivity::class.java))
-        }
-
-        bindActionCard(
-            cardView = tileTeacherAssignments,
-            title = "Teacher Assignments",
-            subtitle = "Assign instructors to courses and manage teaching access",
-            iconRes = R.drawable.ic_person,
-            accentColor = Color.parseColor("#8B5CF6")
-        ) {
-            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "teachers")
-            startActivity(intent)
-        }
-
-        // --- Section 2: Members & Permissions ---
-        bindActionCard(
-            cardView = tileStudentRoster,
-            title = "Student Roster & Verification",
-            subtitle = "View enrolled students, verify accounts & manage roles",
-            iconRes = R.drawable.ic_users,
-            accentColor = Color.parseColor("#0EA5E9")
-        ) {
-            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "people")
-            startActivity(intent)
-        }
-
-        bindActionCard(
-            cardView = tileManageCr,
-            title = "Class Representatives (CR)",
-            subtitle = "Appoint or revoke Class Representative permissions",
-            iconRes = R.drawable.ic_badge,
-            accentColor = Color.parseColor("#F59E0B")
-        ) {
-            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "people")
             startActivity(intent)
         }
 
@@ -175,33 +123,31 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // --- Section 3: Semester & Progression ---
         bindActionCard(
             cardView = tileActiveSemester,
             title = "Switch Active Semester",
-            subtitle = "Publish new semester or change active progression",
+            subtitle = "Advance to next semester or switch active progression",
             iconRes = R.drawable.ic_academic_cap,
             accentColor = Color.parseColor("#06B6D4")
         ) {
             showSemesterSwitchDialog()
         }
 
-        bindActionCard(
-            cardView = tileCloneSemester,
-            title = "Clone / Copy Semester Plan",
-            subtitle = "Duplicate routine, courses & teachers to a new semester",
-            iconRes = R.drawable.ic_copy,
-            accentColor = Color.parseColor("#6366F1")
-        ) {
-            showCloneSemesterDialog()
-        }
+        // --- Section 2: Admin Only (Server Owner & Admins) ---
+        val canAccessAdminTools = isServerOwner || role == "admin"
+        layoutAdminSection.visibility = if (canAccessAdminTools) View.VISIBLE else View.GONE
 
-        // --- Section 4: System & Global Tools ---
-        val canAccessGlobalTools = isServerOwner || role == "admin"
-        if (canAccessGlobalTools) {
-            headerSystemSection.visibility = View.VISIBLE
-            tileCourseCatalog.visibility = View.VISIBLE
-            tileSystemHealth.visibility = View.VISIBLE
+        if (canAccessAdminTools) {
+            bindActionCard(
+                cardView = tileAllUsersRoles,
+                title = "All Users & Roles",
+                subtitle = "View all batch members, accounts and manage user permissions",
+                iconRes = R.drawable.ic_users,
+                accentColor = Color.parseColor("#0EA5E9")
+            ) {
+                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "people")
+                startActivity(intent)
+            }
 
             bindActionCard(
                 cardView = tileCourseCatalog,
@@ -223,10 +169,6 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
             ) {
                 ClassMateHealthDialog.show(this, lifecycleScope)
             }
-        } else {
-            headerSystemSection.visibility = View.GONE
-            tileCourseCatalog.visibility = View.GONE
-            tileSystemHealth.visibility = View.GONE
         }
     }
 
@@ -309,7 +251,7 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                 val courseCount = if (activeSemId.isNotBlank()) {
                     val semCourses = ClassMateAuthApi.rows(
                         "semester_courses",
-                        "select=id&semester_id=eq.$activeSemId&status=eq.active"
+                        "select=id&semester_id=eq.$activeSemId"
                     )
                     semCourses.length()
                 } else {
@@ -367,7 +309,7 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                         val messageText = if (status == "completed") {
                             "Reactivating Semester $semNum will set its courses and weekly timetable routine back as active for this batch."
                         } else {
-                            "Publishing Semester $semNum will make it active for this batch and complete the current semester."
+                            "Publishing Semester $semNum will make it active for this batch and complete the current semester. All notices remain intact."
                         }
 
                         MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
@@ -391,76 +333,6 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                     .show()
             } catch (e: Exception) {
                 Toast.makeText(this@ClassMateBatchAdminActivity, "Could not load semesters: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun showCloneSemesterDialog() {
-        lifecycleScope.launch {
-            try {
-                val sourceRows = ClassMateAuthApi.rows(
-                    "semesters",
-                    "select=id,semester_number,status&batch_id=eq.$batchId&status=in.(active,completed)&order=semester_number"
-                )
-                val targetRows = ClassMateAuthApi.rows(
-                    "semesters",
-                    "select=id,semester_number&batch_id=eq.$batchId&status=eq.not_started&order=semester_number"
-                )
-
-                if (sourceRows.length() == 0) {
-                    Toast.makeText(this@ClassMateBatchAdminActivity, "No active or completed semesters found to copy from.", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                if (targetRows.length() == 0) {
-                    Toast.makeText(this@ClassMateBatchAdminActivity, "No draft semester available. Destination draft must exist to copy into.", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-
-                val sources = (0 until sourceRows.length()).map { sourceRows.getJSONObject(it) }
-                val sourceLabels = sources.map { "Semester ${it.optInt("semester_number")} (${it.optString("status")})" }.toTypedArray()
-
-                MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                    .setTitle("Step 1: Choose Source Semester")
-                    .setItems(sourceLabels) { _, srcIndex ->
-                        val source = sources[srcIndex]
-                        val targets = (0 until targetRows.length()).map { targetRows.getJSONObject(it) }
-                        val targetLabels = targets.map { "Semester ${it.optInt("semester_number")} (Draft)" }.toTypedArray()
-
-                        MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                            .setTitle("Step 2: Choose Destination Draft")
-                            .setItems(targetLabels) { _, tgtIndex ->
-                                val target = targets[tgtIndex]
-
-                                MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                                    .setTitle("Copy Semester Plan?")
-                                    .setMessage("Duplicate courses, timetable routine slots, and teacher assignments from Semester ${source.optInt("semester_number")} into Semester ${target.optInt("semester_number")}?")
-                                    .setPositiveButton("Copy Plan") { _, _ ->
-                                        lifecycleScope.launch {
-                                            try {
-                                                ClassMateAuthApi.rpcText(
-                                                    "clone_semester",
-                                                    JSONObject()
-                                                        .put("from_id", source.getString("id"))
-                                                        .put("to_id", target.getString("id"))
-                                                )
-                                                Toast.makeText(this@ClassMateBatchAdminActivity, "Semester plan cloned successfully!", Toast.LENGTH_LONG).show()
-                                                loadBatchData()
-                                            } catch (e: Exception) {
-                                                Toast.makeText(this@ClassMateBatchAdminActivity, "Clone failed: ${e.message}", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
-                                    .setNegativeButton("Cancel", null)
-                                    .show()
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
-
-            } catch (e: Exception) {
-                Toast.makeText(this@ClassMateBatchAdminActivity, "Failed to load semesters: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

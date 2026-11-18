@@ -213,29 +213,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     fun setComposeBadge(tab: com.shuaib.classmate.ui.ClassMateTab, badge: com.shuaib.classmate.ui.NavBadge?) {
-
-
-
         if (badge == null) {
-
-
-
             composeBadgeMap.remove(tab)
-
-
-
+            findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.removeBadge(tab.id)
         } else {
-
-
-
             composeBadgeMap[tab] = badge
-
-
-
+            findViewById<GlassBottomNavView>(R.id.classmate_home_nav)?.let { nav ->
+                val b = nav.getOrCreateBadge(tab.id)
+                b.isVisible = true
+                b.backgroundColor = androidx.core.content.ContextCompat.getColor(this, R.color.cm_unread_dot)
+                when (badge) {
+                    is com.shuaib.classmate.ui.NavBadge.Count -> b.number = badge.count
+                    is com.shuaib.classmate.ui.NavBadge.Dot -> b.clearNumber()
+                }
+            }
         }
-
-
-
     }
 
 
@@ -537,6 +529,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 }
 
             }
+
+
 
 
 
@@ -1030,7 +1024,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-    private var profile: JSONObject? = null
+    internal var profile: JSONObject? = null
 
 
 
@@ -1055,6 +1049,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private var welcomeDialog: AlertDialog? = null
+    private var studentBanDialog: AlertDialog? = null
 
 
 
@@ -1634,6 +1629,14 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+    private val avatarImagePicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            uploadProfilePhoto(uri)
+        }
+    }
+
     private val googleLauncher = registerForActivityResult(
 
 
@@ -1803,11 +1806,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-        if (intent.getStringExtra("OPEN_TAB") == "notices") selectedTab = R.id.nav_notices
-
-
-
-        else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
+        val initialNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
+            ?: intent.getStringExtra("noticeId")
+            ?: intent.getStringExtra("notice_id")
+            ?: intent.getStringExtra("record_id")
+        if (intent.getStringExtra("OPEN_TAB") == "notices" || !initialNoticeId.isNullOrBlank()) {
+            selectedTab = R.id.nav_notices
+        } else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
 
 
 
@@ -1848,8 +1853,15 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 showHome(); renderHomeTab(selectedTab)
+                maybeTriggerSpotlightTour()
 
-
+                if (!initialNoticeId.isNullOrBlank()) {
+                    window.decorView.postDelayed({
+                        if (::academicScreens.isInitialized) {
+                            academicScreens.openDirectNotice(initialNoticeId)
+                        }
+                    }, 450)
+                }
 
                 if (intent.getBooleanExtra("OPEN_RFID_ATTENDANCE", false)) {
 
@@ -2364,9 +2376,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private fun signOut() {
-
-
-
         profileValidated=false
 
 
@@ -2601,6 +2610,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
         loaded.put("is_server_owner", isServerOwner)
 
+        if (showStudentBanGate()) return
+
 
 
         authBusy = false
@@ -2676,8 +2687,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                     renderHomeTab(selectedTab)
-
-
+                    maybeTriggerSpotlightTour()
 
                 }
 
@@ -2704,8 +2714,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 renderHomeTab(selectedTab)
-
-
+                maybeTriggerSpotlightTour()
 
             }
 
@@ -2765,11 +2774,177 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
     }
 
+    private suspend fun showStudentBanGate(): Boolean {
+        val ban = runCatching { ClassMateAuthApi.rpc("active_student_ban", JSONObject()) }.getOrNull()
+        if (ban == null || ban.isNull("ends_at")) return false
+        if (studentBanDialog?.isShowing != true) {
+            val density = resources.displayMetrics.density
+            fun dp(value: Int) = (value * density).toInt()
+            fun textView(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+                text = value
+                textSize = size
+                setTextColor(color)
+                if (bold) setTypeface(typeface, Typeface.BOLD)
+                setLineSpacing(dp(3).toFloat(), 1f)
+            }
+            fun infoSection(title: String, body: String, warning: Boolean = false) = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(17), dp(15), dp(17), dp(15))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(getColor(if (warning) R.color.cm_notice_deadline_bg else R.color.cm_bg_secondary))
+                    cornerRadius = dp(17).toFloat()
+                    if (warning) setStroke(dp(1), getColor(R.color.cm_notice_deadline_text))
+                }
+                addView(textView(title.uppercase(), 10f, getColor(if (warning) R.color.cm_notice_deadline_text else R.color.cm_text_muted), true))
+                addView(textView(body, if (warning) 15f else 14f, getColor(R.color.cm_text_primary), warning).apply {
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) }
+                })
+            }
+            val accessReturn = runCatching {
+                java.time.Instant.parse(ban.optString("ends_at")).atZone(java.time.ZoneId.of("Asia/Dhaka"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMM yyyy · h:mm a")) + " · Bangladesh time"
+            }.getOrElse { ban.optString("ends_at").replace("T", " ").take(16) }
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(24), dp(24), dp(24), dp(22))
+                addView(TextView(this@ClassMateAuthActivity).apply {
+                    text = "!"; gravity = Gravity.CENTER; textSize = 25f
+                    setTypeface(typeface, Typeface.BOLD); setTextColor(getColor(R.color.cm_error))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(getColor(R.color.cm_notice_deadline_bg))
+                    }
+                    layoutParams = LinearLayout.LayoutParams(dp(58), dp(58)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(15) }
+                })
+                addView(textView("CLASSMATE ACCESS PAUSED", 10f, getColor(R.color.cm_error), true).apply { gravity = Gravity.CENTER; letterSpacing = 0.12f })
+                addView(textView("You’re temporarily banned", 24f, getColor(R.color.cm_text_primary), true).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+                })
+                addView(textView("Your account access is restricted until the ban expires or is lifted by your batch CR or an administrator.", 14f, getColor(R.color.cm_text_muted)).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(19) }
+                })
+                addView(infoSection("Reason for this ban", ban.optString("reason").takeIf { it.isNotBlank() } ?: "No reason was provided. Ask your batch CR or an administrator for details.", true))
+                addView(infoSection("Access expected to return", accessReturn).apply {
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) }
+                })
+                addView(textView("Need a review? Contact your batch CR or a ClassMate administrator. This screen will close automatically as soon as your access is restored.", 12f, getColor(R.color.cm_text_muted)).apply {
+                    gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(17) }
+                })
+            }
+            val dialogContent = ScrollView(this).apply {
+                isFillViewport = true
+                addView(MaterialCardView(this@ClassMateAuthActivity).apply {
+                    radius = dp(26).toFloat(); strokeWidth = dp(1)
+                    strokeColor = getColor(R.color.cm_border)
+                    setCardBackgroundColor(getColor(R.color.cm_surface)); cardElevation = dp(18).toFloat()
+                    addView(content)
+                })
+            }
+            val dialogHeight = (resources.displayMetrics.heightPixels * 0.84f).toInt()
+            studentBanDialog = AlertDialog.Builder(this)
+                .setView(dialogContent).setCancelable(false).create().also { dialog ->
+                    dialog.setCanceledOnTouchOutside(false)
+                    dialog.show()
+                    dialog.window?.apply {
+                        setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                        setLayout((resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(440)), dialogHeight)
+                    }
+                }
+            lifecycleScope.launch {
+                while (!isFinishing && studentBanDialog?.isShowing == true) {
+                    kotlinx.coroutines.delay(5000)
+                    val latest = runCatching { ClassMateAuthApi.rpc("active_student_ban", JSONObject()) }.getOrNull()
+                    if (latest == null || latest.isNull("ends_at")) {
+                        studentBanDialog?.dismiss()
+                        studentBanDialog = null
+                        if (!isFinishing) runCatching { loadProfile() }
+                        break
+                    }
+                }
+            }
+        }
+        return true
+    }
 
+    fun pickProfilePhoto() {
+        avatarImagePicker.launch("image/*")
+    }
 
+    fun uploadProfilePhoto(uri: android.net.Uri) {
+        val uid = userId.ifBlank { profile?.optString("id").orEmpty() }
+        if (uid.isBlank()) {
+            android.widget.Toast.makeText(this, "Profile not ready for upload", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
 
+        val progressDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Uploading photo")
+            .setMessage("Optimizing and saving to your profile...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
 
+        lifecycleScope.launch {
+            val result = com.shuaib.classmate.utils.ClassMateProfileAvatarManager.uploadAvatar(this@ClassMateAuthActivity, uri, uid)
+            progressDialog.dismiss()
+            result.onSuccess { (url, updated) ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Profile photo updated!", android.widget.Toast.LENGTH_SHORT).show()
+                if (updated.optString("id") == uid) {
+                    profile = updated
+                    ClassMateAcademicCache.saveHome(this@ClassMateAuthActivity, updated, selectedBatchId, selectedBatchLabel)
+                }
+                if (homeShown && selectedTab == R.id.nav_profile) {
+                    renderHomeTab(selectedTab)
+                }
+            }.onFailure { err ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Upload failed: ${err.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
+    fun removeProfilePhoto() {
+        val progressDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Removing photo")
+            .setMessage("Clearing profile picture...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
+        lifecycleScope.launch {
+            val result = com.shuaib.classmate.utils.ClassMateProfileAvatarManager.removeAvatar()
+            progressDialog.dismiss()
+            result.onSuccess { updated ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Profile photo removed", android.widget.Toast.LENGTH_SHORT).show()
+                val uid = userId.ifBlank { profile?.optString("id").orEmpty() }
+                if (updated.optString("id") == uid) {
+                    profile = updated
+                    ClassMateAcademicCache.saveHome(this@ClassMateAuthActivity, updated, selectedBatchId, selectedBatchLabel)
+                }
+                if (homeShown && selectedTab == R.id.nav_profile) {
+                    renderHomeTab(selectedTab)
+                }
+            }.onFailure { err ->
+                android.widget.Toast.makeText(this@ClassMateAuthActivity, "Failed to remove photo: ${err.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun maybeTriggerSpotlightTour() {
+        if (studentBanDialog?.isShowing == true) return
+        val currentPhoto = profile?.optString("avatar_url").takeUnless { it.isNullOrBlank() || it == "null" }
+            ?: com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(this)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+        if (currentPhoto.isNullOrBlank() && com.shuaib.classmate.utils.ClassMateProfileAvatarManager.shouldPrompt(this)) {
+            window.decorView.postDelayed({
+                if (!isFinishing && !isDestroyed && homeShown && studentBanDialog?.isShowing != true) {
+                    com.shuaib.classmate.utils.ClassMateProfileAvatarManager.promptAddProfilePhoto(this) {
+                        pickProfilePhoto()
+                    }
+                }
+            }, 1200)
+        }
+    }
+
+    private fun maybeShowFeatureGuide() {}
 
     private fun showProfilePending(loaded: JSONObject) {
 
@@ -3439,7 +3614,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
 
-            view.setPadding(0, statusBars.top, 0, 0)
+            view.setPadding(0, 0, 0, 0)
+            academicScreens.onStatusBarInset(statusBars.top)
 
             insets
 
@@ -3608,7 +3784,17 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+        val blurBackdrop = findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)
+        blurBackdrop?.attachBehindView(homeHost)
+
         val composeNav = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.classmate_home_compose_nav)
+        composeNav?.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+            val navH = bottom - top
+            if (navH > 0 && blurBackdrop?.layoutParams?.height != navH) {
+                blurBackdrop?.layoutParams?.height = navH
+                blurBackdrop?.requestLayout()
+            }
+        }
 
 
 
@@ -3627,65 +3813,47 @@ class ClassMateAuthActivity : AppCompatActivity() {
             val showBatch = selectedBatchId.isNotBlank() && profile?.optString("verification_status") == "active"
 
             val visibleTabs = androidx.compose.runtime.remember {
-
                 listOf(
-
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
-
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
-
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
-
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
-
                 )
-
             }
 
 
 
+            val fromProfile = profile?.optString("avatar_url").takeUnless { it.isNullOrBlank() || it.equals("null", true) }
+                ?: profile?.optString("photo_url").takeUnless { it.isNullOrBlank() || it.equals("null", true) }
+            val fromGoogle = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(this)?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            val fromFirebase = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()?.takeUnless { it.isBlank() }
+            val userAvatarUrl = fromProfile ?: fromGoogle ?: fromFirebase
+            val userName = profile?.optString("full_name").orEmpty()
+
             com.shuaib.classmate.ui.ClassMateFloatingNavigationBar(
-
                 selectedTab = composeSelectedTab,
-
                 onTabSelected = { tab ->
-
                     composeNavVisible = true
-
                     composeSelectedTab = tab
-
                     selectedTab = tab.id
-
-                    composeBadgeMap.remove(tab)
-
-                    homeHost.post {
-
-                        renderHomeTab(tab.id)
-
+                    if (nav.menu.findItem(tab.id) != null && nav.selectedItemId != tab.id) {
+                        nav.selectedItemId = tab.id
                     }
-
+                    composeBadgeMap.remove(tab)
+                    renderHomeTab(tab.id)
                 },
-
                 visibleTabs = visibleTabs,
-
                 batchTabTitle = if (isTeacher) "Students" else "Batch",
-
                 badges = composeBadgeMap,
-
                 isVisible = composeNavVisible,
-
+                userAvatarUrl = userAvatarUrl,
+                userName = userName,
                 onTabLongClick = { tab ->
-
                     showTabQuickActionsDialog(tab)
-
                 },
-
                 onQuickActionRequest = { tab ->
-
                     getQuickActionsForTab(tab)
-
                 }
-
             )
 
 
@@ -3758,7 +3926,6 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         } }
-
 
 
         nav.setOnItemSelectedListener { item ->
@@ -4105,52 +4272,38 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+    fun setNavigationShown(show: Boolean) {
+        if (::academicScreens.isInitialized) academicScreens.setNavigationShown(show)
+    }
+
     private fun renderHomeTab(tab: Int) {
-
-
-
         if (!homeShown) return
 
-
-
         composeNavVisible = true
-
+        selectedTab = tab
         if (::academicScreens.isInitialized) academicScreens.setNavigationShown(true)
 
-
+        if (tab == R.id.nav_friends) {
+            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark
+        }
 
         composeSelectedTab = com.shuaib.classmate.ui.ClassMateTab.fromId(tab) ?: com.shuaib.classmate.ui.ClassMateTab.TIMETABLE
-
-
-
         composeBadgeMap.remove(composeSelectedTab)
 
-
-
         findViewById<GlassBottomNavView>(R.id.classmate_home_nav).apply {
-
-
-
+            removeBadge(tab)
             animate().cancel()
-
-
-
             translationY = 0f
-
-
-
             alpha = 1f
-
-
-
+            if (menu.findItem(tab)?.isVisible == true && selectedItemId != tab) {
+                selectedItemId = tab
+            }
             val visibleItems = (0 until menu.size()).map { menu.getItem(it) }.filter { it.isVisible }
-
-
-
-            post { updateActiveTab(visibleItems.indexOfFirst { it.itemId == tab }, visibleItems.size) }
-
-
-
+            val tabIdx = visibleItems.indexOfFirst { it.itemId == tab }
+            if (tabIdx >= 0) {
+                post { updateActiveTab(tabIdx, visibleItems.size) }
+            }
         }
 
 
@@ -6568,21 +6721,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val openTab = intent.getStringExtra("OPEN_TAB")
+        val targetNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
+            ?: intent.getStringExtra("noticeId")
+            ?: intent.getStringExtra("notice_id")
+            ?: intent.getStringExtra("record_id")
 
-
-
-        if (openTab == "notices") {
-
-
-
+        if (openTab == "notices" || !targetNoticeId.isNullOrBlank()) {
             selectedTab = R.id.nav_notices
-
-
-
             renderHomeTab(selectedTab)
-
-
-
+            if (!targetNoticeId.isNullOrBlank()) {
+                window.decorView.postDelayed({
+                    if (::academicScreens.isInitialized) {
+                        academicScreens.openDirectNotice(targetNoticeId)
+                    }
+                }, 400)
+            }
         } else if (openTab in setOf("library", "courses")) {
 
 
@@ -8190,8 +8343,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
                 renderHomeTab(selectedTab)
-
-
+                maybeTriggerSpotlightTour()
 
             }
 

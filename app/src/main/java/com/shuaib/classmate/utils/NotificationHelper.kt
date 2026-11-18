@@ -16,7 +16,7 @@ object NotificationHelper {
     private const val CHANNEL_NOTICES_ID = "classmate_notices"
     private const val CHANNEL_CANCELLATIONS_ID = "classmate_cancellations"
 
-    fun showNotification(context: Context, title: String, body: String, isCancel: Boolean) {
+    fun showNotification(context: Context, title: String, body: String, isCancel: Boolean, noticeId: String? = null) {
         if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
             return
         }
@@ -25,9 +25,15 @@ object NotificationHelper {
         val channelId = if (isCancel) CHANNEL_CANCELLATIONS_ID else CHANNEL_NOTICES_ID
         val color = if (isCancel) Color.RED else Color.parseColor("#3B82F6")
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        val targetClass = if (com.shuaib.classmate.BuildConfig.CLASSMATE_AUTH_ENABLED) com.shuaib.classmate.activities.ClassMateAuthActivity::class.java else MainActivity::class.java
+        val intent = Intent(context, targetClass).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("OPEN_TAB", "notices")
+            if (!noticeId.isNullOrBlank()) {
+                putExtra("TARGET_NOTICE_ID", noticeId)
+                putExtra("noticeId", noticeId)
+                putExtra("record_id", noticeId)
+            }
         }
 
         val pendingIntent = PendingIntent.getActivity(

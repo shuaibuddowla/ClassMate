@@ -34,7 +34,9 @@ internal object ClassMateRoutineExporter {
         }
 
         val sb = StringBuilder()
-        val titleBatch = batchLabel.ifBlank { "MBSTU" }
+        val instShort = ClassMateAcademicCache.institutionShortName(context)
+        val instName = ClassMateAcademicCache.institutionName(context)
+        val titleBatch = batchLabel.ifBlank { instShort }
         sb.append("📅 ").append(titleBatch).append(" · Class Routine\n")
         sb.append("═".repeat(34)).append("\n\n")
 
@@ -80,8 +82,9 @@ internal object ClassMateRoutineExporter {
             sb.append("No active routine periods scheduled yet for this batch.\n")
         }
 
+        val campusTag = "$instName · Student Companion"
         sb.append("───────────────\n")
-        sb.append("Shared via ClassMate · MBSTU Student Companion")
+        sb.append("Shared via ClassMate · ").append(campusTag)
 
         try {
             val sendIntent = Intent().apply {

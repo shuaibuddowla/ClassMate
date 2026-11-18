@@ -177,6 +177,10 @@ object ClassMateAuthApi {
         JSONObject(request("POST", "/functions/v1/signed-classmate-resource",
             JSONObject().put("resource_id", resourceId))).getString("url")
 
+    suspend fun edgePost(functionName: String, body: JSONObject = JSONObject()): String = withContext(Dispatchers.IO) {
+        request("POST", "/functions/v1/$functionName", body)
+    }
+
     suspend fun deleteResource(resourceId: String) {
         val body = JSONObject().put("action", "delete").put("resource_id", resourceId)
         val path = "/functions/v1/upload-classmate-resource"
