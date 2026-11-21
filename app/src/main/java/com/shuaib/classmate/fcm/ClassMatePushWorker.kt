@@ -37,8 +37,9 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
 
         val release = inputData.getString("kind") == "app_update"
         val blood = inputData.getString("kind") == "blood_request"
-        val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update")
+        val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update", "batch_fund_reminder")
         val attendance = inputData.getString("kind") in setOf("attendance_open", "attendance_marked")
+        val assessmentReminder = inputData.getString("kind") == "assessment_reminder"
         if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
@@ -47,7 +48,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         }
         val isTargetedPersonal = inputData.getString("kind") in setOf(
             "student_ban", "student_ban_lifted",
-            "batch_fund_deposit", "batch_fund_update",
+            "batch_fund_deposit", "batch_fund_update", "batch_fund_reminder",
             "attendance_marked"
         )
         val targetRecipient = inputData.getString("recipient_id")
@@ -105,6 +106,18 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     blood -> Intent(context,com.shuaib.classmate.activities.ClassMateBloodActivity::class.java).putExtra("request_id",key)
                     fund -> Intent(context,com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java).apply {
                         putExtra("batch_id", inputData.getString("batch_id") ?: identity.optString("batch_id"))
+                        if (inputData.getString("kind") == "batch_fund_reminder") {
+                            putExtra("open_payers", true)
+                        }
+                    }
+                    assessmentReminder -> Intent(context, ClassMateAuthActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("OPEN_TAB", "upcoming")
+                        val aid = inputData.getString("assessment_id") ?: inputData.getString("record_id")
+                        if (!aid.isNullOrBlank()) {
+                            putExtra("EXTRA_ASSESSMENT_ID", aid)
+                            putExtra("record_id", aid)
+                        }
                     }
                     else -> Intent(context,ClassMateAuthActivity::class.java).apply {
                         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -121,10 +134,14 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 val rawBody = inputData.getString("body") ?: "New class update available"
                 val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawTitle, isForNotification = true)
                 val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawBody, isForNotification = true)
-                val builder = NotificationCompat.Builder(context,channel).setSmallIcon(R.drawable.ic_classmate_notification)
+                val batchId = inputData.getString("batch_id") ?: identity.optString("batch_id")
+                val groupKey = if (blood) "classmate_group_blood" else "classmate_group_batch_${batchId.ifBlank { "general" }}"
+                val builder = NotificationCompat.Builder(context, channel).setSmallIcon(R.drawable.ic_classmate_notification)
                     .setColor(0xFF3B82F6.toInt()).setContentTitle(formattedTitle)
                     .setContentText(formattedBody).setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody)).setContentIntent(pending)
                     .setPriority(NotificationCompat.PRIORITY_HIGH).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setGroup(groupKey)
+                    .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
                     .setOnlyAlertOnce(true).setAutoCancel(true)
                 if(blood) {
                     builder.setColor(0xFFC43E52.toInt())
@@ -138,13 +155,49 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     }
                 }
                 val notification=builder.build()
-                try { manager.notify(key.hashCode(),notification) } catch (_: SecurityException) { return Result.failure() }
+                try {
+                    manager.notify(key.hashCode(), notification)
+                    if (!blood && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        val summaryNotification = NotificationCompat.Builder(context, channel)
+                            .setSmallIcon(R.drawable.ic_classmate_notification)
+                            .setColor(0xFF3B82F6.toInt())
+                            .setStyle(NotificationCompat.InboxStyle().setSummaryText("ClassMate updates"))
+                            .setGroup(groupKey)
+                            .setGroupSummary(true)
+                            .setAutoCancel(true)
+                            .build()
+                        manager.notify(groupKey.hashCode(), summaryNotification)
+                    }
+                    ClassMateInAppPush.notify(
+                        InAppNotificationEvent(
+                            title = rawTitle,
+                            body = rawBody,
+                            kind = inputData.getString("kind") ?: "notice",
+                            recordId = key,
+                            openTab = when {
+                                attendance -> "library"
+                                blood -> "blood"
+                                fund -> "fund"
+                                assessmentReminder -> "upcoming"
+                                else -> "notices"
+                            }
+                        )
+                    )
+                } catch (_: SecurityException) { return Result.failure() }
             }
         }
         if(state=="displayed" && eventKey!=null) ledger.record(eventKey)
         // Automatic checks remain useful even when Android notifications are disabled.
         if(release) UpdateCoordinator.enqueueReleaseCheck(context)
-        if(!release) com.shuaib.classmate.activities.ClassMateUnreadActivity.changed()
+        if(!release) {
+            com.shuaib.classmate.activities.ClassMateUnreadActivity.changed()
+            val batch = inputData.getString("batch_id") ?: identity.optString("batch_id")
+            if (!batch.isNullOrBlank()) {
+                runCatching {
+                    com.shuaib.classmate.repositories.AssessmentRepository.getInstance(context).refreshFromRemote(batch)
+                }
+            }
+        }
         val event = inputData.getString("event_id")
         val hash = inputData.getString("token_hash")
         if (event != null && hash != null) {
@@ -159,7 +212,11 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
     companion object {
         fun enqueue(context: Context, values: Map<String,String>) {
             // Only known, bounded fields enter WorkManager's persisted Data (10 KB limit).
-            val fields = listOf("project_ref","recipient_id","batch_id","kind","record_id","event_id","token_hash","version_code","version_name","title","body","blood_match","expires_at")
+            val fields = listOf(
+                "project_ref", "recipient_id", "batch_id", "kind", "record_id", "event_id",
+                "token_hash", "version_code", "version_name", "title", "body", "blood_match",
+                "expires_at", "session_id", "course_code", "course_title", "assessment_id", "routine_slot_id"
+            )
             val data = Data.Builder().apply { fields.forEach { key -> values[key]?.let { putString(key,it.take(500)) } } }.build()
             val work = OneTimeWorkRequestBuilder<ClassMatePushWorker>().setInputData(data)
                 .apply { if(Build.VERSION.SDK_INT>=31) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) }.build()

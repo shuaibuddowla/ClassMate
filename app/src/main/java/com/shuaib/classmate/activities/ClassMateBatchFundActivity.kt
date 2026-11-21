@@ -1365,32 +1365,35 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         Toast.makeText(this@ClassMateBatchFundActivity, "You are offline. Connect to internet to send reminders.", Toast.LENGTH_SHORT).show()
                         return@setOnClickListener
                     }
+                    val unpaidProfileIds = unpaidList.mapNotNull { s ->
+                        s.optString("profile_id").trim().takeIf { id -> id.isNotBlank() && id != "null" }
+                    }
+                    if (unpaidProfileIds.isEmpty()) {
+                        Toast.makeText(this@ClassMateBatchFundActivity, "No student profile accounts found for unpaid students.", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
                     MaterialAlertDialogBuilder(this@ClassMateBatchFundActivity)
-                        .setTitle("Send Reminder to ${unpaidList.size} Classmates?")
+                        .setTitle("Send Reminder to ${unpaidProfileIds.size} Classmates?")
                         .setMessage("A push notification will be sent to remind everyone who hasn't paid for '$colDisplay' yet.")
                         .setPositiveButton("Send Reminder") { _, _ ->
                             btnRemindUnpaid.isEnabled = false
-                            NotificationSender.sendToBatch(
-                                batchId = batchId,
-                                title = "Batch Fund Reminder: $colDisplay",
-                                message = "Gentle reminder from your CR to clear pending dues for $colDisplay.",
-                                type = "batch_fund_reminder",
-                                extraData = mapOf("campaign_title" to colDisplay, "action" to "batch_fund"),
-                                onSuccess = {
-                                    runOnUiThread {
-                                        btnRemindUnpaid.isEnabled = true
-                                        HapticHelper.success(this@ClassMateBatchFundActivity)
-                                        Toast.makeText(this@ClassMateBatchFundActivity, "Reminders sent to ${unpaidList.size} unpaid students!", Toast.LENGTH_SHORT).show()
+                            lifecycleScope.launch {
+                                try {
+                                    val params = JSONObject().apply {
+                                        put("target_batch", batchId)
+                                        put("target_collection", colDisplay)
+                                        put("unpaid_profile_ids", JSONArray(unpaidProfileIds))
                                     }
-                                },
-                                onFailure = { err ->
-                                    runOnUiThread {
-                                        btnRemindUnpaid.isEnabled = true
-                                        HapticHelper.warning(this@ClassMateBatchFundActivity)
-                                        Toast.makeText(this@ClassMateBatchFundActivity, "Failed to send: $err", Toast.LENGTH_SHORT).show()
-                                    }
+                                    val count = ClassMateAuthApi.rpcText("send_batch_fund_dues_reminder", params).trim().toIntOrNull() ?: unpaidProfileIds.size
+                                    btnRemindUnpaid.isEnabled = true
+                                    HapticHelper.success(this@ClassMateBatchFundActivity)
+                                    Toast.makeText(this@ClassMateBatchFundActivity, "Reminders sent to $count unpaid students!", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    btnRemindUnpaid.isEnabled = true
+                                    HapticHelper.warning(this@ClassMateBatchFundActivity)
+                                    Toast.makeText(this@ClassMateBatchFundActivity, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
-                            )
+                            }
                         }
                         .setNegativeButton("Cancel", null)
                         .show()
