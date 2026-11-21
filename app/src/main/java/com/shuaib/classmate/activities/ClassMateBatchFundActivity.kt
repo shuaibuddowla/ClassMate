@@ -1,10 +1,12 @@
 package com.shuaib.classmate.activities
 
 import android.app.DatePickerDialog
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -17,6 +19,7 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,9 +40,15 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.shuaib.classmate.R
+import com.shuaib.classmate.data.offline.ClassMateBatchFundCache
+import com.shuaib.classmate.data.offline.OfflineFundQueue
+import com.shuaib.classmate.data.offline.PendingFundTransaction
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.utils.EmptyStateHelper
 import com.shuaib.classmate.utils.HapticHelper
-import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
+import com.shuaib.classmate.utils.NetworkMonitor
+import com.shuaib.classmate.utils.NotificationSender
+import com.shuaib.classmate.workers.OfflineFundSyncWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -105,7 +114,35 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     private lateinit var tvLedgerCountSubtitle: TextView
     private lateinit var cardSummaryHub: View
 
+    private val syncReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == OfflineFundSyncWorker.ACTION_FUND_SYNCED) {
+                loadData()
+                loadBatchRoster()
+            }
+        }
+    }
+
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            ContextCompat.registerReceiver(
+                this,
+                syncReceiver,
+                IntentFilter(OfflineFundSyncWorker.ACTION_FUND_SYNCED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            unregisterReceiver(syncReceiver)
+        } catch (_: Exception) {}
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -281,6 +318,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
     private fun loadBatchRoster() {
         if (batchId.isBlank()) return
+        val cached = ClassMateBatchFundCache.getRoster(this, batchId)
+        if (cached.isNotEmpty()) {
+            batchRoster = cached
+        }
         lifecycleScope.launch {
             try {
                 val res = ClassMateAuthApi.rpcText(
@@ -299,13 +340,97 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         list.add(p)
                     }
                 }
-                batchRoster = list
+                if (list.isNotEmpty()) {
+                    batchRoster = list
+                    ClassMateBatchFundCache.saveRoster(this@ClassMateBatchFundActivity, batchId, list)
+                }
             } catch (_: Exception) {}
         }
     }
 
+    private fun applySummaryData(summary: JSONObject) {
+        var bal = summary.optDouble("current_balance", 0.0)
+        var coll = summary.optDouble("total_collected", 0.0)
+        var spent = summary.optDouble("total_spent", 0.0)
+        var count = summary.optInt("transaction_count", 0)
+
+        // Optimistic adjustments from offline pending transactions
+        val pendingTxs = OfflineFundQueue.getForBatch(this, batchId)
+        for (ptx in pendingTxs) {
+            if (ptx.type == "inflow") {
+                bal += ptx.amount
+                coll += ptx.amount
+            } else {
+                bal -= ptx.amount
+                spent += ptx.amount
+            }
+            count++
+        }
+
+        currentBalance = bal
+        totalCollected = coll
+        totalSpent = spent
+        txCount = count
+        isCr = summary.optBoolean("is_cr", false)
+        fundDescription = summary.optString("fund_description", "Used for mess, events, jersey, and other batch expenses.")
+        batchName = summary.optString("batch_name", batchLabel.ifBlank { "Batch Fund" })
+        university = summary.optString("university", "MBSTU")
+
+        val totalStudents = summary.optInt("total_students", 0)
+        val paidStudents = summary.optInt("paid_students", 0)
+        val unpaidStudents = summary.optInt("unpaid_students", 0)
+
+        ongoingTitle = summary.optString("ongoing_title", "").trim()
+        ongoingCanon = summary.optString("ongoing_canon", "").trim()
+        ongoingCollected = summary.optDouble("ongoing_collected", 0.0)
+        ongoingPaidCount = summary.optInt("ongoing_paid_count", 0)
+        ongoingUnpaidCount = summary.optInt("ongoing_unpaid_count", 0)
+        ongoingProgress = summary.optDouble("ongoing_progress", 0.0)
+
+        // Update UI
+        toolbar.title = "Batch Fund"
+        toolbar.subtitle = "$batchName • $university"
+        tvCurrentBalance.text = "৳ ${formatMoney(currentBalance)}"
+        tvHeroCollected.text = "৳ ${formatMoney(totalCollected)}"
+        tvHeroSpent.text = "৳ ${formatMoney(totalSpent)}"
+        layoutCrQuickActions.visibility = if (isCr) View.VISIBLE else View.GONE
+        layoutMainActions.visibility = if (isCr) View.VISIBLE else View.GONE
+
+        // Ongoing campaign hero card & dues tracker banner
+        if (ongoingTitle.isNotBlank()) {
+            cardHeroOngoingCampaign.visibility = View.VISIBLE
+            tvHeroCampaignTag.text = "ACTIVE CAMPAIGN: ${ongoingTitle.uppercase()}"
+            val totalOngoing = ongoingPaidCount + ongoingUnpaidCount
+            tvHeroCampaignRatio.text = "$ongoingPaidCount / $totalOngoing Paid"
+            pbHeroCampaign.progress = ongoingProgress.toInt().coerceIn(0, 100)
+            tvHeroCampaignCollected.text = "৳ ${formatMoney(ongoingCollected)} Collected"
+            tvHeroCampaignDues.text = "$ongoingUnpaidCount Unpaid ›"
+
+            tvPayersActivePill.visibility = View.VISIBLE
+            tvPayersActivePill.text = ongoingTitle
+            tvPayersBannerSubtitle.text = "$ongoingTitle: $ongoingPaidCount Paid • $ongoingUnpaidCount Unpaid"
+        } else {
+            cardHeroOngoingCampaign.visibility = View.GONE
+            tvPayersActivePill.visibility = View.GONE
+            if (totalStudents > 0) {
+                tvPayersBannerSubtitle.text = "$paidStudents Paid • $unpaidStudents Unpaid • Tap to view tracker"
+            } else {
+                tvPayersBannerSubtitle.text = "Track who paid, who owes & copy unpaid lists"
+            }
+        }
+        tvLedgerCountSubtitle.text = "$txCount ${if (txCount == 1) "transaction" else "transactions"}"
+
+        tvBalanceStats.text = "Total Collected: ৳ ${formatMoney(totalCollected)} • Total Spent: ৳ ${formatMoney(totalSpent)}"
+        tvFundDescription.text = fundDescription
+        ivEditDescHint.visibility = if (isCr) View.VISIBLE else View.GONE
+    }
+
     private fun loadData() {
         if (batchId.isBlank()) return
+        val cachedSummary = ClassMateBatchFundCache.getSummary(this, batchId)
+        if (cachedSummary != null) {
+            applySummaryData(cachedSummary)
+        }
         lifecycleScope.launch {
             try {
                 // Fetch summary
@@ -313,63 +438,8 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     "batch_fund_summary",
                     JSONObject().put("target_batch", batchId)
                 )
-
-                currentBalance = summary.optDouble("current_balance", 0.0)
-                totalCollected = summary.optDouble("total_collected", 0.0)
-                totalSpent = summary.optDouble("total_spent", 0.0)
-                txCount = summary.optInt("transaction_count", 0)
-                isCr = summary.optBoolean("is_cr", false)
-                fundDescription = summary.optString("fund_description", "Used for mess, events, jersey, and other batch expenses.")
-                batchName = summary.optString("batch_name", batchLabel.ifBlank { "Batch Fund" })
-                university = summary.optString("university", "MBSTU")
-
-                val totalStudents = summary.optInt("total_students", 0)
-                val paidStudents = summary.optInt("paid_students", 0)
-                val unpaidStudents = summary.optInt("unpaid_students", 0)
-
-                ongoingTitle = summary.optString("ongoing_title", "").trim()
-                ongoingCanon = summary.optString("ongoing_canon", "").trim()
-                ongoingCollected = summary.optDouble("ongoing_collected", 0.0)
-                ongoingPaidCount = summary.optInt("ongoing_paid_count", 0)
-                ongoingUnpaidCount = summary.optInt("ongoing_unpaid_count", 0)
-                ongoingProgress = summary.optDouble("ongoing_progress", 0.0)
-
-                // Update UI
-                toolbar.title = "Batch Fund"
-                toolbar.subtitle = "$batchName • $university"
-                tvCurrentBalance.text = "৳ ${formatMoney(currentBalance)}"
-                tvHeroCollected.text = "৳ ${formatMoney(totalCollected)}"
-                tvHeroSpent.text = "৳ ${formatMoney(totalSpent)}"
-                layoutCrQuickActions.visibility = if (isCr) View.VISIBLE else View.GONE
-                layoutMainActions.visibility = if (isCr) View.VISIBLE else View.GONE
-
-                // Ongoing campaign hero card & dues tracker banner
-                if (ongoingTitle.isNotBlank()) {
-                    cardHeroOngoingCampaign.visibility = View.VISIBLE
-                    tvHeroCampaignTag.text = "ACTIVE CAMPAIGN: ${ongoingTitle.uppercase()}"
-                    val totalOngoing = ongoingPaidCount + ongoingUnpaidCount
-                    tvHeroCampaignRatio.text = "$ongoingPaidCount / $totalOngoing Paid"
-                    pbHeroCampaign.progress = ongoingProgress.toInt().coerceIn(0, 100)
-                    tvHeroCampaignCollected.text = "৳ ${formatMoney(ongoingCollected)} Collected"
-                    tvHeroCampaignDues.text = "$ongoingUnpaidCount Unpaid ›"
-
-                    tvPayersActivePill.visibility = View.VISIBLE
-                    tvPayersActivePill.text = ongoingTitle
-                    tvPayersBannerSubtitle.text = "$ongoingTitle: $ongoingPaidCount Paid • $ongoingUnpaidCount Unpaid"
-                } else {
-                    cardHeroOngoingCampaign.visibility = View.GONE
-                    tvPayersActivePill.visibility = View.GONE
-                    if (totalStudents > 0) {
-                        tvPayersBannerSubtitle.text = "$paidStudents Paid • $unpaidStudents Unpaid • Tap to view tracker"
-                    } else {
-                        tvPayersBannerSubtitle.text = "Track who paid, who owes & copy unpaid lists"
-                    }
-                }
-                tvLedgerCountSubtitle.text = "$txCount ${if (txCount == 1) "transaction" else "transactions"}"
-
-                tvBalanceStats.text = "Total Collected: ৳ ${formatMoney(totalCollected)} • Total Spent: ৳ ${formatMoney(totalSpent)}"
-                tvFundDescription.text = fundDescription
-                ivEditDescHint.visibility = if (isCr) View.VISIBLE else View.GONE
+                ClassMateBatchFundCache.saveSummary(this@ClassMateBatchFundActivity, batchId, summary)
+                applySummaryData(summary)
 
                 if ((intent.getBooleanExtra("open_record_dialog", false) || intent.getBooleanExtra("open_add_fund", false)) && isCr) {
                     intent.removeExtra("open_record_dialog")
@@ -383,7 +453,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 // Load recent 5 transactions
                 loadRecentTransactions()
             } catch (e: Exception) {
-                Toast.makeText(this@ClassMateBatchFundActivity, "Error loading fund: ${e.message}", Toast.LENGTH_SHORT).show()
+                if (cachedSummary == null) {
+                    Toast.makeText(this@ClassMateBatchFundActivity, "Error loading fund: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                loadRecentTransactions()
             } finally {
                 swipeRefresh.isRefreshing = false
             }
@@ -391,28 +464,25 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     }
 
     private suspend fun loadRecentTransactions() {
-        shimmerRecentActivity.visibility = View.VISIBLE
-        shimmerRecentActivity.startShimmer()
-        EmptyStateHelper.hide(emptyStateOverview)
-        recentActivityContainer.visibility = View.GONE
-        try {
-            val responseText = ClassMateAuthApi.rpcText(
-                "batch_fund_transactions",
-                JSONObject().apply {
-                    put("target_batch", batchId)
-                    put("filter_type", "all")
-                    put("query_text", "")
-                    put("result_offset", 0)
-                    put("page_limit", 5)
+        val cachedTxs = ClassMateBatchFundCache.getTransactions(this, batchId)
+        val pendingTxs = OfflineFundQueue.getForBatch(this, batchId)
+
+        fun displayTransactions(serverArray: JSONArray?) {
+            val allList = mutableListOf<JSONObject>()
+            pendingTxs.forEach { allList.add(it.toLedgerJsonObject()) }
+            if (serverArray != null) {
+                for (i in 0 until serverArray.length()) {
+                    allList.add(serverArray.getJSONObject(i))
                 }
-            )
+            }
+            val displayList = allList.take(5)
+
             shimmerRecentActivity.stopShimmer()
             shimmerRecentActivity.visibility = View.GONE
             recentActivityContainer.visibility = View.VISIBLE
-            val txArray = JSONArray(responseText)
             recentActivityContainer.removeAllViews()
 
-            if (txArray.length() == 0) {
+            if (displayList.isEmpty()) {
                 EmptyStateHelper.show(
                     emptyStateOverview,
                     iconRes = R.drawable.ic_sparkle,
@@ -421,22 +491,49 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 )
             } else {
                 EmptyStateHelper.hide(emptyStateOverview)
-                for (i in 0 until txArray.length()) {
-                    val tx = txArray.getJSONObject(i)
+                for (tx in displayList) {
                     recentActivityContainer.addView(createTransactionRow(tx))
                 }
             }
-        } catch (e: Exception) {
-            shimmerRecentActivity.stopShimmer()
-            shimmerRecentActivity.visibility = View.GONE
-            recentActivityContainer.visibility = View.VISIBLE
-            recentActivityContainer.removeAllViews()
-            EmptyStateHelper.showError(
-                emptyStateOverview,
-                title = "Could not load activity",
-                errorMessage = "Check your connection and tap below to retry.",
-                onRetry = { loadData() }
+        }
+
+        // Show cached + pending immediately if available
+        if (cachedTxs != null || pendingTxs.isNotEmpty()) {
+            displayTransactions(cachedTxs)
+        } else {
+            shimmerRecentActivity.visibility = View.VISIBLE
+            shimmerRecentActivity.startShimmer()
+            EmptyStateHelper.hide(emptyStateOverview)
+            recentActivityContainer.visibility = View.GONE
+        }
+
+        try {
+            val responseText = ClassMateAuthApi.rpcText(
+                "batch_fund_transactions",
+                JSONObject().apply {
+                    put("target_batch", batchId)
+                    put("filter_type", "all")
+                    put("query_text", "")
+                    put("result_offset", 0)
+                    put("page_limit", 20)
+                }
             )
+            val txArray = JSONArray(responseText)
+            ClassMateBatchFundCache.saveTransactions(this, batchId, txArray)
+            displayTransactions(txArray)
+        } catch (e: Exception) {
+            if (cachedTxs == null && pendingTxs.isEmpty()) {
+                shimmerRecentActivity.stopShimmer()
+                shimmerRecentActivity.visibility = View.GONE
+                recentActivityContainer.visibility = View.VISIBLE
+                recentActivityContainer.removeAllViews()
+                EmptyStateHelper.showError(
+                    emptyStateOverview,
+                    title = "Could not load activity",
+                    errorMessage = "Check your connection and tap below to retry.",
+                    onRetry = { loadData() }
+                )
+            }
         }
     }
 
@@ -457,12 +554,13 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     }
 
     private fun createTransactionRow(tx: JSONObject): View {
+        val isPending = tx.optBoolean("is_offline_pending", false)
         val isInflow = tx.optString("type") == "inflow"
         val amount = tx.optDouble("amount", 0.0)
         val title = tx.optString("title")
         val studentName = tx.optString("student_name")
         val dateStr = tx.optString("transacted_at")
-        val canEdit = tx.optBoolean("can_edit", isCr)
+        val canEdit = if (isPending) isCr else tx.optBoolean("can_edit", isCr)
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -477,7 +575,23 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             isClickable = canEdit
             isFocusable = canEdit
             if (canEdit) {
-                setOnClickListener { showTransactionActionsDialog(tx) }
+                if (isPending) {
+                    setOnClickListener {
+                        MaterialAlertDialogBuilder(this@ClassMateBatchFundActivity)
+                            .setTitle("Pending Offline Transaction")
+                            .setMessage("This transaction was recorded while offline. It will be uploaded automatically once you are connected to the internet.\n\nAmount: ৳ ${formatMoney(amount)}\nTitle: $title")
+                            .setPositiveButton("Keep Waiting", null)
+                            .setNegativeButton("Discard") { _, _ ->
+                                val offlineId = tx.optString("offline_id").ifBlank { tx.optString("id").removePrefix("offline_") }
+                                OfflineFundQueue.remove(this@ClassMateBatchFundActivity, offlineId)
+                                Toast.makeText(this@ClassMateBatchFundActivity, "Offline transaction discarded", Toast.LENGTH_SHORT).show()
+                                loadData()
+                            }
+                            .show()
+                    }
+                } else {
+                    setOnClickListener { showTransactionActionsDialog(tx) }
+                }
             }
         }
 
@@ -513,7 +627,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             textSize = 14.5f
             typeface = Typeface.DEFAULT_BOLD
         }
-        val formattedDate = formatTransactionDate(dateStr)
+        val formattedDate = if (isPending) "Just now" else formatTransactionDate(dateStr)
         val tvSub = TextView(this).apply {
             val subText = if (studentName.isNotBlank() && studentName != "null") {
                 val subTitle = if (title.isNotBlank() && !title.equals(studentName, ignoreCase = true)) title else (if (isInflow) "Deposit" else "Expense")
@@ -529,14 +643,42 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         infoCol.addView(tvSub)
         card.addView(infoCol)
 
-        // Amount
+        // Amount & Pending Badge Column
+        val rightCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }
         val tvAmount = TextView(this).apply {
             text = if (isInflow) "+ ৳ ${formatMoney(amount)}" else "- ৳ ${formatMoney(amount)}"
             setTextColor(if (isInflow) 0xFF16A34A.toInt() else 0xFFDC2626.toInt())
             textSize = 14.5f
             typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.END
         }
-        card.addView(tvAmount)
+        rightCol.addView(tvAmount)
+
+        if (isPending) {
+            val tvPending = TextView(this).apply {
+                text = "🕒 Pending Sync"
+                textSize = 9.5f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(0xFFD97706.toInt())
+                setPadding(dp(6), dp(1), dp(6), dp(1))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(8).toFloat()
+                    setColor(0xFFFEF3C7.toInt())
+                    setStroke(dp(1), 0xFFFDE68A.toInt())
+                }
+                val lp = LinearLayout.LayoutParams(-2, -2).apply {
+                    topMargin = dp(2)
+                    gravity = Gravity.END
+                }
+                layoutParams = lp
+            }
+            rightCol.addView(tvPending)
+        }
+        card.addView(rightCol)
 
         return card
     }
@@ -590,21 +732,33 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             tilTitle.hint = "Reason (e.g. Monthly Fund, Tour) *"
         }
 
-        // Quick reason chips (prioritizing recent batch collections)
+        // Quick reason chips (prioritizing cached/recent batch collections)
         val defaultReasons = listOf("Monthly Fund", "Orientation", "Jersey", "Tour", "Picnic", "Farewell", "Batch Feast")
-        chipGroupReasons.removeAllViews()
-        for (r in defaultReasons) {
-            val chip = Chip(this).apply {
-                text = r
-                isCheckable = false
-                isClickable = true
-                setOnClickListener {
-                    etTitle.setText(r)
-                    etTitle.setSelection(r.length)
+        fun populateChips(titles: Collection<String>) {
+            chipGroupReasons.removeAllViews()
+            for (r in titles) {
+                val chip = Chip(this@ClassMateBatchFundActivity).apply {
+                    text = r
+                    isCheckable = false
+                    isClickable = true
+                    setOnClickListener {
+                        etTitle.setText(r)
+                        etTitle.setSelection(r.length)
+                    }
                 }
+                chipGroupReasons.addView(chip)
             }
-            chipGroupReasons.addView(chip)
         }
+        val cachedCollections = ClassMateBatchFundCache.getCollections(this, batchId)
+        val initialTitles = linkedSetOf<String>()
+        if (cachedCollections != null) {
+            for (i in 0 until cachedCollections.length()) {
+                val t = cachedCollections.getJSONObject(i).optString("title").trim()
+                if (t.isNotBlank()) initialTitles.add(t)
+            }
+        }
+        defaultReasons.forEach { initialTitles.add(it) }
+        populateChips(initialTitles)
 
         lifecycleScope.launch {
             try {
@@ -613,25 +767,14 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     JSONObject().put("target_batch", batchId)
                 )
                 val colArray = JSONArray(colResponse)
+                ClassMateBatchFundCache.saveCollections(this@ClassMateBatchFundActivity, batchId, colArray)
                 val dynamicTitles = linkedSetOf<String>()
                 for (i in 0 until colArray.length()) {
                     val t = colArray.getJSONObject(i).optString("title").trim()
                     if (t.isNotBlank()) dynamicTitles.add(t)
                 }
                 defaultReasons.forEach { dynamicTitles.add(it) }
-                chipGroupReasons.removeAllViews()
-                for (r in dynamicTitles) {
-                    val chip = Chip(this@ClassMateBatchFundActivity).apply {
-                        text = r
-                        isCheckable = false
-                        isClickable = true
-                        setOnClickListener {
-                            etTitle.setText(r)
-                            etTitle.setSelection(r.length)
-                        }
-                    }
-                    chipGroupReasons.addView(chip)
-                }
+                populateChips(dynamicTitles)
             } catch (_: Exception) {}
         }
 
@@ -776,11 +919,48 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             val btnToDisable = if (keepOpen) btnSaveAndAddAnother else btnSaveManual
             btnToDisable.isEnabled = false
 
+            val type = if (isDeposit) "inflow" else "outflow"
+            val sName = if (isDeposit) (selectedStudentName ?: studentRawName) else null
+            val sId = if (isDeposit) studentOptions.firstOrNull { it.profileId == selectedStudentProfileId || it.fullName.equals(sName, ignoreCase = true) }?.studentId else null
+
+            fun saveOffline() {
+                val pendingTx = PendingFundTransaction(
+                    batchId = batchId,
+                    type = type,
+                    amount = amt,
+                    title = title,
+                    studentName = sName,
+                    studentId = sId,
+                    studentProfileId = if (isDeposit) selectedStudentProfileId else null
+                )
+                OfflineFundQueue.enqueue(this@ClassMateBatchFundActivity, pendingTx)
+                HapticHelper.success(this@ClassMateBatchFundActivity)
+                Toast.makeText(
+                    this@ClassMateBatchFundActivity,
+                    "Saved offline. Will sync to database automatically when online.",
+                    Toast.LENGTH_LONG
+                ).show()
+                loadData()
+
+                if (keepOpen) {
+                    btnToDisable.isEnabled = true
+                    actvStudent.text?.clear()
+                    selectedStudentProfileId = null
+                    selectedStudentName = null
+                    etAmount.text?.clear()
+                    actvStudent.requestFocus()
+                } else {
+                    dialog.dismiss()
+                }
+            }
+
+            if (!NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                saveOffline()
+                return
+            }
+
             lifecycleScope.launch {
                 try {
-                    val type = if (isDeposit) "inflow" else "outflow"
-                    val sName = if (isDeposit) (selectedStudentName ?: studentRawName) else null
-
                     ClassMateAuthApi.rpc(
                         "record_batch_fund_transaction",
                         JSONObject().apply {
@@ -789,7 +969,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             put("trans_amount", amt)
                             put("trans_title", title)
                             put("trans_student_name", sName)
-                            put("trans_student_id", if (isDeposit) studentOptions.firstOrNull { it.profileId == selectedStudentProfileId || it.fullName.equals(sName, ignoreCase = true) }?.studentId else null)
+                            put("trans_student_id", sId)
                             put("trans_date", todayStr)
                             if (isDeposit && !selectedStudentProfileId.isNullOrBlank()) {
                                 put("trans_student_profile_id", selectedStudentProfileId)
@@ -816,9 +996,14 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         dialog.dismiss()
                     }
                 } catch (e: Exception) {
-                    HapticHelper.warning(this@ClassMateBatchFundActivity)
-                    btnToDisable.isEnabled = true
-                    Toast.makeText(this@ClassMateBatchFundActivity, "Error saving: ${e.message}", Toast.LENGTH_LONG).show()
+                    val isNetwork = e is java.io.IOException || e.message?.contains("network", ignoreCase = true) == true
+                    if (isNetwork) {
+                        saveOffline()
+                    } else {
+                        HapticHelper.warning(this@ClassMateBatchFundActivity)
+                        btnToDisable.isEnabled = true
+                        Toast.makeText(this@ClassMateBatchFundActivity, "Error saving: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -867,10 +1052,67 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         fun fetchLedger() {
             ledgerJob?.cancel()
-            shimmerLedger.visibility = View.VISIBLE
-            shimmerLedger.startShimmer()
-            EmptyStateHelper.hide(emptyStateLedger)
-            container.visibility = View.GONE
+            val cachedArray = ClassMateBatchFundCache.getTransactions(this@ClassMateBatchFundActivity, batchId)
+            val pendingList = OfflineFundQueue.getForBatch(this@ClassMateBatchFundActivity, batchId)
+
+            fun renderLedgerItems(serverArray: JSONArray?) {
+                val mergedList = mutableListOf<JSONObject>()
+                val filteredPending = pendingList.filter {
+                    val typeMatch = currentFilter == "all" || it.type == currentFilter
+                    val queryMatch = currentQuery.isBlank() ||
+                        it.title.contains(currentQuery, ignoreCase = true) ||
+                        (it.studentName?.contains(currentQuery, ignoreCase = true) == true) ||
+                        (it.studentId?.contains(currentQuery, ignoreCase = true) == true)
+                    typeMatch && queryMatch
+                }
+                filteredPending.forEach { mergedList.add(it.toLedgerJsonObject()) }
+
+                if (serverArray != null) {
+                    val seenIds = HashSet<String>()
+                    for (i in 0 until serverArray.length()) {
+                        val tx = serverArray.getJSONObject(i)
+                        val id = tx.optString("id")
+                        if (id.isNotBlank() && !seenIds.add(id)) continue
+                        mergedList.add(tx)
+                    }
+                }
+
+                shimmerLedger.stopShimmer()
+                shimmerLedger.visibility = View.GONE
+                container.visibility = View.VISIBLE
+                container.removeAllViews()
+
+                if (mergedList.isEmpty()) {
+                    EmptyStateHelper.show(
+                        emptyStateLedger,
+                        iconRes = R.drawable.ic_search_modern,
+                        title = if (currentQuery.isNotBlank()) "No matching transactions" else "No transactions found",
+                        subtitle = if (currentQuery.isNotBlank()) "No records match '$currentQuery'. Try searching something else." else "No transactions recorded under this filter yet."
+                    )
+                } else {
+                    EmptyStateHelper.hide(emptyStateLedger)
+                    for (tx in mergedList) {
+                        val row = createTransactionRow(tx)
+                        val isPending = tx.optBoolean("is_offline_pending", false)
+                        if (isCr && !isPending) {
+                            row.setOnClickListener {
+                                dialog.dismiss()
+                                showTransactionActionsDialog(tx)
+                            }
+                        }
+                        container.addView(row)
+                    }
+                }
+            }
+
+            if (cachedArray != null || pendingList.isNotEmpty()) {
+                renderLedgerItems(cachedArray)
+            } else {
+                shimmerLedger.visibility = View.VISIBLE
+                shimmerLedger.startShimmer()
+                EmptyStateHelper.hide(emptyStateLedger)
+                container.visibility = View.GONE
+            }
 
             ledgerJob = lifecycleScope.launch {
                 try {
@@ -884,52 +1126,25 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             put("page_limit", 500)
                         }
                     )
-                    shimmerLedger.stopShimmer()
-                    shimmerLedger.visibility = View.GONE
-                    container.visibility = View.VISIBLE
                     val array = JSONArray(response)
-
-                    // Clear views right before populating to eliminate race condition duplicates
-                    container.removeAllViews()
-
-                    if (array.length() == 0) {
-                        EmptyStateHelper.show(
-                            emptyStateLedger,
-                            iconRes = R.drawable.ic_search_modern,
-                            title = if (currentQuery.isNotBlank()) "No matching transactions" else "No transactions found",
-                            subtitle = if (currentQuery.isNotBlank()) "No records match '$currentQuery'. Try searching something else." else "No transactions recorded under this filter yet."
-                        )
-                    } else {
-                        EmptyStateHelper.hide(emptyStateLedger)
-                        val seenIds = HashSet<String>()
-                        for (i in 0 until array.length()) {
-                            val tx = array.getJSONObject(i)
-                            val id = tx.optString("id")
-                            if (id.isNotBlank() && !seenIds.add(id)) {
-                                continue
-                            }
-                            val row = createTransactionRow(tx)
-                            if (isCr) {
-                                row.setOnClickListener {
-                                    dialog.dismiss()
-                                    showTransactionActionsDialog(tx)
-                                }
-                            }
-                            container.addView(row)
-                        }
+                    if (currentFilter == "all" && currentQuery.isBlank()) {
+                        ClassMateBatchFundCache.saveTransactions(this@ClassMateBatchFundActivity, batchId, array)
                     }
+                    renderLedgerItems(array)
                 } catch (e: Exception) {
                     if (e is CancellationException) return@launch
-                    shimmerLedger.stopShimmer()
-                    shimmerLedger.visibility = View.GONE
-                    container.visibility = View.VISIBLE
-                    container.removeAllViews()
-                    EmptyStateHelper.showError(
-                        emptyStateLedger,
-                        title = "Could not load ledger",
-                        errorMessage = e.message ?: "Failed to retrieve transactions.",
-                        onRetry = { fetchLedger() }
-                    )
+                    if (cachedArray == null && pendingList.isEmpty()) {
+                        shimmerLedger.stopShimmer()
+                        shimmerLedger.visibility = View.GONE
+                        container.visibility = View.VISIBLE
+                        container.removeAllViews()
+                        EmptyStateHelper.showError(
+                            emptyStateLedger,
+                            title = "Could not load ledger",
+                            errorMessage = e.message ?: "Failed to retrieve transactions.",
+                            onRetry = { fetchLedger() }
+                        )
+                    }
                 }
             }
         }
@@ -1012,6 +1227,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val tvSheetUnpaidStat = view.findViewById<TextView>(R.id.tvSheetUnpaidStat)
         val pbSheetCampaign = view.findViewById<ProgressBar>(R.id.pbSheetCampaign)
         val btnCopyUnpaid = view.findViewById<MaterialButton>(R.id.btnCopyUnpaid)
+        val btnRemindUnpaid = view.findViewById<MaterialButton>(R.id.btnRemindUnpaid)
         val etSearch = view.findViewById<TextInputEditText>(R.id.etPayersSearch)
         val container = view.findViewById<LinearLayout>(R.id.payersItemsContainer)
         val emptyStatePayers = view.findViewById<View>(R.id.emptyStatePayers)
@@ -1119,7 +1335,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             // Contextual Copy Unpaid button inside summary card
             if (unpaidList.isNotEmpty()) {
                 btnCopyUnpaid.visibility = View.VISIBLE
-                btnCopyUnpaid.text = "Copy Unpaid"
+                btnCopyUnpaid.text = "Copy (${unpaidList.size})"
                 btnCopyUnpaid.setOnClickListener {
                     HapticHelper.lightPop(it)
                     val sb = StringBuilder()
@@ -1136,6 +1352,51 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 }
             } else {
                 btnCopyUnpaid.visibility = View.GONE
+            }
+
+            // Remind Unpaid Button inside summary card (Option B)
+            if (unpaidList.isNotEmpty() && isCr) {
+                btnRemindUnpaid.visibility = View.VISIBLE
+                btnRemindUnpaid.text = "Remind (${unpaidList.size})"
+                btnRemindUnpaid.setOnClickListener {
+                    HapticHelper.lightPop(it)
+                    if (!NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                        HapticHelper.warning(this@ClassMateBatchFundActivity)
+                        Toast.makeText(this@ClassMateBatchFundActivity, "You are offline. Connect to internet to send reminders.", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    MaterialAlertDialogBuilder(this@ClassMateBatchFundActivity)
+                        .setTitle("Send Reminder to ${unpaidList.size} Classmates?")
+                        .setMessage("A push notification will be sent to remind everyone who hasn't paid for '$colDisplay' yet.")
+                        .setPositiveButton("Send Reminder") { _, _ ->
+                            btnRemindUnpaid.isEnabled = false
+                            NotificationSender.sendToBatch(
+                                batchId = batchId,
+                                title = "Batch Fund Reminder: $colDisplay",
+                                message = "Gentle reminder from your CR to clear pending dues for $colDisplay.",
+                                type = "batch_fund_reminder",
+                                extraData = mapOf("campaign_title" to colDisplay, "action" to "batch_fund"),
+                                onSuccess = {
+                                    runOnUiThread {
+                                        btnRemindUnpaid.isEnabled = true
+                                        HapticHelper.success(this@ClassMateBatchFundActivity)
+                                        Toast.makeText(this@ClassMateBatchFundActivity, "Reminders sent to ${unpaidList.size} unpaid students!", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onFailure = { err ->
+                                    runOnUiThread {
+                                        btnRemindUnpaid.isEnabled = true
+                                        HapticHelper.warning(this@ClassMateBatchFundActivity)
+                                        Toast.makeText(this@ClassMateBatchFundActivity, "Failed to send: $err", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            } else {
+                btnRemindUnpaid.visibility = View.GONE
             }
 
             if (filterMode == "unpaid" && unpaidList.isEmpty() && filtered.isNotEmpty()) {
@@ -1367,10 +1628,26 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         fun fetchPayers() {
             payersJob?.cancel()
-            shimmerPayers.visibility = View.VISIBLE
-            shimmerPayers.startShimmer()
-            EmptyStateHelper.hide(emptyStatePayers)
-            container.visibility = View.GONE
+            val cachedPayers = ClassMateBatchFundCache.getPayers(this@ClassMateBatchFundActivity, batchId, selectedCollection)
+            if (cachedPayers != null && cachedPayers.length() > 0) {
+                allPayers.clear()
+                val seenPayers = HashSet<String>()
+                for (i in 0 until cachedPayers.length()) {
+                    val payer = cachedPayers.getJSONObject(i)
+                    val pid = payer.optString("profile_id").ifBlank { payer.optString("student_id") }
+                    if (pid.isNotBlank() && !seenPayers.add(pid)) continue
+                    allPayers.add(payer)
+                }
+                shimmerPayers.stopShimmer()
+                shimmerPayers.visibility = View.GONE
+                container.visibility = View.VISIBLE
+                renderList(currentSearchQuery)
+            } else {
+                shimmerPayers.visibility = View.VISIBLE
+                shimmerPayers.startShimmer()
+                EmptyStateHelper.hide(emptyStatePayers)
+                container.visibility = View.GONE
+            }
 
             payersJob = lifecycleScope.launch {
                 try {
@@ -1382,6 +1659,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     }
                     val response = ClassMateAuthApi.rpcText("batch_fund_payers", params)
                     val array = JSONArray(response)
+                    ClassMateBatchFundCache.savePayers(this@ClassMateBatchFundActivity, batchId, selectedCollection, array)
                     val seenPayers = HashSet<String>()
                     allPayers.clear()
                     for (i in 0 until array.length()) {
@@ -1396,18 +1674,124 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     renderList(currentSearchQuery)
                 } catch (e: Exception) {
                     if (e is CancellationException) return@launch
-                    shimmerPayers.stopShimmer()
-                    shimmerPayers.visibility = View.GONE
-                    container.visibility = View.VISIBLE
-                    container.removeAllViews()
-                    EmptyStateHelper.showError(
-                        emptyStatePayers,
-                        title = "Could not load contributors",
-                        errorMessage = e.message ?: "Failed to retrieve student records.",
-                        onRetry = { fetchPayers() }
-                    )
+                    if (allPayers.isEmpty()) {
+                        shimmerPayers.stopShimmer()
+                        shimmerPayers.visibility = View.GONE
+                        container.visibility = View.VISIBLE
+                        container.removeAllViews()
+                        EmptyStateHelper.showError(
+                            emptyStatePayers,
+                            title = "Could not load contributors",
+                            errorMessage = e.message ?: "Failed to retrieve student records.",
+                            onRetry = { fetchPayers() }
+                        )
+                    }
                 }
             }
+        }
+
+        fun populateCollectionChips(colArray: JSONArray) {
+            val collectionsList = mutableListOf<JSONObject>()
+            for (i in 0 until colArray.length()) {
+                val item = colArray.getJSONObject(i)
+                if (item.optString("title").trim().isNotBlank()) {
+                    collectionsList.add(item)
+                }
+            }
+            collectionsList.sortWith { a, b ->
+                val modA = a.optString("last_modified_at").ifBlank { a.optString("last_transacted_at") }
+                val modB = b.optString("last_modified_at").ifBlank { b.optString("last_transacted_at") }
+                modB.compareTo(modA)
+            }
+            val matching = collectionsList.firstOrNull {
+                it.optString("title").equals(selectedCollection, ignoreCase = true)
+            }
+            if (matching != null) {
+                selectedCollection = matching.optString("title")
+            }
+            chipGroupCollections.removeAllViews()
+
+            val ongoingItem = if (ongoingTitle.isNotBlank()) {
+                collectionsList.firstOrNull { it.optString("title").equals(ongoingTitle, ignoreCase = true) }
+            } else null
+
+            val remainingCollections = if (ongoingItem != null) {
+                collectionsList.filterNot { it.optString("title").equals(ongoingTitle, ignoreCase = true) }
+            } else {
+                collectionsList
+            }
+
+            if (ongoingItem != null) {
+                val colTitle = ongoingItem.optString("title").trim()
+                val isInitialSelected = selectedCollection.equals(colTitle, ignoreCase = true)
+                val chip = Chip(this@ClassMateBatchFundActivity).apply {
+                    text = "★ $colTitle"
+                    tag = colTitle
+                    isCheckable = true
+                    isChecked = isInitialSelected
+                    setOnClickListener {
+                        HapticHelper.selectionTick(it)
+                        if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
+                            selectedCollection = colTitle
+                            updateChipsVisualState()
+                            fetchPayers()
+                        }
+                    }
+                }
+                chipGroupCollections.addView(chip)
+            }
+
+            for (item in remainingCollections) {
+                val colTitle = item.optString("title").trim()
+                val isInitialSelected = selectedCollection.equals(colTitle, ignoreCase = true)
+                val chip = Chip(this@ClassMateBatchFundActivity).apply {
+                    text = colTitle
+                    tag = colTitle
+                    isCheckable = true
+                    isChecked = isInitialSelected
+                    setOnClickListener {
+                        HapticHelper.selectionTick(it)
+                        if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
+                            selectedCollection = colTitle
+                            updateChipsVisualState()
+                            fetchPayers()
+                        }
+                    }
+                }
+                chipGroupCollections.addView(chip)
+            }
+
+            val allChip = Chip(this@ClassMateBatchFundActivity).apply {
+                text = "All Collections"
+                tag = "all"
+                isCheckable = true
+                isChecked = selectedCollection == "all"
+                setOnClickListener {
+                    HapticHelper.selectionTick(it)
+                    if (selectedCollection != "all") {
+                        selectedCollection = "all"
+                        updateChipsVisualState()
+                        fetchPayers()
+                    }
+                }
+            }
+            chipGroupCollections.addView(allChip)
+            updateChipsVisualState()
+
+            chipGroupCollections.post {
+                for (i in 0 until chipGroupCollections.childCount) {
+                    val chip = chipGroupCollections.getChildAt(i) as? Chip ?: continue
+                    if (chip.isChecked) {
+                        hsvCollections.smoothScrollTo(chip.left - dp(16), 0)
+                        break
+                    }
+                }
+            }
+        }
+
+        val cachedCols = ClassMateBatchFundCache.getCollections(this@ClassMateBatchFundActivity, batchId)
+        if (cachedCols != null && cachedCols.length() > 0) {
+            populateCollectionChips(cachedCols)
         }
 
         // Fetch dynamic collection titles sorted by latest modified first
@@ -1418,115 +1802,8 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     JSONObject().put("target_batch", batchId)
                 )
                 val colArray = JSONArray(colResponse)
-                val collectionsList = mutableListOf<JSONObject>()
-                for (i in 0 until colArray.length()) {
-                    val item = colArray.getJSONObject(i)
-                    if (item.optString("title").trim().isNotBlank()) {
-                        collectionsList.add(item)
-                    }
-                }
-
-                // Strictly sort by date of modification / transaction descending
-                collectionsList.sortWith { a, b ->
-                    val modA = a.optString("last_modified_at").ifBlank { a.optString("last_transacted_at") }
-                    val modB = b.optString("last_modified_at").ifBlank { b.optString("last_transacted_at") }
-                    modB.compareTo(modA)
-                }
-
-                // If selectedCollection matches any in collectionsList, normalize title casing
-                val matching = collectionsList.firstOrNull {
-                    it.optString("title").equals(selectedCollection, ignoreCase = true)
-                }
-                if (matching != null) {
-                    selectedCollection = matching.optString("title")
-                }
-
-                chipGroupCollections.removeAllViews()
-
-                // If ongoingTitle is present, separate it so it appears first with a star badge!
-                val ongoingItem = if (ongoingTitle.isNotBlank()) {
-                    collectionsList.firstOrNull { it.optString("title").equals(ongoingTitle, ignoreCase = true) }
-                } else null
-
-                val remainingCollections = if (ongoingItem != null) {
-                    collectionsList.filterNot { it.optString("title").equals(ongoingTitle, ignoreCase = true) }
-                } else {
-                    collectionsList
-                }
-
-                // 1. Ongoing campaign chip first if present (Clean title without raw payment count)
-                if (ongoingItem != null) {
-                    val colTitle = ongoingItem.optString("title").trim()
-                    val isInitialSelected = selectedCollection.equals(colTitle, ignoreCase = true)
-
-                    val chip = Chip(this@ClassMateBatchFundActivity).apply {
-                        text = "★ $colTitle"
-                        tag = colTitle
-                        isCheckable = true
-                        isChecked = isInitialSelected
-                        setOnClickListener {
-                            HapticHelper.selectionTick(it)
-                            if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
-                                selectedCollection = colTitle
-                                updateChipsVisualState()
-                                fetchPayers()
-                            }
-                        }
-                    }
-                    chipGroupCollections.addView(chip)
-                }
-
-                // 2. Dynamic other collection chips sorted by latest modified date
-                for (item in remainingCollections) {
-                    val colTitle = item.optString("title").trim()
-                    val isInitialSelected = selectedCollection.equals(colTitle, ignoreCase = true)
-
-                    val chip = Chip(this@ClassMateBatchFundActivity).apply {
-                        text = colTitle
-                        tag = colTitle
-                        isCheckable = true
-                        isChecked = isInitialSelected
-                        setOnClickListener {
-                            HapticHelper.selectionTick(it)
-                            if (!selectedCollection.equals(colTitle, ignoreCase = true)) {
-                                selectedCollection = colTitle
-                                updateChipsVisualState()
-                                fetchPayers()
-                            }
-                        }
-                    }
-                    chipGroupCollections.addView(chip)
-                }
-
-                // 3. All Collections chip
-                val allChip = Chip(this@ClassMateBatchFundActivity).apply {
-                    text = "All Collections"
-                    tag = "all"
-                    isCheckable = true
-                    isChecked = selectedCollection == "all"
-                    setOnClickListener {
-                        HapticHelper.selectionTick(it)
-                        if (selectedCollection != "all") {
-                            selectedCollection = "all"
-                            updateChipsVisualState()
-                            fetchPayers()
-                        }
-                    }
-                }
-                chipGroupCollections.addView(allChip)
-
-                updateChipsVisualState()
-
-                // Smooth scroll to selected chip
-                chipGroupCollections.post {
-                    for (i in 0 until chipGroupCollections.childCount) {
-                        val chip = chipGroupCollections.getChildAt(i) as? Chip ?: continue
-                        if (chip.isChecked) {
-                            hsvCollections.smoothScrollTo(chip.left - dp(16), 0)
-                            break
-                        }
-                    }
-                }
+                ClassMateBatchFundCache.saveCollections(this@ClassMateBatchFundActivity, batchId, colArray)
+                populateCollectionChips(colArray)
             } catch (_: Exception) {}
 
             fetchPayers()

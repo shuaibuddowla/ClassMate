@@ -15,6 +15,38 @@ object NotificationHelper {
 
     private const val CHANNEL_NOTICES_ID = "classmate_notices"
     private const val CHANNEL_CANCELLATIONS_ID = "classmate_cancellations"
+    private const val CHANNEL_GENERAL_ID = "classmate_notifications"
+
+    fun showFundSyncNotification(context: Context, title: String, body: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+        val targetClass = if (com.shuaib.classmate.BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java
+        } else MainActivity::class.java
+
+        val intent = Intent(context, targetClass).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_GENERAL_ID)
+            .setSmallIcon(R.drawable.ic_classmate_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setColor(Color.parseColor("#10B981"))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), notification)
+    }
 
     fun showNotification(context: Context, title: String, body: String, isCancel: Boolean, noticeId: String? = null) {
         if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {

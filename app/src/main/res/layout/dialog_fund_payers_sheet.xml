@@ -66,7 +66,7 @@
         android:padding="14dp"
         android:layout_marginTop="10dp">
 
-        <!-- Top row: Campaign Title & Secondary Copy Unpaid Button (Neutral/Teal) -->
+        <!-- Top row: Campaign Title & Actions (Copy Unpaid + Remind Unpaid) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -81,15 +81,20 @@
                 android:text="Orientation"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="15.5sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:layout_marginEnd="8dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCopyUnpaid"
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
-                android:text="Copy Unpaid"
+                android:text="Copy"
                 android:textSize="11.5sp"
                 android:textStyle="bold"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
                 app:icon="@drawable/ic_copy"
                 app:iconSize="13dp"
                 android:insetTop="0dp"
@@ -99,6 +104,29 @@
                 app:iconTint="#0D9488"
                 app:backgroundTint="#CCFBF1"
                 app:strokeColor="#99F6E4"
+                app:strokeWidth="1dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRemindUnpaid"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginStart="6dp"
+                android:text="Remind"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                app:icon="@drawable/ic_notifications"
+                app:iconSize="13dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="17dp"
+                android:textColor="#D97706"
+                app:iconTint="#D97706"
+                app:backgroundTint="#FEF3C7"
+                app:strokeColor="#FDE68A"
                 app:strokeWidth="1dp"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:visibility="gone" />

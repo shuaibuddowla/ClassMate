@@ -1,6 +1,7 @@
 package com.shuaib.classmate.activities
 
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.repeatOnLifecycle
 
 
 
@@ -894,6 +895,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             }
 
+            com.shuaib.classmate.ui.ClassMateTab.UPCOMING -> {
+                if (isAdmin || isCr || isTeacher) {
+                    listOfNotNull(
+                        com.shuaib.classmate.ui.TabQuickAction(
+                            title = "Post Assessment",
+                            subtitle = "Create CT, assignment or quiz",
+                            iconRes = R.drawable.ic_upcoming,
+                            onClick = {
+                                selectHomeTab(R.id.nav_upcoming)
+                                academicScreens.openPostAssessmentSheet()
+                            }
+                        )
+                    )
+                } else emptyList()
+            }
         }
 
     }
@@ -1806,13 +1822,17 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+        val openTab = intent.getStringExtra("OPEN_TAB")
+        val targetAssessmentId = intent.getStringExtra("EXTRA_ASSESSMENT_ID")
         val initialNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
             ?: intent.getStringExtra("noticeId")
             ?: intent.getStringExtra("notice_id")
-            ?: intent.getStringExtra("record_id")
-        if (intent.getStringExtra("OPEN_TAB") == "notices" || !initialNoticeId.isNullOrBlank()) {
+            ?: if (openTab == "notices") intent.getStringExtra("record_id") else null
+        if (openTab == "upcoming" || !targetAssessmentId.isNullOrBlank()) {
+            selectedTab = R.id.nav_upcoming
+        } else if (openTab == "notices" || !initialNoticeId.isNullOrBlank()) {
             selectedTab = R.id.nav_notices
-        } else if (intent.getStringExtra("OPEN_TAB") in setOf("library", "courses")) selectedTab = R.id.nav_pdf
+        } else if (openTab in setOf("library", "courses")) selectedTab = R.id.nav_pdf
 
 
 
@@ -1854,6 +1874,15 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
                 showHome(); renderHomeTab(selectedTab)
                 maybeTriggerSpotlightTour()
+
+                if (!targetAssessmentId.isNullOrBlank()) {
+                    window.decorView.postDelayed({
+                        if (::academicScreens.isInitialized) {
+                            academicScreens.openDirectAssessment(targetAssessmentId)
+                            academicScreens.openAssessmentBottomSheetInPlace(targetAssessmentId)
+                        }
+                    }, 450)
+                }
 
                 if (!initialNoticeId.isNullOrBlank()) {
                     window.decorView.postDelayed({
@@ -3785,16 +3814,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val blurBackdrop = findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)
-        blurBackdrop?.attachBehindView(homeHost)
+        blurBackdrop?.visibility = View.GONE
 
         val composeNav = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.classmate_home_compose_nav)
-        composeNav?.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
-            val navH = bottom - top
-            if (navH > 0 && blurBackdrop?.layoutParams?.height != navH) {
-                blurBackdrop?.layoutParams?.height = navH
-                blurBackdrop?.requestLayout()
-            }
-        }
 
 
 
@@ -3816,6 +3838,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
                 listOf(
                     com.shuaib.classmate.ui.ClassMateTab.TIMETABLE,
                     com.shuaib.classmate.ui.ClassMateTab.NOTICES,
+                    com.shuaib.classmate.ui.ClassMateTab.UPCOMING,
                     com.shuaib.classmate.ui.ClassMateTab.COURSES,
                     com.shuaib.classmate.ui.ClassMateTab.SETTINGS
                 )
@@ -3833,14 +3856,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
             com.shuaib.classmate.ui.ClassMateFloatingNavigationBar(
                 selectedTab = composeSelectedTab,
                 onTabSelected = { tab ->
-                    composeNavVisible = true
-                    composeSelectedTab = tab
-                    selectedTab = tab.id
-                    if (nav.menu.findItem(tab.id) != null && nav.selectedItemId != tab.id) {
-                        nav.selectedItemId = tab.id
+                    if (tab == composeSelectedTab) {
+                        // Instagram-style: re-tapping active tab smoothly scrolls the current content to top
+                        homeHost.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvNotices)?.smoothScrollToPosition(0)
+                        homeHost.findViewById<androidx.core.widget.NestedScrollView>(R.id.nestedScrollView)?.smoothScrollTo(0, 0)
+                        homeHost.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile)?.smoothScrollTo(0, 0)
+                    } else {
+                        composeNavVisible = true
+                        composeSelectedTab = tab
+                        selectedTab = tab.id
+                        if (nav.menu.findItem(tab.id) != null && nav.selectedItemId != tab.id) {
+                            nav.selectedItemId = tab.id
+                        }
+                        composeBadgeMap.remove(tab)
+                        renderHomeTab(tab.id)
                     }
-                    composeBadgeMap.remove(tab)
-                    renderHomeTab(tab.id)
                 },
                 visibleTabs = visibleTabs,
                 batchTabTitle = if (isTeacher) "Students" else "Batch",
@@ -3867,6 +3897,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
         val activeNavTabs = listOf(
             R.id.nav_timetable,
             R.id.nav_notices,
+            R.id.nav_upcoming,
             R.id.nav_pdf,
             R.id.nav_profile
         )
@@ -4028,6 +4059,59 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             }
 
+        }
+
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                com.shuaib.classmate.fcm.ClassMateInAppPush.events.collect { event ->
+                    val cleanTitle = event.title.ifBlank { "ClassMate update" }
+                    val cleanBody = event.body.ifBlank { "New update available" }
+                    val message = "$cleanTitle: $cleanBody"
+                    val rootView = findViewById<android.view.View>(android.R.id.content) ?: window.decorView
+                    val snackbar = com.google.android.material.snackbar.Snackbar.make(
+                        rootView,
+                        message,
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    )
+                    snackbar.setAction("View") {
+                        when (event.openTab) {
+                            "upcoming" -> {
+                                selectHomeTab(R.id.nav_upcoming)
+                                event.recordId?.let { aid ->
+                                    window.decorView.postDelayed({
+                                        if (::academicScreens.isInitialized) {
+                                            academicScreens.openDirectAssessment(aid)
+                                            academicScreens.openAssessmentBottomSheetInPlace(aid)
+                                        }
+                                    }, 300)
+                                }
+                            }
+                            "library" -> {
+                                selectHomeTab(R.id.nav_pdf)
+                            }
+                            "blood" -> {
+                                event.recordId?.let { reqId ->
+                                    startActivity(Intent(this@ClassMateAuthActivity, ClassMateBloodActivity::class.java).putExtra("request_id", reqId))
+                                }
+                            }
+                            "fund" -> {
+                                startActivity(Intent(this@ClassMateAuthActivity, ClassMateBatchFundActivity::class.java).putExtra("batch_id", selectedBatchId))
+                            }
+                            else -> {
+                                selectHomeTab(R.id.nav_notices)
+                                event.recordId?.let { nid ->
+                                    window.decorView.postDelayed({
+                                        if (::academicScreens.isInitialized) {
+                                            academicScreens.openDirectNotice(nid)
+                                        }
+                                    }, 300)
+                                }
+                            }
+                        }
+                    }
+                    snackbar.show()
+                }
+            }
         }
 
     }
@@ -4357,9 +4441,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
             academicScreens.render(tab, homeHost)
-
-
-
+            findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)?.let { blur ->
+                blur.post { blur.invalidateBackdrop() }
+                blur.postDelayed({ blur.invalidateBackdrop() }, 200L)
+            }
             return
 
 
@@ -6721,12 +6806,25 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val openTab = intent.getStringExtra("OPEN_TAB")
+        val targetAssessmentId = intent.getStringExtra("EXTRA_ASSESSMENT_ID")
         val targetNoticeId = intent.getStringExtra("TARGET_NOTICE_ID")
             ?: intent.getStringExtra("noticeId")
             ?: intent.getStringExtra("notice_id")
-            ?: intent.getStringExtra("record_id")
+            ?: if (openTab == "notices") intent.getStringExtra("record_id") else null
 
-        if (openTab == "notices" || !targetNoticeId.isNullOrBlank()) {
+        if (openTab == "upcoming" || !targetAssessmentId.isNullOrBlank()) {
+            selectedTab = R.id.nav_upcoming
+            renderHomeTab(selectedTab)
+            val aid = targetAssessmentId ?: targetNoticeId
+            if (!aid.isNullOrBlank()) {
+                window.decorView.postDelayed({
+                    if (::academicScreens.isInitialized) {
+                        academicScreens.openDirectAssessment(aid)
+                        academicScreens.openAssessmentBottomSheetInPlace(aid)
+                    }
+                }, 400)
+            }
+        } else if (openTab == "notices" || !targetNoticeId.isNullOrBlank()) {
             selectedTab = R.id.nav_notices
             renderHomeTab(selectedTab)
             if (!targetNoticeId.isNullOrBlank()) {
@@ -6857,6 +6955,22 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        if (ev != null) {
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)?.notifyScroll()
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)?.postDelayed({
+                        findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)?.invalidateBackdrop()
+                    }, 50L)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
 
     private var notificationOfferShown=false
 
