@@ -96,17 +96,6 @@ class ProfileFragment : Fragment() {
         if (success) tempImageUri?.let { uploadProfilePicture(it) }
     }
 
-    private val requestCameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            com.shuaib.classmate.services.ShakeToTorchService.start(requireContext())
-        } else {
-            Toast.makeText(context, "Camera permission is required to turn on the flashlight.", Toast.LENGTH_SHORT).show()
-            binding.switchShakeToTorch.isChecked = false
-        }
-    }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
         return binding.root
@@ -702,16 +691,7 @@ class ProfileFragment : Fragment() {
         binding.switchShakeToTorch.setOnCheckedChangeListener { _, isChecked ->
             prefs.setShakeToTorchEnabled(isChecked)
             if (isChecked) {
-                val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                    requireContext(),
-                    android.Manifest.permission.CAMERA
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                
-                if (hasCameraPermission) {
-                    com.shuaib.classmate.services.ShakeToTorchService.start(requireContext())
-                } else {
-                    requestCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
-                }
+                com.shuaib.classmate.services.ShakeToTorchService.start(requireContext())
             } else {
                 com.shuaib.classmate.services.ShakeToTorchService.stop(requireContext())
             }

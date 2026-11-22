@@ -55,16 +55,9 @@ class ShakeToTorchService : Service() {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         shakeDetector = ShakeDetector {
             if (appPrefs.isShakeToTorchEnabled()) {
-                val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                    this,
-                    android.Manifest.permission.CAMERA
-                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                
-                if (hasCameraPermission) {
-                    val isOn = TorchManager.toggle(this)
-                    val state = if (isOn) "ON" else "OFF"
-                    Log.d("ShakeToTorchService", "Flashlight toggled: $state")
-                }
+                val isOn = TorchManager.toggle(this)
+                val state = if (isOn) "ON" else "OFF"
+                Log.d("ShakeToTorchService", "Flashlight toggled: $state")
             }
         }
         

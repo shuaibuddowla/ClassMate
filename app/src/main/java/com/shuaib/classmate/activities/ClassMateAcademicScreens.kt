@@ -536,12 +536,6 @@ internal class ClassMateAcademicScreens(
         root.v<SwitchCompat>(R.id.switchShakeToTorch).apply {
             isChecked = prefs.isShakeToTorchEnabled()
             setOnCheckedChangeListener { _, checked ->
-                if (checked && ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED) {
-                    isChecked = false
-                    ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.CAMERA), 4011)
-                    return@setOnCheckedChangeListener
-                }
                 prefs.setShakeToTorchEnabled(checked)
                 if (checked) ShakeToTorchService.start(activity) else ShakeToTorchService.stop(activity)
             }

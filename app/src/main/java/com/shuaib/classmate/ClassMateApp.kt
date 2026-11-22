@@ -59,8 +59,9 @@ class ClassMateApp : Application() {
         super.onCreate()
         instance = this
         UpdateNotifications.createChannel(this)
-        if (AppPreferences(this).pendingMandatoryVersionCode() <= BuildConfig.VERSION_CODE)
-            AppPreferences(this).setPendingMandatoryVersionCode(0)
+        val prefs = AppPreferences(this)
+        if (prefs.pendingMandatoryVersionCode() <= BuildConfig.VERSION_CODE)
+            prefs.setPendingMandatoryVersionCode(0)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private var started = 0
             override fun onActivityStarted(activity: Activity) { started++; isVisible = true }
@@ -84,13 +85,14 @@ class ClassMateApp : Application() {
             override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })
-        runCatching { UpdateCoordinator.schedule(this) }
-            .onFailure { Log.e("ClassMateUpdate", "Could not schedule updates", it) }
-        applyThemePreference(AppPreferences(this))
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { UpdateCoordinator.schedule(this@ClassMateApp) }
+                .onFailure { Log.e("ClassMateUpdate", "Could not schedule updates", it) }
+        }
+        applyThemePreference(prefs)
         registerNetworkResumptionListener()
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
             com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.attach(this)
-            val prefs = AppPreferences(this)
             prefs.setAutoMuteEnabled(false)
             prefs.setShakeToTorchEnabled(false)
             com.shuaib.classmate.services.ClassMateAutoMuteScheduler.cancel(this)
@@ -106,8 +108,6 @@ class ClassMateApp : Application() {
         FirestoreManager.enableOfflinePersistence()
         // Production migrations must run through a privileged, reviewed server-side tool.
         // Never copy tenant data from an untrusted Android client at application startup.
-
-        val prefs = AppPreferences(this)
 
         applyThemePreference(prefs)
         createNotificationChannels()

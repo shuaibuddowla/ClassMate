@@ -168,20 +168,21 @@ object PeriodCompanionBottomSheet {
             val rawSubject = period.subject.trim()
             val parsedCode: String
             val parsedName: String
+            val isUuidCode = period.courseCode.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
 
-            if (period.courseCode.isNotBlank()) {
+            if (period.courseCode.isNotBlank() && !isUuidCode) {
                 parsedCode = period.courseCode.trim()
-                parsedName = if (rawSubject.isNotBlank()) rawSubject else parsedCode
+                parsedName = if (rawSubject.isNotBlank() && !rawSubject.equals(parsedCode, ignoreCase = true)) rawSubject else ""
             } else {
                 val codePattern = Regex("(?i)\\b([A-Z]{2,5}[-\\s]?\\d{3,4}[A-Z]?)\\b")
                 val match = codePattern.find(rawSubject)
                 if (match != null) {
                     parsedCode = match.value.trim().uppercase(Locale.getDefault())
                     val remaining = rawSubject.removeRange(match.range).trim(' ', '-', ':', '–', '·', '(', ')')
-                    parsedName = if (remaining.isNotBlank()) remaining else parsedCode
+                    parsedName = if (remaining.isNotBlank() && !remaining.equals(parsedCode, ignoreCase = true)) remaining else ""
                 } else {
                     parsedCode = rawSubject
-                    parsedName = rawSubject
+                    parsedName = ""
                 }
             }
 
@@ -190,8 +191,7 @@ object PeriodCompanionBottomSheet {
                 tvCourseName.text = parsedName
                 tvCourseName.isVisible = true
             } else {
-                tvCourseName.text = "Class Session"
-                tvCourseName.isVisible = true
+                tvCourseName.isVisible = false
             }
 
             // Class Type Badge
@@ -648,8 +648,11 @@ object PeriodCompanionBottomSheet {
         if (courses.isEmpty()) return null
 
         // 1. By offering ID
-        if (period.courseOfferingId.isNotBlank()) {
-            courses.firstOrNull { it.semesterCourseId == period.courseOfferingId }?.let { return it }
+        val offeringId = period.courseOfferingId.ifBlank {
+            if (period.courseCode.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))) period.courseCode else ""
+        }
+        if (offeringId.isNotBlank()) {
+            courses.firstOrNull { it.semesterCourseId == offeringId }?.let { return it }
         }
 
         // 2. By Course Code exact / normalized match

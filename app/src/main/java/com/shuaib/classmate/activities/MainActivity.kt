@@ -143,13 +143,7 @@ class MainActivity : AppCompatActivity() {
         appPrefs = AppPreferences(this)
         synchronizeV2Session()
         if (appPrefs.isShakeToTorchEnabled()) {
-            val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.CAMERA
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (hasCameraPermission) {
-                com.shuaib.classmate.services.ShakeToTorchService.start(this)
-            }
+            com.shuaib.classmate.services.ShakeToTorchService.start(this)
         }
 
         val navHostFragment = supportFragmentManager

@@ -19,8 +19,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import com.shuaib.classmate.BuildConfig
 import com.shuaib.classmate.R
 import com.shuaib.classmate.utils.HapticHelper
@@ -89,10 +87,11 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         binding.rvRoster.layoutManager = LinearLayoutManager(this)
         binding.rvRoster.adapter = rosterAdapter
 
-        binding.tabQrCode.setOnClickListener { switchTab(isQr = true) }
+        binding.tabQrCode.visibility = View.GONE
         binding.tabLiveRoster.setOnClickListener { switchTab(isQr = false) }
         binding.btnViewList.setOnClickListener { switchTab(isQr = false) }
         binding.cardLiveCounter.setOnClickListener { switchTab(isQr = false) }
+        switchTab(isQr = false)
 
         binding.btnCloseAttendance.setOnClickListener {
             closeSession()
@@ -170,40 +169,9 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
                     }
                 }
 
-                if (!isSessionClosed && sessionSecret != null) {
-                    startQrRotation()
-                }
-
                 startLiveCounterPoll()
             } catch (e: Exception) {
                 Toast.makeText(this@ClassMateTeacherLiveAttendanceActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    private fun startQrRotation() {
-        qrRotationJob?.cancel()
-        qrRotationJob = lifecycleScope.launch {
-            val secret = sessionSecret ?: return@launch
-            while (isActive && !isSessionClosed) {
-                val nowSec = System.currentTimeMillis() / 1000
-                val windowIdx = nowSec / 15
-                val secondsRemaining = (15 - (nowSec % 15)).toInt()
-
-                val token = hmacSha256(secret, windowIdx.toString())
-                val payload = JSONObject().apply {
-                    put("s", sessionId)
-                    put("w", windowIdx)
-                    put("t", token)
-                }.toString()
-
-                val qrBitmap = generateQrBitmap(payload, 600, 600)
-                binding.ivQrCode.setImageBitmap(qrBitmap)
-
-                binding.tvCountdown.text = "Rotates in ${secondsRemaining}s"
-                binding.progressCountdown.progress = secondsRemaining
-
-                delay(1000)
             }
         }
     }
@@ -444,20 +412,8 @@ class ClassMateTeacherLiveAttendanceActivity : AppCompatActivity() {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun generateQrBitmap(text: String, width: Int, height: Int): Bitmap {
-        val bitMatrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, width, height)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
-            }
-        }
-        return bitmap
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        qrRotationJob?.cancel()
         livePollJob?.cancel()
     }
 

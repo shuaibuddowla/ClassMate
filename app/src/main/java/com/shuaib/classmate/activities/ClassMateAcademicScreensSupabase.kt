@@ -2255,7 +2255,17 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                (root as LinearLayout).addView(ui.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+                val container = root.findViewById<FrameLayout>(R.id.timetableContentContainer)
+
+                if (container != null) {
+
+                    container.addView(ui.scroll, 0, FrameLayout.LayoutParams(-1, -1))
+
+                } else {
+
+                    (root as LinearLayout).addView(ui.scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+                }
 
 
 
@@ -2549,19 +2559,11 @@ internal class ClassMateAcademicScreensSupabase(
         }
 
         val btnPostAssessment = root.findViewById<View>(R.id.btnSpeedDialPostAssessment)
-        val isUpcoming = root.findViewById<View>(R.id.composeViewUpcoming) != null
 
-        if (isUpcoming) {
-            fabSpeedDial.setOnClickListener {
-                com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
-                openPostAssessmentSheet()
-            }
-        } else {
-            fabSpeedDial.setOnClickListener {
-                android.util.Log.d("SPEED_DIAL", "fabSpeedDial clicked! isSpeedDialOpen=$isSpeedDialOpen")
-                com.shuaib.classmate.utils.HapticHelper.lightPop(it)
-                setSpeedDialState(!isSpeedDialOpen)
-            }
+        fabSpeedDial.setOnClickListener {
+            android.util.Log.d("SPEED_DIAL", "fabSpeedDial clicked! isSpeedDialOpen=$isSpeedDialOpen")
+            com.shuaib.classmate.utils.HapticHelper.lightPop(it)
+            setSpeedDialState(!isSpeedDialOpen)
         }
 
         btnPostAssessment?.setOnClickListener {
@@ -4527,18 +4529,42 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                if (item.optString("semester_course_id") in editableCourses) {
+                val canEdit = item.optString("semester_course_id") in editableCourses ||
+                    profile().optBoolean("is_cr") ||
+                    profile().optString("role") in setOf("admin", "teacher")
 
+                val courseTitle = names[courseId] ?: "Class"
+                val actualCourseCode = codes[courseId]?.trim().orEmpty()
+                val p = com.shuaib.classmate.models.Period(
+                    id = item.optString("id"),
+                    subject = courseTitle,
+                    room = item.optString("room").takeUnless { it == "null" },
+                    teacher = teacherName,
+                    startTime = item.optString("start_time"),
+                    endTime = item.optString("end_time"),
+                    courseCode = actualCourseCode,
+                    classKind = item.optString("type").ifBlank { if (isLabSession) "lab" else "class" },
+                    courseOfferingId = courseId
+                )
 
+                card.setOnClickListener {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    com.shuaib.classmate.ui.PeriodCompanionBottomSheet.show(
+                        activity = activity,
+                        period = p,
+                        isAdmin = canEdit,
+                        batchId = batchId(),
+                        onChangePeriod = if (canEdit) { { onAddPeriod(item, day) } } else null,
+                        onOpenResources = { onOpenCourse(courseId, courseTitle, false) }
+                    )
+                }
 
-                    card.setOnLongClickListener { com.shuaib.classmate.ui.ClassMateHaptics.hold(it); onAddPeriod(item, day); true }
-
-
-
-                    card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddPeriod(item, day) }
-
-
-
+                if (canEdit) {
+                    card.setOnLongClickListener {
+                        com.shuaib.classmate.ui.ClassMateHaptics.hold(it)
+                        onAddPeriod(item, day)
+                        true
+                    }
                 }
 
 
@@ -10660,6 +10686,34 @@ internal class ClassMateAcademicScreensSupabase(
         val repo = com.shuaib.classmate.repositories.AssessmentRepository.getInstance(activity)
         if (bId.isNotBlank()) {
             repo.loadAssessments(bId)
+            val accountId = profile().optString("id").ifBlank { "default_user" }
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    val currentRoutine = ClassMateAcademicCache.read(activity, accountId, bId, "routine")
+                        ?: ClassMateAcademicCache.read(activity, "default_user", bId, "routine")
+                    if (currentRoutine == null && ClassMateAcademicCache.online(activity)) {
+                        val semester = ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$bId&status=eq.active&limit=1").optJSONObject(0)?.optString("id")
+                        if (semester != null) {
+                            val offerings = rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))
+                            val ids = offerings.map { it.getString("id") }
+                            if (ids.isNotEmpty()) {
+                                val routines = ClassMateAuthApi.rows("routine_slots", "select=id,semester_course_id,day_of_week,start_time,end_time,room,type&semester_course_id=in.(${ids.joinToString(",")})&order=start_time")
+                                val catalog = rows(JSONArray(ClassMateAuthApi.rpcText("batch_timetable_catalog", JSONObject().put("target_batch", bId)))).associateBy { it.getString("id") }
+                                val names = JSONObject(); val codes = JSONObject()
+                                offerings.forEach {
+                                    val cid = it.getString("course_id")
+                                    val cat = catalog[cid]
+                                    names.put(it.getString("id"), cat?.optString("course_title") ?: "Course")
+                                    codes.put(it.getString("id"), cat?.optString("course_code") ?: "")
+                                }
+                                val snapshot = JSONObject().put("entries", routines).put("names", names).put("codes", codes).put("saved_at", System.currentTimeMillis())
+                                ClassMateAcademicCache.save(activity, accountId, bId, "routine", snapshot)
+                                ClassMateAcademicCache.save(activity, "default_user", bId, "routine", snapshot)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         val swipeRefresh = root.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipeRefreshUpcoming)
@@ -10679,12 +10733,30 @@ internal class ClassMateAcademicScreensSupabase(
         val canManage = role in setOf("admin", "teacher") || isCr
 
         val cachedCourses = librarySnapshot?.courses?.values?.toList().orEmpty()
-        val availableCourses = cachedCourses.map { c ->
-            com.shuaib.classmate.ui.assessment.CourseChoice(
-                courseOfferingId = c.optString("id"),
-                courseCode = c.optString("course_code").ifBlank { c.optString("code") },
-                courseTitle = c.optString("course_title").ifBlank { c.optString("title") }
-            )
+        val availableCourses = if (cachedCourses.isNotEmpty()) {
+            cachedCourses.map { c ->
+                val catalogId = c.optString("id")
+                val offering = librarySnapshot?.offerings?.firstOrNull { it.optString("course_id") == catalogId }
+                val effectiveOfferingId = offering?.optString("id").takeUnless { it.isNullOrBlank() } ?: catalogId
+                com.shuaib.classmate.ui.assessment.CourseChoice(
+                    courseOfferingId = effectiveOfferingId,
+                    courseCode = c.optString("course_code").ifBlank { c.optString("code") },
+                    courseTitle = c.optString("course_title").ifBlank { c.optString("title") }
+                )
+            }
+        } else {
+            val accountId = profile().optString("id").ifBlank { "default_user" }
+            val routineSnap = ClassMateAcademicCache.read(activity, accountId, bId, "routine")
+                ?: ClassMateAcademicCache.read(activity, "default_user", bId, "routine")
+            val names = routineSnap?.optJSONObject("names") ?: JSONObject()
+            val codes = routineSnap?.optJSONObject("codes") ?: JSONObject()
+            names.keys().asSequence().map { offId ->
+                com.shuaib.classmate.ui.assessment.CourseChoice(
+                    courseOfferingId = offId,
+                    courseCode = codes.optString(offId),
+                    courseTitle = names.optString(offId)
+                )
+            }.toList()
         }
 
         composeView.setContent {
@@ -10693,7 +10765,72 @@ internal class ClassMateAcademicScreensSupabase(
                 currentBatchId = bId,
                 canManage = canManage,
                 availableCourses = availableCourses,
-                routineLookup = { _, _ -> null },
+                routineLookup = { courseOfferingId, dayOfWeek ->
+                    val accountId = profile().optString("id").ifBlank { "default_user" }
+                    val routineSnapshot = ClassMateAcademicCache.read(activity, accountId, bId, "routine")
+                        ?: ClassMateAcademicCache.read(activity, "default_user", bId, "routine")
+                    val entries = rows(routineSnapshot?.optJSONArray("entries") ?: JSONArray())
+
+                    // 1. Direct match by semester_course_id
+                    var slot = entries.firstOrNull {
+                        it.optInt("day_of_week") == dayOfWeek &&
+                            it.optString("semester_course_id").equals(courseOfferingId, ignoreCase = true)
+                    }
+
+                    // 2. Match if courseOfferingId was a catalog course_id
+                    if (slot == null && librarySnapshot != null) {
+                        val matchingOfferingIds = librarySnapshot!!.offerings
+                            .filter { it.optString("course_id").equals(courseOfferingId, ignoreCase = true) }
+                            .map { it.optString("id") }
+                            .toSet()
+                        if (matchingOfferingIds.isNotEmpty()) {
+                            slot = entries.firstOrNull {
+                                it.optInt("day_of_week") == dayOfWeek &&
+                                    it.optString("semester_course_id") in matchingOfferingIds
+                            }
+                        }
+                    }
+
+                    // 3. Match by course code or title in routine snapshot
+                    if (slot == null) {
+                        val codesMap = routineSnapshot?.optJSONObject("codes")
+                        val namesMap = routineSnapshot?.optJSONObject("names")
+                        val courseObj = librarySnapshot?.courses?.get(courseOfferingId)
+                        val targetCode = courseObj?.optString("course_code").orEmpty()
+                        val targetTitle = courseObj?.optString("course_title").orEmpty()
+
+                        val matchedOfferingIds = mutableSetOf<String>()
+                        if (codesMap != null && targetCode.isNotBlank()) {
+                            codesMap.keys().forEach { id ->
+                                if (codesMap.optString(id).equals(targetCode, ignoreCase = true)) {
+                                    matchedOfferingIds.add(id)
+                                }
+                            }
+                        }
+                        if (namesMap != null && targetTitle.isNotBlank()) {
+                            namesMap.keys().forEach { id ->
+                                if (namesMap.optString(id).equals(targetTitle, ignoreCase = true)) {
+                                    matchedOfferingIds.add(id)
+                                }
+                            }
+                        }
+                        if (matchedOfferingIds.isNotEmpty()) {
+                            slot = entries.firstOrNull {
+                                it.optInt("day_of_week") == dayOfWeek &&
+                                    it.optString("semester_course_id") in matchedOfferingIds
+                            }
+                        }
+                    }
+
+                    if (slot != null) {
+                        val rawTime = slot.optString("start_time")
+                        val formattedTime = hour(rawTime)
+                        val room = slot.optString("room").takeUnless { it.equals("null", ignoreCase = true) }.orEmpty()
+                        Pair(formattedTime, room)
+                    } else {
+                        null
+                    }
+                },
                 onPostNotice = { title, body, courseId, onCreated ->
                     if (bId.isNotBlank()) {
                         scope.launch(Dispatchers.IO) {
