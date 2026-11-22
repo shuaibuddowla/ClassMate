@@ -146,7 +146,7 @@ object NoticePresentationMapper {
     }
 
     fun mapPoll(pollJson: JSONObject, currentUserId: String): PollPresentationModel? {
-        val id = pollJson.optString("id")
+        val id = pollJson.optString("poll_id").ifBlank { pollJson.optString("id") }
         if (id.isBlank()) return null
         val question = pollJson.optString("question")
         val isMultipleChoice = pollJson.optBoolean("is_multiple_choice", false)
@@ -168,7 +168,8 @@ object NoticePresentationMapper {
             val optId = opt.optString("id")
             val optText = opt.optString("option_text")
             val votesCount = opt.optInt("votes_count", 0)
-            val isSelectedByMe = optId in mySelectedOptionIds || opt.optBoolean("selected_by_me", false)
+            val isSelectedByMe = optId in mySelectedOptionIds || opt.optBoolean("is_my_vote", false) || opt.optBoolean("selected_by_me", false)
+            if (isSelectedByMe) mySelectedOptionIds.add(optId)
             val percentage = if (totalVotes > 0) {
                 (votesCount.toFloat() / totalVotes.toFloat()) * 100f
             } else 0f

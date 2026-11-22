@@ -6,25 +6,24 @@ import android.widget.ImageButton
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
-import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.shuaib.classmate.R
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.databinding.ActivityCreatePollBinding
-import com.shuaib.classmate.utils.NotificationSender
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.ThemeColors
-import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 class CreatePollActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCreatePollBinding
-    private lateinit var db: FirebaseFirestore
-    private lateinit var auth: FirebaseAuth
     private var options = mutableListOf("", "")
-    private var currentUserName = ""
     private var pollId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,16 +31,7 @@ class CreatePollActivity : AppCompatActivity() {
         binding = ActivityCreatePollBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        db = FirebaseFirestore.getInstance()
-        auth = FirebaseAuth.getInstance()
-
         binding.btnBack.setOnClickListener { finish() }
-
-        val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { doc ->
-                currentUserName = doc.getString("name") ?: "Admin"
-            }
 
         // Check if editing
         pollId = intent.getStringExtra("POLL_ID")
@@ -62,11 +52,11 @@ class CreatePollActivity : AppCompatActivity() {
         renderOptions()
 
         binding.btnAddOption.setOnClickListener {
-            if (options.size < 12) {
+            if (options.size < 10) {
                 options.add("")
                 renderOptions()
             } else {
-                Toast.makeText(this, "Maximum 12 options allowed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Maximum 10 options allowed", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -129,20 +119,24 @@ class CreatePollActivity : AppCompatActivity() {
             row.addView(removeButton)
             binding.optionsContainer.addView(row)
         }
-        binding.btnAddOption.isVisible = options.size < 12
+        binding.btnAddOption.isVisible = options.size < 10
     }
 
     private fun publishPoll() {
         val question = binding.etQuestion.text.toString().trim()
 
-        if (question.isEmpty()) {
-            binding.etQuestion.error = "Question required"
+        if (question.length < 2) {
+            binding.etQuestion.error = "Question required (at least 2 characters)"
             return
         }
 
-        val validOptions = options.filter { it.isNotBlank() }
+        val validOptions = options.map { it.trim() }.filter { it.isNotBlank() }
         if (validOptions.size < 2) {
             Toast.makeText(this, "At least 2 options required", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (validOptions.size > 10) {
+            Toast.makeText(this, "Maximum 10 options allowed", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -154,45 +148,40 @@ class CreatePollActivity : AppCompatActivity() {
             else -> 24
         }
 
-        val expiresAt = Timestamp(Date(System.currentTimeMillis() + hours * 3600000L))
+        val targetBatchId = AppContextManager.getManagedBatchId()
+            .ifBlank { AppContextManager.getBatchId() }
+
+        if (targetBatchId.isBlank()) {
+            Toast.makeText(this, "Batch not selected", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         binding.progressBar.isVisible = true
         binding.btnPublish.isEnabled = false
 
-        val targetBatchId = com.shuaib.classmate.utils.AppContextManager.getManagedBatchId()
-        val targetSemester = com.shuaib.classmate.utils.AppContextManager.getSemesterId()
-
-        val pollData = hashMapOf(
-            "batchId" to targetBatchId,
-            "question" to question,
-            "options" to validOptions,
-            "createdBy" to currentUserName,
-            "expiresAt" to expiresAt,
-            "isActive" to true,
-            "allowMultipleAnswers" to binding.switchMultipleAnswers.isChecked,
-            "semester" to targetSemester
-        )
-
-        val pollRef = db.collection("batches").document(targetBatchId).collection("polls")
-        val task = if (pollId != null) {
-            pollRef.document(pollId!!).update(pollData as Map<String, Any>)
-        } else {
-            pollData["createdAt"] = FieldValue.serverTimestamp()
-            pollData["votes"] = emptyMap<String, String>()
-            pollRef.add(pollData)
+        val params = JSONObject().apply {
+            put("target_batch", targetBatchId)
+            put("poll_question", question)
+            put("poll_options", JSONArray(validOptions))
+            put("poll_description", "")
+            put("is_multiple_choice", binding.switchMultipleAnswers.isChecked)
+            put("is_anonymous", false)
+            put("duration_hours", hours)
         }
 
-        task.addOnSuccessListener {
-            if (pollId == null) {
-                NotificationSender.sendPollAlert(question = question, batchId = targetBatchId)
+        lifecycleScope.launch(Dispatchers.Main) {
+            try {
+                withContext(Dispatchers.IO) {
+                    ClassMateAuthApi.rpc("publish_batch_poll", params)
+                }
+                binding.progressBar.isVisible = false
+                Toast.makeText(this@CreatePollActivity, "Poll published successfully!", Toast.LENGTH_SHORT).show()
+                finish()
+            } catch (e: Exception) {
+                binding.progressBar.isVisible = false
+                binding.btnPublish.isEnabled = true
+                Toast.makeText(this@CreatePollActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
-            binding.progressBar.isVisible = false
-            Toast.makeText(this, if (pollId != null) "Poll updated!" else "Poll published!", Toast.LENGTH_SHORT).show()
-            finish()
-        }.addOnFailureListener { e ->
-            binding.progressBar.isVisible = false
-            binding.btnPublish.isEnabled = true
-            Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }

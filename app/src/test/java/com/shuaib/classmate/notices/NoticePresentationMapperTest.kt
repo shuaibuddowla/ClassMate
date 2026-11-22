@@ -97,6 +97,42 @@ class NoticePresentationMapperTest {
     }
 
     @Test
+    fun testPollWithPollIdAndIsMyVoteFromSupabaseRpc() {
+        val pollJson = JSONObject().apply {
+            put("poll_id", "poll_supabase_uuid")
+            put("notice_id", "notice_uuid")
+            put("question", "Which room for review?")
+            put("total_votes", 10)
+            put("total_voters", 8)
+            put("is_multiple_choice", true)
+            put("options", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("id", "opt_101")
+                    put("option_text", "Room 401")
+                    put("votes_count", 6)
+                    put("is_my_vote", true)
+                })
+                put(JSONObject().apply {
+                    put("id", "opt_102")
+                    put("option_text", "Room 402")
+                    put("votes_count", 4)
+                    put("is_my_vote", false)
+                })
+            })
+        }
+
+        val pollPresentation = NoticePresentationMapper.mapPoll(pollJson, "user_1")
+        assertNotNull(pollPresentation)
+        assertEquals("poll_supabase_uuid", pollPresentation!!.id)
+        assertEquals(10, pollPresentation.totalVotes)
+        assertEquals(true, pollPresentation.isMultipleChoice)
+        assertEquals(true, pollPresentation.options[0].isSelectedByMe)
+        assertEquals(false, pollPresentation.options[1].isSelectedByMe)
+        assertEquals(60f, pollPresentation.options[0].percentage, 0.001f)
+        assertEquals(40f, pollPresentation.options[1].percentage, 0.001f)
+    }
+
+    @Test
     fun testEngagementMappingAndPinnedState() {
         val rawItem = JSONObject().apply {
             put("id", "notice_999")

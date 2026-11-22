@@ -331,8 +331,10 @@ export function Notices({
       .filter((n, i, a) => a.findIndex((x) => x.id === n.id) === i) || [];
   const details =
     feed.data?.pages.reduce((acc, p) => {
-      for (const k of ["engagement", "reads", "authors", "previews"])
+      if (!p?.details) return acc;
+      for (const k of Object.keys(p.details)) {
         acc[k] = [...(acc[k] || []), ...(p.details[k] || [])];
+      }
       return acc;
     }, {} as Row) || {};
   const attachments =
@@ -2885,7 +2887,19 @@ function PollComposeForm({
         is_anonymous: isAnonymous,
         duration_hours: durationHours > 0 ? durationHours : null,
       });
-      onCreated(res || undefined);
+      onCreated(
+        res
+          ? {
+              ...res,
+              id: res.notice_id || res.id,
+              title: res.question || cleanQ,
+              body: description.trim(),
+              type: "poll",
+              created_at: new Date().toISOString(),
+              author_id: ctx.user,
+            }
+          : undefined,
+      );
     } catch (err: any) {
       setError(err?.message || "Failed to publish poll.");
       setBusy(false);
