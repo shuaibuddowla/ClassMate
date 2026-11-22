@@ -5,14 +5,17 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.core.content.ContextCompat
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
+import android.view.animation.DecelerateInterpolator
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ItemPeriodBinding
@@ -22,22 +25,26 @@ import com.shuaib.classmate.utils.animateSpringScale
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 import java.util.Locale
-import android.view.animation.DecelerateInterpolator
 
 class PeriodAdapter(
-    private var periods: List<Period>,
+    periods: List<Period> = emptyList(),
     private var isPausedByCalendarException: Boolean = false,
     private var isViewingToday: Boolean = false,
     private val onPeriodClick: (Period) -> Unit = {},
     private val onPeriodLongClick: (Period) -> Unit = {}
-) : RecyclerView.Adapter<PeriodAdapter.PeriodViewHolder>() {
+) : ListAdapter<Period, PeriodAdapter.PeriodViewHolder>(PeriodDiffCallback) {
 
     inner class PeriodViewHolder(val binding: ItemPeriodBinding) :
         RecyclerView.ViewHolder(binding.root)
 
     private var lastAnimatedPosition = -1
+
+    init {
+        if (periods.isNotEmpty()) {
+            submitList(periods)
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PeriodViewHolder {
         val binding = ItemPeriodBinding.inflate(
@@ -47,18 +54,24 @@ class PeriodAdapter(
     }
 
     override fun onBindViewHolder(holder: PeriodViewHolder, position: Int) {
-        val period = periods[position]
+        onBindViewHolder(holder, position, emptyList())
+    }
+
+    override fun onBindViewHolder(holder: PeriodViewHolder, position: Int, payloads: List<Any>) {
+        val period = getItem(position)
         val b = holder.binding
         val context = holder.itemView.context
+
+        if (payloads.isNotEmpty() && payloads.contains(PAYLOAD_STATUS_UPDATE)) {
+            // Partial payload update: re-evaluates live/paused/cancelled status without full rebuild
+            bindStatus(context, b, period)
+            return
+        }
 
         b.root.animate().cancel()
         b.root.scaleX = 1f
         b.root.scaleY = 1f
         b.layoutAttendanceStrip.visibility = View.GONE
-
-        val accent = ContextCompat.getColor(context, R.color.cm_primary_light)
-        val isLabSession = period.classKind.equals("lab", true) ||
-            period.subject.trim().endsWith("lab", ignoreCase = true) || period.subject.trim().endsWith("labs", ignoreCase = true)
 
         b.tvSubject.text = period.subject
         b.tvTeacher.text = period.teacher
@@ -70,22 +83,59 @@ class PeriodAdapter(
         b.tvDuration.text = durationLabel(period)
         b.tvTypeBadge.typeface = Typeface.DEFAULT_BOLD
 
-        b.layoutStartClock.background = rounded(context, 50f, ColorUtils.setAlphaComponent(accent, 28))
-        b.vStatusIndicator.backgroundTintList = ColorStateList.valueOf(accent)
-        b.vEndDot.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 120))
-        b.tvStartTime.setTextColor(accent)
-
         b.tvSubject.paintFlags = b.tvSubject.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-        b.cardRoot.alpha = if (isPausedByCalendarException) 0.58f else 1f
         b.root.isEnabled = true
         b.root.isClickable = true
-        b.tvSubstituteMsg.isVisible = false
         b.layoutDuration.isVisible = true
         b.vCancelledDivider.isVisible = false
         b.layoutStartClock.isVisible = true
         b.vTimeLine.isVisible = true
         b.vEndDot.isVisible = true
         b.tvEndTime.isVisible = true
+
+        bindStatus(context, b, period)
+
+        b.root.setOnClickListener {
+            it.animateSpringScale(0.97f)
+            onPeriodClick(period)
+        }
+
+        b.root.setOnLongClickListener {
+            onPeriodLongClick(period)
+            true
+        }
+
+        if (position > lastAnimatedPosition) {
+            val density = context.resources.displayMetrics.density
+            val delay = if (position > 4) 0L else (position * 45L)
+            b.root.alpha = 0f
+            b.root.translationY = 32f * density
+            b.root.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(delay)
+                .setInterpolator(DecelerateInterpolator(1.5f))
+                .setDuration(350)
+                .start()
+            lastAnimatedPosition = position
+        } else {
+            b.root.alpha = 1f
+            b.root.translationY = 0f
+        }
+    }
+
+    private fun bindStatus(context: Context, b: ItemPeriodBinding, period: Period) {
+        val accent = ContextCompat.getColor(context, R.color.cm_primary_light)
+        val isLabSession = period.classKind.equals("lab", true) ||
+            period.subject.trim().endsWith("lab", ignoreCase = true) ||
+            period.subject.trim().endsWith("labs", ignoreCase = true)
+
+        b.layoutStartClock.background = rounded(context, 50f, ColorUtils.setAlphaComponent(accent, 28))
+        b.vStatusIndicator.backgroundTintList = ColorStateList.valueOf(accent)
+        b.vEndDot.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(accent, 120))
+        b.tvStartTime.setTextColor(accent)
+        b.cardRoot.alpha = if (isPausedByCalendarException) 0.58f else 1f
+        b.tvSubstituteMsg.isVisible = false
 
         val isLive = isViewingToday && !isPausedByCalendarException && !period.isCancelled && checkIsLive(period)
         if (isLive) {
@@ -153,34 +203,6 @@ class PeriodAdapter(
             b.tvSubstituteMsg.isVisible = true
             b.tvSubstituteMsg.text = period.scheduleChange
             b.tvTypeBadge.text = "CHANGED"
-        }
-
-        b.root.setOnClickListener {
-            it.animateSpringScale(0.97f)
-            onPeriodClick(period)
-        }
-
-        b.root.setOnLongClickListener {
-            onPeriodLongClick(period)
-            true
-        }
-
-        if (position > lastAnimatedPosition) {
-            val density = context.resources.displayMetrics.density
-            val delay = if (position > 4) 0L else (position * 45L)
-            b.root.alpha = 0f
-            b.root.translationY = 32f * density
-            b.root.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setStartDelay(delay)
-                .setInterpolator(DecelerateInterpolator(1.5f))
-                .setDuration(350)
-                .start()
-            lastAnimatedPosition = position
-        } else {
-            b.root.alpha = 1f
-            b.root.translationY = 0f
         }
     }
 
@@ -253,19 +275,47 @@ class PeriodAdapter(
         view.startAnimation(pulse)
     }
 
-    override fun getItemCount(): Int = periods.size
-
     fun updateList(newList: List<Period>, isToday: Boolean, resetAnimation: Boolean = false) {
-        periods = newList
+        val todayChanged = isViewingToday != isToday
         isViewingToday = isToday
         if (resetAnimation) {
             lastAnimatedPosition = -1
         }
-        notifyDataSetChanged()
+        submitList(newList) {
+            if (todayChanged) {
+                notifyItemRangeChanged(0, itemCount, PAYLOAD_STATUS_UPDATE)
+            }
+        }
     }
 
     fun setPausedByCalendarException(paused: Boolean) {
-        isPausedByCalendarException = paused
-        notifyDataSetChanged()
+        if (isPausedByCalendarException != paused) {
+            isPausedByCalendarException = paused
+            notifyItemRangeChanged(0, itemCount, PAYLOAD_STATUS_UPDATE)
+        }
+    }
+
+    companion object {
+        const val PAYLOAD_STATUS_UPDATE = "payload_status_update"
+
+        val PeriodDiffCallback = object : DiffUtil.ItemCallback<Period>() {
+            override fun areItemsTheSame(oldItem: Period, newItem: Period): Boolean {
+                return if (oldItem.id.isNotBlank() && newItem.id.isNotBlank()) {
+                    oldItem.id == newItem.id
+                } else {
+                    oldItem.subject == newItem.subject &&
+                        oldItem.startTime == newItem.startTime &&
+                        oldItem.endTime == newItem.endTime
+                }
+            }
+
+            override fun areContentsTheSame(oldItem: Period, newItem: Period): Boolean {
+                return oldItem == newItem
+            }
+
+            override fun getChangePayload(oldItem: Period, newItem: Period): Any? {
+                return if (oldItem != newItem) PAYLOAD_STATUS_UPDATE else null
+            }
+        }
     }
 }

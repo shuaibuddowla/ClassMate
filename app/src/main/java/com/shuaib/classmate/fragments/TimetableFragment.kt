@@ -623,7 +623,9 @@ class TimetableFragment : Fragment() {
                             }.map { it.id }.toSet()
                             if (currentLive != lastLivePeriodIds) {
                                 lastLivePeriodIds = currentLive
-                                periodAdapter?.notifyDataSetChanged()
+                                periodAdapter?.let { adapter ->
+                                    adapter.notifyItemRangeChanged(0, adapter.itemCount, PeriodAdapter.PAYLOAD_STATUS_UPDATE)
+                                }
                             }
                         }
                     }

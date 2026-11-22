@@ -4,32 +4,20 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Clean Clock Face Circle -->
     <path
-        android:fillColor="#00000000"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,3A9,9 0 1,0 12,21A9,9 0 1,0 12,3Z"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M10,2h4" />
+        android:strokeWidth="1.8" />
+    <!-- Clock Hands (Hour & Minute) -->
     <path
-        android:fillColor="#00000000"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,7V12L15.5,14"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M12,2v3" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M12,21 C7.58,21 4,17.42 4,13 C4,8.58 7.58,5 12,5 C16.42,5 20,8.58 20,13 C20,17.42 16.42,21 12,21 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M12,13V9" />
+        android:strokeWidth="1.8" />
 </vector>
