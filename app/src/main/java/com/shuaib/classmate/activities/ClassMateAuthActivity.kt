@@ -4335,23 +4335,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     fun selectHomeTab(tabId: Int) {
-
         val tab = com.shuaib.classmate.ui.ClassMateTab.fromId(tabId) ?: return
-
         composeNavVisible = true
-
         composeSelectedTab = tab
-
         selectedTab = tabId
-
         composeBadgeMap.remove(tab)
-
-        homeHost.post {
-
-            renderHomeTab(tabId)
-
-        }
-
+        renderHomeTab(tabId)
     }
 
 
@@ -4398,47 +4387,19 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             content = homeHost
 
-
-
-            homeHost.removeAllViews()
-
-
-
-            if(tab==R.id.nav_friends) {
-
-
-
-                friendsScreen.render(homeHost,selectedBatchLabel)
-
-
-
+            if (tab == R.id.nav_friends) {
+                for (i in 0 until homeHost.childCount) {
+                    homeHost.getChildAt(i).visibility = View.GONE
+                }
+                friendsScreen.render(homeHost, selectedBatchLabel)
                 unreadActivity?.showUnseenRequest()
-
-
-
                 return
-
-
-
             }
 
-
-
-            if(tab == R.id.nav_transit) {
-
-
-
+            if (tab == R.id.nav_transit) {
                 academicScreens.render(tab, homeHost)
-
-
-
                 return
-
-
-
             }
-
-
 
             academicScreens.render(tab, homeHost)
             findViewById<com.shuaib.classmate.ui.FrostedGlassBackdropView>(R.id.classmate_home_blur_backdrop)?.let { blur ->

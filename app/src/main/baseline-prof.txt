@@ -1,0 +1,48 @@
+# ClassMate Jetpack Baseline Profile
+# Hot startup and critical UI paths for Ahead-Of-Time (AOT) compilation
+
+# Application Lifecycle
+Lcom/shuaib/classmate/ClassMateApp;
+Lcom/shuaib/classmate/activities/MainActivity;
+Lcom/shuaib/classmate/activities/ClassMateAuthActivity;
+Lcom/shuaib/classmate/activities/ClassMateAcademicScreensSupabase;
+Lcom/shuaib/classmate/activities/ClassMateAcademicScreens;
+
+# Notice Feed & Rendering Performance
+Lcom/shuaib/classmate/notices/NoticeFeedAdapter;
+Lcom/shuaib/classmate/notices/NoticeFeedAdapter$NoticeDiffCallback;
+Lcom/shuaib/classmate/notices/NoticeFeedAdapter$DateHeaderViewHolder;
+Lcom/shuaib/classmate/notices/NoticeFeedAdapter$PagingFooterViewHolder;
+Lcom/shuaib/classmate/notices/NoticeModernViewHolder;
+Lcom/shuaib/classmate/notices/NoticePresentationMapper;
+Lcom/shuaib/classmate/notices/NoticePresentationModel;
+Lcom/shuaib/classmate/notices/NoticeFeedRow;
+Lcom/shuaib/classmate/notices/NoticeFeedRow$Header;
+Lcom/shuaib/classmate/notices/NoticeFeedRow$DateHeader;
+Lcom/shuaib/classmate/notices/NoticeFeedRow$NoticeCard;
+Lcom/shuaib/classmate/notices/NoticeFeedRow$PagingFooter;
+Lcom/shuaib/classmate/notices/NoticeCardCallbacks;
+Lcom/shuaib/classmate/notices/NoticeTextFormatter;
+
+# Timetable, Assessments & Companion Sheets
+Lcom/shuaib/classmate/adapters/PeriodAdapter;
+Lcom/shuaib/classmate/models/Period;
+Lcom/shuaib/classmate/ui/PeriodCompanionBottomSheet;
+Lcom/shuaib/classmate/fragments/TimetableFragment;
+Lcom/shuaib/classmate/fragments/ProfileFragment;
+Lcom/shuaib/classmate/repositories/AssessmentRepository;
+Lcom/shuaib/classmate/repositories/NoticeRepository;
+
+# Data, Preferences & Auth
+Lcom/shuaib/classmate/data/remote/supabase/ClassMateAuthApi;
+Lcom/shuaib/classmate/activities/ClassMateAcademicCache;
+Lcom/shuaib/classmate/utils/AppPreferences;
+Lcom/shuaib/classmate/utils/DateHelper;
+Lcom/shuaib/classmate/utils/HapticHelper;
+
+# AndroidX & Shimmer hot classes
+Lcom/facebook/shimmer/ShimmerFrameLayout;
+Landroidx/recyclerview/widget/RecyclerView;
+Landroidx/recyclerview/widget/LinearLayoutManager;
+Landroidx/recyclerview/widget/ListAdapter;
+Landroidx/recyclerview/widget/AsyncListDiffer;

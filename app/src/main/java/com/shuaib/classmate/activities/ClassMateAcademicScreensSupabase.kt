@@ -431,7 +431,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-    private val noticePageSize=10
+    private val noticePageSize = 20
 
 
 
@@ -940,20 +940,25 @@ internal class ClassMateAcademicScreensSupabase(
     fun prewarmTabs(host: ViewGroup) {
         com.shuaib.classmate.ui.ClassMateHamburgerSheet.warmUp(activity)
         host.postDelayed({
-            val tabsToPrewarm = listOf(R.id.nav_notices, R.id.nav_pdf, R.id.nav_profile)
+            val tabsToPrewarm = listOf(R.id.nav_notices, R.id.nav_pdf, R.id.nav_upcoming, R.id.nav_profile)
             for (tab in tabsToPrewarm) {
                 if (tabRoots[tab] == null) {
                     try {
                         val layout = when (tab) {
                             R.id.nav_notices -> R.layout.fragment_notice
                             R.id.nav_pdf -> R.layout.fragment_pdf_library
+                            R.id.nav_upcoming -> R.layout.fragment_upcoming
                             else -> R.layout.classmate_profile
                         }
                         val prewarmed = inflater.inflate(layout, host, false)
+                        prewarmed.visibility = View.GONE
                         tabRoots[tab] = prewarmed
+                        host.addView(prewarmed, LinearLayout.LayoutParams(-1, -1))
+                        applyHeaderTopInset(prewarmed)
                         when (tab) {
                             R.id.nav_notices -> setupNotices(prewarmed)
                             R.id.nav_pdf -> setupLibrary(prewarmed)
+                            R.id.nav_upcoming -> setupUpcomingAssessments(prewarmed)
                             else -> setupProfile(prewarmed)
                         }
                         bindFloatingNavigation(tab, prewarmed)
@@ -964,22 +969,16 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     fun render(tab: Int, host: LinearLayout) {
-
-
-
         tabRoots[tab]?.let { root ->
-
-
-
-            navShown=true
-
-
-
-            (root.parent as? ViewGroup)?.removeView(root)
-
-
-
-            host.addView(root,LinearLayout.LayoutParams(-1,-1))
+            navShown = true
+            if (root.parent !== host) {
+                (root.parent as? ViewGroup)?.removeView(root)
+                host.addView(root, LinearLayout.LayoutParams(-1, -1))
+            }
+            for (i in 0 until host.childCount) {
+                val child = host.getChildAt(i)
+                child.visibility = if (child === root) View.VISIBLE else View.GONE
+            }
             applyHeaderTopInset(root)
 
             if (tab == R.id.nav_transit) {
@@ -996,281 +995,113 @@ internal class ClassMateAcademicScreensSupabase(
                 pauseTransitWebView()
             }
 
-            root.doOnAttach {
-                bindFloatingNavigation(tab, root)
-                val atTop = when (tab) {
-                    R.id.nav_notices -> !(root.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvNotices)?.canScrollVertically(-1) ?: false)
-                    R.id.nav_timetable, R.id.nav_pdf -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.nestedScrollView)?.scrollY ?: 0) == 0
-                    R.id.nav_profile -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile)?.scrollY ?: 0) == 0
-                    else -> true
-                }
-                updateTabHeaderColors(root, !atTop)
-                setTabHeaderCollapsed(root, !atTop)
-
-                if (tab == R.id.nav_transit) {
-                    resumeTransitWebView()
-                } else {
-                    pauseTransitWebView()
-                }
-
-                when(tab) {
-                    R.id.nav_upcoming -> {
-                        stopNoticePoller()
-                        setupUpcomingAssessments(root)
-                    }
-                    R.id.nav_timetable -> {
-
-
-
-                        stopNoticePoller()
-
-
-
-                        if (LocalDate.now() != lastTimetableSetupDate) {
-
-
-
-                            lastTimetableSetupDate = LocalDate.now()
-
-
-
-                            selectedDay = LocalDate.now().dayOfWeek.value % 7
-
-
-
-                            setupTimetable(root)
-
-
-
-                        } else if(calendarMode) {
-
-
-
-                            (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show()
-
-
-
-                        } else {
-
-
-
-                            loadTimetable(root, force = false)
-
-
-
-                        }
-
-
-
-                    }
-
-
-
-                    R.id.nav_notices -> {
-                        startNoticePoller(root)
-                        if (!ClassMateAcademicCache.online(activity)) {
-                            if (noticeFeed.isEmpty() || noticeBatch != batchId()) restoreNoticeCache()
-                            renderNoticeFeed(root)
-                        } else {
-                            if (noticeFeed.isEmpty() || noticeBatch != batchId()) {
-                                restoreNoticeCache()
-                                if (noticeFeed.isEmpty()) {
-                                    val shimmer = root.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
-                                    shimmer?.visibility = View.VISIBLE
-                                    shimmer?.startShimmer()
-                                    root.v<View>(R.id.emptyNoticeState).visibility = View.GONE
-                                    root.v<View>(R.id.rvNotices).visibility = View.GONE
-                                } else {
-                                    renderNoticeFeed(root)
-                                }
-                            }
-                            if (noticeFeed.isEmpty() || android.os.SystemClock.elapsedRealtime() - noticeSyncedAt > 10_000) {
-                                loadNotices(root, preserveOlder = true)
-                            }
-                        }
-                    }
-
-                    R.id.nav_pdf -> {
-                        stopNoticePoller()
-                        if (!ClassMateAcademicCache.online(activity)) {
-                            if (librarySnapshot == null || librarySnapshot?.batchId != batchId()) {
-                                librarySnapshot = restoreLibraryCache(batchId())
-                            }
-                        }
-                        loadLibrary(root)
-                    }
-
-
-
-                    R.id.nav_transit -> {
-
-
-
-                        stopNoticePoller()
-
-
-
-                    }
-
-
-
-                    else -> {
-
-
-
-                        stopNoticePoller()
-
-
-
-                        setupProfile(root)
-
-
-
-                        refreshProfile(root, isPullToRefresh = false)
-
-
-
-                    }
-
-
-
-                }
-
-
-
+            val atTop = when (tab) {
+                R.id.nav_notices -> !(root.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvNotices)?.canScrollVertically(-1) ?: false)
+                R.id.nav_timetable, R.id.nav_pdf -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.nestedScrollView)?.scrollY ?: 0) == 0
+                R.id.nav_profile -> (root.findViewById<androidx.core.widget.NestedScrollView>(R.id.scrollProfile)?.scrollY ?: 0) == 0
+                else -> true
             }
+            updateTabHeaderColors(root, !atTop)
+            setTabHeaderCollapsed(root, !atTop)
 
-
-
+            when (tab) {
+                R.id.nav_upcoming -> {
+                    stopNoticePoller()
+                }
+                R.id.nav_timetable -> {
+                    stopNoticePoller()
+                    if (LocalDate.now() != lastTimetableSetupDate) {
+                        lastTimetableSetupDate = LocalDate.now()
+                        selectedDay = LocalDate.now().dayOfWeek.value % 7
+                        setupTimetable(root)
+                    } else if (calendarMode) {
+                        (root.getTag(R.id.btnToggleCalendar) as? ClassMateCalendarUi)?.show()
+                    }
+                }
+                R.id.nav_notices -> {
+                    startNoticePoller(root)
+                    if (!ClassMateAcademicCache.online(activity)) {
+                        if (noticeFeed.isEmpty() || noticeBatch != batchId()) restoreNoticeCache()
+                        renderNoticeFeed(root)
+                    } else {
+                        if (noticeFeed.isEmpty() || noticeBatch != batchId()) {
+                            restoreNoticeCache()
+                            if (noticeFeed.isEmpty()) {
+                                val shimmer = root.findViewById<com.facebook.shimmer.ShimmerFrameLayout>(R.id.shimmerView)
+                                shimmer?.visibility = View.VISIBLE
+                                shimmer?.startShimmer()
+                                root.v<View>(R.id.emptyNoticeState).visibility = View.GONE
+                                root.v<View>(R.id.rvNotices).visibility = View.GONE
+                            } else {
+                                renderNoticeFeed(root)
+                            }
+                        }
+                        if (noticeFeed.isEmpty() || android.os.SystemClock.elapsedRealtime() - noticeSyncedAt > 10_000) {
+                            loadNotices(root, preserveOlder = true)
+                        }
+                    }
+                }
+                R.id.nav_pdf -> {
+                    stopNoticePoller()
+                    if (!ClassMateAcademicCache.online(activity)) {
+                        if (librarySnapshot == null || librarySnapshot?.batchId != batchId()) {
+                            librarySnapshot = restoreLibraryCache(batchId())
+                        }
+                    }
+                }
+                R.id.nav_transit -> {
+                    stopNoticePoller()
+                }
+                else -> {
+                    stopNoticePoller()
+                }
+            }
             return
-
-
-
         }
 
-
-
         val layout = when (tab) {
-
-
-
             R.id.nav_timetable -> R.layout.fragment_timetable
-
-
-
             R.id.nav_notices -> R.layout.fragment_notice
-
-
-
             R.id.nav_pdf -> R.layout.fragment_pdf_library
-
-
-
             R.id.nav_transit -> R.layout.fragment_transit
             R.id.nav_upcoming -> R.layout.fragment_upcoming
             else -> R.layout.classmate_profile
-
-
-
         }
 
-
-
         val root = inflater.inflate(layout, host, false)
-
-
-
-        tabRoots[tab]=root
-
-
-
+        tabRoots[tab] = root
         host.addView(root, LinearLayout.LayoutParams(-1, -1))
+        for (i in 0 until host.childCount) {
+            val child = host.getChildAt(i)
+            child.visibility = if (child === root) View.VISIBLE else View.GONE
+        }
         applyHeaderTopInset(root)
-
-
 
         navShown = true
 
-
-
-        if(tab==R.id.nav_notices) { noticeHeaderCollapsed = false; noticeScrollTravel = 0 }
-
-
-
-        // Cold offline loads contain no suspending network call. Wait for attachment
-
-
-
-        // so visibility guards do not discard the cached result before the first draw.
-
-
+        if (tab == R.id.nav_notices) { noticeHeaderCollapsed = false; noticeScrollTravel = 0 }
 
         root.doOnAttach {
-
-
-
             when (tab) {
-
-
-
                 R.id.nav_timetable -> {
                     setupTimetable(root)
                     prewarmTabs(host)
                 }
-
-
-
                 R.id.nav_notices -> {
                     noticeTabVisitId++
                     setupNotices(root)
                 }
-
-
-
                 R.id.nav_pdf -> setupLibrary(root)
-
-
-
                 R.id.nav_transit -> setupTransit(root)
                 R.id.nav_upcoming -> setupUpcomingAssessments(root)
-
-
-
                 else -> {
-
-
-
                     setupProfile(root)
-
-
-
                     refreshProfile(root, isPullToRefresh = false)
-
-
-
                 }
-
-
-
             }
-
-
-
             bindFloatingNavigation(tab, root)
-
-
-
         }
-
-
-
     }
-
-
-
-
-
-
 
     private fun bindFloatingNavigation(tab: Int, root: View) {
         if (root.getTag(R.id.tag_floating_nav_bound) == true) return
@@ -1336,7 +1167,8 @@ internal class ClassMateAcademicScreensSupabase(
                         handleHeaderScroll(dy, atTop)
 
                         val last = (recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
-                        if (dy > 0 && recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE && last >= noticeHeaderOffset + noticeVisibleIds.size - 3) {
+                        val total = recyclerView.adapter?.itemCount ?: 0
+                        if (dy > 0 && total > 0 && last >= total - 4 && !noticeLoadingOlder && noticeHasMore) {
                             loadOlderNotices(root)
                         }
                     }
@@ -2606,6 +2438,11 @@ internal class ClassMateAcademicScreensSupabase(
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
                 if (isSpeedDialOpen && Math.abs(dy) > 8) {
                     setSpeedDialState(false)
+                }
+                val last = (recyclerView.layoutManager as? LinearLayoutManager)?.findLastVisibleItemPosition() ?: -1
+                val total = recyclerView.adapter?.itemCount ?: 0
+                if (dy > 0 && total > 0 && last >= total - 4 && !noticeLoadingOlder && noticeHasMore) {
+                    loadOlderNotices(root)
                 }
             }
         })

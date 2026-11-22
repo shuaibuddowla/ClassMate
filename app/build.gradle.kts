@@ -167,6 +167,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
 
+    // Baseline Profile Installer
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+
     // UI essentials
     implementation(libs.androidx.core.ktx)
     implementation("androidx.core:core-splashscreen:1.0.1")

@@ -157,7 +157,7 @@ fun ClassMateFloatingNavigationBar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(56.dp),
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -211,19 +211,19 @@ fun ClassMateFloatingNavigationBar(
                                 val dockColor = if (isDark) Color(0x22FFFFFF) else Color(0x0F000000)
                                 Box(
                                     modifier = Modifier
-                                        .width(48.dp)
-                                        .height(32.dp)
+                                        .width(54.dp)
+                                        .height(38.dp)
                                         .scale(animatedScale)
                                         .background(
                                             color = dockColor.copy(alpha = dockColor.alpha * dockAlpha),
-                                            shape = RoundedCornerShape(16.dp)
+                                            shape = RoundedCornerShape(19.dp)
                                         )
                                 )
                             }
                             if (tab == ClassMateTab.SETTINGS) {
                                 // Profile Tab: Dynamic Instagram Avatar with Active Ring
-                                val ringSize = 28.dp
-                                val avatarSize = 22.dp
+                                val ringSize = 33.dp
+                                val avatarSize = 27.dp
                                 Box(
                                     modifier = Modifier
                                         .size(ringSize)
@@ -274,7 +274,7 @@ fun ClassMateFloatingNavigationBar(
                                                 Text(
                                                     text = initial,
                                                     color = if (isSelected) activeColor else inactiveColor,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     textAlign = TextAlign.Center
                                                 )
@@ -283,17 +283,17 @@ fun ClassMateFloatingNavigationBar(
                                                     painter = painterResource(id = if (isSelected) tab.filledIcon else tab.outlineIcon),
                                                     contentDescription = labelText,
                                                     tint = if (isSelected) activeColor else inactiveColor,
-                                                    modifier = Modifier.size(16.dp)
+                                                    modifier = Modifier.size(18.dp)
                                                 )
                                             }
                                         }
                                     }
                                 }
                             } else {
-                                // Regular Tab: Clean 24dp Icon with Top-Right Instagram Notification Dot
+                                // Regular Tab: Clean 27dp Icon with Top-Right Instagram Notification Dot
                                 Box(
                                     modifier = Modifier
-                                        .size(24.dp)
+                                        .size(28.dp)
                                         .scale(animatedScale),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -302,7 +302,7 @@ fun ClassMateFloatingNavigationBar(
                                         painter = painterResource(id = iconRes),
                                         contentDescription = labelText,
                                         tint = if (isSelected) activeColor else inactiveColor,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(27.dp)
                                     )
 
                                     // Instagram Notification Red Dot at top-right
