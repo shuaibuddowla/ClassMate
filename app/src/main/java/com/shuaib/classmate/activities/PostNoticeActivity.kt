@@ -1,19 +1,25 @@
 // com/shuaib/classmate/activities/PostNoticeActivity.kt
 package com.shuaib.classmate.activities
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -78,6 +84,20 @@ class PostNoticeActivity : AppCompatActivity() {
     private var selectedImageMimeType = ""
     private var selectedImageSize = 0L
 
+    // Voice recognition state
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var isListeningVoice = false
+
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startVoiceRecognition()
+        } else {
+            Toast.makeText(this, "Microphone permission is required for voice input", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private val imagePicker = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -108,6 +128,29 @@ class PostNoticeActivity : AppCompatActivity() {
         }
     }
 
+    private val docPicker = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val mimeType = contentResolver.getType(it).orEmpty().lowercase()
+            val size = getFileSize(it)
+            if (size > 15 * 1024 * 1024) {
+                Toast.makeText(this, "Choose a file smaller than 15 MB.", Toast.LENGTH_LONG).show()
+                return@let
+            }
+            selectedImageUri = it
+            val name = getFileName(it) ?: "document.pdf"
+            binding.imagePreview.isVisible = true
+            binding.attachmentPreview.isVisible = true
+            binding.tvImageName.text = name
+            binding.ivAttachmentPreview.setImageResource(R.drawable.ic_attach)
+            attachmentType = "document"
+            attachmentFileName = name
+            selectedImageMimeType = mimeType
+            selectedImageSize = size
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPostNoticeBinding.inflate(layoutInflater)
@@ -123,6 +166,7 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.sectionSubTeacher.isVisible = false
         setupSubjectPicker()
         setupAttachmentButtons()
+        setupVoiceInput()
         fetchAdminName()
         setupEditModeIfNeeded()
 
@@ -226,6 +270,11 @@ class PostNoticeActivity : AppCompatActivity() {
                 finish()
             }
         }
+        val checked = binding.rgNoticeType.checkedRadioButtonId.takeIf { it != -1 } ?: R.id.rbNormal
+        binding.sectionNormal.isVisible = checked == R.id.rbNormal
+        binding.sectionSubjectPicker.isVisible = checked == R.id.rbCancel || checked == R.id.rbSub
+        binding.sectionSubTeacher.isVisible = checked == R.id.rbSub
+        binding.sectionVacationDetails.isVisible = checked == R.id.rbVacation
     }
 
     private fun setupPostingMode() {
@@ -337,6 +386,9 @@ class PostNoticeActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         courseListener?.remove()
+        try {
+            speechRecognizer?.destroy()
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -344,12 +396,163 @@ class PostNoticeActivity : AppCompatActivity() {
         binding.btnAttachImage.setOnClickListener {
             imagePicker.launch("image/*")
         }
+        binding.btnAttachDoc.setOnClickListener {
+            docPicker.launch("*/*")
+        }
         binding.btnRemoveImage.setOnClickListener {
             selectedImageUri = null
             attachmentType = "none"
+            attachmentFileName = ""
             selectedImageMimeType = ""
             selectedImageSize = 0L
             binding.attachmentPreview.isVisible = false
+        }
+    }
+
+    private fun setupVoiceInput() {
+        binding.btnVoiceInput.setOnClickListener {
+            if (isListeningVoice) {
+                stopVoiceRecognition()
+            } else {
+                if (ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    startVoiceRecognition()
+                } else {
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+    }
+
+    private fun startVoiceRecognition() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition is not available on this device", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            speechRecognizer?.destroy()
+            val googleComponent = try {
+                val pm = packageManager
+                val queryIntent = Intent(android.speech.RecognitionService.SERVICE_INTERFACE)
+                val services = pm.queryIntentServices(queryIntent, 0)
+                val target = services.firstOrNull {
+                    it.serviceInfo.packageName == "com.google.android.tts" ||
+                    it.serviceInfo.packageName == "com.google.android.googlequicksearchbox"
+                }
+                if (target != null) {
+                    android.content.ComponentName(target.serviceInfo.packageName, target.serviceInfo.name)
+                } else null
+            } catch (_: Exception) { null }
+
+            speechRecognizer = if (googleComponent != null) {
+                try {
+                    SpeechRecognizer.createSpeechRecognizer(this, googleComponent)
+                } catch (_: Exception) {
+                    SpeechRecognizer.createSpeechRecognizer(this)
+                }
+            } else {
+                SpeechRecognizer.createSpeechRecognizer(this)
+            }
+
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
+                putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "bn-BD")
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("bn-BD", "bn-IN", "en-US"))
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            }
+
+            speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    isListeningVoice = true
+                    updateVoiceUiState(active = true)
+                }
+
+                override fun onBeginningOfSpeech() {}
+
+                override fun onRmsChanged(rmsdB: Float) {
+                    if (!isListeningVoice) return
+                    val factor = ((rmsdB + 2f) / 12f).coerceIn(0.12f, 1.0f)
+                    val density = resources.displayMetrics.density
+                    val maxH = 24 * density
+
+                    binding.barSignal1.layoutParams = binding.barSignal1.layoutParams.apply {
+                        height = (maxH * factor * 0.65f).toInt().coerceAtLeast((5 * density).toInt())
+                    }
+                    binding.barSignal2.layoutParams = binding.barSignal2.layoutParams.apply {
+                        height = (maxH * factor * 1.0f).toInt().coerceAtLeast((8 * density).toInt())
+                    }
+                    binding.barSignal3.layoutParams = binding.barSignal3.layoutParams.apply {
+                        height = (maxH * factor * 0.85f).toInt().coerceAtLeast((6 * density).toInt())
+                    }
+                    binding.barSignal4.layoutParams = binding.barSignal4.layoutParams.apply {
+                        height = (maxH * factor * 0.5f).toInt().coerceAtLeast((4 * density).toInt())
+                    }
+                }
+
+                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                override fun onEndOfSpeech() {}
+
+                override fun onError(error: Int) {
+                    isListeningVoice = false
+                    updateVoiceUiState(active = false)
+                }
+
+                override fun onResults(results: Bundle?) {
+                    isListeningVoice = false
+                    updateVoiceUiState(active = false)
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val spokenText = matches?.firstOrNull { m -> m.any { c -> c in '\u0980'..'\u09FF' } }?.trim()
+                        ?: matches?.firstOrNull()?.trim()
+                    if (!spokenText.isNullOrEmpty()) {
+                        val currentText = binding.etBody.text?.toString().orEmpty().trim()
+                        val combined = if (currentText.isEmpty()) {
+                            spokenText
+                        } else {
+                            "$currentText $spokenText"
+                        }
+                        binding.etBody.setText(combined)
+                        binding.etBody.setSelection(combined.length)
+                        binding.etBody.requestFocus()
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {}
+
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            isListeningVoice = false
+            updateVoiceUiState(active = false)
+            Toast.makeText(this, "Voice recognition error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun stopVoiceRecognition() {
+        try {
+            speechRecognizer?.stopListening()
+        } catch (_: Exception) {}
+        isListeningVoice = false
+        updateVoiceUiState(active = false)
+    }
+
+    private fun updateVoiceUiState(active: Boolean) {
+        binding.layoutVoiceSignal.isVisible = active
+        if (active) {
+            binding.btnVoiceInput.setBackgroundResource(R.drawable.bg_voice_btn_active)
+            binding.btnVoiceInput.setColorFilter(ContextCompat.getColor(this, R.color.cm_on_primary))
+        } else {
+            binding.btnVoiceInput.setBackgroundResource(R.drawable.bg_voice_btn_selector)
+            binding.btnVoiceInput.setColorFilter(ContextCompat.getColor(this, R.color.cm_primary))
         }
     }
 
@@ -486,28 +689,29 @@ class PostNoticeActivity : AppCompatActivity() {
 
         // If there's an attachment, upload first
         when (attachmentType) {
-            "image" -> {
+            "image", "document" -> {
                 if (com.shuaib.classmate.utils.AppContextManager.appContextFlow.value.v2SessionActive) {
                     saveNoticeToFirestore(titleText, bodyText)
                     return
                 }
                 binding.attachmentProgress.isVisible = true
-                binding.tvAttachmentProgress.text = "Uploading image..."
+                val progressLabel = if (attachmentType == "document") "Uploading document..." else "Uploading image..."
+                binding.tvAttachmentProgress.text = progressLabel
 
                 CloudinaryUploader.uploadImage(
                     context = this,
                     fileUri = selectedImageUri!!,
-                    folder = "notice_images",
-                    onSuccess = { imageUrl, _ ->
+                    folder = "notice_attachments",
+                    onSuccess = { fileUrl, _ ->
                         binding.attachmentProgress.isVisible = false
-                        uploadedAttachmentUrl = imageUrl
+                        uploadedAttachmentUrl = fileUrl
                         saveNoticeToFirestore(titleText, bodyText)
                     },
                     onFailure = { error ->
                         binding.progressBar.isVisible = false
                         binding.btnPublish.isEnabled = true
                         binding.attachmentProgress.isVisible = false
-                        Toast.makeText(this, "Image upload failed: $error", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Upload failed: $error", Toast.LENGTH_LONG).show()
                     }
                 )
             }
@@ -526,21 +730,23 @@ class PostNoticeActivity : AppCompatActivity() {
                 runCatching {
                     val repository = NoticeRepository.getInstance(this@PostNoticeActivity)
                     val noticeId = repository.publishSupabaseBatchNotice(targetBatchId, title, body)
-                    val imageUri = selectedImageUri
-                    if (attachmentType == "image" && imageUri != null) {
+                    val attachmentUri = selectedImageUri
+                    if (attachmentType != "none" && attachmentUri != null) {
+                        val isDoc = attachmentType == "document"
+                        val progressLabel = if (isDoc) "Uploading document…" else "Uploading image…"
                         runOnUiThread {
                             binding.attachmentProgress.isVisible = true
-                            binding.tvAttachmentProgress.text = "Uploading image…"
+                            binding.tvAttachmentProgress.text = progressLabel
                         }
-                        repository.uploadSupabaseNoticeImage(
+                        repository.uploadSupabaseNoticeAttachment(
                             this@PostNoticeActivity,
                             noticeId,
-                            imageUri,
+                            attachmentUri,
                             attachmentFileName,
                             selectedImageMimeType,
                             selectedImageSize
                         ) { progress ->
-                            runOnUiThread { binding.tvAttachmentProgress.text = "Uploading image… $progress%" }
+                            runOnUiThread { binding.tvAttachmentProgress.text = "$progressLabel $progress%" }
                         }
                     }
                     noticeId

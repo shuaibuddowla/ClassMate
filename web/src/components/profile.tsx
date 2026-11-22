@@ -34,6 +34,8 @@ import {
   Radio,
   Cloud,
   Bus,
+  Menu,
+  Wallet,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import { openAndroidInstallPrompt, isAndroidMobileDevice } from "./android-install-popup";
@@ -473,9 +475,21 @@ export function Profile({
       ) : (
         <>
           <div className="page-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h1>Settings</h1>
-              <p className="profile-mobile">Preferences, management and system controls</p>
+            <div className="page-heading-left">
+              {ctx.openDrawer && (
+                <button
+                  type="button"
+                  className="icon hamburger-btn"
+                  aria-label="Open navigation menu"
+                  onClick={ctx.openDrawer}
+                >
+                  <Menu size={22} strokeWidth={2.2} />
+                </button>
+              )}
+              <div>
+                <h1>Settings</h1>
+                <p className="profile-mobile">Preferences, management and system controls</p>
+              </div>
             </div>
             <button
               type="button"
@@ -512,7 +526,7 @@ export function Profile({
         {Boolean(ctx.transit) && (
           <button
             type="button"
-            className="settings-row"
+            className="settings-row mobile-hidden"
             onClick={() => {
               if (ctx.transit) {
                 ctx.transit();
@@ -560,6 +574,23 @@ export function Profile({
           </div>
         </div>
 
+        {Boolean(ctx.openBatchFund) && (
+          <button
+            type="button"
+            className="settings-row"
+            onClick={ctx.openBatchFund}
+          >
+            <div className="setting-icon-box purple">
+              <Wallet size={18} />
+            </div>
+            <div className="settings-row-text">
+              <span>Batch Fund</span>
+              <small>Treasury balance, collections &amp; expenses</small>
+            </div>
+            <ChevronRight size={18} className="chevron" />
+          </button>
+        )}
+
         {(ctx.owner || ctx.profile.is_cr || ctx.profile.role === "teacher") && (
           <button className="settings-row" onClick={ctx.manage}>
             <div className="setting-icon-box emerald">
@@ -578,7 +609,7 @@ export function Profile({
         )}
 
         {ctx.owner && ctx.ai && (
-          <button className="settings-row" onClick={ctx.ai}>
+          <button className="settings-row mobile-hidden" onClick={ctx.ai}>
             <div className="setting-icon-box amber">
               <Sparkles size={18} />
             </div>
@@ -652,10 +683,10 @@ export function Profile({
       </section>
 
       {/* 4. PREFERENCES & APPEARANCE */}
-      <h3 className="profile-label">PREFERENCES &amp; APPEARANCE</h3>
-      <section className="card settings-group-card">
+      <h3 className={`profile-label ${!ctx.owner ? "mobile-hidden" : ""}`}>PREFERENCES &amp; APPEARANCE</h3>
+      <section className={`card settings-group-card ${!ctx.owner ? "mobile-hidden" : ""}`}>
         {/* 3-Way Appearance Picker */}
-        <div className="settings-row theme-picker-row">
+        <div className="settings-row theme-picker-row mobile-hidden">
           <div className="setting-icon-box indigo">
             {theme === "dark" ? <Moon size={18} /> : theme === "light" ? <Sun size={18} /> : <Monitor size={18} />}
           </div>
@@ -887,7 +918,7 @@ export function Profile({
           <ChevronRight size={18} className="chevron" />
         </a>
 
-        <button className="settings-row" onClick={() => setDeveloperOpen(true)}>
+        <button className="settings-row mobile-hidden" onClick={() => setDeveloperOpen(true)}>
           <div className="setting-icon-box indigo">
             <Code2 size={18} />
           </div>
@@ -899,8 +930,8 @@ export function Profile({
         </button>
       </section>
 
-      {/* 8. SIGN OUT (MATCHED WITH ANDROID OUTLINED BUTTON) */}
-      <div className="profile-signout-container">
+      {/* 8. SIGN OUT (In hamburger menu on mobile) */}
+      <div className="profile-signout-container mobile-hidden">
         <button
           type="button"
           className="profile-signout-android"

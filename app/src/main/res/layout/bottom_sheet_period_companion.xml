@@ -1,0 +1,703 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet"
+    android:paddingBottom="24dp">
+
+    <!-- Top Grab Handle -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_bottom_sheet_handle" />
+
+    <ViewFlipper
+        android:id="@+id/viewFlipperCompanion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:animateFirstView="false">
+
+        <!-- ============================================================== -->
+        <!-- VIEW 0: COMPANION HOME VIEW                                   -->
+        <!-- ============================================================== -->
+        <LinearLayout
+            android:id="@+id/layoutCompanionHome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp">
+
+            <!-- Course Header Badges (Type & Slot & Room) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tvCourseTypeBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_badge_pill"
+                    android:backgroundTint="#E0F2FE"
+                    android:textColor="#0284C7"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    tools:text="THEORY" />
+
+                <TextView
+                    android:id="@+id/tvRoutineSlotBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_badge_pill"
+                    android:backgroundTint="#F1F5F9"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    tools:text="10:00 AM – 11:20 AM" />
+
+                <TextView
+                    android:id="@+id/tvRoomBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_badge_pill"
+                    android:backgroundTint="#FEF3C7"
+                    android:textColor="#D97706"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    tools:text="Room 304" />
+            </LinearLayout>
+
+            <!-- Course Title & Code -->
+            <TextView
+                android:id="@+id/tvCourseCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="21sp"
+                android:textStyle="bold"
+                android:textColor="@color/cm_text_primary"
+                android:fontFamily="@font/plus_jakarta_sans_bold"
+                tools:text="CSE 2201" />
+
+            <TextView
+                android:id="@+id/tvCourseName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/cm_text_secondary"
+                android:layout_marginTop="2dp"
+                tools:text="Data Structures and Algorithms" />
+
+            <!-- CR / Authorized Admin: Change Period Action Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnChangePeriod"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="14dp"
+                android:text="Change Period"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                android:textColor="@color/cm_primary"
+                app:icon="@drawable/ic_edit"
+                app:iconTint="@color/cm_primary"
+                app:iconSize="16dp"
+                app:iconGravity="textStart"
+                app:strokeColor="@color/cm_primary"
+                app:strokeWidth="1dp"
+                app:backgroundTint="@color/cm_surface"
+                app:cornerRadius="12dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- Section Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/cm_border"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- 1. OPTION CARD: Course Attendance -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardOptionAttendance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                app:cardBackgroundColor="@color/cm_surface"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#DCFCE7">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_check"
+                            app:tint="#16A34A"
+                            android:contentDescription="Attendance" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Course Attendance"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/cm_text_primary" />
+
+                        <TextView
+                            android:id="@+id/tvAttendanceSummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Checking digital records…"
+                            android:textSize="12sp"
+                            android:textColor="@color/cm_text_secondary"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvAttendancePill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#DCFCE7"
+                        android:textColor="#16A34A"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="3dp"
+                        android:paddingBottom="3dp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="85%" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="6dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_disabled"
+                        android:contentDescription="Open Attendance" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 2. OPTION CARD: Course Resources -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardOptionResources"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                app:cardBackgroundColor="@color/cm_surface"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#E0E7FF">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_folder_outline"
+                            app:tint="#4F46E5"
+                            android:contentDescription="Resources" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Course Resources"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/cm_text_primary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Lecture slides, question bank &amp; notes"
+                            android:textSize="12sp"
+                            android:textColor="@color/cm_text_secondary"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_disabled"
+                        android:contentDescription="Open Resources" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 3. OPTION CARD: Course Teacher -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardOptionTeacher"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                app:cardBackgroundColor="@color/cm_surface"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_badge_pill"
+                        android:backgroundTint="#F3E8FF">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_person"
+                            app:tint="#9333EA"
+                            android:contentDescription="Teacher" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Course Teacher"
+                            android:textSize="14.5sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/cm_text_primary" />
+
+                        <TextView
+                            android:id="@+id/tvTeacherSummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Instructor profile &amp; contacts"
+                            android:textSize="12sp"
+                            android:textColor="@color/cm_text_secondary"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="@color/cm_text_disabled"
+                        android:contentDescription="Open Teacher" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- ============================================================== -->
+        <!-- VIEW 1: ATTENDANCE DETAIL VIEW (SUB-PAGE)                     -->
+        <!-- ============================================================== -->
+        <LinearLayout
+            android:id="@+id/layoutAttendanceDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp">
+
+            <!-- Sub-Page Back Navigation Header -->
+            <LinearLayout
+                android:id="@+id/btnBackAttendance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_chevron_left"
+                    app:tint="@color/cm_primary"
+                    android:contentDescription="Back" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Back to Class Overview"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_primary"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
+
+            <!-- Course Title Subheader -->
+            <TextView
+                android:id="@+id/tvAttendanceDetailCourseTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/cm_text_primary"
+                android:layout_marginTop="6dp"
+                tools:text="CSE 2201 Attendance Details" />
+
+            <!-- Attendance Rate Big Banner -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                app:cardBackgroundColor="@color/cm_surface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/tvAttendanceDetailPct"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="30sp"
+                            android:textStyle="bold"
+                            android:textColor="#16A34A"
+                            tools:text="85.7%" />
+
+                        <TextView
+                            android:id="@+id/tvAttendanceHealthBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/bg_badge_pill"
+                            android:backgroundTint="#DCFCE7"
+                            android:textColor="#16A34A"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:paddingTop="3dp"
+                            android:paddingBottom="3dp"
+                            tools:text="Eligible" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvAttendanceDetailClassesSummary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="@color/cm_text_secondary"
+                        android:layout_marginTop="4dp"
+                        tools:text="12 attended of 14 sessions held" />
+
+                    <!-- Progress Bar -->
+                    <ProgressBar
+                        android:id="@+id/pbAttendanceDetail"
+                        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="6dp"
+                        android:layout_marginTop="12dp"
+                        android:max="100"
+                        android:progress="85"
+                        android:progressTint="#16A34A"
+                        android:progressBackgroundTint="#F1F5F9" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Session History Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="SESSION LOGS"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/cm_text_disabled"
+                android:letterSpacing="0.08"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Session List Container inside Max Height Scroll -->
+            <androidx.core.widget.NestedScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxHeight="260dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutSessionHistoryContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </androidx.core.widget.NestedScrollView>
+
+        </LinearLayout>
+
+        <!-- ============================================================== -->
+        <!-- VIEW 2: TEACHER PROFILE VIEW (SUB-PAGE)                       -->
+        <!-- ============================================================== -->
+        <LinearLayout
+            android:id="@+id/layoutTeacherDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp">
+
+            <!-- Sub-Page Back Navigation Header -->
+            <LinearLayout
+                android:id="@+id/btnBackTeacher"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_chevron_left"
+                    app:tint="@color/cm_primary"
+                    android:contentDescription="Back" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Back to Class Overview"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/cm_primary"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
+
+            <!-- Teacher Info Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/cm_border"
+                app:cardBackgroundColor="@color/cm_surface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <FrameLayout
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_tile_teacher_icon">
+
+                            <TextView
+                                android:id="@+id/tvTeacherDetailInitials"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:fontFamily="@font/plus_jakarta_sans_bold"
+                                android:textColor="#7C3AED"
+                                android:textSize="18sp"
+                                tools:text="MK" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="14dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvTeacherDetailName"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/plus_jakarta_sans_bold"
+                                android:textSize="16sp"
+                                android:textColor="@color/cm_text_primary"
+                                tools:text="Dr. Mostofa Kamal" />
+
+                            <TextView
+                                android:id="@+id/tvTeacherDetailDesignation"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textSize="12.5sp"
+                                android:textColor="@color/cm_text_secondary"
+                                tools:text="Associate Professor · CSE" />
+
+                            <TextView
+                                android:id="@+id/tvTeacherDetailEmail"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textSize="12sp"
+                                android:textColor="@color/cm_primary"
+                                tools:text="mostofa@mbstu.ac.bd" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Contact Action Buttons -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTeacherDetailCopyEmail"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
+                            android:text="Copy Email"
+                            android:textAllCaps="false"
+                            android:textSize="12sp"
+                            android:textColor="@color/cm_text_primary"
+                            app:icon="@drawable/ic_copy"
+                            app:iconTint="@color/cm_text_primary"
+                            app:iconSize="14dp"
+                            app:iconGravity="textStart"
+                            app:strokeColor="@color/cm_border"
+                            app:cornerRadius="10dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTeacherDetailSendEmail"
+                            style="@style/Widget.Material3.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:text="Send Email"
+                            android:textAllCaps="false"
+                            android:textSize="12sp"
+                            app:icon="@drawable/ic_email"
+                            app:iconTint="#FFFFFF"
+                            app:iconSize="14dp"
+                            app:iconGravity="textStart"
+                            app:cornerRadius="10dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Other Courses Taught -->
+            <TextView
+                android:id="@+id/tvTeacherOtherCoursesLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="OTHER ASSIGNED COURSES"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/cm_text_disabled"
+                android:letterSpacing="0.08"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupTeacherCourses"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+    </ViewFlipper>
+
+</LinearLayout>

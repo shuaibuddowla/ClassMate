@@ -28,8 +28,13 @@ class BootReceiver : BroadcastReceiver() {
                                 val profile = ClassMateAuthApi.initializeProfile()
                                 if (prefs.isAutoMuteEnabled() && profile.optString("role") == "student")
                                     ClassMateAutoMuteScheduler.schedule(context, profile.optString("batch_id"))
-                                if (prefs.isNotificationsEnabled())
+                                if (prefs.isNotificationsEnabled()) {
                                     ClassMateNoticeReminderScheduler.restore(context, profile.getString("id"))
+                                    val batchId = profile.optString("batch_id")
+                                    if (batchId.isNotBlank()) {
+                                        com.shuaib.classmate.repositories.AssessmentRepository.getInstance(context).loadAssessments(batchId)
+                                    }
+                                }
                             }
                         } catch (e: Exception) { Log.e(TAG, "Could not restore Supabase alarms", e) }
                         finally { pending.finish() }

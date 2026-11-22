@@ -27,6 +27,7 @@ import {
   X,
   AlertCircle,
   AlertTriangle,
+  Menu,
 } from "lucide-react";
 import { rpc, supabase, edge, openFile, uploadFile, type Row } from "@/lib/api";
 import { type R2StorageStats, formatBytes } from "./r2-storage-modal";
@@ -263,20 +264,32 @@ export function Library({ ctx }: { ctx: Context }) {
       className={`library-screen ${selectedCourse ? "course-files-page" : ""}`}
     >
       <div className="page-heading">
-        <div>
-          {selectedCourse ? (
-            <button className="inline" onClick={closeCourse}>
-              <ArrowLeft size={18} /> Back to Courses
+        <div className="page-heading-left">
+          {ctx.openDrawer && !selectedCourse && (
+            <button
+              type="button"
+              className="icon hamburger-btn"
+              aria-label="Open navigation menu"
+              onClick={ctx.openDrawer}
+            >
+              <Menu size={22} strokeWidth={2.2} />
             </button>
-          ) : (
-            <span className="eyebrow">COURSES & RESOURCES</span>
           )}
-          <h1>{selectedCourse?.course_title || "Courses"}</h1>
-          <p>
-            {selectedCourse && <span>{selectedCourse.course_code} · </span>}{entries.length}
-            {files.hasNextPage ? "+" : ""}{" "}
-            {entries.length === 1 ? "file" : "files"} shown
-          </p>
+          <div>
+            {selectedCourse ? (
+              <button className="inline" onClick={closeCourse}>
+                <ArrowLeft size={18} /> Back to Courses
+              </button>
+            ) : (
+              <span className="eyebrow">COURSES & RESOURCES</span>
+            )}
+            <h1>{selectedCourse?.course_title || "Courses"}</h1>
+            <p>
+              {selectedCourse && <span>{selectedCourse.course_code} · </span>}{entries.length}
+              {files.hasNextPage ? "+" : ""}{" "}
+              {entries.length === 1 ? "file" : "files"} shown
+            </p>
+          </div>
         </div>
         <div className="library-heading-actions">
           <button

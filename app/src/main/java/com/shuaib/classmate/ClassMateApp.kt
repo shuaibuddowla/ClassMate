@@ -89,12 +89,16 @@ class ClassMateApp : Application() {
         applyThemePreference(AppPreferences(this))
         registerNetworkResumptionListener()
         if (BuildConfig.CLASSMATE_AUTH_ENABLED) {
+            com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.attach(this)
             val prefs = AppPreferences(this)
             prefs.setAutoMuteEnabled(false)
             prefs.setShakeToTorchEnabled(false)
             com.shuaib.classmate.services.ClassMateAutoMuteScheduler.cancel(this)
             com.shuaib.classmate.services.ShakeToTorchService.stop(this)
             createNotificationChannels()
+            CoroutineScope(Dispatchers.IO).launch {
+                com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.restoreSession()
+            }
             return
         }
         NoticeTextFormatter.init(this)
@@ -303,8 +307,20 @@ class ClassMateApp : Application() {
                 description = "Progress notifications for background library file uploads"
             }
 
+            // Assessments Channel
+            val assessmentsChannel = NotificationChannel(
+                "classmate_assessments",
+                "Upcoming Assessments & Deadlines",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Reminders for upcoming class tests, quizzes, and assignments"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+
             notificationManager.createNotificationChannels(
-                listOf(chatChannel, generalChannel, noticesChannel, cancellationsChannel, libraryUploadsChannel)
+                listOf(chatChannel, generalChannel, noticesChannel, cancellationsChannel, libraryUploadsChannel, assessmentsChannel)
             )
         }
     }

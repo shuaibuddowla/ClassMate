@@ -5,7 +5,11 @@
     android:layout_height="match_parent"
     android:background="#F2F4FA">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -14,7 +18,7 @@
             android:paddingEnd="12dp"
             app:navigationIcon="@drawable/ic_chevron_left"
             app:navigationIconTint="#12152A"
-            app:title="AI settings"
+            app:title="AI Settings"
             app:titleTextColor="#12152A" />
 
         <androidx.core.widget.NestedScrollView
@@ -30,6 +34,7 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="16dp">
 
+                <!-- Hero Banner -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -37,44 +42,264 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:padding="18dp">
-                    <FrameLayout android:layout_width="50dp" android:layout_height="50dp" android:background="@drawable/bg_library_header_action">
-                        <ImageView android:layout_width="26dp" android:layout_height="26dp" android:layout_gravity="center" android:src="@drawable/ic_ai_logo" app:tint="@color/white" />
+                    <FrameLayout
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:background="@drawable/bg_library_header_action">
+                        <ImageView
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_ai_logo"
+                            app:tint="@color/white" />
                     </FrameLayout>
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Assistant routing" android:textColor="@color/white" android:textSize="18sp" android:textStyle="bold" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Choose the primary engine and model used by ClassMate." android:textColor="#DCE3FF" android:textSize="12.5sp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ClassMate AI Engine"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Powered exclusively by Google Gemini and Supabase edge intelligence."
+                            android:textColor="#DCE3FF"
+                            android:textSize="12.5sp" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <TextView style="@style/AiSettingsSectionLabel" android:layout_marginTop="22dp" android:text="PRIMARY ENGINE" />
-                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                        <TextView style="@style/AiSettingsTitle" android:text="Primary provider" />
-                        <TextView style="@style/AiSettingsDescription" android:text="Requests automatically fall back to the other provider if the primary service is unavailable." />
-                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerPrimaryProvider" style="@style/AiSettingsSpinner" />
+                <!-- Model Preferences Section -->
+                <TextView
+                    style="@style/AiSettingsSectionLabel"
+                    android:layout_marginTop="22dp"
+                    android:text="MODEL CONFIGURATION" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AiSettingsCard">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <ImageView
+                                android:layout_width="34dp"
+                                android:layout_height="34dp"
+                                android:background="@drawable/bg_library_action_capsule"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_ai_logo"
+                                app:tint="#2F45F0" />
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    style="@style/AiSettingsTitle"
+                                    android:text="Gemini Primary Model" />
+                                <TextView
+                                    android:id="@+id/tvModelSpeedBadge"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:background="#E8EEFF"
+                                    android:paddingHorizontal="6dp"
+                                    android:paddingVertical="2dp"
+                                    android:text="Ultra-Fast &amp; Accurate"
+                                    android:textColor="#2F45F0"
+                                    android:textSize="11sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <TextView
+                            style="@style/AiSettingsDescription"
+                            android:layout_marginTop="10dp"
+                            android:text="Used across voice speech-to-text, notice drafting, academic summaries, and smart formatting." />
+
+                        <androidx.appcompat.widget.AppCompatSpinner
+                            android:id="@+id/spinnerGeminiModel"
+                            style="@style/AiSettingsSpinner"
+                            android:layout_marginTop="12dp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <TextView style="@style/AiSettingsSectionLabel" android:layout_marginTop="22dp" android:text="MODEL PREFERENCES" />
-                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                            <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_library_action_capsule" android:padding="8dp" android:src="@drawable/ic_ai_logo" app:tint="#2F45F0" />
-                            <TextView style="@style/AiSettingsTitle" android:layout_marginStart="10dp" android:text="Gemini model" />
-                        </LinearLayout>
-                        <TextView style="@style/AiSettingsDescription" android:text="Balanced for reasoning, speed and multimodal assistance." />
-                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerGeminiModel" style="@style/AiSettingsSpinner" />
+                <!-- Workspace Agent Section -->
+                <TextView
+                    style="@style/AiSettingsSectionLabel"
+                    android:layout_marginTop="22dp"
+                    android:text="WORKSPACE ASSISTANT" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AiSettingsCard">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+                        <TextView
+                            style="@style/AiSettingsTitle"
+                            android:text="Interactive Batch Agent" />
+                        <TextView
+                            style="@style/AiSettingsDescription"
+                            android:layout_marginTop="4dp"
+                            android:text="Direct conversational assistant for your batch. Ask about schedules, classes, notices, or draft routine changes." />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnOpenAiWorkspace"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:layout_marginTop="14dp"
+                            android:backgroundTint="#2F45F0"
+                            android:text="Launch ClassMate AI Chat"
+                            android:textAllCaps="false"
+                            android:textColor="@color/white"
+                            android:textSize="14sp"
+                            app:cornerRadius="12dp"
+                            app:icon="@drawable/ic_ai_logo"
+                            app:iconGravity="textStart"
+                            app:iconPadding="8dp"
+                            app:iconTint="@color/white" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <com.google.android.material.card.MaterialCardView style="@style/AiSettingsCard" android:layout_marginTop="12dp">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                            <ImageView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/bg_library_action_capsule" android:padding="8dp" android:src="@drawable/ic_ai_logo" app:tint="#7C3AED" />
-                            <TextView style="@style/AiSettingsTitle" android:layout_marginStart="10dp" android:text="Groq model" />
+                <!-- Engine Features Highlights -->
+                <TextView
+                    style="@style/AiSettingsSectionLabel"
+                    android:layout_marginTop="22dp"
+                    android:text="INTEGRATED CAPABILITIES" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AiSettingsCard">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🎙️"
+                                android:textSize="18sp" />
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Multilingual Speech-to-Text"
+                                    android:textColor="#12152A"
+                                    android:textSize="13.5sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Native Bengali, English, and Benglish voice transcription directly into notices."
+                                    android:textColor="#666F8A"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
                         </LinearLayout>
-                        <TextView style="@style/AiSettingsDescription" android:text="Optimized for fast text responses and backup routing." />
-                        <androidx.appcompat.widget.AppCompatSpinner android:id="@+id/spinnerGroqModel" style="@style/AiSettingsSpinner" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="12dp"
+                            android:background="#EDF0F7" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="✨"
+                                android:textSize="18sp" />
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Automated Notice Polishing"
+                                    android:textColor="#12152A"
+                                    android:textSize="13.5sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Extracts dates, times, course codes, and venues into beautifully formatted notices."
+                                    android:textColor="#666F8A"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="12dp"
+                            android:background="#EDF0F7" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🔒"
+                                android:textSize="18sp" />
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Secure Edge Architecture"
+                                    android:textColor="#12152A"
+                                    android:textSize="13.5sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Supabase authentication, rotated server API keys, and low-latency Cloudflare routing."
+                                    android:textColor="#666F8A"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+                        </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -82,7 +307,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="8dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="20dp"
                     android:gravity="center"
                     android:text="Changes are saved automatically on this device."
                     android:textColor="#565C75"

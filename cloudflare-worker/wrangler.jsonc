@@ -7,6 +7,7 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "classmate-a016a",
     "ARCHIVE_API_URL": "https://mbstu-cse-archive.vercel.app/api",
-    "SUPABASE_URL": "https://cbskpifgbdbgdmnnxfrh.supabase.co"
+    "SUPABASE_URL": "https://cbskpifgbdbgdmnnxfrh.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_YcAvoJqDZQ06XZobEueGoA_mTgiGtNL"
   }
 }

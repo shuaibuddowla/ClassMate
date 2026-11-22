@@ -62,9 +62,15 @@ class ClassMateAiActivity : AppCompatActivity() {
             override fun handleOnBackPressed() { if(!busy) finish() else Toast.makeText(this@ClassMateAiActivity,"Please wait for the current request",Toast.LENGTH_SHORT).show() }
         })
         operation {
-            canWrite=ClassMateAuthApi.rpcText("ai_can_write",JSONObject().put("target_batch",batch)).trim()=="true"
-            if(!canWrite) { finish(); return@operation }
-            if(conversation!=null) loadMessages() else render()
+            canWrite = ClassMateAuthApi.rpcText("ai_can_write", JSONObject().put("target_batch", batch)).trim() == "true"
+            if (!canWrite) {
+                status.visibility = View.VISIBLE
+                status.text = "ClassMate AI Workspace requires admin or CR permissions for this batch."
+                send.isEnabled = false
+                input.isEnabled = false
+                return@operation
+            }
+            if (conversation != null) loadMessages() else render()
         }
     }
     override fun onSaveInstanceState(out:Bundle) {

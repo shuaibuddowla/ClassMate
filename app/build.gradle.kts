@@ -56,7 +56,7 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        val appVersionCode = 46
+        val appVersionCode = 48
         versionCode = appVersionCode
         versionName = "1.1.$appVersionCode"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -72,8 +72,7 @@ android {
         buildConfigField("String", "FIREBASE_ROLE_BRIDGE_URL", "\"$firebaseRoleBridgeUrl\"")
         buildConfigField("String", "ONESIGNAL_APP_ID", "\"${getLocalProperty("ONESIGNAL_APP_ID")}\"")
         buildConfigField("String", "TELEGRAM_CHANNEL_ID", "\"${getLocalProperty("TELEGRAM_CHANNEL_ID")}\"")
-        buildConfigField("String", "GEMINI_MODEL", "\"gemini-2.5-flash\"")
-        buildConfigField("String", "GROQ_MODEL", "\"llama-3.3-70b-versatile\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"gemini-3.5-flash\"")
         buildConfigField("String", "STREAM_API_KEY", "\"${getLocalProperty("STREAM_API_KEY")}\"")
     }
 
@@ -222,6 +221,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

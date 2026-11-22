@@ -1,0 +1,509 @@
+package com.shuaib.classmate.ui.assessment
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.shuaib.classmate.R
+import com.shuaib.classmate.models.AssessmentItem
+import com.shuaib.classmate.repositories.AssessmentRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UpcomingAssessmentsScreen(
+    repository: AssessmentRepository,
+    currentBatchId: String = "",
+    canManage: Boolean,
+    availableCourses: List<CourseChoice>,
+    routineLookup: (courseOfferingId: String, dayOfWeek: Int) -> Pair<String, String>?,
+    onPostNotice: (title: String, body: String, courseId: String?, onNoticeCreated: ((String) -> Unit)?) -> Unit,
+    onBroadcastPush: (title: String, message: String) -> Unit,
+    courseFilesLookup: (courseId: String) -> List<JSONObject>,
+    onOpenFile: (JSONObject) -> Unit,
+    onOpenCourseFolder: ((courseOfferingId: String, courseTitle: String) -> Unit)? = null,
+    onOpenHamburger: () -> Unit = {},
+    onScrollChange: (Boolean) -> Unit = {},
+    onIsAtTopChanged: (Boolean) -> Unit = {},
+    triggerOpenPostSheet: Boolean = false,
+    onPostSheetOpened: () -> Unit = {},
+    targetAssessmentId: String? = null,
+    onClearTargetAssessment: () -> Unit = {},
+    onOpenPostAssessmentDialog: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    isDark: Boolean = isSystemInDarkTheme()
+) {
+    val allAssessments by repository.assessmentsFlow.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    val listState = rememberLazyListState()
+    val isAtTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 15
+        }
+    }
+
+    LaunchedEffect(isAtTop) {
+        onIsAtTopChanged(isAtTop)
+    }
+
+    var previousIndex by remember { mutableIntStateOf(0) }
+    var previousOffset by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (currentIndex, currentOffset) ->
+                if (currentIndex != previousIndex || currentOffset != previousOffset) {
+                    onScrollChange(true)
+                }
+                previousIndex = currentIndex
+                previousOffset = currentOffset
+            }
+    }
+
+    var selectedFilter by remember { mutableStateOf<AssessmentFilter>(AssessmentFilter.All) }
+    var isHistoryOpen by remember { mutableStateOf(false) }
+
+    // Intercept system back button when in History view, returning to Upcoming
+    BackHandler(enabled = isHistoryOpen) {
+        isHistoryOpen = false
+    }
+
+    var selectedDetailAssessment by remember { mutableStateOf<AssessmentItem?>(null) }
+    var editingAssessment by remember { mutableStateOf<AssessmentItem?>(null) }
+    var showPostSheet by remember { mutableStateOf(false) }
+
+    // External trigger to open post assessment (e.g. from Speed Dial FAB)
+    LaunchedEffect(triggerOpenPostSheet) {
+        if (triggerOpenPostSheet) {
+            showPostSheet = true
+            onPostSheetOpened()
+        }
+    }
+
+    // Direct deep-link handling if targetAssessmentId is provided
+    LaunchedEffect(targetAssessmentId, allAssessments) {
+        if (!targetAssessmentId.isNullOrBlank()) {
+            val matched = allAssessments.firstOrNull { it.id.equals(targetAssessmentId, ignoreCase = true) }
+            if (matched != null) {
+                selectedDetailAssessment = matched
+                onClearTargetAssessment()
+            }
+        }
+    }
+
+    // Split upcoming vs past
+    val upcomingItems = remember(allAssessments) {
+        allAssessments.filterNot { it.isPast() }
+    }
+    val pastItems = remember(allAssessments) {
+        allAssessments.filter { it.isPast() }.reversed()
+    }
+
+    // Next up hero assessment (the closest upcoming one)
+    val heroAssessment = remember(upcomingItems) {
+        upcomingItems.firstOrNull()
+    }
+
+    // Timeline items (excluding hero if showing upcoming 'All', or filtered)
+    val displayList = remember(allAssessments, selectedFilter, isHistoryOpen) {
+        val baseList = if (isHistoryOpen) pastItems else upcomingItems
+        val filtered = when (selectedFilter) {
+            is AssessmentFilter.All -> baseList
+            else -> baseList.filter { it.type == selectedFilter.key }
+        }
+        // If viewing upcoming and "All", hero card already displays the first item
+        if (!isHistoryOpen && selectedFilter == AssessmentFilter.All && filtered.isNotEmpty()) {
+            filtered.drop(1)
+        } else {
+            filtered
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AssessmentColors.screenBackgroundColor(isDark))
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 96.dp, bottom = 120.dp)
+        ) {
+            // Hero Section: Elevated Card with Gradient Border
+            if (!isHistoryOpen && heroAssessment != null) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        AssessmentHeroCard(
+                            assessment = heroAssessment,
+                            onClick = { selectedDetailAssessment = heroAssessment },
+                            isDark = isDark
+                        )
+                    }
+                }
+            } else if (!isHistoryOpen && upcomingItems.isEmpty()) {
+                // All caught up banner
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF131A2A) else Color(0xFFFFFFFF)
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_check),
+                                contentDescription = null,
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "All Caught Up!",
+                                    fontSize = 16.sp,
+                                    fontFamily = PlusJakartaBold,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AssessmentColors.primaryTextColor(isDark)
+                                )
+                                Text(
+                                    text = "No pending assessments or deadlines right now.",
+                                    fontSize = 12.5.sp,
+                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Filter Chips Row
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                AssessmentFilterRow(
+                    selectedFilter = selectedFilter,
+                    onFilterSelected = { selectedFilter = it },
+                    showPastArchive = isHistoryOpen,
+                    onTogglePastArchive = { isHistoryOpen = it },
+                    isDark = isDark
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            // Section Subheader
+            item {
+                val headerText = when {
+                    isHistoryOpen -> "Past Records (${displayList.size})"
+                    selectedFilter != AssessmentFilter.All -> "${selectedFilter.label} (${displayList.size})"
+                    else -> "Coming Up (${displayList.size})"
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = headerText,
+                        fontSize = 14.5.sp,
+                        fontFamily = PlusJakartaBold,
+                        fontWeight = FontWeight.Bold,
+                        color = AssessmentColors.primaryTextColor(isDark)
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Timeline Items
+            if (displayList.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp, horizontal = 20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isDark) Color(0xFF141D30) else Color(0xFFE2E8F0),
+                            border = BorderStroke(1.dp, if (isDark) Color(0x28FFFFFF) else Color(0x10000000)),
+                            modifier = Modifier.size(54.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_assignment),
+                                    contentDescription = null,
+                                    tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (isHistoryOpen) "No past or completed assessments found" else "No upcoming assessments for this filter",
+                            fontSize = 14.sp,
+                            fontFamily = PlusJakartaBold,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AssessmentColors.primaryTextColor(isDark)
+                        )
+                        Text(
+                            text = if (isHistoryOpen) "Past exams and completed deadlines will be archived here." else "New class tests, quizzes and assignments will appear here.",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                items(displayList, key = { it.id }) { item ->
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                        AssessmentTimelineCard(
+                            assessment = item,
+                            onClick = { selectedDetailAssessment = item },
+                            isDark = isDark
+                        )
+                    }
+                }
+            }
+        }
+
+        // Floating Transparent App Brand Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 12.dp, top = 6.dp, end = 16.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isHistoryOpen) {
+                    // Back Navigation Button (38dp x 38dp) to return to Upcoming
+                    IconButton(
+                        onClick = { isHistoryOpen = false },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_back),
+                            contentDescription = "Back to Upcoming",
+                            tint = AssessmentColors.primaryTextColor(isDark),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    // Hamburger Menu Button (38dp x 38dp)
+                    IconButton(
+                        onClick = onOpenHamburger,
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_hamburger_menu),
+                            contentDescription = "Menu",
+                            tint = AssessmentColors.primaryTextColor(isDark),
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Text(
+                    text = if (isHistoryOpen) "Assessment History" else "Upcoming",
+                    fontSize = 24.sp,
+                    fontFamily = PlusJakartaBold,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = AssessmentColors.primaryTextColor(isDark),
+                    letterSpacing = (-0.4).sp,
+                    maxLines = 1
+                )
+            }
+
+            if (!isHistoryOpen) {
+                // Dedicated History Button in top right corner (only visible on Upcoming page)
+                Surface(
+                    onClick = { isHistoryOpen = true },
+                    shape = RoundedCornerShape(50),
+                    color = if (isDark) Color(0xFF141D30).copy(alpha = 0.9f) else Color(0xFFF1F5F9).copy(alpha = 0.95f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isDark) Color(0x30FFFFFF) else Color(0x1F000000)
+                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_clock),
+                            contentDescription = null,
+                            tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "History",
+                            fontSize = 12.sp,
+                            fontFamily = PlusJakartaBold,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF475569)
+                        )
+                    }
+                }
+            } else {
+                // Subtle Record Count badge on History page
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isDark) Color(0xFF141D30).copy(alpha = 0.85f) else Color(0xFFF1F5F9).copy(alpha = 0.85f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isDark) Color(0x28FFFFFF) else Color(0x15000000)
+                    )
+                ) {
+                    Text(
+                        text = "${pastItems.size} Records",
+                        fontSize = 11.5.sp,
+                        fontFamily = PlusJakartaBold,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF64748B),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // Detail Bottom Sheet
+        if (selectedDetailAssessment != null) {
+            val relevantFiles = remember(selectedDetailAssessment) {
+                selectedDetailAssessment?.courseId?.let { courseFilesLookup(it) } ?: emptyList()
+            }
+
+            AssessmentDetailBottomSheet(
+                assessment = selectedDetailAssessment,
+                onDismiss = { selectedDetailAssessment = null },
+                canManage = canManage,
+                onEdit = { toEdit ->
+                    editingAssessment = toEdit
+                    selectedDetailAssessment = null
+                    showPostSheet = true
+                },
+                onDelete = { toDelete ->
+                    selectedDetailAssessment = null
+                    scope.launch {
+                        repository.deleteAssessment(toDelete.id, currentBatchId)
+                    }
+                },
+                courseFiles = relevantFiles,
+                onOpenFile = onOpenFile,
+                onOpenCourseFolder = onOpenCourseFolder,
+                isDark = isDark
+            )
+        }
+
+        // Post / Edit Assessment Bottom Sheet
+        if (showPostSheet) {
+            PostAssessmentBottomSheet(
+                initialAssessment = editingAssessment,
+                currentBatchId = currentBatchId,
+                availableCourses = availableCourses,
+                routineLookup = routineLookup,
+                onDismiss = {
+                    showPostSheet = false
+                    editingAssessment = null
+                },
+                onSubmit = { item, alsoPostNotice ->
+                    // 1. Save to repository with batch isolation (instant UI update)
+                    repository.saveAssessment(item, currentBatchId)
+
+                    // 2. Post notice in background if checked and update noticeId on assessment
+                    if (alsoPostNotice) {
+                        scope.launch(Dispatchers.IO) {
+                            val validAssessmentId = item.id.ifBlank { java.util.UUID.randomUUID().toString() }
+                            val typeName = item.assessmentType.displayName
+                            val courseName = item.courseTitle.ifBlank { item.courseCode }
+                            val noticeTitle = "$typeName • $courseName"
+                            val article = if (typeName.firstOrNull()?.lowercaseChar() in listOf('a', 'e', 'i', 'o', 'u')) "An" else "A"
+                            val noticeBody = "$article $typeName has been announced. Click below to view details.\n\n[assessment_id:$validAssessmentId]"
+                            onPostNotice(noticeTitle, noticeBody, item.courseId) { noticeId ->
+                                scope.launch(Dispatchers.IO) {
+                                    repository.updateAssessmentNoticeId(validAssessmentId, noticeId, currentBatchId)
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Send Push Notification Alert in background
+                    scope.launch(Dispatchers.IO) {
+                        onBroadcastPush(
+                            "📝 New ${item.assessmentType.displayName}: ${item.courseCode}",
+                            "${item.title} — Due ${item.getFormattedDate()} ${item.deadlineTime}"
+                        )
+                    }
+                },
+                isDark = isDark
+            )
+        }
+    }
+}

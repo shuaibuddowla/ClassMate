@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp">
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp">
     <com.google.android.material.card.MaterialCardView android:id="@+id/cardRoot"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:clickable="false" android:focusable="false" app:cardCornerRadius="20dp"
-        app:cardElevation="2dp" app:cardBackgroundColor="@android:color/transparent"
+        app:cardElevation="0dp" app:cardBackgroundColor="@android:color/transparent"
+        app:cardPreventCornerOverlap="false" app:cardUseCompatPadding="false"
+        android:clipToOutline="true"
         app:strokeColor="@color/cm_notice_premium_stroke" app:strokeWidth="1dp">
         <LinearLayout android:id="@+id/noticeCardSurface" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:background="@drawable/bg_notice_premium_general"
@@ -148,6 +150,36 @@
                     android:text="Tap to view" android:textColor="#FFFFFF" android:textSize="11sp" />
             </FrameLayout>
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/assessmentAttachmentContainer" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="10dp"
+                android:visibility="gone" app:cardBackgroundColor="@color/cm_notice_attachment"
+                app:cardCornerRadius="14dp" app:cardElevation="0dp"
+                app:strokeColor="@color/cm_notice_premium_stroke" app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center_vertical" android:orientation="horizontal"
+                    android:padding="10dp">
+                    <TextView android:id="@+id/tvAssessmentBadge" android:layout_width="34dp"
+                        android:layout_height="34dp" android:background="@drawable/bg_badge_purple"
+                        android:gravity="center" android:textColor="@color/cm_primary"
+                        android:textSize="10sp" android:textStyle="bold" />
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp" android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView android:id="@+id/tvAssessmentName" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:ellipsize="middle"
+                            android:maxLines="1" android:textColor="@color/cm_text_primary"
+                            android:textSize="12sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvAssessmentSubtext" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:textColor="@color/cm_text_muted"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+                    <ImageView android:id="@+id/btnOpenAssessment" android:layout_width="30dp"
+                        android:layout_height="30dp" android:contentDescription="Open assessment"
+                        android:padding="6dp" android:src="@drawable/ic_open_external"
+                        app:tint="@color/cm_primary" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/fileAttachmentContainer" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="10dp"
                 android:visibility="gone" app:cardBackgroundColor="@color/cm_notice_attachment"
@@ -204,8 +236,12 @@
                     android:layout_marginStart="8dp"
                     android:gravity="center_vertical"
                     android:text="📌 Pinned"
-                    android:textSize="11sp"
-                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="10.5sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/cm_primary"
+                    android:background="@drawable/bg_date_header_pill"
+                    android:paddingHorizontal="7dp"
+                    android:paddingVertical="2dp"
                     android:visibility="gone" />
             </LinearLayout>
 

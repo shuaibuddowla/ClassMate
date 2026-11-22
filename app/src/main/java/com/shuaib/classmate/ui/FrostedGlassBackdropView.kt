@@ -16,12 +16,12 @@ import android.view.ViewTreeObserver
 /**
  * Real-time hardware-accelerated frosted glass backdrop blur.
  *
- * Captures the underlying content (notices, courses, timetable) directly behind the bottom bar,
+ * Captures the underlying content (notices, courses, timetable, upcoming) directly behind the bottom bar,
  * downsamples it by 8x (which dissolves and eliminates text legibility), and on Android 12+
  * applies a GPU RenderEffect Gaussian blur shader.
  *
- * Uses OnScrollChangedListener instead of continuous pre-draw invalidation to guarantee
- * zero flickering and zero blinking during scroll animations.
+ * Employs responsive 30fps throttled capture during active touches/scrolls and instant settling capture
+ * when scrolling stops, providing a rich frosted glass reflection with zero frame drops.
  */
 class FrostedGlassBackdropView @JvmOverloads constructor(
     context: Context,
@@ -40,7 +40,7 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
     private val locThis = IntArray(2)
     private val locBehind = IntArray(2)
     private var lastCaptureTimeMs = 0L
-    private val captureIntervalMs = 120L
+    private val captureIntervalMs = 33L // ~30fps smooth updates during active scroll
 
     private val updateRunnable = Runnable {
         if (!isCapturing && isShown && width > 0 && height > 0) {
@@ -49,14 +49,12 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
     }
 
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener {
-        if (!isCapturing && isShown && width > 0 && height > 0) {
-            val now = android.os.SystemClock.uptimeMillis()
-            if (now - lastCaptureTimeMs >= captureIntervalMs) {
-                invalidate()
-            } else {
-                removeCallbacks(updateRunnable)
-                postDelayed(updateRunnable, captureIntervalMs)
-            }
+        notifyScroll()
+    }
+
+    private val layoutChangeListener = View.OnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
+        if (r - l > 0 && b - t > 0) {
+            post { invalidateBackdrop() }
         }
     }
 
@@ -71,16 +69,77 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
 
     fun attachBehindView(target: View) {
         if (behindView === target) return
-        behindView?.viewTreeObserver?.removeOnScrollChangedListener(scrollListener)
+        behindView?.removeOnLayoutChangeListener(layoutChangeListener)
+        unregisterScrollListener()
         behindView = target
-        target.viewTreeObserver.addOnScrollChangedListener(scrollListener)
-        invalidate()
+        behindView?.addOnLayoutChangeListener(layoutChangeListener)
+        registerScrollListener()
+        post { invalidateBackdrop() }
+    }
+
+    private fun registerScrollListener() {
+        try {
+            viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+            viewTreeObserver.addOnScrollChangedListener(scrollListener)
+        } catch (_: Throwable) {}
+        behindView?.let { target ->
+            try {
+                target.viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+                target.viewTreeObserver.addOnScrollChangedListener(scrollListener)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun unregisterScrollListener() {
+        try {
+            viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+        } catch (_: Throwable) {}
+        behindView?.let { target ->
+            try {
+                target.viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        behindView?.addOnLayoutChangeListener(layoutChangeListener)
+        registerScrollListener()
+        post { invalidateBackdrop() }
+        postDelayed({ invalidateBackdrop() }, 200L)
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        behindView?.removeOnLayoutChangeListener(layoutChangeListener)
         removeCallbacks(updateRunnable)
-        behindView?.viewTreeObserver?.removeOnScrollChangedListener(scrollListener)
+        unregisterScrollListener()
+    }
+
+    /**
+     * Called during scroll / swipe events across any tab to update the frosted backdrop in real time.
+     * Throttled to ~30fps to maintain 120Hz display smoothness without frame drops.
+     */
+    fun notifyScroll() {
+        if (!isCapturing && isShown && width > 0 && height > 0) {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - lastCaptureTimeMs >= captureIntervalMs) {
+                invalidate()
+            } else {
+                removeCallbacks(updateRunnable)
+                postDelayed(updateRunnable, captureIntervalMs)
+            }
+        }
+    }
+
+    /**
+     * Force immediate recapture when content settles or when tabs switch.
+     */
+    fun invalidateBackdrop() {
+        if (!isCapturing && isShown && width > 0 && height > 0) {
+            lastCaptureTimeMs = 0L
+            invalidate()
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -90,7 +149,7 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
         val defaultH = (84 * density).toInt()
 
         val finalHeight = when (hMode) {
-            MeasureSpec.EXACTLY -> hSize
+            MeasureSpec.EXACTLY -> if (hSize > 0) hSize else defaultH
             MeasureSpec.AT_MOST -> minOf(hSize, defaultH)
             else -> defaultH
         }
@@ -107,21 +166,23 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
             val sh = (h / downscaleFactor).coerceAtLeast(1)
             downscaledBitmap = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888)
             downscaledCanvas = Canvas(downscaledBitmap!!)
-            invalidate()
+            invalidateBackdrop()
         }
     }
 
     override fun onDraw(canvas: Canvas) {
-        val target = behindView ?: return
-        val bmp = downscaledBitmap ?: return
-        val dCanvas = downscaledCanvas ?: return
+        val target = behindView
+        val bmp = downscaledBitmap
+        val dCanvas = downscaledCanvas
+        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+
         if (width <= 0 || height <= 0) return
 
         val parentView = parent as? View
         val isTranslating = (parentView?.translationY ?: 0f) != 0f
 
-        // Only recapture when stationary at dock position to prevent flickering during scroll transitions
-        if (!isTranslating && !isCapturing && target.width > 0 && target.height > 0) {
+        // Only recapture when stationary at dock position to prevent flickering during show/hide transitions
+        if (target != null && bmp != null && dCanvas != null && !isTranslating && !isCapturing && target.width > 0 && target.height > 0) {
             isCapturing = true
             try {
                 lastCaptureTimeMs = android.os.SystemClock.uptimeMillis()
@@ -150,11 +211,14 @@ class FrostedGlassBackdropView @JvmOverloads constructor(
         }
 
         // Draw blurred color field across this view
-        canvas.drawBitmap(bmp, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), filterPaint)
+        if (bmp != null) {
+            canvas.drawBitmap(bmp, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), filterPaint)
+        }
 
-        // Frosted diffusion overlay (lets melted RGB colors reflect through)
-        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        overlayPaint.color = if (isDark) Color.argb(195, 11, 20, 26) else Color.argb(205, 255, 255, 255)
+        // Frosted diffusion overlay:
+        // ~65% white in light mode / ~68% dark slate in dark mode
+        // allows the blurred colors of cards, dates, tags & images to vividly reflect through
+        overlayPaint.color = if (isDark) Color.argb(175, 11, 20, 26) else Color.argb(170, 255, 255, 255)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
     }
 }

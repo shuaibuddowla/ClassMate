@@ -193,30 +193,85 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <RadioGroup
-                    android:id="@+id/rgNoticeType"
+                <!-- Modern Horizontal Notice Type Pill Selector -->
+                <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginBottom="24dp">
-                    <RadioButton android:id="@+id/rbNormal" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="Normal"
-                        android:textColor="@color/cm_text_primary" android:checked="true" />
-                    <RadioButton android:id="@+id/rbCancel" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="Cancellation"
-                        android:textColor="@color/cm_text_primary" />
-                    <RadioButton android:id="@+id/rbPoll" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="Create Poll"
-                        android:textColor="@color/cm_text_primary" />
-                    <RadioButton android:id="@+id/rbSub" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="Substitute"
-                        android:textColor="@color/cm_text_primary" />
-                    <RadioButton android:id="@+id/rbVacation" android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" android:text="Vacation / Holiday"
-                        android:textColor="@color/cm_text_primary" />
-                </RadioGroup>
+                    android:scrollbars="none"
+                    android:layout_marginBottom="20dp">
 
-                <!-- Normal section -->
+                    <RadioGroup
+                        android:id="@+id/rgNoticeType"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:orientation="horizontal"
+                        android:background="@drawable/bg_notice_mode_container"
+                        android:padding="3dp">
+
+                        <RadioButton
+                            android:id="@+id/rbNormal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:button="@null"
+                            android:background="@drawable/sl_notice_mode_pill"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:text="General Notice"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="16dp"
+                            android:gravity="center"
+                            android:checked="true" />
+
+                        <RadioButton
+                            android:id="@+id/rbCancel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:button="@null"
+                            android:background="@drawable/sl_notice_mode_pill"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:text="Class Cancellation"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="16dp"
+                            android:gravity="center" />
+
+                        <RadioButton
+                            android:id="@+id/rbPoll"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:button="@null"
+                            android:background="@drawable/sl_notice_mode_pill"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:text="Interactive Poll"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="16dp"
+                            android:gravity="center" />
+
+                        <RadioButton
+                            android:id="@+id/rbVacation"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:button="@null"
+                            android:background="@drawable/sl_notice_mode_pill"
+                            android:textColor="@color/sl_notice_mode_text"
+                            android:text="Holiday"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="16dp"
+                            android:gravity="center" />
+
+                        <RadioButton
+                            android:id="@+id/rbSub"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:visibility="gone"
+                            android:button="@null"
+                            android:text="Substitute" />
+                    </RadioGroup>
+                </HorizontalScrollView>
+
+                <!-- Normal / General Notice section -->
                 <LinearLayout
                     android:id="@+id/sectionNormal"
                     android:layout_width="match_parent"
@@ -231,90 +286,74 @@
                         android:textColorHint="@color/cm_text_secondary"
                         app:boxStrokeColor="@color/cm_primary"
                         app:hintTextColor="@color/cm_primary"
+                        app:boxCornerRadiusTopStart="14dp"
+                        app:boxCornerRadiusTopEnd="14dp"
+                        app:boxCornerRadiusBottomStart="14dp"
+                        app:boxCornerRadiusBottomEnd="14dp"
+                        app:boxBackgroundColor="@color/cm_surface"
                         android:layout_marginBottom="16dp">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etTitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/cm_text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/layoutBodyInput"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Notice Body"
-                        android:textColorHint="@color/cm_text_secondary"
-                        app:boxStrokeColor="@color/cm_primary"
-                        app:hintTextColor="@color/cm_primary"
-                        app:helperText="Supports: *bold*, _italic_, ~strike~, `mono`, • list, 1. numbered"
-                        app:helperTextEnabled="true"
-                        app:helperTextTextColor="@color/cm_text_muted"
-                        android:layout_marginBottom="16dp">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etBody"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:minLines="4"
-                            android:gravity="top"
-                            android:textColor="@color/cm_text_primary" />
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Attachment section (only for normal notices) -->
+                    <!-- Modern Chat-Style Pill Container for Message & Actions -->
                     <LinearLayout
-                        android:id="@+id/sectionAttachment"
+                        android:id="@+id/cardNoticeBodyContainer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:background="@drawable/bg_card_primary"
-                        android:padding="16dp"
+                        android:background="@drawable/bg_notice_message_box"
+                        android:padding="14dp"
                         android:layout_marginBottom="16dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="📎 ATTACHMENT (OPTIONAL)"
-                            android:textColor="@color/cm_text_secondary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.1"
-                            android:layout_marginBottom="12dp" />
-
-                        <Button
-                            android:id="@+id/btnAttachImage"
+                        <!-- Dynamic Auto-expanding Notice Message Body -->
+                        <EditText
+                            android:id="@+id/etBody"
                             android:layout_width="match_parent"
-                            android:layout_height="48dp"
-                            android:layout_marginBottom="12dp"
-                            android:background="@drawable/bg_badge_purple"
-                            android:text="Choose Image"
-                            android:textColor="@color/cm_primary"
-                            android:textSize="13sp" />
+                            android:layout_height="wrap_content"
+                            android:minLines="3"
+                            android:maxLines="14"
+                            android:gravity="top|start"
+                            android:background="@null"
+                            android:hint="Notice Message..."
+                            android:textColorHint="@color/cm_text_muted"
+                            android:textColor="@color/cm_text_primary"
+                            android:textSize="15sp"
+                            android:lineSpacingMultiplier="1.2"
+                            android:inputType="textMultiLine|textCapSentences"
+                            android:scrollbars="vertical"
+                            android:paddingBottom="12dp" />
 
-                        <!-- Selected attachment preview -->
+                        <!-- Selected Attachment Preview Pill (Image or Document) -->
                         <LinearLayout
                             android:id="@+id/attachmentPreview"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:visibility="gone">
+                            android:background="@drawable/bg_settings_card"
+                            android:padding="8dp"
+                            android:visibility="gone"
+                            android:layout_marginBottom="10dp">
 
-                            <!-- Image preview -->
                             <LinearLayout
                                 android:id="@+id/imagePreview"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:orientation="horizontal"
-                                android:gravity="center_vertical"
-                                android:visibility="gone">
+                                android:gravity="center_vertical">
 
                                 <ImageView
                                     android:id="@+id/ivAttachmentPreview"
-                                    android:layout_width="72dp"
-                                    android:layout_height="72dp"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
                                     android:scaleType="centerCrop"
                                     android:background="@drawable/bg_settings_card"
-                                    android:layout_marginEnd="12dp" />
+                                    android:layout_marginEnd="10dp" />
 
                                 <TextView
                                     android:id="@+id/tvImageName"
@@ -324,21 +363,20 @@
                                     android:textColor="@color/cm_text_primary"
                                     android:textSize="13sp"
                                     android:maxLines="1"
-                                    android:ellipsize="end" />
+                                    android:ellipsize="middle" />
 
                                 <ImageButton
                                     android:id="@+id/btnRemoveImage"
-                                    android:layout_width="32dp"
-                                    android:layout_height="32dp"
+                                    android:layout_width="36dp"
+                                    android:layout_height="36dp"
                                     android:src="@drawable/ic_close"
                                     android:background="?attr/selectableItemBackgroundBorderless"
-                                    app:tint="@color/cm_cancel_red" />
-
+                                    app:tint="@color/cm_cancel_red"
+                                    android:contentDescription="Remove attachment" />
                             </LinearLayout>
-
                         </LinearLayout>
 
-                        <!-- Upload progress for attachment -->
+                        <!-- Upload progress indicator -->
                         <LinearLayout
                             android:id="@+id/attachmentProgress"
                             android:layout_width="match_parent"
@@ -346,24 +384,116 @@
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
                             android:visibility="gone"
-                            android:layout_marginTop="8dp">
+                            android:layout_marginBottom="8dp">
 
                             <ProgressBar
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:indeterminateTint="@color/cm_primary"
-                                android:layout_marginEnd="12dp" />
+                                android:layout_marginEnd="8dp" />
 
                             <TextView
                                 android:id="@+id/tvAttachmentProgress"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textColor="@color/cm_primary"
-                                android:textSize="13sp" />
-
+                                android:textSize="12sp" />
                         </LinearLayout>
 
+                        <!-- Bottom Composer Action Pill Bar -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <!-- Document / File Button (+) -->
+                            <ImageButton
+                                android:id="@+id/btnAttachDoc"
+                                android:layout_width="38dp"
+                                android:layout_height="38dp"
+                                android:src="@drawable/ic_add"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                app:tint="@color/cm_primary"
+                                android:padding="7dp"
+                                android:contentDescription="Attach file" />
+
+                            <!-- Photo / Gallery Button -->
+                            <ImageButton
+                                android:id="@+id/btnAttachImage"
+                                android:layout_width="38dp"
+                                android:layout_height="38dp"
+                                android:src="@drawable/ic_gallery_photo"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                app:tint="@color/cm_primary"
+                                android:padding="7dp"
+                                android:layout_marginStart="4dp"
+                                android:contentDescription="Attach photo" />
+
+                            <!-- Spacer -->
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="1dp"
+                                android:layout_weight="1" />
+
+                            <!-- Dynamic Voice Volume Signal Waves (Scales in real-time) -->
+                            <LinearLayout
+                                android:id="@+id/layoutVoiceSignal"
+                                android:layout_width="wrap_content"
+                                android:layout_height="32dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:visibility="gone"
+                                android:layout_marginEnd="8dp">
+
+                                <View
+                                    android:id="@+id/barSignal1"
+                                    android:layout_width="3.5dp"
+                                    android:layout_height="10dp"
+                                    android:background="@drawable/bg_voice_signal_bar"
+                                    android:layout_marginHorizontal="2dp" />
+
+                                <View
+                                    android:id="@+id/barSignal2"
+                                    android:layout_width="3.5dp"
+                                    android:layout_height="18dp"
+                                    android:background="@drawable/bg_voice_signal_bar"
+                                    android:layout_marginHorizontal="2dp" />
+
+                                <View
+                                    android:id="@+id/barSignal3"
+                                    android:layout_width="3.5dp"
+                                    android:layout_height="24dp"
+                                    android:background="@drawable/bg_voice_signal_bar"
+                                    android:layout_marginHorizontal="2dp" />
+
+                                <View
+                                    android:id="@+id/barSignal4"
+                                    android:layout_width="3.5dp"
+                                    android:layout_height="12dp"
+                                    android:background="@drawable/bg_voice_signal_bar"
+                                    android:layout_marginHorizontal="2dp" />
+                            </LinearLayout>
+
+                            <!-- Modern Voice Waveform / STT Button -->
+                            <ImageButton
+                                android:id="@+id/btnVoiceInput"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:src="@drawable/ic_voice_wave"
+                                android:background="@drawable/bg_voice_btn_selector"
+                                app:tint="@color/cm_primary"
+                                android:padding="8dp"
+                                android:contentDescription="Voice to Text" />
+                        </LinearLayout>
                     </LinearLayout>
+
+                    <!-- Legacy sectionAttachment anchor (hidden) to prevent binding breaks -->
+                    <LinearLayout
+                        android:id="@+id/sectionAttachment"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <!-- Vacation/Holiday section -->

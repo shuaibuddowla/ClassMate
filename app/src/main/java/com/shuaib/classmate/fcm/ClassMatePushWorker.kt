@@ -34,7 +34,6 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         if (inputData.getString("project_ref") != expectedProject) return Result.success()
         var identity = ClassMateAuthApi.notificationIdentity()
 
-
         val release = inputData.getString("kind") == "app_update"
         val blood = inputData.getString("kind") == "blood_request"
         val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update", "batch_fund_reminder")
@@ -43,16 +42,18 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
-                ClassMateAuthApi.saveNotificationIdentity(identity)
+                if (identity != null) ClassMateAuthApi.saveNotificationIdentity(identity)
             } catch (_: Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
         }
+        if (identity == null) return Result.success()
+
         val isTargetedPersonal = inputData.getString("kind") in setOf(
             "student_ban", "student_ban_lifted",
             "batch_fund_deposit", "batch_fund_update", "batch_fund_reminder",
             "attendance_marked"
         )
         val targetRecipient = inputData.getString("recipient_id")
-        if (isTargetedPersonal && !targetRecipient.isNullOrBlank() && targetRecipient != identity?.optString("id")) {
+        if (isTargetedPersonal && !targetRecipient.isNullOrBlank() && targetRecipient != identity.optString("id")) {
             return Result.success()
         }
         if (!ClassMatePushPolicy.addressedToCurrentUser(inputData.getString("project_ref"),inputData.getString("recipient_id"),
@@ -69,12 +70,31 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         val matched = blood && inputData.getString("blood_match") == "true"
-        val channel = if(matched) "classmate_blood_emergency" else if(release) UpdateNotifications.CHANNEL_ID else "classmate_notifications"
+        val channel = when {
+            matched -> "classmate_blood_emergency"
+            release -> UpdateNotifications.CHANNEL_ID
+            assessmentReminder -> "classmate_assessments"
+            inputData.getString("kind") == "class_change" -> "classmate_cancellations"
+            inputData.getString("kind") == "notice" -> "classmate_notices"
+            else -> "classmate_notifications"
+        }
         if(matched && Build.VERSION.SDK_INT>=26) {
             manager.createNotificationChannel(android.app.NotificationChannel(channel,"Verified blood requests",NotificationManager.IMPORTANCE_HIGH).apply {
                 description="Urgent blood requests matching your profile"
                 enableVibration(true)
                 setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"),android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build())
+            })
+        } else if (Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(channel) == null) {
+            val (name, desc) = when (channel) {
+                "classmate_assessments" -> "Upcoming Assessments & Deadlines" to "Reminders for upcoming class tests, quizzes, and assignments"
+                "classmate_notices" -> "ClassMate Notices" to "Notifications for ClassMate updates"
+                "classmate_cancellations" -> "ClassMate Cancellations" to "Notifications for cancelled classes"
+                UpdateNotifications.CHANNEL_ID -> "ClassMate Updates" to "App release announcements"
+                else -> "ClassMate Notifications" to "General class schedules, notices, and updates"
+            }
+            manager.createNotificationChannel(android.app.NotificationChannel(channel, name, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = desc
+                enableVibration(true)
             })
         }
         val state = when {
@@ -201,10 +221,12 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         val event = inputData.getString("event_id")
         val hash = inputData.getString("token_hash")
         if (event != null && hash != null) {
-            try {
+            runCatching {
                 ClassMateAuthApi.rpcText("report_notification_receipt",JSONObject().put("target_event",event)
                     .put("target_hash",hash).put("target_state",state).put("target_version",BuildConfig.VERSION_CODE))
-            } catch (_: Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
+            }.onFailure { e ->
+                android.util.Log.w("PushWorker", "Receipt report deferred/failed: ${e.message}")
+            }
         }
         return Result.success()
     }

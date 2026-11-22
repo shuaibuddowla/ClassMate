@@ -59,9 +59,15 @@ export async function syncPushIdentity(user: string, batch: string) {
       const app =
         getApps()[0] ||
         initializeApp(JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG));
-      onMessage(getMessaging(app), (payload) =>
-        registration.active?.postMessage({ type: "push", data: payload.data }),
-      );
+      onMessage(getMessaging(app), (payload) => {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") {
+          window.dispatchEvent(
+            new CustomEvent("classmate:push-in-app", { detail: payload.data })
+          );
+        } else {
+          registration.active?.postMessage({ type: "push", data: payload.data });
+        }
+      });
     }
   }
 }

@@ -295,22 +295,59 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            if (!ClassMateAuthApi.restoreSession()) {
-                if (ClassMateAuthApi.accessToken.isNullOrBlank()) {
-                    Toast.makeText(this@ClassMateBatchFundActivity, "Session expired, please sign in again", Toast.LENGTH_SHORT).show()
-                    finish()
-                    return@launch
+            val hasSavedSession = ClassMateAuthApi.hasSavedSession() || !ClassMateAuthApi.accessToken.isNullOrBlank()
+            if (!hasSavedSession) {
+                Toast.makeText(this@ClassMateBatchFundActivity, "Please sign in to access Batch Fund", Toast.LENGTH_SHORT).show()
+                finish()
+                return@launch
+            }
+
+            // Restore/refresh session in background if online, but NEVER block or kill offline usage
+            if (NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                runCatching { ClassMateAuthApi.restoreSession() }
+            }
+
+            if (batchId.isBlank()) {
+                val cachedHome = ClassMateAcademicCache.home(this@ClassMateBatchFundActivity)
+                batchId = cachedHome?.optString("batch").orEmpty().ifBlank {
+                    cachedHome?.optJSONObject("profile")?.optString("batch_id").orEmpty()
+                }.ifBlank {
+                    com.shuaib.classmate.utils.AppContextManager.getManagedBatchId().ifBlank {
+                        com.shuaib.classmate.utils.AppContextManager.getBatchId()
+                    }
+                }
+                if (batchLabel.isBlank()) {
+                    batchLabel = cachedHome?.optString("label").orEmpty()
                 }
             }
-            if (batchId.isBlank()) {
-                val prof = ClassMateAuthApi.initializeProfile()
-                batchId = prof.optString("batch_id").ifBlank { prof.optString("effective_batch_id") }
+
+            if (batchId.isBlank() && NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                runCatching {
+                    val prof = ClassMateAuthApi.initializeProfile()
+                    batchId = prof.optString("batch_id").ifBlank { prof.optString("effective_batch_id") }
+                }
             }
+
             if (batchId.isBlank()) {
                 Toast.makeText(this@ClassMateBatchFundActivity, "No active batch associated with your profile.", Toast.LENGTH_SHORT).show()
                 finish()
                 return@launch
             }
+
+            // Pre-seed CR capabilities from cached profile so actions are available immediately offline
+            val cachedProfile = ClassMateAcademicCache.home(this@ClassMateBatchFundActivity)?.optJSONObject("profile")
+            if (cachedProfile != null) {
+                val isCrOrAdmin = cachedProfile.optBoolean("is_cr", false) ||
+                        cachedProfile.optBoolean("is_admin", false) ||
+                        cachedProfile.optString("role") in setOf("admin", "cr")
+                if (isCrOrAdmin) {
+                    isCr = true
+                    layoutCrQuickActions.visibility = View.VISIBLE
+                    layoutMainActions.visibility = View.VISIBLE
+                    ivEditDescHint.visibility = View.VISIBLE
+                }
+            }
+
             loadData()
             loadBatchRoster()
         }
@@ -322,6 +359,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         if (cached.isNotEmpty()) {
             batchRoster = cached
         }
+        if (!NetworkMonitor.isOnline(this)) return
         lifecycleScope.launch {
             try {
                 val res = ClassMateAuthApi.rpcText(
@@ -433,13 +471,15 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             try {
-                // Fetch summary
-                val summary = ClassMateAuthApi.rpc(
-                    "batch_fund_summary",
-                    JSONObject().put("target_batch", batchId)
-                )
-                ClassMateBatchFundCache.saveSummary(this@ClassMateBatchFundActivity, batchId, summary)
-                applySummaryData(summary)
+                if (NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                    // Fetch summary
+                    val summary = ClassMateAuthApi.rpc(
+                        "batch_fund_summary",
+                        JSONObject().put("target_batch", batchId)
+                    )
+                    ClassMateBatchFundCache.saveSummary(this@ClassMateBatchFundActivity, batchId, summary)
+                    applySummaryData(summary)
+                }
 
                 if ((intent.getBooleanExtra("open_record_dialog", false) || intent.getBooleanExtra("open_add_fund", false)) && isCr) {
                     intent.removeExtra("open_record_dialog")
@@ -507,32 +547,34 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             recentActivityContainer.visibility = View.GONE
         }
 
-        try {
-            val responseText = ClassMateAuthApi.rpcText(
-                "batch_fund_transactions",
-                JSONObject().apply {
-                    put("target_batch", batchId)
-                    put("filter_type", "all")
-                    put("query_text", "")
-                    put("result_offset", 0)
-                    put("page_limit", 20)
-                }
-            )
-            val txArray = JSONArray(responseText)
-            ClassMateBatchFundCache.saveTransactions(this, batchId, txArray)
-            displayTransactions(txArray)
-        } catch (e: Exception) {
-            if (cachedTxs == null && pendingTxs.isEmpty()) {
-                shimmerRecentActivity.stopShimmer()
-                shimmerRecentActivity.visibility = View.GONE
-                recentActivityContainer.visibility = View.VISIBLE
-                recentActivityContainer.removeAllViews()
-                EmptyStateHelper.showError(
-                    emptyStateOverview,
-                    title = "Could not load activity",
-                    errorMessage = "Check your connection and tap below to retry.",
-                    onRetry = { loadData() }
+        if (NetworkMonitor.isOnline(this)) {
+            try {
+                val responseText = ClassMateAuthApi.rpcText(
+                    "batch_fund_transactions",
+                    JSONObject().apply {
+                        put("target_batch", batchId)
+                        put("filter_type", "all")
+                        put("query_text", "")
+                        put("result_offset", 0)
+                        put("page_limit", 20)
+                    }
                 )
+                val txArray = JSONArray(responseText)
+                ClassMateBatchFundCache.saveTransactions(this, batchId, txArray)
+                displayTransactions(txArray)
+            } catch (e: Exception) {
+                if (cachedTxs == null && pendingTxs.isEmpty()) {
+                    shimmerRecentActivity.stopShimmer()
+                    shimmerRecentActivity.visibility = View.GONE
+                    recentActivityContainer.visibility = View.VISIBLE
+                    recentActivityContainer.removeAllViews()
+                    EmptyStateHelper.showError(
+                        emptyStateOverview,
+                        title = "Could not load activity",
+                        errorMessage = "Check your connection and tap below to retry.",
+                        onRetry = { loadData() }
+                    )
+                }
             }
         }
     }
@@ -1115,6 +1157,23 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             }
 
             ledgerJob = lifecycleScope.launch {
+                if (!NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                    if (cachedArray == null && pendingList.isEmpty()) {
+                        shimmerLedger.stopShimmer()
+                        shimmerLedger.visibility = View.GONE
+                        container.visibility = View.VISIBLE
+                        container.removeAllViews()
+                        EmptyStateHelper.show(
+                            emptyStateLedger,
+                            iconRes = R.drawable.ic_warning_triangle,
+                            title = "You're offline",
+                            subtitle = "Connect to the internet to load updated transactions.",
+                            actionText = "Retry",
+                            onAction = { fetchLedger() }
+                        )
+                    }
+                    return@launch
+                }
                 try {
                     val response = ClassMateAuthApi.rpcText(
                         "batch_fund_transactions",
@@ -1645,6 +1704,25 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 shimmerPayers.visibility = View.GONE
                 container.visibility = View.VISIBLE
                 renderList(currentSearchQuery)
+            } else if (batchRoster.isNotEmpty()) {
+                allPayers.clear()
+                val seenPayers = HashSet<String>()
+                for (student in batchRoster) {
+                    val pid = student.optString("id").ifBlank { student.optString("profile_id") }.ifBlank { student.optString("student_id") }
+                    if (pid.isNotBlank() && !seenPayers.add(pid)) continue
+                    val p = JSONObject().apply {
+                        put("profile_id", student.optString("id").ifBlank { student.optString("profile_id") })
+                        put("full_name", student.optString("full_name"))
+                        put("student_id", student.optString("student_id"))
+                        put("total_paid", 0.0)
+                        put("payment_count", 0)
+                    }
+                    allPayers.add(p)
+                }
+                shimmerPayers.stopShimmer()
+                shimmerPayers.visibility = View.GONE
+                container.visibility = View.VISIBLE
+                renderList(currentSearchQuery)
             } else {
                 shimmerPayers.visibility = View.VISIBLE
                 shimmerPayers.startShimmer()
@@ -1653,6 +1731,22 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             }
 
             payersJob = lifecycleScope.launch {
+                if (!NetworkMonitor.isOnline(this@ClassMateBatchFundActivity)) {
+                    if (allPayers.isEmpty()) {
+                        shimmerPayers.stopShimmer()
+                        shimmerPayers.visibility = View.GONE
+                        container.visibility = View.VISIBLE
+                        EmptyStateHelper.show(
+                            emptyStatePayers,
+                            iconRes = R.drawable.ic_warning_triangle,
+                            title = "You're offline",
+                            subtitle = "Connect to the internet to load updated contributor lists.",
+                            actionText = "Retry",
+                            onAction = { fetchPayers() }
+                        )
+                    }
+                    return@launch
+                }
                 try {
                     val params = JSONObject().apply {
                         put("target_batch", batchId)

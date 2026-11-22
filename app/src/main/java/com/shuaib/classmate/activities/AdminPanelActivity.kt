@@ -121,6 +121,26 @@ class AdminPanelActivity : AppCompatActivity() {
             }
         }
 
+        // ClassMate AI Workspace
+        if (user.canPostNotices() || user.canEditTimetable() || user.isAdmin()) {
+            binding.cardClassMateAi.visibility = View.VISIBLE
+            binding.cardClassMateAi.applyClickAnimation {
+                val batchId = currentUser?.batchId.orEmpty().ifBlank {
+                    AppContextManager.getManagedBatchId().ifBlank {
+                        AppContextManager.getBatchId()
+                    }
+                }.ifBlank {
+                    com.shuaib.classmate.activities.ClassMateAcademicCache.home(this)?.optString("batch").orEmpty()
+                        .ifBlank { com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi.notificationIdentity()?.optString("batch_id").orEmpty() }
+                }
+                val intent = Intent(this, ClassMateAiActivity::class.java).apply {
+                    putExtra("batch_id", batchId)
+                }
+                startActivity(intent)
+                overrideOpenTransition()
+            }
+        }
+
         // Timetable
         if (user.canEditTimetable()) {
             binding.cardEditTimetable.visibility = View.VISIBLE

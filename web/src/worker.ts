@@ -66,24 +66,32 @@ async function display(data: Record<string, string> | undefined) {
   )
     return;
   if (!(await claim(`event:${data.recipient_id}:${data.event_id}`))) return;
-  await self.registration.showNotification(self.location.host, {
-    body: [
-      data.title && !/^ClassMate(?: update)?$/i.test(data.title)
-        ? data.title
-        : "",
-      data.body || "Your batch has a new update.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+  const notifTitle =
+    data.title && !/^ClassMate(?: update)?$/i.test(data.title)
+      ? data.title
+      : "ClassMate";
+  await self.registration.showNotification(notifTitle, {
+    body: data.body || "Your batch has a new update.",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.event_id,
-    ...(data.kind === "blood_request" ? { requireInteraction: true, actions: [...(data.blood_match === "true" ? [{action:"donate",title:"I can donate"}] : []),{action:"call",title:"Call attendant"}] } : {}),
+    ...(data.kind === "blood_request"
+      ? {
+          requireInteraction: true,
+          actions: [
+            ...(data.blood_match === "true"
+              ? [{ action: "donate", title: "I can donate" }]
+              : []),
+            { action: "call", title: "Call attendant" },
+          ],
+        }
+      : {}),
     data: {
       kind: data.kind,
       record: data.record_id,
       batch: data.batch_id,
       event: data.event_id,
+      assessment_id: data.assessment_id,
     },
   });
 }
@@ -184,22 +192,27 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const kind = event.notification.data?.kind;
   const isFund = kind === "batch_fund_deposit" || kind === "batch_fund_update";
+  const isAssessment = kind === "assessment_reminder" || kind === "assessment";
   const path =
     kind === "blood_request"
       ? "friends/blood"
       : isFund
         ? "friends/fund"
-        : ["release", "app_update"].includes(kind)
-          ? "profile"
-          : kind === "file"
-            ? "library"
-            : "notices";
+        : isAssessment
+          ? "upcoming"
+          : ["release", "app_update"].includes(kind)
+            ? "profile"
+            : kind === "file"
+              ? "library"
+              : "notices";
   const target =
     ["release", "app_update"].includes(kind)
       ? "/#profile"
       : isFund
         ? "/#friends/fund"
-        : `/#${path}/${encodeURIComponent(event.notification.data?.record || "")}`;
+        : isAssessment
+          ? `/#upcoming?id=${encodeURIComponent(event.notification.data?.assessment_id || event.notification.data?.record || "")}`
+          : `/#${path}/${encodeURIComponent(event.notification.data?.record || "")}`;
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })

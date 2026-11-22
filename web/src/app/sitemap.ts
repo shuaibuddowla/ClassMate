@@ -54,19 +54,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { data: notices } = await db
         .schema("classmate")
         .from("notices")
-        .select("id, title, body, published_at")
+        .select("id, title, body, published_at, is_cancelled")
         .order("published_at", { ascending: false })
-        .limit(60);
+        .limit(100);
 
       if (notices && Array.isArray(notices)) {
-        // Filter out blank or thin draft notices to prevent Soft 404 warnings from Googlebot
-        const validNotices = notices.filter(
-          (n) =>
-            n.id &&
-            n.title &&
-            n.title.trim().length > 0 &&
-            ((n.body && n.body.trim().length >= 20) || (n.title && n.title.trim().length >= 20))
-        );
+        // High quality indexation filter:
+        // Exclude cancelled notices, automated resource upload stubs, and thin one-liners (< 120 chars)
+        // to comply with Google Search Essentials and prevent Soft 404 warnings.
+        const validNotices = notices.filter((n) => {
+          if (!n.id || !n.title) return false;
+          if (n.is_cancelled) return false;
+
+          const title = n.title.trim();
+          const body = (n.body || "").trim();
+
+          // Exclude auto-generated resource upload stubs (they link to files, not standalone content)
+          if (title.toLowerCase().startsWith("resource:") || body.toLowerCase().includes("a new resource has been shared")) {
+            return false;
+          }
+
+          // Notice must have substantive text content (minimum 120 characters)
+          return body.length >= 120;
+        });
+
         const noticeEntries: MetadataRoute.Sitemap = validNotices.map((n) => ({
           url: `${baseUrl}/n/${n.id}`,
           lastModified: n.published_at ? new Date(n.published_at) : new Date(),

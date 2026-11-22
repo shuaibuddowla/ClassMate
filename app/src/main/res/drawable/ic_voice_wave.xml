@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Modern Voice Waveform / Audio Frequency Icon -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3c-0.83,0 -1.5,0.67 -1.5,1.5v15c0,0.83 0.67,1.5 1.5,1.5s1.5,-0.67 1.5,-1.5v-15c0,-0.83 -0.67,-1.5 -1.5,-1.5zM7.5,7c-0.83,0 -1.5,0.67 -1.5,1.5v7c0,0.83 0.67,1.5 1.5,1.5s1.5,-0.67 1.5,-1.5v-7c0,-0.83 -0.67,-1.5 -1.5,-1.5zM16.5,7c-0.83,0 -1.5,0.67 -1.5,1.5v7c0,0.83 0.67,1.5 1.5,1.5s1.5,-0.67 1.5,-1.5v-7c0,-0.83 -0.67,-1.5 -1.5,-1.5zM3,10c-0.83,0 -1.5,0.67 -1.5,1.5v1c0,0.83 0.67,1.5 1.5,1.5s1.5,-0.67 1.5,-1.5v-1c0,-0.83 -0.67,-1.5 -1.5,-1.5zM21,10c-0.83,0 -1.5,0.67 -1.5,1.5v1c0,0.83 0.67,1.5 1.5,1.5s1.5,-0.67 1.5,-1.5v-1c0,-0.83 -0.67,-1.5 -1.5,-1.5z" />
+</vector>

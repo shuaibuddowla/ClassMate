@@ -11,7 +11,6 @@ object AppConstants {
     val TELEGRAM_CHANNEL_ID: String = BuildConfig.TELEGRAM_CHANNEL_ID
 
     val GEMINI_MODEL: String = BuildConfig.GEMINI_MODEL
-    val GROQ_MODEL: String = BuildConfig.GROQ_MODEL
 
     // Links
     const val WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/ENVSddeEDrwGrNntcAOzzr"

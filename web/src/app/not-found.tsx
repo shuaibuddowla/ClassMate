@@ -2,8 +2,14 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main
-      style={{
+    <>
+      <head>
+        <title>404 - Page Not Found · ClassMate</title>
+        <meta name="robots" content="noindex, nofollow" />
+        <meta name="googlebot" content="noindex, nofollow" />
+      </head>
+      <main
+        style={{
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
@@ -40,5 +46,6 @@ export default function NotFound() {
         Return to Home
       </Link>
     </main>
+    </>
   );
 }

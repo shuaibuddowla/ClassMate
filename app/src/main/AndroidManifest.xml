@@ -20,6 +20,7 @@
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
@@ -45,6 +46,10 @@
 
 
     <queries>
+
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
 
         <package android:name="com.whatsapp" />
 
@@ -143,6 +148,19 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" android:host="classmatebd.vercel.app" />
+
+            </intent-filter>
+
+            <intent-filter>
+
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="classmate" android:host="notice" />
+                <data android:scheme="classmate" android:host="n" />
 
             </intent-filter>
 
@@ -581,11 +599,13 @@
 
 
         <receiver
-
             android:name=".services.ClassMateNoticeReminderReceiver"
-
             android:enabled="true"
+            android:exported="false" />
 
+        <receiver
+            android:name=".services.ClassMateAssessmentReminderReceiver"
+            android:enabled="true"
             android:exported="false" />
 
 

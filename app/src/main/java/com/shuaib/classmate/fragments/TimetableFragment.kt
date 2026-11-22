@@ -35,7 +35,9 @@ import com.shuaib.classmate.models.Period
 import com.shuaib.classmate.repositories.AcademicCalendarRepository
 import com.shuaib.classmate.utils.CountdownManager
 import com.shuaib.classmate.utils.NotificationRouter
+import com.shuaib.classmate.ui.PeriodCompanionBottomSheet
 import com.shuaib.classmate.utils.AnimUtils
+import com.shuaib.classmate.utils.AppContextManager
 import com.shuaib.classmate.utils.HapticHelper
 import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.animateSpringScale
@@ -83,6 +85,7 @@ class TimetableFragment : Fragment() {
     private var isHeroExpanded = false
     private var todayPeriods: List<Period>? = null
     private var currentHeroSubject: String? = null
+    private var currentHeroPeriod: Period? = null
     private var hasResumedOnce = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val showLoadingRunnable = Runnable { showLoadingState() }
@@ -528,11 +531,11 @@ class TimetableFragment : Fragment() {
                     isPausedByCalendarException = shouldPauseSelectedDay(),
                     isViewingToday = isToday,
                     onPeriodClick = { period ->
-                        val bundle = bundleOf("subjectName" to period.subject)
-                        (activity as? MainActivity)?.openChildDestination(
-                            R.id.nav_pdf,
-                            R.id.fragment_subject_pdf_list,
-                            bundle
+                        PeriodCompanionBottomSheet.show(
+                            fragment = this,
+                            period = period,
+                            isAdmin = isAdmin,
+                            batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
                         )
                     },
                     onPeriodLongClick = { period ->
@@ -571,6 +574,19 @@ class TimetableFragment : Fragment() {
                 binding.ivHeroChevron.rotation = if (isHeroExpanded) 90f else 0f
             } else {
                 binding.ivHeroChevron.animate().rotation(if (isHeroExpanded) 90f else 0f).setDuration(180).start()
+            }
+        }
+
+        binding.btnHeroCompanion.setOnClickListener {
+            it.animateSpringScale(0.95f)
+            val p = currentHeroPeriod
+            if (p != null) {
+                PeriodCompanionBottomSheet.show(
+                    fragment = this,
+                    period = p,
+                    isAdmin = isAdmin,
+                    batchId = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
+                )
             }
         }
 
@@ -637,6 +653,7 @@ class TimetableFragment : Fragment() {
         }
 
         binding.heroNextClass.isVisible = true
+        currentHeroPeriod = nextPeriod
         currentHeroSubject = nextPeriod.subject
         binding.tvHeroSubject.text = nextPeriod.subject
         binding.tvHeroTeacher.text = nextPeriod.teacher.ifBlank { "Course Teacher" }

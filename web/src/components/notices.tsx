@@ -30,7 +30,9 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
+  Menu,
 } from "lucide-react";
+import { WhatsAppText } from "@/lib/whatsapp-formatter";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
 import { dhakaToday, formatStamp, parseDate, dateKey } from "@/lib/calendar";
@@ -71,7 +73,22 @@ export function Notices({
     [comments, setComments] = useState<Row | null>(null),
     [detailNotice, setDetailNotice] = useState<Row | null>(null),
     [error, setError] = useState<unknown>(null),
-    [reminder, setReminder] = useState<Row | null>(null);
+    [reminder, setReminder] = useState<Row | null>(null),
+    [noticeAssessmentId, setNoticeAssessmentId] = useState<string | null>(null);
+
+  const noticeAssessmentQuery = useQuery({
+    queryKey: [ctx.user, ctx.batch, "notice-assessment-detail", noticeAssessmentId],
+    enabled: !!noticeAssessmentId,
+    queryFn: async () => {
+      const { data } = await supabase()
+        .schema("classmate")
+        .from("assessments")
+        .select("*")
+        .eq("id", noticeAssessmentId!)
+        .maybeSingle();
+      return data;
+    },
+  });
   const receiptsEnabled = useQuery({
     queryKey: [ctx.user, "owner-preferences"],
     enabled: ctx.owner,
@@ -370,17 +387,29 @@ export function Notices({
   return (
     <div className="notices-screen">
       <div className="page-heading transparent">
-        <div>
-          <span className="eyebrow">STAY IN THE LOOP</span>
-          <h1>Notices</h1>
-          <p>
-            {notices.length}
-            {feed.hasNextPage ? "+" : ""} updates ·{" "}
-            <button className="inline" onClick={() => feed.refetch()}>
-              <span className="notice-desktop-label">Refresh</span>
-              <span className="notice-mobile-label">Pull to refresh</span>
+        <div className="page-heading-left">
+          {ctx.openDrawer && (
+            <button
+              type="button"
+              className="icon hamburger-btn"
+              aria-label="Open navigation menu"
+              onClick={ctx.openDrawer}
+            >
+              <Menu size={22} strokeWidth={2.2} />
             </button>
-          </p>
+          )}
+          <div>
+            <span className="eyebrow">STAY IN THE LOOP</span>
+            <h1>Notices</h1>
+            <p>
+              {notices.length}
+              {feed.hasNextPage ? "+" : ""} updates ·{" "}
+              <button className="inline" onClick={() => feed.refetch()}>
+                <span className="notice-desktop-label">Refresh</span>
+                <span className="notice-mobile-label">Pull to refresh</span>
+              </button>
+            </p>
+          </div>
         </div>
         <div className="notice-heading-actions">
           <button
@@ -465,6 +494,7 @@ export function Notices({
               onEdit={() => setEditing(n)}
               onDelete={() => setDeleting(n)}
               onOpenDetail={() => setDetailNotice(n)}
+              onOpenAssessment={setNoticeAssessmentId}
               onReaders={(triggerRef) => setReaders({ notice: n, triggerRef })}
               onComments={() => setComments(n)}
               onLike={(liked) =>
@@ -603,6 +633,133 @@ export function Notices({
           }
           close={() => setDetailNotice(null)}
         />
+      )}{" "}
+      {noticeAssessmentId && (
+        <Modal
+          title={
+            noticeAssessmentQuery.data
+              ? `${noticeAssessmentQuery.data.type?.toUpperCase() || "ASSESSMENT"} · ${noticeAssessmentQuery.data.course_code || ""}`
+              : "Assessment Details"
+          }
+          close={() => setNoticeAssessmentId(null)}
+        >
+          {noticeAssessmentQuery.isLoading ? (
+            <div style={{ padding: 24, textAlign: "center" }}>
+              <LoaderCircle className="spin" size={24} />
+            </div>
+          ) : noticeAssessmentQuery.data ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 9999,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    background: "rgba(99, 102, 241, 0.12)",
+                    color: "var(--accent, #6366f1)",
+                    border: "1px solid rgba(99, 102, 241, 0.25)",
+                  }}
+                >
+                  {noticeAssessmentQuery.data.type || "Assessment"}
+                </span>
+                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--foreground)" }}>
+                  {noticeAssessmentQuery.data.course_code}
+                </span>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: "1.15rem", fontWeight: 700, margin: "0 0 6px 0", color: "var(--foreground)" }}>
+                  {noticeAssessmentQuery.data.title}
+                </h3>
+                <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--muted)" }}>
+                  {noticeAssessmentQuery.data.course_title}
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  background: "var(--surface-variant, rgba(0,0,0,0.03))",
+                  border: "1px solid var(--border)",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <div>
+                  <div style={{ color: "var(--muted)", fontSize: "0.75rem", marginBottom: 2 }}>📅 Deadline</div>
+                  <div style={{ fontWeight: 600 }}>
+                    {noticeAssessmentQuery.data.deadline_date}{" "}
+                    {noticeAssessmentQuery.data.deadline_time ? `at ${noticeAssessmentQuery.data.deadline_time}` : ""}
+                  </div>
+                </div>
+                {noticeAssessmentQuery.data.room && (
+                  <div>
+                    <div style={{ color: "var(--muted)", fontSize: "0.75rem", marginBottom: 2 }}>📍 Venue</div>
+                    <div style={{ fontWeight: 600 }}>
+                      {/^\d+$/.test(noticeAssessmentQuery.data.room.trim())
+                        ? `Room ${noticeAssessmentQuery.data.room.trim()}`
+                        : noticeAssessmentQuery.data.room.trim()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {noticeAssessmentQuery.data.syllabus && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 6, color: "var(--muted)" }}>
+                    Syllabus & Instructions
+                  </div>
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      background: "var(--surface-variant, rgba(0,0,0,0.02))",
+                      border: "1px solid var(--border)",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {noticeAssessmentQuery.data.syllabus}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="accent"
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  setNoticeAssessmentId(null);
+                  window.location.hash = "#upcoming";
+                }}
+              >
+                <CalendarClock size={16} />
+                <span>Browse Upcoming Tab</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{ padding: 16, textAlign: "center", color: "var(--muted)" }}>
+              Assessment details could not be loaded.
+            </div>
+          )}
+        </Modal>
       )}{" "}
       {reminder && (
         <Modal title="Set a reminder" close={() => setReminder(null)}>
@@ -1515,6 +1672,7 @@ function NoticeCard({
   onComments,
   onReaders,
   onOpenDetail,
+  onOpenAssessment,
   onEdit,
   onDelete,
   markRead,
@@ -1537,6 +1695,7 @@ function NoticeCard({
   onComments: () => void;
   onReaders: (triggerRef?: React.RefObject<HTMLElement | null>) => void;
   onOpenDetail: () => void;
+  onOpenAssessment?: (id: string) => void;
   onEdit: () => void;
   onDelete: () => void;
   markRead: () => void;
@@ -1607,7 +1766,10 @@ function NoticeCard({
       : n.class_change_id
         ? "cancelled"
         : "general";
-  const body = String((showTranslation ? translated?.body : n.body) || "");
+  const rawBody = String((showTranslation ? translated?.body : n.body) || "");
+  const assessmentMatch = rawBody.match(/\[assessment_id:([^\]]+)\]/);
+  const assessmentId = assessmentMatch ? assessmentMatch[1] : null;
+  const body = rawBody.replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "").trimEnd();
   const rawLines = body.split("\n");
   const hasLineOverflow = rawLines.length > 5;
   const isCharOverflow = body.length > 350;
@@ -1615,7 +1777,7 @@ function NoticeCard({
   const text = (() => {
     if (expanded || !isOverflow) return body;
     if (hasLineOverflow) {
-      const preview = rawLines.slice(0, 5).join("\n");
+      const preview = rawLines.slice(0, 5).join("\n").trimEnd();
       return preview.length > 280 ? truncateSafely(preview, 280) : preview;
     }
     return truncateSafely(body, 280);
@@ -1698,33 +1860,53 @@ function NoticeCard({
           className={`notice-body ${expanded ? "expanded" : ""} ${isOverflow ? "clickable" : ""}`}
           onClick={handleBodyClick}
         >
-          {text.split(urlRegex).map((part, i) =>
-            isUrl(part) ? (
-              <a
-                key={i}
-                href={
-                  part.startsWith("http://") || part.startsWith("https://")
-                    ? part
-                    : `https://${part}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleLinkClick}
-              >
-                <Highlight text={part} search={search} />
-              </a>
-            ) : (
-              <Highlight key={i} text={part} search={search} />
-            ),
+          <WhatsAppText text={text} search={search} />
+          {isOverflow && (
+            <button
+              type="button"
+              className="inline accent notice-inline-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }}
+            >
+              {expanded ? "  see less" : " … see more"}
+            </button>
           )}
         </div>
-        {isOverflow && (
+        {assessmentId && (
           <button
             type="button"
-            className="inline accent notice-inline-toggle"
-            onClick={() => setExpanded(!expanded)}
+            className="quick-file"
+            style={{
+              borderColor: "rgba(99, 102, 241, 0.25)",
+              color: "var(--accent, #6366f1)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              padding: "10px 14px",
+              borderRadius: 12,
+              marginTop: 10,
+              cursor: "pointer",
+              background: "rgba(99, 102, 241, 0.05)",
+              textAlign: "left",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenAssessment ? onOpenAssessment(assessmentId) : (window.location.hash = `#upcoming?id=${assessmentId}`);
+            }}
           >
-            {expanded ? "see less" : "… see more"}
+            <CalendarClock size={20} style={{ flexShrink: 0, color: "var(--accent, #6366f1)" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 600, fontSize: "0.88rem", color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>
+                {n.title?.split("•")?.[1]?.trim() || n.title || "Assessment Details"}
+              </span>
+              <span style={{ opacity: 0.75, fontSize: "0.75rem", color: "var(--muted)" }}>
+                Click to view syllabus & deadline
+              </span>
+            </div>
+            <ExternalLink size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
           </button>
         )}
         {poll && (
@@ -1927,9 +2109,25 @@ function NoticeCard({
                 ? `https://classmatebd.vercel.app/r/${slug}`
                 : `https://classmatebd.vercel.app/n/${n.id}`;
               const shareTitle = (n.resource_id && resource?.title) ? resource.title : (n.title || "Notice");
-              const shareText = n.resource_id
+              let shareText = n.resource_id
                 ? `${shareTitle}\n${shareUrl}`
                 : (n.title || "Notice");
+
+              if (assessmentId) {
+                try {
+                  const { data: a } = await supabase()
+                    .schema("classmate")
+                    .from("assessments")
+                    .select("*")
+                    .eq("id", assessmentId)
+                    .maybeSingle();
+                  if (a) {
+                    shareText = `📝 ${n.title || "Upcoming Assessment"}\n\nTitle: ${a.title}\n📅 Deadline: ${a.deadline_date}${a.deadline_time ? ` at ${a.deadline_time}` : ""}${a.room ? `\n📍 Venue: ${/^\d+$/.test(a.room.trim()) ? `Room ${a.room.trim()}` : a.room.trim()}` : ""}${a.syllabus ? `\n\n📖 Syllabus:\n${a.syllabus.trim()}` : ""}\n\n🔗 View Notice: ${shareUrl}`;
+                  }
+                } catch {
+                  // ignore
+                }
+              }
 
               if (typeof navigator !== "undefined" && navigator.share) {
                 try {
@@ -2167,7 +2365,13 @@ function ReaderList({
               <div className="wa-notice-preview-title">{notice.title}</div>
             )}
             {notice.body && (
-              <div className="wa-notice-preview-body">{notice.body}</div>
+              <div className="wa-notice-preview-body">
+                <WhatsAppText
+                  text={String(notice.body)
+                    .replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "")
+                    .trimEnd()}
+                />
+              </div>
             )}
             <div className="wa-notice-preview-meta">
               <span>{bubbleTime}</span>
@@ -2259,8 +2463,24 @@ export function NoticeDetailModal({
     initialIndex: number;
   } | null>(null);
 
-  const copyNotice = () => {
-    const text = `${notice.title || ""}\n\n${notice.body || ""}`.trim();
+  const copyNotice = async () => {
+    let text = `${notice.title || ""}\n\n${notice.body || ""}`.replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "").trim();
+    const m = String(notice.body).match(/\[assessment_id:([^\]]+)\]/);
+    if (m && m[1]) {
+      try {
+        const { data: a } = await supabase()
+          .schema("classmate")
+          .from("assessments")
+          .select("*")
+          .eq("id", m[1].trim())
+          .maybeSingle();
+        if (a) {
+          text = `📝 ${notice.title || "Upcoming Assessment"}\n\nTitle: ${a.title}\n📅 Deadline: ${a.deadline_date}${a.deadline_time ? ` at ${a.deadline_time}` : ""}${a.room ? `\n📍 Venue: ${/^\d+$/.test(a.room.trim()) ? `Room ${a.room.trim()}` : a.room.trim()}` : ""}${a.syllabus ? `\n\n📖 Syllabus:\n${a.syllabus.trim()}` : ""}\n\n🔗 View Notice: https://classmatebd.vercel.app/n/${notice.id}`;
+        }
+      } catch {
+        // ignore
+      }
+    }
     navigator.clipboard
       .writeText(text)
       .then(() => {
@@ -2278,28 +2498,44 @@ export function NoticeDetailModal({
         </div>
 
         <div className="notice-detail-body-scroll">
-          {notice.body && (
-            <div className="notice-detail-content">
-              {notice.body.split(urlRegex).map((part: string, i: number) =>
-                isUrl(part) ? (
-                  <a
-                    key={i}
-                    href={
-                      part.startsWith("http://") || part.startsWith("https://")
-                        ? part
-                        : `https://${part}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {part}
-                  </a>
-                ) : (
-                  part
-                ),
-              )}
-            </div>
-          )}
+          {notice.body && (() => {
+            const raw = String(notice.body);
+            const m = raw.match(/\[assessment_id:([^\]]+)\]/);
+            const aId = m ? m[1] : null;
+            const cleanText = raw.replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "").trimEnd();
+            return (
+              <div className="notice-detail-content">
+                <WhatsAppText text={cleanText} />
+                {aId && (
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="inline accent"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "6px 14px",
+                        borderRadius: 9999,
+                        background: "rgba(99, 102, 241, 0.08)",
+                        border: "1px solid rgba(99, 102, 241, 0.2)",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        close();
+                        window.location.hash = `#upcoming?id=${aId}`;
+                      }}
+                    >
+                      <CalendarClock size={16} />
+                      <span>View Assessment in Upcoming &rarr;</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {((attachmentsList && attachmentsList.length > 0) || attachment?.url) && (
             <NoticeAttachmentsView
@@ -2369,9 +2605,26 @@ export function NoticeDetailModal({
                 ? `https://classmatebd.vercel.app/r/${slug}`
                 : `https://classmatebd.vercel.app/n/${notice.id}`;
               const shareTitle = (notice.resource_id && resource?.title) ? resource.title : (notice.title || "Notice");
-              const shareText = notice.resource_id
+              let shareText = notice.resource_id
                 ? `${shareTitle}\n${shareUrl}`
                 : (notice.title || "Notice");
+
+              const aMatch = String(notice.body).match(/\[assessment_id:([^\]]+)\]/);
+              if (aMatch && aMatch[1]) {
+                try {
+                  const { data: a } = await supabase()
+                    .schema("classmate")
+                    .from("assessments")
+                    .select("*")
+                    .eq("id", aMatch[1].trim())
+                    .maybeSingle();
+                  if (a) {
+                    shareText = `📝 ${notice.title || "Upcoming Assessment"}\n\nTitle: ${a.title}\n📅 Deadline: ${a.deadline_date}${a.deadline_time ? ` at ${a.deadline_time}` : ""}${a.room ? `\n📍 Venue: ${/^\d+$/.test(a.room.trim()) ? `Room ${a.room.trim()}` : a.room.trim()}` : ""}${a.syllabus ? `\n\n📖 Syllabus:\n${a.syllabus.trim()}` : ""}\n\n🔗 View Notice: ${shareUrl}`;
+                  }
+                } catch {
+                  // ignore
+                }
+              }
 
               if (typeof navigator !== "undefined" && navigator.share) {
                 try {

@@ -52,6 +52,7 @@ enum class ClassMateTab(
 ) {
     TIMETABLE(R.id.nav_timetable, "Timetable", R.drawable.ic_timetable_outline, R.drawable.ic_timetable),
     NOTICES(R.id.nav_notices, "Notices", R.drawable.ic_bell_outline, R.drawable.ic_notice),
+    UPCOMING(R.id.nav_upcoming, "Upcoming", R.drawable.ic_upcoming_outline, R.drawable.ic_upcoming),
     COURSES(R.id.nav_pdf, "Courses", R.drawable.ic_academic_cap_outline, R.drawable.ic_academic_cap_filled),
     TRANSIT(R.id.nav_transit, "Transit", R.drawable.ic_bus_outline, R.drawable.ic_bus_filled),
     BATCH(R.id.nav_friends, "Batch", R.drawable.ic_batch_friends, R.drawable.ic_batch_friends_filled),
@@ -115,13 +116,14 @@ fun ClassMateFloatingNavigationBar(
 ) {
     val haptic = LocalHapticFeedback.current
 
-    // ClassMate brand accent palette: Vibrant primary blue for active tabs
-    val activeColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF1D4ED8)
-    val inactiveColor = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B)
-    // Real-time backdrop blur is provided by FrostedGlassBackdropView directly underneath
-    val barBg = Color.Transparent
-    val topBorderColor = if (isDark) Color(0x338696A0) else Color(0x1F000000)
-    val badgeDotColor = Color(0xFFE11D48)
+    // Instagram solid monochrome palette
+    val activeColor = if (isDark) Color(0xFFFFFFFF) else Color(0xFF18181B)
+    val inactiveColor = if (isDark) Color(0xFFA1A1AA) else Color(0xFF71717A)
+    // Instagram solid 100% opaque bottom bar
+    val barBg = if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
+    // Instagram 1px hairline divider shadow line
+    val topBorderColor = if (isDark) Color(0xFF262626) else Color(0xFFDBDBDB)
+    val badgeDotColor = Color(0xFFFF3040)
 
     // Quick actions sheet state
     var quickActionTab by remember { mutableStateOf<ClassMateTab?>(null) }
@@ -135,9 +137,9 @@ fun ClassMateFloatingNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .drawBehind {
-                    // Minimal, clean top border without any glowing gradient or lighting up in dark mode
+                    // Instagram exact 1px top hairline divider
                     drawLine(
-                        color = if (isDark) Color(0x18FFFFFF) else Color(0x140F172A),
+                        color = topBorderColor,
                         start = Offset(0f, 0f),
                         end = Offset(size.width, 0f),
                         strokeWidth = 1.dp.toPx()
@@ -149,12 +151,13 @@ fun ClassMateFloatingNavigationBar(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(barBg)
                     .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(48.dp),
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -164,36 +167,33 @@ fun ClassMateFloatingNavigationBar(
                         val interactionSource = remember(tab) { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
 
-                        // Micro-interaction tactile bounce
+                        // Instagram micro-interaction tactile spring bounce
                         val animatedScale by animateFloatAsState(
-                            targetValue = if (isPressed) 0.86f else 1.0f,
+                            targetValue = if (isPressed) 0.85f else 1.0f,
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow
+                                stiffness = Spring.StiffnessMediumLow
                             ),
-                            label = "tabScale"
+                            label = "igTabScale"
                         )
 
-                        // Extra fast capsular outliner animation (40ms snappy response)
-                        val capsuleAlpha by animateFloatAsState(
+                        // Instagram faded dock animation for selected tab
+                        val dockAlpha by animateFloatAsState(
                             targetValue = if (isSelected) 1f else 0f,
-                            animationSpec = tween(durationMillis = 40, easing = FastOutSlowInEasing),
-                            label = "capsuleAlpha"
+                            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                            label = "dockAlpha"
                         )
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .scale(animatedScale)
                                 .combinedClickable(
                                     indication = null,
                                     interactionSource = interactionSource,
                                     onClick = {
-                                        if (!isSelected) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onTabSelected(tab)
-                                        }
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onTabSelected(tab)
                                     },
                                     onLongClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -206,137 +206,122 @@ fun ClassMateFloatingNavigationBar(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            val capsuleShape = RoundedCornerShape(percent = 50)
-
-                            val capsuleBgColor = if (isSelected) {
-                                if (isDark) Color(0xFF1B3354) else Color(0xFFE0EDFE)
-                            } else {
-                                if (isDark) Color(0xFF131D24) else Color(0xFFFFFFFF)
+                            // Faded dock capsule behind the active tab
+                            if (dockAlpha > 0f) {
+                                val dockColor = if (isDark) Color(0x22FFFFFF) else Color(0x0F000000)
+                                Box(
+                                    modifier = Modifier
+                                        .width(48.dp)
+                                        .height(32.dp)
+                                        .scale(animatedScale)
+                                        .background(
+                                            color = dockColor.copy(alpha = dockColor.alpha * dockAlpha),
+                                            shape = RoundedCornerShape(16.dp)
+                                        )
+                                )
                             }
-
-                            val capsuleBorderColor = if (isSelected) {
-                                if (isDark) Color(0x9960A5FA) else Color(0x661D4ED8)
-                            } else {
-                                if (isDark) Color(0x2BFFFFFF) else Color(0x1F0F172A)
-                            }
-
-                            // Clean Water Drop Elevated Capsule with zero glitter
-                            Box(
-                                modifier = Modifier
-                                    .shadow(
-                                        elevation = if (isSelected) 2.5.dp else 1.5.dp,
-                                        shape = capsuleShape,
-                                        clip = false,
-                                        ambientColor = if (isDark) Color(0x66000000) else Color(0x1F0F172A),
-                                        spotColor = if (isSelected) {
-                                            if (isDark) Color(0x403B82F6) else Color(0x331D4ED8)
-                                        } else {
-                                            Color.Transparent
-                                        }
-                                    )
-                                    .width(56.dp)
-                                    .height(36.dp)
-                                    .clip(capsuleShape)
-                                    .background(capsuleBgColor)
-                                    .border(
-                                        width = 1.dp,
-                                        color = capsuleBorderColor,
-                                        shape = capsuleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                    if (tab == ClassMateTab.SETTINGS) {
-                                        // Profile Tab: Dynamic Instagram Avatar with Active Ring
+                            if (tab == ClassMateTab.SETTINGS) {
+                                // Profile Tab: Dynamic Instagram Avatar with Active Ring
+                                val ringSize = 28.dp
+                                val avatarSize = 22.dp
+                                Box(
+                                    modifier = Modifier
+                                        .size(ringSize)
+                                        .scale(animatedScale),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        // Active Outer Ring
                                         Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            if (isSelected) {
-                                                // Active Outer Ring
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(28.dp)
-                                                        .border(
-                                                            width = 1.5.dp,
-                                                            color = activeColor,
-                                                            shape = CircleShape
-                                                        )
+                                            modifier = Modifier
+                                                .size(ringSize)
+                                                .border(
+                                                    width = 1.5.dp,
+                                                    color = activeColor,
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    }
+
+                                    // Circular Avatar Content
+                                    Box(
+                                        modifier = Modifier
+                                            .size(avatarSize)
+                                            .clip(CircleShape)
+                                            .background(if (isDark) Color(0xFF27272A) else Color(0xFFE4E4E7)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!userAvatarUrl.isNullOrBlank()) {
+                                            AndroidView(
+                                                factory = { ctx ->
+                                                    ImageView(ctx).apply {
+                                                        scaleType = ImageView.ScaleType.CENTER_CROP
+                                                    }
+                                                },
+                                                update = { imageView ->
+                                                    Glide.with(imageView.context)
+                                                        .load(userAvatarUrl)
+                                                        .circleCrop()
+                                                        .placeholder(R.drawable.bg_circle_avatar_placeholder)
+                                                        .error(R.drawable.bg_circle_avatar_placeholder)
+                                                        .into(imageView)
+                                                },
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        } else {
+                                            val initial = userName.trim().take(1).uppercase()
+                                            if (initial.isNotBlank()) {
+                                                Text(
+                                                    text = initial,
+                                                    color = if (isSelected) activeColor else inactiveColor,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            } else {
+                                                Icon(
+                                                    painter = painterResource(id = if (isSelected) tab.filledIcon else tab.outlineIcon),
+                                                    contentDescription = labelText,
+                                                    tint = if (isSelected) activeColor else inactiveColor,
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
-
-                                            // Circular Avatar Content
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(23.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (isDark) Color(0xFF27272A) else Color(0xFFE4E4E7))
-                                                    .border(
-                                                        width = if (isSelected) 1.dp else 0.5.dp,
-                                                        color = if (isSelected) barBg else (if (isDark) Color(0x33FFFFFF) else Color(0x1F000000)),
-                                                        shape = CircleShape
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (!userAvatarUrl.isNullOrBlank()) {
-                                                    AndroidView(
-                                                        factory = { ctx ->
-                                                            ImageView(ctx).apply {
-                                                                scaleType = ImageView.ScaleType.CENTER_CROP
-                                                            }
-                                                        },
-                                                        update = { imageView ->
-                                                            Glide.with(imageView.context)
-                                                                .load(userAvatarUrl)
-                                                                .circleCrop()
-                                                                .placeholder(R.drawable.bg_circle_avatar_placeholder)
-                                                                .error(R.drawable.bg_circle_avatar_placeholder)
-                                                                .into(imageView)
-                                                        },
-                                                        modifier = Modifier.fillMaxSize()
-                                                    )
-                                                } else {
-                                                    val initial = userName.trim().take(1).uppercase()
-                                                    if (initial.isNotBlank()) {
-                                                        Text(
-                                                            text = initial,
-                                                            color = if (isSelected) activeColor else inactiveColor,
-                                                            fontSize = 11.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            textAlign = TextAlign.Center
-                                                        )
-                                                    } else {
-                                                        Icon(
-                                                            painter = painterResource(id = if (isSelected) tab.filledIcon else tab.outlineIcon),
-                                                            contentDescription = labelText,
-                                                            tint = if (isSelected) activeColor else inactiveColor,
-                                                            modifier = Modifier.size(16.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
                                         }
-                                    } else {
-                                        // Regular Tab: Clean 24dp Icon (Outline vs Filled)
-                                        val iconRes = if (isSelected) tab.filledIcon else tab.outlineIcon
-                                        Icon(
-                                            painter = painterResource(id = iconRes),
-                                            contentDescription = labelText,
-                                            tint = if (isSelected) activeColor else inactiveColor,
-                                            modifier = Modifier.size(24.dp)
+                                    }
+                                }
+                            } else {
+                                // Regular Tab: Clean 24dp Icon with Top-Right Instagram Notification Dot
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .scale(animatedScale),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val iconRes = if (isSelected) tab.filledIcon else tab.outlineIcon
+                                    Icon(
+                                        painter = painterResource(id = iconRes),
+                                        contentDescription = labelText,
+                                        tint = if (isSelected) activeColor else inactiveColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+
+                                    // Instagram Notification Red Dot at top-right
+                                    val badge = badges[tab]
+                                    if (badge != null && !isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .offset(x = 2.dp, y = (-2).dp)
+                                                .size(7.dp)
+                                                .border(
+                                                    width = 1.5.dp,
+                                                    color = barBg,
+                                                    shape = CircleShape
+                                                )
+                                                .background(badgeDotColor, CircleShape)
                                         )
                                     }
                                 }
-
-                            // Instagram-Style Notification Dot directly below without displacing vertical center
-                            val badge = badges[tab]
-                            if (badge != null && !isSelected) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 2.dp)
-                                        .size(4.5.dp)
-                                        .background(badgeDotColor, CircleShape)
-                                )
                             }
                         }
                     }

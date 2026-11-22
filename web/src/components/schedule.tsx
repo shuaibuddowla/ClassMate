@@ -15,6 +15,7 @@ import {
   Phone,
   MapPin,
   Navigation,
+  Menu,
 } from "lucide-react";
 import {
   KNOWN_BUS_INFO,
@@ -598,21 +599,33 @@ export function Schedule({ ctx }: { ctx: Context }) {
     <div className="schedule-screen">
       <div className="schedule-header">
         <div className="page-heading">
-          <div>
-            {mode === "calendar" ? (
-              <span className="eyebrow">YOUR UNIVERSITY, MONTH BY MONTH</span>
-            ) : mode === "bus" ? (
-              <span className="eyebrow">MBSTU WHEELS · LIVE SYNC</span>
-            ) : null}
-            {mode === "calendar" ? (
-              <h1>Academic calendar</h1>
-            ) : mode === "bus" ? (
-              <h1>বিশ্ববিদ্যালয় বাস শিডিউল</h1>
-            ) : (
-              <h1 className="schedule-brand-title">
-                classmate<span className="brand-dot">.</span>
-              </h1>
+          <div className="page-heading-left">
+            {ctx.openDrawer && (
+              <button
+                type="button"
+                className="icon hamburger-btn"
+                aria-label="Open navigation menu"
+                onClick={ctx.openDrawer}
+              >
+                <Menu size={22} strokeWidth={2.2} />
+              </button>
             )}
+            <div>
+              {mode === "calendar" ? (
+                <span className="eyebrow">YOUR UNIVERSITY, MONTH BY MONTH</span>
+              ) : mode === "bus" ? (
+                <span className="eyebrow">MBSTU WHEELS · LIVE SYNC</span>
+              ) : null}
+              {mode === "calendar" ? (
+                <h1>Academic calendar</h1>
+              ) : mode === "bus" ? (
+                <h1>বিশ্ববিদ্যালয় বাস শিডিউল</h1>
+              ) : (
+                <h1 className="schedule-brand-title">
+                  classmate<span className="brand-dot">.</span>
+                </h1>
+              )}
+            </div>
           </div>
           {mode === "routine" &&
             Object.values(editable.data || {}).some(Boolean) && (
@@ -953,6 +966,27 @@ export function Schedule({ ctx }: { ctx: Context }) {
                             const campusTimes = bus.campusToDistrict || [];
                             const cityTimes = bus.districtToCampus || [];
 
+                            const campusParsed = campusTimes
+                              .map((t) => ({ str: t, min: parseScheduleTimeToMinutes(t) }))
+                              .filter((x): x is { str: string; min: number } => x.min !== null)
+                              .sort((a, b) => a.min - b.min);
+                            const nextCampusTrip = campusParsed.find((x) => x.min >= currentMin);
+                            const isCampusDone = campusParsed.length > 0 && !nextCampusTrip;
+
+                            const cityParsed = cityTimes
+                              .map((t) => ({ str: t, min: parseScheduleTimeToMinutes(t) }))
+                              .filter((x): x is { str: string; min: number } => x.min !== null)
+                              .sort((a, b) => a.min - b.min);
+                            const nextCityTrip = cityParsed.find((x) => x.min >= currentMin);
+                            const isCityDone = cityParsed.length > 0 && !nextCityTrip;
+
+                            const getCountdownBadge = (tripMin: number) => {
+                              const diff = tripMin - currentMin;
+                              if (diff <= 0) return "এখন ছাড়বে";
+                              if (diff < 60) return `${diff} মি. পর`;
+                              return `${Math.floor(diff / 60)}ঘ ${diff % 60}মি পর`;
+                            };
+
                             return (
                               <div className="bus-fleet-card" key={bus.busId}>
                                 <div className="bus-card-top">
@@ -1020,21 +1054,46 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                     <div className="bus-timing-column">
                                       <div className="bus-timing-heading">
                                         <span>🏛️ ক্যাম্পাস হতে প্রস্থান</span>
-                                        {bus.fromCampus && bus.fromCampus !== "--:--" && (
-                                          <span className="bus-timing-next-hint">
-                                            পরবর্তী: {bus.fromCampus}
+                                        {nextCampusTrip && (
+                                          <span className="bus-timing-status-badge live">
+                                            {getCountdownBadge(nextCampusTrip.min)}
                                           </span>
+                                        )}
+                                        {isCampusDone && (
+                                          <span className="bus-timing-status-badge done">
+                                            সম্পন্ন
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="bus-prominent-departure">
+                                        {nextCampusTrip ? (
+                                          <>
+                                            <div className="bus-departure-time-primary">{nextCampusTrip.str}</div>
+                                            <div className="bus-departure-subhint">পরবর্তী ট্রিপ</div>
+                                          </>
+                                        ) : isCampusDone ? (
+                                          <>
+                                            <div className="bus-departure-time-done">সূচি সম্পন্ন</div>
+                                            <div className="bus-departure-subhint">
+                                              শেষ ট্রিপ ছিল {campusParsed[campusParsed.length - 1].str}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="bus-departure-time-primary">{campusTimes[0] || "--:--"}</div>
+                                            <div className="bus-departure-subhint">১ম ট্রিপ</div>
+                                          </>
                                         )}
                                       </div>
                                       <div className="bus-chip-list">
                                         {campusTimes.length ? (
                                           campusTimes.map((time) => {
-                                            const isNext = time === bus.fromCampus;
-                                            const isPast = isDeparturePast(time, currentMin);
+                                            const isNext = nextCampusTrip ? time === nextCampusTrip.str : false;
+                                            const isPast = isDeparturePast(time, currentMin) && !isNext;
                                             return (
                                               <span
                                                 key={time}
-                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast && !isNext ? "is-past" : ""}`}
+                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast ? "is-past" : ""}`}
                                               >
                                                 {time}
                                                 {isNext && <span className="chip-badge">পরবর্তী</span>}
@@ -1052,21 +1111,46 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                     <div className="bus-timing-column">
                                       <div className="bus-timing-heading">
                                         <span>🏙️ শহর হতে প্রস্থান</span>
-                                        {bus.toCampus && bus.toCampus !== "--:--" && (
-                                          <span className="bus-timing-next-hint">
-                                            পরবর্তী: {bus.toCampus}
+                                        {nextCityTrip && (
+                                          <span className="bus-timing-status-badge live">
+                                            {getCountdownBadge(nextCityTrip.min)}
                                           </span>
+                                        )}
+                                        {isCityDone && (
+                                          <span className="bus-timing-status-badge done">
+                                            সম্পন্ন
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="bus-prominent-departure">
+                                        {nextCityTrip ? (
+                                          <>
+                                            <div className="bus-departure-time-primary">{nextCityTrip.str}</div>
+                                            <div className="bus-departure-subhint">পরবর্তী ট্রিপ</div>
+                                          </>
+                                        ) : isCityDone ? (
+                                          <>
+                                            <div className="bus-departure-time-done">সূচি সম্পন্ন</div>
+                                            <div className="bus-departure-subhint">
+                                              শেষ ট্রিপ ছিল {cityParsed[cityParsed.length - 1].str}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="bus-departure-time-primary">{cityTimes[0] || "--:--"}</div>
+                                            <div className="bus-departure-subhint">১ম ট্রিপ</div>
+                                          </>
                                         )}
                                       </div>
                                       <div className="bus-chip-list">
                                         {cityTimes.length ? (
                                           cityTimes.map((time) => {
-                                            const isNext = time === bus.toCampus;
-                                            const isPast = isDeparturePast(time, currentMin);
+                                            const isNext = nextCityTrip ? time === nextCityTrip.str : false;
+                                            const isPast = isDeparturePast(time, currentMin) && !isNext;
                                             return (
                                               <span
                                                 key={time}
-                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast && !isNext ? "is-past" : ""}`}
+                                                className={`bus-departure-chip ${isNext ? "is-next" : ""} ${isPast ? "is-past" : ""}`}
                                               >
                                                 {time}
                                                 {isNext && <span className="chip-badge">পরবর্তী</span>}

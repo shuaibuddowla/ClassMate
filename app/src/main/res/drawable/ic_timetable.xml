@@ -1,9 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Header rings -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M19,3h-1V1h-2v2H8V1H6v2H5C3.89,3 3,3.9 3,5v14c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2zM19,19H5V8h14v11zM7,10h5v5H7z" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,2.5C7.55,2.5 8,2.95 8,3.5V6C8,6.55 7.55,7 7,7S6,6.55 6,6V3.5C6,2.95 6.45,2.5 7,2.5ZM17,2.5C17.55,2.5 18,2.95 18,3.5V6C18,6.55 17.55,7 17,7S16,6.55 16,6V3.5C16,2.95 16.45,2.5 17,2.5Z" />
+    <!-- Solid Calendar Card with clean modern uninked slots -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,5H6C4.9,5 4,5.9 4,7V8.5H20V7C20,5.9 19.1,5 18,5ZM4,10V18C4,19.1 4.9,20 6,20H18C19.1,20 20,19.1 20,18V10H4ZM9,13H7V15H9V13ZM13,13H11V15H13V13ZM17,13H15V15H17V13ZM9,16H7V18H9V16ZM13,16H11V18H13V16ZM17,16H15V18H17V16Z" />
 </vector>

@@ -116,30 +116,23 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
-    fun isGeminiPrimary(): Boolean =
-        prefs.getBoolean("is_gemini_primary", true)
+    fun isGeminiPrimary(): Boolean = true
 
     fun setGeminiPrimary(enabled: Boolean) {
-        prefs.edit()
-            .putBoolean("is_gemini_primary", enabled)
-            .apply()
+        // Gemini is the dedicated engine.
     }
 
-    fun getGeminiModel(): String =
-        prefs.getString("gemini_model", "gemini-2.5-flash") ?: "gemini-2.5-flash"
+    fun getGeminiModel(): String {
+        val saved = prefs.getString("gemini_model", null)
+        if (saved == null || saved == "gemini-2.5-flash" || saved == "gemini-1.5-flash") {
+            return "gemini-3.5-flash"
+        }
+        return saved
+    }
 
     fun setGeminiModel(model: String) {
         prefs.edit()
             .putString("gemini_model", model)
-            .apply()
-    }
-
-    fun getGroqModel(): String =
-        prefs.getString("groq_model", "llama-3.3-70b-versatile") ?: "llama-3.3-70b-versatile"
-
-    fun setGroqModel(model: String) {
-        prefs.edit()
-            .putString("groq_model", model)
             .apply()
     }
 

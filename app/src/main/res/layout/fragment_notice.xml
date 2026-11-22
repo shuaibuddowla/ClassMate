@@ -24,7 +24,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="58dp"
+                android:paddingTop="50dp"
                 android:paddingBottom="100dp"
                 android:scrollbars="vertical"
                 android:overScrollMode="never"
@@ -83,7 +83,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:paddingHorizontal="14dp"
-                android:paddingTop="58dp"
+                android:paddingTop="50dp"
                 android:visibility="gone"
                 app:shimmer_auto_start="true"
                 app:shimmer_base_alpha="0.4"
@@ -383,4 +383,9 @@
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <include layout="@layout/layout_speed_dial" />
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/composeNoticeOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 </FrameLayout>

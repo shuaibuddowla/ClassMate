@@ -24,17 +24,34 @@ object ClassMateBatchFundCache {
     fun getRoster(context: Context, batchId: String): List<JSONObject> {
         if (batchId.isBlank()) return emptyList()
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val raw = prefs.getString(KEY_ROSTER_PREFIX + batchId, null) ?: return emptyList()
-        return try {
-            val arr = JSONArray(raw)
-            val list = mutableListOf<JSONObject>()
-            for (i in 0 until arr.length()) {
-                list.add(arr.getJSONObject(i))
-            }
-            list
-        } catch (_: Exception) {
-            emptyList()
+        val raw = prefs.getString(KEY_ROSTER_PREFIX + batchId, null)
+        if (!raw.isNullOrBlank()) {
+            try {
+                val arr = JSONArray(raw)
+                val list = mutableListOf<JSONObject>()
+                for (i in 0 until arr.length()) {
+                    list.add(arr.getJSONObject(i))
+                }
+                if (list.isNotEmpty()) return list
+            } catch (_: Exception) {}
         }
+        // Fallback: check cached payers from Dues Tracker across all campaigns
+        val seen = linkedMapOf<String, JSONObject>()
+        for ((key, value) in prefs.all) {
+            if (key.startsWith("${KEY_PAYERS_PREFIX}${batchId}_") && value is String) {
+                try {
+                    val pArr = JSONArray(value)
+                    for (i in 0 until pArr.length()) {
+                        val p = pArr.getJSONObject(i)
+                        val id = p.optString("profile_id").ifBlank { p.optString("student_id") }
+                        if (id.isNotBlank() && !seen.containsKey(id)) {
+                            seen[id] = p
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return seen.values.toList()
     }
 
     fun saveSummary(context: Context, batchId: String, summary: JSONObject) {

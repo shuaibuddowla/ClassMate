@@ -96,6 +96,28 @@ object ClassMateAuthApi {
         }
     }
 
+    fun getValidAccessToken(): String? {
+        if (sessionStore == null) {
+            val ctx = appContext ?: com.shuaib.classmate.ClassMateApp.instance
+            if (ctx != null) {
+                attach(ctx)
+            }
+        }
+        if (accessToken != null && System.currentTimeMillis() < expiresAtMs - 60_000) {
+            return accessToken
+        }
+        val stored = refreshToken ?: sessionStore?.load()
+        if (stored != null) {
+            try {
+                refreshSession(stored)
+                return accessToken
+            } catch (e: Exception) {
+                android.util.Log.e("ClassMateAuth", "Failed to refresh token: ${e.message}")
+            }
+        }
+        return accessToken
+    }
+
     private suspend fun refreshIfNeeded() {
         if (accessToken != null && System.currentTimeMillis() < expiresAtMs - 60_000) return
         refreshMutex.withLock {

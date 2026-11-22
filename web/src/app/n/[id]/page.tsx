@@ -12,7 +12,11 @@ import {
   Smartphone,
   Globe,
   Share2,
+  CalendarClock,
+  MapPin,
 } from "lucide-react";
+
+export const dynamic = "force-dynamic";
 
 export interface PublicNoticeAttachment {
   id: string;
@@ -40,6 +44,19 @@ export interface PublicPoll {
   total_voters: number;
   total_votes: number;
   options: PublicPollOption[];
+}
+
+export interface PublicAssessment {
+  id: string;
+  title: string;
+  type: string;
+  course_code?: string;
+  course_title?: string;
+  deadline_date: string;
+  deadline_time?: string;
+  room?: string;
+  syllabus?: string;
+  posted_by?: string;
 }
 
 interface PublicNotice {
@@ -74,6 +91,7 @@ interface PublicNotice {
   resource_is_link?: boolean;
   attachments?: PublicNoticeAttachment[];
   poll?: PublicPoll;
+  assessment?: PublicAssessment;
 }
 
 function getSupabase() {
@@ -161,6 +179,56 @@ async function fetchPublicNotice(id: string): Promise<PublicNotice | null> {
     }
   }
 
+  if (notice) {
+    if (!notice.assessment) {
+      try {
+        const match = notice.body ? notice.body.match(/\[assessment_id:([^\]]+)\]/) : null;
+        const targetAssessmentId = match ? match[1].trim() : null;
+        let assessmentRow = null;
+
+        if (targetAssessmentId) {
+          const { data } = await db
+            .schema("classmate")
+            .from("assessments")
+            .select("*")
+            .eq("id", targetAssessmentId)
+            .maybeSingle();
+          assessmentRow = data;
+        }
+
+        if (!assessmentRow) {
+          const { data } = await db
+            .schema("classmate")
+            .from("assessments")
+            .select("*")
+            .eq("notice_id", notice.id)
+            .maybeSingle();
+          assessmentRow = data;
+        }
+
+        if (assessmentRow) {
+          notice.assessment = {
+            id: assessmentRow.id,
+            title: assessmentRow.title,
+            type: assessmentRow.type,
+            course_code: assessmentRow.course_code,
+            course_title: assessmentRow.course_title,
+            deadline_date: assessmentRow.deadline_date,
+            deadline_time: assessmentRow.deadline_time,
+            room: assessmentRow.room,
+            syllabus: assessmentRow.syllabus,
+            posted_by: assessmentRow.posted_by,
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Always strip assessment_id from viewable body
+    notice.body = notice.body.replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "").trim();
+  }
+
   return notice;
 }
 
@@ -191,9 +259,17 @@ export async function generateMetadata({
   );
   const ogImageUrl = firstImage?.url || `https://classmatebd.vercel.app/n/${notice.id}/opengraph-image`;
 
+  const isThinOrCancelled =
+    notice.is_cancelled ||
+    (notice.body.trim().length < 80 && (!notice.attachments || notice.attachments.length === 0));
+
   return {
     title: `${notice.title} · ClassMate Notice`,
     description,
+    robots: {
+      index: !isThinOrCancelled,
+      follow: true,
+    },
     alternates: {
       canonical: pageUrl,
     },
@@ -390,6 +466,130 @@ export default async function PublicNoticePage({
           <div className="notice-body-content">
             {notice.body}
           </div>
+
+          {/* Assessment Card (if notice is an assessment announcement) */}
+          {notice.assessment && (
+            <div
+              style={{
+                marginTop: 20,
+                borderRadius: 16,
+                padding: "18px 20px",
+                background: "color-mix(in srgb, var(--primary, #6366f1) 6%, transparent)",
+                border: "1.5px solid color-mix(in srgb, var(--primary, #6366f1) 20%, transparent)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <span
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 9999,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    background: "color-mix(in srgb, var(--primary, #6366f1) 15%, transparent)",
+                    color: "var(--primary, #6366f1)",
+                    border: "1px solid color-mix(in srgb, var(--primary, #6366f1) 30%, transparent)",
+                  }}
+                >
+                  📝 {notice.assessment.type || "Assessment"}
+                </span>
+                {notice.assessment.course_code && (
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-secondary, #64748b)" }}>
+                    {notice.assessment.course_code}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <h2 style={{ fontSize: "1.2rem", fontWeight: 700, margin: "0 0 4px 0", color: "var(--text-primary, #0f172a)" }}>
+                  {notice.assessment.title}
+                </h2>
+                {notice.assessment.course_title && (
+                  <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary, #64748b)" }}>
+                    {notice.assessment.course_title}
+                  </p>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  background: "var(--card-bg, #ffffff)",
+                  border: "1px solid var(--border-color, rgba(0,0,0,0.08))",
+                  fontSize: "0.88rem",
+                }}
+              >
+                <div>
+                  <div style={{ color: "var(--text-muted, #64748b)", fontSize: "0.75rem", marginBottom: 2 }}>📅 Deadline</div>
+                  <div style={{ fontWeight: 600, color: "var(--text-primary, #0f172a)" }}>
+                    {notice.assessment.deadline_date}{" "}
+                    {notice.assessment.deadline_time ? `at ${notice.assessment.deadline_time}` : ""}
+                  </div>
+                </div>
+                {notice.assessment.room && (
+                  <div>
+                    <div style={{ color: "var(--text-muted, #64748b)", fontSize: "0.75rem", marginBottom: 2 }}>📍 Venue</div>
+                    <div style={{ fontWeight: 600, color: "var(--text-primary, #0f172a)" }}>
+                      {/^\d+$/.test(notice.assessment.room.trim())
+                        ? `Room ${notice.assessment.room.trim()}`
+                        : notice.assessment.room.trim()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {notice.assessment.syllabus && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.82rem", marginBottom: 6, color: "var(--text-muted, #64748b)" }}>
+                    📖 Syllabus & Instructions
+                  </div>
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      background: "var(--card-bg, #ffffff)",
+                      border: "1px solid var(--border-color, rgba(0,0,0,0.08))",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.6,
+                      whiteSpace: "pre-wrap",
+                      color: "var(--text-primary, #0f172a)",
+                    }}
+                  >
+                    {notice.assessment.syllabus}
+                  </div>
+                </div>
+              )}
+
+              <a
+                href={`https://classmatebd.vercel.app/#upcoming?id=${notice.assessment.id}`}
+                style={{
+                  marginTop: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "10px 18px",
+                  borderRadius: 12,
+                  background: "var(--primary, #6366f1)",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  fontSize: "0.88rem",
+                }}
+              >
+                <CalendarClock size={16} />
+                <span>Open in Upcoming Assessments &rarr;</span>
+              </a>
+            </div>
+          )}
 
           {/* Poll Card (if notice is a poll) */}
           {notice.poll && (

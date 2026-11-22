@@ -315,6 +315,9 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                         result.getJSONObject(i).apply { put("is_banned",optString("profile_id") in bannedProfiles) }
                     }.filter { it.optString("role") in setOf("student", "admin") }
                     val merged=(if(reset) page else adapter.currentList+page).distinctBy { it.optString("profile_id") }
+                    if (query.isBlank() && merged.isNotEmpty()) {
+                        com.shuaib.classmate.data.offline.ClassMateBatchFundCache.saveRoster(activity, batch, merged)
+                    }
                     val pfxRegex = Regex("^([A-Za-z]+)(\\d{2})")
                     val counts = mutableMapOf<String, Int>()
                     merged.forEach { s ->
@@ -630,45 +633,60 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         view.findViewById<TextView>(R.id.tvBanStudentName)?.text = fullName
         view.findViewById<TextView>(R.id.tvBanStudentId)?.text = if (batch.isNotBlank()) "$studentId · $batch" else studentId
 
-        var selectedDays = 3
-        val btn3 = view.findViewById<MaterialButton>(R.id.btnBan3Days)
-        val btn7 = view.findViewById<MaterialButton>(R.id.btnBan7Days)
-        val btn30 = view.findViewById<MaterialButton>(R.id.btnBan30Days)
+        val actvBanDuration = view.findViewById<android.widget.AutoCompleteTextView>(R.id.actvBanDuration)
+        val tilCustomBanDays = view.findViewById<TextInputLayout>(R.id.tilCustomBanDays)
+        val etCustomBanDays = view.findViewById<TextInputEditText>(R.id.etCustomBanDays)
+        val layoutPermanentBanWarning = view.findViewById<View>(R.id.layoutPermanentBanWarning)
         val etReason = view.findViewById<TextInputEditText>(R.id.etBanReason)
         val tilReason = view.findViewById<TextInputLayout>(R.id.tilBanReason)
         val btnConfirm = view.findViewById<MaterialButton>(R.id.btnConfirmBan)
         val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancelBan)
 
-        if (isOwner) {
-            btn30?.visibility = View.VISIBLE
+        val durationOptions = listOf("3 Days", "7 Days", "Custom Days", "Permanent Ban")
+        val durationAdapter = android.widget.ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, durationOptions)
+        actvBanDuration?.setAdapter(durationAdapter)
+        actvBanDuration?.setText(durationOptions[0], false)
+        actvBanDuration?.setOnClickListener {
+            actvBanDuration.showDropDown()
         }
 
-        fun updateDayButtons() {
-            val primaryColor = ContextCompat.getColor(activity, R.color.cm_primary)
-            val mutedColor = ContextCompat.getColor(activity, R.color.cm_text_muted)
-            val containerColor = ContextCompat.getColor(activity, R.color.cm_primary_container)
+        var selectedDurationMode = "3 Days"
+        var selectedDays = 3
 
-            listOf(btn3 to 3, btn7 to 7, btn30 to 30).forEach { (btn, days) ->
-                if (btn == null) return@forEach
-                val isSelected = days == selectedDays
-                if (isSelected) {
-                    btn.setBackgroundColor(containerColor)
-                    btn.setTextColor(primaryColor)
-                    btn.strokeColor = ColorStateList.valueOf(primaryColor)
-                    btn.strokeWidth = dp(2)
-                } else {
-                    btn.setBackgroundColor(Color.TRANSPARENT)
-                    btn.setTextColor(mutedColor)
-                    btn.strokeColor = ColorStateList.valueOf(ContextCompat.getColor(activity, R.color.cm_divider))
-                    btn.strokeWidth = dp(1)
+        fun applyDurationMode(mode: String) {
+            selectedDurationMode = mode
+            when (mode) {
+                "3 Days" -> {
+                    selectedDays = 3
+                    tilCustomBanDays?.visibility = View.GONE
+                    layoutPermanentBanWarning?.visibility = View.GONE
+                    btnConfirm?.text = "Restrict Access"
+                }
+                "7 Days" -> {
+                    selectedDays = 7
+                    tilCustomBanDays?.visibility = View.GONE
+                    layoutPermanentBanWarning?.visibility = View.GONE
+                    btnConfirm?.text = "Restrict Access"
+                }
+                "Custom Days" -> {
+                    tilCustomBanDays?.visibility = View.VISIBLE
+                    layoutPermanentBanWarning?.visibility = View.GONE
+                    btnConfirm?.text = "Restrict Access"
+                }
+                "Permanent Ban" -> {
+                    selectedDays = -1
+                    tilCustomBanDays?.visibility = View.GONE
+                    layoutPermanentBanWarning?.visibility = View.VISIBLE
+                    btnConfirm?.text = "Ban Permanently"
                 }
             }
         }
-        updateDayButtons()
+        applyDurationMode("3 Days")
 
-        btn3?.setOnClickListener { selectedDays = 3; updateDayButtons() }
-        btn7?.setOnClickListener { selectedDays = 7; updateDayButtons() }
-        btn30?.setOnClickListener { selectedDays = 30; updateDayButtons() }
+        actvBanDuration?.setOnItemClickListener { _, _, position, _ ->
+            val chosen = durationOptions.getOrElse(position) { "3 Days" }
+            applyDurationMode(chosen)
+        }
 
         // Quick reason chips
         view.findViewById<com.google.android.material.chip.Chip>(R.id.chipReasonDisruption)?.setOnClickListener {
@@ -688,9 +706,27 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             tilReason?.error = null
         }
 
+        view.findViewById<View>(R.id.btnDismissBanSheet)?.setOnClickListener { sheet.dismiss() }
         btnCancel?.setOnClickListener { sheet.dismiss() }
 
         btnConfirm?.setOnClickListener {
+            val finalDays = when (selectedDurationMode) {
+                "3 Days" -> 3
+                "7 Days" -> 7
+                "Permanent Ban" -> -1
+                "Custom Days" -> {
+                    val raw = etCustomBanDays?.text?.toString()?.trim().orEmpty()
+                    val parsed = raw.toIntOrNull()
+                    if (parsed == null || parsed < 1) {
+                        tilCustomBanDays?.error = "Enter a valid number of days (at least 1)"
+                        return@setOnClickListener
+                    }
+                    tilCustomBanDays?.error = null
+                    parsed
+                }
+                else -> 3
+            }
+
             val reason = etReason?.text?.toString()?.trim().orEmpty()
             if (reason.length < 3) {
                 tilReason?.error = "Please provide a reason (minimum 3 characters)"
@@ -698,7 +734,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             }
             tilReason?.error = null
             btnConfirm.isEnabled = false
-            btnConfirm.text = "Restricting..."
+            btnConfirm.text = if (finalDays == -1) "Banning permanently..." else "Restricting..."
 
             scope.launch {
                 try {
@@ -706,16 +742,17 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                         "manage_student_ban",
                         JSONObject()
                             .put("target_profile", profileId)
-                            .put("target_days", selectedDays)
+                            .put("target_days", finalDays)
                             .put("target_reason", reason)
                             .put("target_lift", false)
                     )
                     sheet.dismiss()
                     onStateChanged(null, true, false)
-                    Toast.makeText(activity, "$fullName has been restricted for $selectedDays days", Toast.LENGTH_SHORT).show()
+                    val toastMsg = if (finalDays == -1) "$fullName has been permanently banned" else "$fullName has been restricted for $finalDays days"
+                    Toast.makeText(activity, toastMsg, Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     btnConfirm.isEnabled = true
-                    btnConfirm.text = "Restrict Access"
+                    btnConfirm.text = if (finalDays == -1) "Ban Permanently" else "Restrict Access"
                     Toast.makeText(activity, e.message ?: "Could not ban student", Toast.LENGTH_LONG).show()
                 }
             }

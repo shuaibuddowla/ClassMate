@@ -68,6 +68,7 @@
     <color name="cm_notice_premium_general">#B794F5</color>
     <color name="cm_notice_premium_cancel">#FDA4AF</color>
     <color name="cm_notice_premium_resource">#58D9B6</color>
+    <color name="cm_shimmer_placeholder">#1E293B</color>
     <color name="cm_notice_premium_stroke">#2A3942</color>
     <color name="cm_notice_summary">#141519</color>
     <color name="cm_notice_action">#2B252A36</color>

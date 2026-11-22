@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private val mainTabs = listOf(
         R.id.nav_timetable,
         R.id.nav_notices,
+        R.id.nav_upcoming,
         R.id.nav_pdf,
         R.id.nav_profile
     )
@@ -330,6 +331,7 @@ class MainActivity : AppCompatActivity() {
             return when (mainTabs[position]) {
                 R.id.nav_timetable -> TimetableFragment()
                 R.id.nav_notices -> NoticeFragment()
+                R.id.nav_upcoming -> com.shuaib.classmate.fragments.UpcomingAssessmentsFragment()
                 R.id.nav_pdf -> PdfLibraryFragment()
                 R.id.nav_profile -> ProfileFragment()
                 else -> TimetableFragment()
@@ -779,6 +781,7 @@ class MainActivity : AppCompatActivity() {
         private val MAIN_TAB_DESTINATIONS = setOf(
             R.id.nav_timetable,
             R.id.nav_notices,
+            R.id.nav_upcoming,
             R.id.nav_pdf,
             R.id.nav_profile
         )
@@ -786,6 +789,7 @@ class MainActivity : AppCompatActivity() {
         private val TAB_DESTINATION_MAP = mapOf(
             R.id.nav_timetable to R.id.nav_timetable,
             R.id.nav_notices to R.id.nav_notices,
+            R.id.nav_upcoming to R.id.nav_upcoming,
             R.id.nav_pdf to R.id.nav_pdf,
             R.id.fragment_library_all_files to R.id.nav_pdf,
             R.id.fragment_library_search to R.id.nav_pdf,

@@ -103,7 +103,7 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
             )
         )
 
-        executeRequest(requestBody) { responseText ->
+        executeRequest(requestBody, targetModel = null) { responseText ->
             try {
                 val parsedText = parseTextResponse(responseText)
                 val cleanedText = cleanMarkdownResponse(parsedText)
@@ -192,7 +192,7 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
             )
         )
 
-        executeRequest(requestBody) { responseText ->
+        executeRequest(requestBody, targetModel = null) { responseText ->
             try {
                 val jsonText = parseTextResponse(responseText)
                 val cleanJson = jsonText.trim()
@@ -208,6 +208,59 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
                 }
             } catch (e: Exception) {
                 Result.failure(AiProviderError.InvalidResponse("Failed to parse draft JSON: ${e.message}"))
+            }
+        }
+    }
+
+    suspend fun transcribeAudio(
+        audioBytes: ByteArray,
+        mimeType: String = "audio/mp4"
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val base64Data = android.util.Base64.encodeToString(audioBytes, android.util.Base64.NO_WRAP)
+        val prompt = """
+            You are ClassMate Voice Assistant, an expert academic speech-to-text transcriber for university students and teachers.
+            Listen to this audio recording and transcribe the speech into text verbatim with high precision.
+            
+            Language Guidelines:
+            1. If the speaker spoke in Bengali/Bangla or phonetic Banglish, transcribe into natural, grammatically correct Bengali script (বাংলা লিপি).
+            2. If the speaker spoke in English, transcribe into natural English.
+            3. If the speaker spoke mixed Bengali & English (e.g. academic course codes like "CSE 2101", "CST-201", "Room 403", "10:30 AM", "CT", "Quiz", "Assignment", "Lab", teacher names), preserve the Bengali words in Bengali script (বাংলা) and preserve English academic terms, numbers, and dates accurately.
+            4. Strictly output ONLY the transcribed words. Do NOT include introductory phrases (like "Here is the transcription:"), quotation marks, or markdown wrappers.
+        """.trimIndent()
+
+        val requestBody = mapOf(
+            "contents" to listOf(
+                mapOf(
+                    "parts" to listOf(
+                        mapOf(
+                            "inlineData" to mapOf(
+                                "mimeType" to mimeType,
+                                "data" to base64Data
+                            )
+                        ),
+                        mapOf("text" to prompt)
+                    )
+                )
+            ),
+            "generationConfig" to mapOf(
+                "temperature" to 0.1,
+                "maxOutputTokens" to 2048,
+                "thinkingConfig" to mapOf(
+                    "thinkingBudget" to 0
+                )
+            )
+        )
+
+        executeRequest(requestBody, targetModel = "gemini-3.5-flash") { responseText ->
+            try {
+                val text = parseTextResponse(responseText).trim()
+                    .removeSurrounding("\"")
+                    .removePrefix("Here is the transcription:")
+                    .removePrefix("Transcription:")
+                    .trim()
+                Result.success(text)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
         }
     }
@@ -249,8 +302,8 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
         return (firstPart?.get("text") as? String) ?: throw Exception("Empty text content from AI")
     }
 
-    private fun <T> executeRequest(bodyMap: Any, parser: (String) -> Result<T>): Result<T> {
-        val selectedModel = try {
+    private fun <T> executeRequest(bodyMap: Any, targetModel: String? = null, parser: (String) -> Result<T>): Result<T> {
+        val selectedModel = targetModel ?: try {
             AppPreferences(ClassMateApp.instance).getGeminiModel()
         } catch (_: Throwable) {
             AppConstants.GEMINI_MODEL
@@ -273,6 +326,7 @@ class GeminiAiProvider(private val client: OkHttpClient, private val gson: Gson)
                 if (response.isSuccessful && responseBody != null) {
                     parser(responseBody)
                 } else {
+                    android.util.Log.e("GeminiAiProvider", "HTTP ${response.code}: $responseBody")
                     val error = mapError(response.code, responseBody)
                     Result.failure(error)
                 }

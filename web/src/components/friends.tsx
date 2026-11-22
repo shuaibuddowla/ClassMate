@@ -59,6 +59,8 @@ export function Friends({ ctx }: { ctx: Context }) {
     [search, setSearch] = useState(""),
     [person, setPerson] = useState<Row | null>(null),
     [banTarget, setBanTarget] = useState<Row | null>(null),
+    [banDurationMode, setBanDurationMode] = useState<"3" | "7" | "custom" | "permanent">("3"),
+    [customDaysInput, setCustomDaysInput] = useState<string>(""),
     [banDays, setBanDays] = useState<number>(3),
     [banReason, setBanReason] = useState<string>(""),
     [error, setError] = useState<unknown>(null),
@@ -75,7 +77,9 @@ export function Friends({ ctx }: { ctx: Context }) {
         await rpc("transfer_batch_cr", { target_profile: p.profile_id });
         await ctx.refreshProfile(await rpc<Row>("create_or_initialize_profile"));
       } else if (action === "ban") {
+        setBanDurationMode("3");
         setBanDays(3);
+        setCustomDaysInput("");
         setBanReason("");
         setBanTarget(p);
         document.querySelectorAll<HTMLDetailsElement>(".batchmate-actions[open]").forEach(el => { el.open = false; });
@@ -364,21 +368,77 @@ export function Friends({ ctx }: { ctx: Context }) {
               The student will be instantly locked out from ClassMate until the ban expires or is lifted by a CR.
             </p>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Duration</label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {[3, 7, ...(ctx.owner ? [30] : [])].map(d => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={banDays === d ? "primary" : "secondary"}
-                    style={{ flex: 1, padding: "8px 12px", fontSize: "13px" }}
-                    onClick={() => setBanDays(d)}
-                  >
-                    {d} Days
-                  </button>
-                ))}
-              </div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Ban Duration</label>
+              <select
+                value={banDurationMode}
+                onChange={e => {
+                  const val = e.target.value as "3" | "7" | "custom" | "permanent";
+                  setBanDurationMode(val);
+                  if (val === "3") setBanDays(3);
+                  else if (val === "7") setBanDays(7);
+                  else if (val === "permanent") setBanDays(-1);
+                  else {
+                    const parsed = parseInt(customDaysInput, 10);
+                    setBanDays(!isNaN(parsed) && parsed > 0 ? parsed : 14);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--foreground)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  outline: "none",
+                  cursor: "pointer"
+                }}
+              >
+                <option value="3">3 Days</option>
+                <option value="7">7 Days</option>
+                <option value="custom">Custom Days</option>
+                <option value="permanent">Permanent Ban</option>
+              </select>
             </div>
+
+            {banDurationMode === "custom" && (
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                  Number of Days
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="3650"
+                  value={customDaysInput}
+                  onChange={e => {
+                    setCustomDaysInput(e.target.value);
+                    const parsed = parseInt(e.target.value, 10);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      setBanDays(parsed);
+                    }
+                  }}
+                  placeholder="Enter number of days (e.g. 14, 30, 90)"
+                  style={{ width: "100%", boxSizing: "border-box" }}
+                />
+              </div>
+            )}
+
+            {banDurationMode === "permanent" && (
+              <div style={{
+                padding: "10px 12px",
+                borderRadius: "10px",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+                color: "#ef4444",
+                fontSize: "12.5px",
+                lineHeight: "1.4"
+              }}>
+                <strong>⚠️ Permanent Restriction:</strong> The student will be permanently locked out from ClassMate across Android and Web until manually unbanned.
+              </div>
+            )}
+
             <div>
               <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>Reason for ban</label>
               <input
@@ -394,11 +454,12 @@ export function Friends({ ctx }: { ctx: Context }) {
               <button
                 type="button"
                 className="danger"
-                disabled={busy || !banReason.trim()}
+                disabled={busy || !banReason.trim() || (banDurationMode === "custom" && (!customDaysInput || parseInt(customDaysInput, 10) <= 0))}
                 onClick={async () => {
                   try {
                     setBusy(true);
-                    await rpc("manage_student_ban", { target_profile: banTarget.profile_id, target_days: banDays, target_reason: banReason.trim(), target_lift: false });
+                    const finalDays = banDurationMode === "permanent" ? -1 : (banDurationMode === "custom" ? (parseInt(customDaysInput, 10) || 1) : banDays);
+                    await rpc("manage_student_ban", { target_profile: banTarget.profile_id, target_days: finalDays, target_reason: banReason.trim(), target_lift: false });
                     qc.setQueryData<Row[]>([ctx.user, ctx.batch, "active-batch-bans"], old => [...(old || []).filter(b => b.profile_id !== banTarget.profile_id), { profile_id: banTarget.profile_id }]);
                     setBanTarget(null);
                     await qc.invalidateQueries({ queryKey: [ctx.user, ctx.batch, "friends"] });
@@ -406,7 +467,7 @@ export function Friends({ ctx }: { ctx: Context }) {
                   } catch(e) { setError(e); } finally { setBusy(false); }
                 }}
               >
-                Confirm Ban
+                {banDurationMode === "permanent" ? "Confirm Permanent Ban" : "Confirm Ban"}
               </button>
             </div>
           </div>

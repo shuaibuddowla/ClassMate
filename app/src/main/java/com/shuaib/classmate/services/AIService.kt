@@ -2,39 +2,41 @@ package com.shuaib.classmate.services
 
 import android.util.Log
 import com.google.gson.Gson
-import com.shuaib.classmate.ai.AiCoordinator
 import com.shuaib.classmate.ai.GeminiAiProvider
-import com.shuaib.classmate.ai.GroqAiProvider
 import com.shuaib.classmate.ai.NoticeDraftInput
 import com.shuaib.classmate.ai.NoticeSummaryInput
-import com.shuaib.classmate.ai.AiProviderError
+import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.models.AiNoticeDraft
-import com.shuaib.classmate.models.Period
+import com.shuaib.classmate.utils.AppContextManager
 import okhttp3.OkHttpClient
 import org.json.JSONObject
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
- * ClassMate AI Service - Powered by Gemini & Groq
- * Handles intelligent scheduling summaries and notice analysis with fallback logic.
+ * ClassMate AI Service - Unified AI Engine powered by Gemini & Supabase Edge Functions.
+ * Handles multimodal speech-to-text, intelligent scheduling summaries, and notice drafting.
  */
 object AIService {
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(40, TimeUnit.SECONDS)
-            .writeTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
     private val gson by lazy { Gson() }
 
-    private val coordinator by lazy {
-        AiCoordinator(
-            GeminiAiProvider(client, gson),
-            GroqAiProvider(client, gson)
-        )
+    val geminiProvider by lazy { GeminiAiProvider(client, gson) }
+
+    /**
+     * Multimodal Audio Transcription powered by Gemini AI.
+     * High precision for Bengali (বাংলা), English, and mixed academic speech.
+     */
+    suspend fun transcribeAudio(audioBytes: ByteArray, mimeType: String = "audio/mp4"): Result<String> {
+        return geminiProvider.transcribeAudio(audioBytes, mimeType)
     }
 
     /**
@@ -57,47 +59,68 @@ object AIService {
         )
 
         return try {
-            val result = coordinator.summarizeNotice(input)
-            if (result.isSuccess) {
-                Result.success(result.getOrThrow().data)
-            } else {
-                val exception = result.exceptionOrNull() ?: Exception("AI failed to generate a summary.")
-                Result.failure(exception)
-            }
+            geminiProvider.summarizeNotice(input)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
+    /**
+     * Converts raw/messy teacher announcements into structured, polished notices.
+     * First attempts the server-side Supabase AI function; falls back to GeminiAiProvider.
+     */
     suspend fun analyzeAndPolishNotice(
         messyText: String,
         currentDateStr: String,
         currentDayName: String,
         subjects: List<String>
     ): AiNoticeDraft? {
-        // Course names come from the current batch/semester Firestore collection.
-        val teacherContext = buildTeacherContext()
+        val batch = AppContextManager.getManagedBatchId().ifBlank { AppContextManager.getBatchId() }
 
+        // Attempt 1: Server-side Supabase Edge Function (classmate-ai auto_notice/compose)
+        if (batch.isNotBlank() && ClassMateAuthApi.accessToken != null) {
+            try {
+                val reqId = UUID.randomUUID().toString()
+                val response = ClassMateAuthApi.ai(
+                    JSONObject()
+                        .put("mode", "auto_notice")
+                        .put("batch_id", batch)
+                        .put("request_id", reqId)
+                        .put("text", messyText)
+                )
+                val resultObj = response.optJSONObject("result")
+                if (resultObj != null) {
+                    val title = resultObj.optString("title").trim()
+                    val body = resultObj.optString("body").trim()
+                    if (title.isNotBlank() && body.isNotBlank()) {
+                        return AiNoticeDraft(
+                            title = title,
+                            body = body,
+                            type = "GENERAL",
+                            confidence = 0.95
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AIService", "Supabase Edge AI notice draft failed, using Gemini provider: ${e.message}")
+            }
+        }
+
+        // Attempt 2: Gemini Direct Provider
         val input = NoticeDraftInput(
             rawInput = messyText,
             currentDate = "$currentDateStr ($currentDayName)",
             supportedTypes = listOf("GENERAL", "CLASS_CANCELLATION", "ASSIGNMENT_DEADLINE", "CLASS_TEST", "EXAM", "RESOURCE", "VACATION", "HOLIDAY", "CLASS_SUSPENDED"),
             knownSubjects = subjects,
-            teacherContext = teacherContext
+            teacherContext = "Use only current batch courses supplied in knownSubjects."
         )
 
         return try {
-            val result = coordinator.generateNoticeDraft(input)
-            result.getOrNull()?.data
+            val result = geminiProvider.generateNoticeDraft(input)
+            result.getOrNull()
         } catch (e: Exception) {
             Log.e("AIService", "Notice polish failed: ${e.message}", e)
             null
         }
     }
-
-
-
-    private fun buildTeacherContext(): String =
-        "Use only the current batch and semester courses supplied in knownSubjects. " +
-            "Do not invent course names, codes, teachers, rooms, or schedules."
 }

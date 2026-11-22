@@ -63,9 +63,14 @@ Deno.serve(async request=>{
               const response=await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(account.project_id!)}/messages:send`,{
                 method:"POST",signal:AbortSignal.timeout(15_000),headers:{Authorization:`Bearer ${bearer}`,"Content-Type":"application/json"},
                 body:JSON.stringify(deliveryPayload(content.fcm_token,{
-                  kind:job.kind,record_id:job.record_id,batch_id:content.batch_id ?? "",event_id:job.event_id,token_hash:job.token_hash,
+                  kind:job.kind,record_id:content.assessment_id ?? content.record_id ?? job.record_id,batch_id:content.batch_id ?? "",event_id:job.event_id,token_hash:job.token_hash,
                   recipient_id:job.profile_id,project_ref:project,version_code:String(content.version_code ?? ""),version_name:String(content.version_name ?? ""),
                   ...(job.kind==="blood_request"?{expires_at:String(content.expires_at),blood_match:String(content.blood_match===true)}:{}),
+                  ...(content.assessment_id?{assessment_id:String(content.assessment_id)}:{}),
+                  ...(content.session_id?{session_id:String(content.session_id)}:{}),
+                  ...(content.course_code?{course_code:String(content.course_code)}:{}),
+                  ...(content.course_title?{course_title:String(content.course_title)}:{}),
+                  ...(content.routine_slot_id?{routine_slot_id:String(content.routine_slot_id)}:{}),
                   title:release?`ClassMate ${content.version_name} is available`:content.title,
                   body:release?"Tap to check and install the latest update.":content.body
                 },content.client_platform))

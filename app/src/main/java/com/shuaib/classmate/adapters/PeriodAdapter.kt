@@ -77,8 +77,8 @@ class PeriodAdapter(
 
         b.tvSubject.paintFlags = b.tvSubject.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
         b.cardRoot.alpha = if (isPausedByCalendarException) 0.58f else 1f
-        b.root.isEnabled = !isPausedByCalendarException
-        b.root.isClickable = !isPausedByCalendarException
+        b.root.isEnabled = true
+        b.root.isClickable = true
         b.tvSubstituteMsg.isVisible = false
         b.layoutDuration.isVisible = true
         b.vCancelledDivider.isVisible = false
@@ -156,10 +156,8 @@ class PeriodAdapter(
         }
 
         b.root.setOnClickListener {
-            if (!isPausedByCalendarException) {
-                it.animateSpringScale(0.97f)
-                onPeriodClick(period)
-            }
+            it.animateSpringScale(0.97f)
+            onPeriodClick(period)
         }
 
         b.root.setOnLongClickListener {

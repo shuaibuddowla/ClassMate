@@ -2,6 +2,9 @@ package com.shuaib.classmate.activities
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 import android.content.ClipboardManager
 import android.content.Context
@@ -30,6 +33,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import java.util.Locale
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -102,6 +106,25 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
     private val selectedNoticeAttachments = mutableListOf<NoticeAttachmentDraft>()
     private var onNoticeAttachmentChanged: (() -> Unit)? = null
+
+    // Gemini Multimodal Voice Recording State
+    private var mediaRecorder: android.media.MediaRecorder? = null
+    private var audioRecordFile: java.io.File? = null
+    private var isRecordingVoice = false
+    private var isTranscribingVoice = false
+    private var voiceRecordStartTime = 0L
+    private var voiceAmplitudeJob: kotlinx.coroutines.Job? = null
+    private var onAudioPermissionGranted: (() -> Unit)? = null
+
+    private val requestAudioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onAudioPermissionGranted?.invoke()
+        } else {
+            Toast.makeText(this, "Microphone permission is required for voice input", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private val pickNoticePhotos = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { selectedUris ->
         if (selectedUris.isNullOrEmpty()) return@registerForActivityResult
@@ -389,6 +412,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
 
         ClassMateAuthApi.attach(applicationContext)
+        lifecycleScope.launch(Dispatchers.IO) {
+            ClassMateAuthApi.restoreSession()
+        }
         uri = state?.getString("file_uri")?.let(Uri::parse)
         selectedFileLabel = state?.getString("file_label").orEmpty()
         selectedFileSize = state?.getLong("file_size", 0L) ?: 0L
@@ -684,7 +710,20 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
     }
 
+    override fun onDestroy() {
+        voiceAmplitudeJob?.cancel()
+        try {
+            if (isRecordingVoice) {
+                mediaRecorder?.stop()
+            }
+            mediaRecorder?.release()
+        } catch (_: Exception) {}
+        mediaRecorder = null
+        super.onDestroy()
+    }
+
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
+    private fun dp(n: Float) = (n * resources.displayMetrics.density).toInt()
 
     private fun formatFileSize(bytes: Long): String {
         if (bytes <= 0) return "0 B"
@@ -719,21 +758,31 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private fun buildNotice() {
         val teacher = intent.getStringExtra("role") == "teacher"
         form.label("Notice type")
-        val choices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+
+        val choices = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(12)
+            }
+        }
         val general = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
             id = View.generateViewId()
             text = "General notice"
             setTextColor(getColor(R.color.cm_text_primary))
+            textSize = 14.5f
         }
         val cancellation = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
             id = View.generateViewId()
             text = "Class cancellation"
             setTextColor(getColor(R.color.cm_text_primary))
+            textSize = 14.5f
         }
         val poll = com.google.android.material.radiobutton.MaterialRadioButton(this).apply {
             id = View.generateViewId()
             text = "Interactive poll"
             setTextColor(getColor(R.color.cm_text_primary))
+            textSize = 14.5f
         }
         choices.addView(general)
         choices.addView(cancellation)
@@ -744,169 +793,62 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val titleBox = title.parent.parent as View
         titleBox.visibility = View.GONE
 
-        val message = form.field("Notice message · English, Banglish or Bengali", true).apply {
-            filters = arrayOf(android.text.InputFilter.LengthFilter(8000))
-        }
-        val messageBox = message.parent.parent as View
-
-        val silentHint = form.label("Banglish auto-converts to Bengali. English remains English. Start with /silent to post without push alerts.")
-
-        // Material 3 Notice Attachment Section (Exclusive to General Notice)
-        val attachmentContainer = LinearLayout(this).apply {
+        // Modern Notice Composer Section (Image 1 reference)
+        val messageComposerBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) }
-        }
-        form.panel.addView(attachmentContainer)
-
-        val headerLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
-        }
-        val tvAttachLabel = TextView(this).apply {
-            text = "NOTICE ATTACHMENT"
-            textSize = 11f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(getColor(R.color.cm_text_secondary))
-            letterSpacing = 0.08f
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-        }
-        val tvAttachBadge = TextView(this).apply {
-            text = "Optional"
-            textSize = 10.5f
-            setTextColor(getColor(R.color.cm_text_muted))
-        }
-        headerLayout.addView(tvAttachLabel)
-        headerLayout.addView(tvAttachBadge)
-        attachmentContainer.addView(headerLayout)
-
-        val pickerButtonsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2)
-        }
-
-        fun createPickerCard(
-            titleText: String,
-            subtitleText: String,
-            iconRes: Int,
-            accentColor: Int,
-            bgTint: Int,
-            onClick: () -> Unit
-        ): LinearLayout {
-            return LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setBackgroundResource(R.drawable.bg_picker_card_empty)
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                val outVal = android.util.TypedValue()
-                theme.resolveAttribute(android.R.attr.selectableItemBackground, outVal, true)
-                foreground = ContextCompat.getDrawable(this@ClassMatePublishActivity, outVal.resourceId)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener { onClick() }
-
-                val iconFrame = FrameLayout(this@ClassMatePublishActivity).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-                    val bg = android.graphics.drawable.GradientDrawable().apply {
-                        cornerRadius = dp(10).toFloat()
-                        setColor(bgTint)
-                    }
-                    background = bg
-                }
-                val iconView = ImageView(this@ClassMatePublishActivity).apply {
-                    layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
-                    setImageResource(iconRes)
-                    setColorFilter(accentColor)
-                }
-                iconFrame.addView(iconView)
-                addView(iconFrame)
-
-                val col = LinearLayout(this@ClassMatePublishActivity).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) }
-                }
-                val tvTitle = TextView(this@ClassMatePublishActivity).apply {
-                    text = titleText
-                    textSize = 12.5f
-                    setTypeface(null, Typeface.BOLD)
-                    setTextColor(getColor(R.color.cm_text_primary))
-                }
-                val tvSub = TextView(this@ClassMatePublishActivity).apply {
-                    text = subtitleText
-                    textSize = 10f
-                    setTextColor(getColor(R.color.cm_text_muted))
-                }
-                col.addView(tvTitle)
-                col.addView(tvSub)
-                addView(col)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(14)
             }
         }
+        form.panel.addView(messageComposerBox)
 
         val primaryColor = getColor(R.color.cm_primary)
         val primarySoft = Color.argb(32, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
         val redColor = getColor(R.color.cm_cancel_red)
         val redSoft = Color.argb(32, Color.red(redColor), Color.green(redColor), Color.blue(redColor))
 
-        val btnPhoto = createPickerCard(
-            "Add Photo",
-            "JPG, PNG, WebP",
-            R.drawable.ic_add_photo_alternate,
-            primaryColor,
-            primarySoft
-        ) {
-            checkAndRequestPhotoPermission()
-        }.apply {
-            (layoutParams as LinearLayout.LayoutParams).marginEnd = dp(4)
+        // Selected Attachment Preview Container (above the chat input capsule)
+        val attachmentPreviewBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(8)
+            }
+            visibility = View.GONE
         }
+        messageComposerBox.addView(attachmentPreviewBox)
 
-        val btnPdf = createPickerCard(
-            "Attach PDF",
-            "Routine, Circular",
-            R.drawable.ic_picture_as_pdf,
-            redColor,
-            redSoft
-        ) {
-            checkAndRequestPdfPermission()
-        }.apply {
-            (layoutParams as LinearLayout.LayoutParams).marginStart = dp(4)
-        }
-
-        pickerButtonsLayout.addView(btnPhoto)
-        pickerButtonsLayout.addView(btnPdf)
-        attachmentContainer.addView(pickerButtonsLayout)
-
+        // Single PDF preview pill
         val activePreviewCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundResource(R.drawable.bg_picker_card_empty)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(10), dp(8), dp(10), dp(8))
             layoutParams = LinearLayout.LayoutParams(-1, -2)
             visibility = View.GONE
         }
-
         val previewIconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
         }
         val previewIconImg = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER)
         }
         previewIconFrame.addView(previewIconImg)
         activePreviewCard.addView(previewIconFrame)
 
         val previewCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) }
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) }
         }
         val tvPreviewName = TextView(this).apply {
-            textSize = 13f
+            textSize = 12.5f
             setTypeface(null, Typeface.BOLD)
             setTextColor(getColor(R.color.cm_text_primary))
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MIDDLE
         }
         val tvPreviewMeta = TextView(this).apply {
-            textSize = 10.5f
+            textSize = 10f
             setTextColor(getColor(R.color.cm_text_muted))
         }
         previewCol.addView(tvPreviewName)
@@ -916,12 +858,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val btnRemoveAttachment = ImageView(this).apply {
             setImageResource(R.drawable.ic_close)
             setColorFilter(getColor(R.color.cm_cancel_red))
-            val pad = dp(6)
+            val pad = dp(5)
             setPadding(pad, pad, pad, pad)
             val outVal = android.util.TypedValue()
             theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
             setBackgroundResource(outVal.resourceId)
-            layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+            layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
             isClickable = true
             isFocusable = true
             setOnClickListener {
@@ -930,7 +872,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
         activePreviewCard.addView(btnRemoveAttachment)
-        attachmentContainer.addView(activePreviewCard)
+        attachmentPreviewBox.addView(activePreviewCard)
 
         // Multi-Photo Carousel Thumbnails Container
         val photoThumbnailsScroll = HorizontalScrollView(this).apply {
@@ -944,11 +886,11 @@ class ClassMatePublishActivity : AppCompatActivity() {
             layoutParams = FrameLayout.LayoutParams(-2, -2)
         }
         photoThumbnailsScroll.addView(photoThumbnailsRow)
-        attachmentContainer.addView(photoThumbnailsScroll)
+        attachmentPreviewBox.addView(photoThumbnailsScroll)
 
         onNoticeAttachmentChanged = {
             if (selectedNoticeAttachments.isNotEmpty()) {
-                pickerButtonsLayout.visibility = View.GONE
+                attachmentPreviewBox.visibility = View.VISIBLE
                 val first = selectedNoticeAttachments.first()
                 if (first.isPdf) {
                     activePreviewCard.visibility = View.VISIBLE
@@ -962,8 +904,6 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     previewIconImg.setImageResource(R.drawable.ic_picture_as_pdf)
                     previewIconImg.setColorFilter(redColor)
                     tvPreviewMeta.text = "${formatFileSize(first.sizeBytes)} · PDF Document"
-                    tvAttachBadge.text = "1 PDF attached"
-                    tvAttachBadge.setTextColor(primaryColor)
                 } else {
                     activePreviewCard.visibility = View.GONE
                     photoThumbnailsScroll.visibility = View.VISIBLE
@@ -971,16 +911,15 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
                     selectedNoticeAttachments.forEachIndexed { index, draft ->
                         val thumbFrame = FrameLayout(this@ClassMatePublishActivity).apply {
-                            layoutParams = LinearLayout.LayoutParams(dp(76), dp(76)).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(68), dp(68)).apply {
                                 marginEnd = dp(8)
                             }
                         }
-
                         val thumbImg = com.google.android.material.imageview.ShapeableImageView(this@ClassMatePublishActivity).apply {
-                            layoutParams = FrameLayout.LayoutParams(dp(70), dp(70), Gravity.BOTTOM or Gravity.START)
+                            layoutParams = FrameLayout.LayoutParams(dp(62), dp(62), Gravity.BOTTOM or Gravity.START)
                             scaleType = ImageView.ScaleType.CENTER_CROP
                             shapeAppearanceModel = shapeAppearanceModel.toBuilder()
-                                .setAllCornerSizes(dp(12).toFloat())
+                                .setAllCornerSizes(dp(10).toFloat())
                                 .build()
                         }
                         com.bumptech.glide.Glide.with(this@ClassMatePublishActivity)
@@ -990,7 +929,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         thumbFrame.addView(thumbImg)
 
                         val removeBtn = ImageView(this@ClassMatePublishActivity).apply {
-                            layoutParams = FrameLayout.LayoutParams(dp(24), dp(24), Gravity.TOP or Gravity.END)
+                            layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP or Gravity.END)
                             setImageResource(R.drawable.ic_close)
                             setColorFilter(Color.WHITE)
                             val bgCircle = android.graphics.drawable.GradientDrawable().apply {
@@ -998,7 +937,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                                 setColor(getColor(R.color.cm_cancel_red))
                             }
                             background = bgCircle
-                            val p = dp(5)
+                            val p = dp(4)
                             setPadding(p, p, p, p)
                             isClickable = true
                             isFocusable = true
@@ -1016,7 +955,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             orientation = LinearLayout.VERTICAL
                             gravity = Gravity.CENTER
                             setBackgroundResource(R.drawable.bg_picker_card_empty)
-                            layoutParams = LinearLayout.LayoutParams(dp(70), dp(70)).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(62), dp(62)).apply {
                                 topMargin = dp(6)
                             }
                             val outVal = android.util.TypedValue()
@@ -1029,13 +968,13 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             }
                         }
                         val addIcon = ImageView(this@ClassMatePublishActivity).apply {
-                            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
-                            setImageResource(R.drawable.ic_add_photo_alternate)
+                            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+                            setImageResource(R.drawable.ic_gallery_photo)
                             setColorFilter(primaryColor)
                         }
                         val addText = TextView(this@ClassMatePublishActivity).apply {
                             text = "+ Add"
-                            textSize = 10f
+                            textSize = 9.5f
                             setTypeface(null, Typeface.BOLD)
                             setTextColor(primaryColor)
                         }
@@ -1043,23 +982,434 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         addMoreBtn.addView(addText)
                         photoThumbnailsRow.addView(addMoreBtn)
                     }
-
-                    val count = selectedNoticeAttachments.size
-                    tvAttachBadge.text = "$count/5 Photos attached"
-                    tvAttachBadge.setTextColor(primaryColor)
                 }
             } else {
-                pickerButtonsLayout.visibility = View.VISIBLE
+                attachmentPreviewBox.visibility = View.GONE
                 activePreviewCard.visibility = View.GONE
                 photoThumbnailsScroll.visibility = View.GONE
-                tvAttachBadge.text = "Optional"
-                tvAttachBadge.setTextColor(getColor(R.color.cm_text_muted))
             }
         }
         onNoticeAttachmentChanged?.invoke()
 
+        // Modern Chat Input Capsule (Image 1 reference: + Message [photo] [mic])
+        val chatInputCapsule = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bg_chat_input_capsule)
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            minimumHeight = dp(52)
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+        messageComposerBox.addView(chatInputCapsule)
+
+        // Document / PDF button (+) on the far left
+        val btnAttachDoc = ImageView(this).apply {
+            setImageResource(R.drawable.ic_add)
+            setColorFilter(primaryColor)
+            val p = dp(8)
+            setPadding(p, p, p, p)
+            val outVal = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+            setBackgroundResource(outVal.resourceId)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Attach Document"
+            setOnClickListener {
+                checkAndRequestPdfPermission()
+            }
+        }
+        chatInputCapsule.addView(btnAttachDoc)
+
+        // Middle container for auto-expanding text message & voice status
+        val middleBox = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                marginStart = dp(4)
+                marginEnd = dp(4)
+            }
+        }
+        chatInputCapsule.addView(middleBox)
+
+        // Dynamic auto-expanding notice message input
+        val message = EditText(this).apply {
+            background = null
+            hint = "Notice message · English, Banglish..."
+            setHintTextColor(getColor(R.color.cm_text_muted))
+            setTextColor(getColor(R.color.cm_text_primary))
+            textSize = 15f
+            minLines = 1
+            maxLines = 8
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                    android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setLineSpacing(0f, 1.2f)
+            filters = arrayOf(android.text.InputFilter.LengthFilter(8000))
+            setPadding(dp(4), dp(10), dp(4), dp(10))
+            layoutParams = FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL)
+        }
+        middleBox.addView(message)
+        com.shuaib.classmate.notices.WhatsAppEditorHelper.attach(message)
+
+        // Recording Live Elements (pulsing red dot + timer + dynamic EQ wave bars)
+        val recordingActiveBox = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            setPadding(dp(4), dp(10), dp(4), dp(10))
+            layoutParams = FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START)
+        }
+        val ivRecordDot = ImageView(this).apply {
+            setImageResource(R.drawable.ic_recording_dot)
+            layoutParams = LinearLayout.LayoutParams(dp(9), dp(9)).apply {
+                marginEnd = dp(8)
+            }
+        }
+        recordingActiveBox.addView(ivRecordDot)
+
+        val tvVoiceTimer = TextView(this).apply {
+            text = "0:00"
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(getColor(R.color.cm_cancel_red))
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply {
+                marginEnd = dp(10)
+            }
+        }
+        recordingActiveBox.addView(tvVoiceTimer)
+
+        fun createSignalBar(initialHeightDp: Int): View {
+            return View(this).apply {
+                setBackgroundResource(R.drawable.bg_voice_signal_bar_red)
+                layoutParams = LinearLayout.LayoutParams(dp(3.5f), dp(initialHeightDp)).apply {
+                    marginEnd = dp(3f)
+                }
+            }
+        }
+        val barSignal1 = createSignalBar(8)
+        val barSignal2 = createSignalBar(14)
+        val barSignal3 = createSignalBar(20)
+        val barSignal4 = createSignalBar(10)
+        recordingActiveBox.addView(barSignal1)
+        recordingActiveBox.addView(barSignal2)
+        recordingActiveBox.addView(barSignal3)
+        recordingActiveBox.addView(barSignal4)
+        middleBox.addView(recordingActiveBox)
+
+        // Transcribing Elements (smooth spinner + "✨ Transcribing with Gemini...")
+        val transcribingBox = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            setPadding(dp(4), dp(10), dp(4), dp(10))
+            layoutParams = FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START)
+        }
+        val pBarTranscribe = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                marginEnd = dp(8)
+            }
+        }
+        val tvTranscribing = TextView(this).apply {
+            text = "✨ Transcribing with Gemini..."
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(primaryColor)
+        }
+        transcribingBox.addView(pBarTranscribe)
+        transcribingBox.addView(tvTranscribing)
+        middleBox.addView(transcribingBox)
+
+        // Photo / Gallery button on the right
+        val btnAttachPhoto = ImageView(this).apply {
+            setImageResource(R.drawable.ic_gallery_photo)
+            setColorFilter(primaryColor)
+            val p = dp(8)
+            setPadding(p, p, p, p)
+            val outVal = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+            setBackgroundResource(outVal.resourceId)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Attach Photo"
+            setOnClickListener {
+                checkAndRequestPhotoPermission()
+            }
+        }
+        chatInputCapsule.addView(btnAttachPhoto)
+
+        // Voice Action Button (Material Mic icon matching Image 1)
+        val btnVoiceInput = ImageView(this).apply {
+            setImageResource(R.drawable.ic_mic)
+            setColorFilter(primaryColor)
+            val p = dp(8)
+            setPadding(p, p, p, p)
+            val outVal = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+            setBackgroundResource(outVal.resourceId)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                marginStart = dp(2)
+            }
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Voice Input"
+        }
+        chatInputCapsule.addView(btnVoiceInput)
+
+        // Hint text under the capsule
+        val silentHint = TextView(this).apply {
+            text = "Banglish auto-converts to Bengali. English remains English. Start with /silent to post without push alerts."
+            textSize = 11.5f
+            setTextColor(getColor(R.color.cm_text_muted))
+            setLineSpacing(0f, 1.25f)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(6)
+                marginStart = dp(6)
+                marginEnd = dp(6)
+            }
+        }
+        messageComposerBox.addView(silentHint)
+
+        var dotPulseAnimator: android.animation.ObjectAnimator? = null
+        fun startDotPulse() {
+            dotPulseAnimator?.cancel()
+            dotPulseAnimator = android.animation.ObjectAnimator.ofFloat(ivRecordDot, "alpha", 1f, 0.25f).apply {
+                duration = 600
+                repeatMode = android.animation.ValueAnimator.REVERSE
+                repeatCount = android.animation.ValueAnimator.INFINITE
+                start()
+            }
+        }
+        fun stopDotPulse() {
+            dotPulseAnimator?.cancel()
+            dotPulseAnimator = null
+            ivRecordDot.alpha = 1f
+        }
+
+        fun updateVoiceUi(isRecording: Boolean, isTranscribing: Boolean) {
+            val outVal = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+
+            if (isRecording) {
+                message.visibility = View.INVISIBLE
+                recordingActiveBox.visibility = View.VISIBLE
+                transcribingBox.visibility = View.GONE
+                startDotPulse()
+
+                btnVoiceInput.isEnabled = true
+                btnVoiceInput.setImageResource(R.drawable.ic_voice_stop)
+                btnVoiceInput.setColorFilter(Color.WHITE)
+                btnVoiceInput.setBackgroundResource(R.drawable.bg_voice_recording_btn)
+                btnAttachPhoto.isEnabled = false
+                btnAttachPhoto.alpha = 0.35f
+                btnAttachDoc.isEnabled = false
+                btnAttachDoc.alpha = 0.35f
+            } else if (isTranscribing) {
+                stopDotPulse()
+                message.visibility = View.INVISIBLE
+                recordingActiveBox.visibility = View.GONE
+                transcribingBox.visibility = View.VISIBLE
+
+                btnVoiceInput.isEnabled = false
+                btnVoiceInput.setImageResource(R.drawable.ic_mic)
+                btnVoiceInput.setColorFilter(getColor(R.color.cm_text_muted))
+                btnVoiceInput.setBackgroundResource(outVal.resourceId)
+                btnAttachPhoto.isEnabled = false
+                btnAttachPhoto.alpha = 0.35f
+                btnAttachDoc.isEnabled = false
+                btnAttachDoc.alpha = 0.35f
+            } else {
+                stopDotPulse()
+                message.visibility = View.VISIBLE
+                recordingActiveBox.visibility = View.GONE
+                transcribingBox.visibility = View.GONE
+
+                btnVoiceInput.isEnabled = true
+                btnVoiceInput.setImageResource(R.drawable.ic_mic)
+                btnVoiceInput.setColorFilter(primaryColor)
+                btnVoiceInput.setBackgroundResource(outVal.resourceId)
+                btnAttachPhoto.isEnabled = true
+                btnAttachPhoto.alpha = 1.0f
+                btnAttachDoc.isEnabled = true
+                btnAttachDoc.alpha = 1.0f
+            }
+        }
+
+        fun stopVoiceRecordingAndTranscribe() {
+            if (!isRecordingVoice) return
+            isRecordingVoice = false
+            voiceAmplitudeJob?.cancel()
+            voiceAmplitudeJob = null
+            btnVoiceInput.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+
+            val elapsed = System.currentTimeMillis() - voiceRecordStartTime
+            try {
+                mediaRecorder?.apply {
+                    stop()
+                    release()
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("ClassMateVoice", "MediaRecorder stop failed: ${e.message}")
+            }
+            mediaRecorder = null
+
+            val file = audioRecordFile
+            if (elapsed < 500 || file == null || !file.exists() || file.length() < 100) {
+                updateVoiceUi(isRecording = false, isTranscribing = false)
+                file?.delete()
+                Toast.makeText(this@ClassMatePublishActivity, "Tap to speak, tap again to finish", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            isTranscribingVoice = true
+            updateVoiceUi(isRecording = false, isTranscribing = true)
+
+            lifecycleScope.launch {
+                val bytes = withContext(Dispatchers.IO) {
+                    try { file.readBytes() } catch (_: Exception) { ByteArray(0) }
+                }
+                withContext(Dispatchers.IO) {
+                    try { file.delete() } catch (_: Exception) {}
+                }
+
+                if (bytes.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        isTranscribingVoice = false
+                        updateVoiceUi(isRecording = false, isTranscribing = false)
+                        Toast.makeText(this@ClassMatePublishActivity, "Could not capture audio", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    ClassMateAuthApi.restoreSession()
+                }
+
+                val result = withContext(Dispatchers.IO) {
+                    com.shuaib.classmate.services.AIService.transcribeAudio(bytes, "audio/mp4")
+                }
+
+                withContext(Dispatchers.Main) {
+                    isTranscribingVoice = false
+                    updateVoiceUi(isRecording = false, isTranscribing = false)
+
+                    if (result.isSuccess) {
+                        val text = result.getOrNull().orEmpty().trim()
+                        if (text.isNotBlank()) {
+                            btnVoiceInput.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            val existing = message.text?.toString().orEmpty().trim()
+                            val combined = if (existing.isEmpty()) text else "$existing $text"
+                            message.setText(combined)
+                            message.setSelection(combined.length)
+                            message.requestFocus()
+                        } else {
+                            Toast.makeText(this@ClassMatePublishActivity, "No speech recognized in audio", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        val err = result.exceptionOrNull()?.message ?: "Voice transcription failed"
+                        android.util.Log.e("ClassMateVoice", "Gemini transcription error: $err", result.exceptionOrNull())
+                        Toast.makeText(this@ClassMatePublishActivity, "Gemini transcription error: $err", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+
+        fun startVoiceRecording() {
+            try {
+                val cacheDir = externalCacheDir ?: cacheDir
+                audioRecordFile = java.io.File(cacheDir, "gemini_voice_${System.currentTimeMillis()}.m4a")
+
+                mediaRecorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    android.media.MediaRecorder(this@ClassMatePublishActivity)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.media.MediaRecorder()
+                }).apply {
+                    setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                    setAudioSamplingRate(16000)
+                    setAudioEncodingBitRate(16000)
+                    setAudioChannels(1)
+                    setOutputFile(audioRecordFile!!.absolutePath)
+                    prepare()
+                    start()
+                }
+
+                isRecordingVoice = true
+                voiceRecordStartTime = System.currentTimeMillis()
+                updateVoiceUi(isRecording = true, isTranscribing = false)
+                btnVoiceInput.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+
+                voiceAmplitudeJob?.cancel()
+                voiceAmplitudeJob = lifecycleScope.launch {
+                    val density = resources.displayMetrics.density
+                    val maxH = 22 * density
+                    val minH = 6 * density
+                    var smoothedAmp = 0f
+
+                    while (isRecordingVoice) {
+                        val rawAmp = try { mediaRecorder?.maxAmplitude ?: 0 } catch (_: Exception) { 0 }
+                        val rawFactor = if (rawAmp > 0) {
+                            (Math.log10(rawAmp.toDouble()) / 4.4).toFloat().coerceIn(0.12f, 1.0f)
+                        } else {
+                            0.12f
+                        }
+                        smoothedAmp = smoothedAmp * 0.4f + rawFactor * 0.6f
+
+                        val elapsed = (System.currentTimeMillis() - voiceRecordStartTime) / 1000
+                        val mins = elapsed / 60
+                        val secs = elapsed % 60
+
+                        runOnUiThread {
+                            if (!isRecordingVoice) return@runOnUiThread
+                            tvVoiceTimer.text = String.format(Locale.US, "%d:%02d", mins, secs)
+
+                            barSignal1.layoutParams = barSignal1.layoutParams.apply {
+                                height = (minH + (maxH - minH) * (smoothedAmp * 0.7f)).toInt()
+                            }
+                            barSignal2.layoutParams = barSignal2.layoutParams.apply {
+                                height = (minH + (maxH - minH) * (smoothedAmp * 1.0f)).toInt()
+                            }
+                            barSignal3.layoutParams = barSignal3.layoutParams.apply {
+                                height = (minH + (maxH - minH) * (smoothedAmp * 0.85f)).toInt()
+                            }
+                            barSignal4.layoutParams = barSignal4.layoutParams.apply {
+                                height = (minH + (maxH - minH) * (smoothedAmp * 0.55f)).toInt()
+                            }
+
+                            if (elapsed >= 35) {
+                                stopVoiceRecordingAndTranscribe()
+                            }
+                        }
+                        delay(65)
+                    }
+                }
+            } catch (e: Exception) {
+                isRecordingVoice = false
+                updateVoiceUi(isRecording = false, isTranscribing = false)
+                Toast.makeText(this@ClassMatePublishActivity, "Recording error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnVoiceInput.setOnClickListener {
+            if (isTranscribingVoice) return@setOnClickListener
+            if (isRecordingVoice) {
+                stopVoiceRecordingAndTranscribe()
+            } else {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    startVoiceRecording()
+                } else {
+                    onAudioPermissionGranted = { startVoiceRecording() }
+                    requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+
         val (courseBox, course) = dropdown(if (teacher) "Assigned course" else "Cancelled course", courses.map { it.second })
         val (dateBox, date) = dropdown("When?", listOf("Today", "Tomorrow"))
+        courseBox.visibility = if (teacher) View.VISIBLE else View.GONE
+        dateBox.visibility = View.GONE
         status = form.status()
 
         val pollContainer = LinearLayout(this).apply {
@@ -1113,39 +1463,38 @@ class ClassMatePublishActivity : AppCompatActivity() {
         val (durationBox, durationField) = createDropdown("Poll Duration", listOf("1 hour", "6 hours", "12 hours", "24 hours", "2 days", "3 days (default)", "7 days", "No expiration"))
         pollContainer.addView(durationBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
 
-        choices.setOnCheckedChangeListener { _, checked ->
+        fun updateTypeUi(checked: Int) {
             val cancelled = checked == cancellation.id
             val isPoll = checked == poll.id
             if (cancelled) {
                 titleBox.visibility = View.GONE
-                messageBox.visibility = View.GONE
-                silentHint.visibility = View.GONE
+                messageComposerBox.visibility = View.GONE
                 courseBox.visibility = View.VISIBLE
                 dateBox.visibility = View.VISIBLE
                 pollContainer.visibility = View.GONE
-                attachmentContainer.visibility = View.GONE
                 submit.text = "Post cancellation"
             } else if (isPoll) {
                 titleBox.visibility = View.GONE
-                messageBox.visibility = View.GONE
-                silentHint.visibility = View.GONE
+                messageComposerBox.visibility = View.GONE
                 courseBox.visibility = View.GONE
                 dateBox.visibility = View.GONE
                 pollContainer.visibility = View.VISIBLE
-                attachmentContainer.visibility = View.GONE
                 submit.text = "Publish poll"
             } else {
                 titleBox.visibility = if (title.text.isNullOrBlank()) View.GONE else View.VISIBLE
-                messageBox.visibility = View.VISIBLE
-                silentHint.visibility = View.VISIBLE
+                messageComposerBox.visibility = View.VISIBLE
                 courseBox.visibility = if (teacher) View.VISIBLE else View.GONE
                 dateBox.visibility = View.GONE
                 pollContainer.visibility = View.GONE
-                attachmentContainer.visibility = View.VISIBLE
                 submit.text = "Post notice"
             }
         }
+
+        choices.setOnCheckedChangeListener { _, checked ->
+            updateTypeUi(checked)
+        }
         choices.check(general.id)
+        updateTypeUi(choices.checkedRadioButtonId)
         submit.text = "Post notice"
         submit.isEnabled = true
 

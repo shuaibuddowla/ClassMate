@@ -6,33 +6,32 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bg_bottom_sheet"
-    android:paddingStart="24dp"
-    android:paddingEnd="24dp"
-    android:paddingTop="16dp"
-    android:paddingBottom="28dp">
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="24dp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="44dp"
+        android:layout_width="38dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
-        android:background="#CBD5E1"
+        android:background="@drawable/bg_ban_handle"
         android:layout_marginBottom="16dp" />
 
-    <!-- Header Section with Emblem -->
+    <!-- Header Section with Danger Emblem & Close Button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="14dp">
+        android:layout_marginBottom="16dp">
 
         <FrameLayout
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_empty_state_icon"
-            android:backgroundTint="#FEE2E2"
-            android:padding="12dp">
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_ban_badge_red"
+            android:padding="11dp">
 
             <ImageView
                 android:layout_width="match_parent"
@@ -63,9 +62,19 @@
                 android:layout_height="wrap_content"
                 android:text="Lock account across Android &amp; Web"
                 android:textColor="@color/cm_text_muted"
-                android:textSize="13sp"
+                android:textSize="12.5sp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btnDismissBanSheet"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/ic_close"
+            app:tint="@color/cm_text_muted"
+            android:contentDescription="Close dialog" />
     </LinearLayout>
 
     <!-- Student Preview Card -->
@@ -74,20 +83,19 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/bg_empty_state_icon"
-        android:backgroundTint="@color/cm_bg_secondary"
-        android:padding="12dp"
-        android:layout_marginBottom="16dp">
+        android:background="@drawable/bg_ban_card_student"
+        android:padding="14dp"
+        android:layout_marginBottom="18dp">
 
         <TextView
             android:id="@+id/tvStudentAvatarBubble"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:gravity="center"
             android:text="SA"
             android:textColor="@color/cm_primary"
             android:textStyle="bold"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:background="@drawable/bg_empty_state_icon"
             android:backgroundTint="@color/cm_primary_container" />
 
@@ -105,7 +113,9 @@
                 android:text="Student Full Name"
                 android:textColor="@color/cm_text_primary"
                 android:textSize="15sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:ellipsize="end"
+                android:maxLines="1" />
 
             <TextView
                 android:id="@+id/tvBanStudentId"
@@ -113,9 +123,23 @@
                 android:layout_height="wrap_content"
                 android:text="Student ID · Batch"
                 android:textColor="@color/cm_text_muted"
-                android:textSize="12sp"
-                android:layout_marginTop="1dp" />
+                android:textSize="12.5sp"
+                android:layout_marginTop="2dp" />
         </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Student"
+            android:textColor="#475569"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_ban_role_pill"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <!-- Duration Section -->
@@ -127,75 +151,112 @@
         android:textSize="11sp"
         android:textStyle="bold"
         android:letterSpacing="0.08"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="6dp" />
 
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilBanDuration"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Duration"
+        app:endIconMode="dropdown_menu"
+        app:boxCornerRadiusBottomEnd="14dp"
+        app:boxCornerRadiusBottomStart="14dp"
+        app:boxCornerRadiusTopEnd="14dp"
+        app:boxCornerRadiusTopStart="14dp"
+        android:layout_marginBottom="10dp">
+
+        <AutoCompleteTextView
+            android:id="@+id/actvBanDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none"
+            android:focusable="false"
+            android:cursorVisible="false"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:ignore="LabelFor" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Custom Days Input (Visible only when 'Custom Days' is chosen) -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCustomBanDays"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Custom duration"
+        app:suffixText="days"
+        app:suffixTextColor="@color/cm_text_muted"
+        app:boxCornerRadiusBottomEnd="14dp"
+        app:boxCornerRadiusBottomStart="14dp"
+        app:boxCornerRadiusTopEnd="14dp"
+        app:boxCornerRadiusTopStart="14dp"
+        app:helperText="Specify the restriction length in days"
+        app:helperTextTextColor="@color/cm_text_muted"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:layout_marginBottom="12dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCustomBanDays"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLength="4"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="14sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Permanent Restriction Warning Banner (Visible only when 'Permanent Ban' is chosen) -->
     <LinearLayout
+        android:id="@+id/layoutPermanentBanWarning"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_ban_card_permanent"
+        android:padding="13dp"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:layout_marginBottom="12dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBan3Days"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:text="3 Days"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:cornerRadius="12dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:layout_marginEnd="6dp" />
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_warning_triangle"
+            app:tint="#DC2626"
+            android:contentDescription="Permanent warning" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBan7Days"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+        <TextView
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="7 Days"
-            android:textSize="13sp"
+            android:layout_marginStart="10dp"
+            android:text="Permanent restriction. The student will be locked out indefinitely across Android and Web until manually lifted by an administrator."
+            android:textColor="#991B1B"
+            android:textSize="12sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:layout_marginEnd="6dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBan30Days"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:text="30 Days"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:cornerRadius="12dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:visibility="gone"
-            tools:visibility="visible" />
+            android:lineSpacingExtra="2dp" />
     </LinearLayout>
 
     <!-- Reason Section -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="REASON FOR RESTRICTION *"
+        android:text="REASON FOR RESTRICTION"
         android:textColor="@color/cm_text_muted"
         android:textSize="11sp"
         android:textStyle="bold"
         android:letterSpacing="0.08"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="6dp" />
 
     <!-- Preset reason quick chips -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:scrollbars="none"
-        android:layout_marginBottom="10dp">
+        android:layout_marginBottom="8dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -209,6 +270,7 @@
                 android:layout_height="wrap_content"
                 android:text="Batch disruption"
                 android:textSize="12sp"
+                app:chipCornerRadius="10dp"
                 android:layout_marginEnd="6dp" />
 
             <com.google.android.material.chip.Chip
@@ -218,6 +280,7 @@
                 android:layout_height="wrap_content"
                 android:text="Misconduct"
                 android:textSize="12sp"
+                app:chipCornerRadius="10dp"
                 android:layout_marginEnd="6dp" />
 
             <com.google.android.material.chip.Chip
@@ -227,6 +290,7 @@
                 android:layout_height="wrap_content"
                 android:text="Spamming"
                 android:textSize="12sp"
+                app:chipCornerRadius="10dp"
                 android:layout_marginEnd="6dp" />
 
             <com.google.android.material.chip.Chip
@@ -235,7 +299,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Inappropriate behavior"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                app:chipCornerRadius="10dp" />
         </LinearLayout>
     </HorizontalScrollView>
 
@@ -245,13 +310,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Provide a reason"
-        app:boxCornerRadiusBottomEnd="12dp"
-        app:boxCornerRadiusBottomStart="12dp"
-        app:boxCornerRadiusTopEnd="12dp"
-        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusBottomEnd="14dp"
+        app:boxCornerRadiusBottomStart="14dp"
+        app:boxCornerRadiusTopEnd="14dp"
+        app:boxCornerRadiusTopStart="14dp"
         app:counterEnabled="true"
         app:counterMaxLength="300"
-        app:helperText="Will be displayed to the student on their lock screen"
+        app:helperText="Displayed to the student on their lockout screen"
         app:helperTextTextColor="@color/cm_text_muted"
         android:layout_marginBottom="16dp">
 
@@ -273,25 +338,26 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/bg_empty_state_icon"
-        android:backgroundTint="#FFFBEB"
+        android:background="@drawable/bg_ban_card_notice"
         android:padding="12dp"
-        android:layout_marginBottom="20dp">
+        android:layout_marginBottom="22dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="ℹ️"
-            android:textSize="14sp" />
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_info"
+            app:tint="#D97706"
+            android:contentDescription="Notice info" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="10dp"
-            android:text="The student will be blocked from viewing batch notices and routine. They will only receive the ban alert."
+            android:text="The student will be blocked from accessing batch notices, routines, and materials until the ban expires or is lifted."
             android:textColor="#92400E"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
     </LinearLayout>
 
     <!-- Action Buttons -->
@@ -303,13 +369,14 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCancelBan"
-            style="@style/Widget.Material3.Button.TextButton"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
             android:text="Cancel"
-            android:textColor="@color/cm_text_muted"
+            android:textColor="@color/cm_text_primary"
             android:textSize="14sp"
+            app:cornerRadius="14dp"
             android:layout_marginEnd="10dp" />
 
         <com.google.android.material.button.MaterialButton
@@ -317,13 +384,18 @@
             style="@style/Widget.Material3.Button"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_weight="1.6"
+            android:layout_weight="1.4"
             android:text="Restrict Access"
-            android:textColor="@color/cm_on_primary"
+            android:textColor="@android:color/white"
             android:textSize="14sp"
             android:textStyle="bold"
             app:backgroundTint="#DC2626"
-            app:cornerRadius="14dp" />
+            app:cornerRadius="14dp"
+            app:icon="@drawable/ic_ban_restriction"
+            app:iconTint="@android:color/white"
+            app:iconGravity="textStart"
+            app:iconPadding="8dp"
+            app:iconSize="18dp" />
     </LinearLayout>
 
 </LinearLayout>

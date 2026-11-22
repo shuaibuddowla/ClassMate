@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-query";
 import {
   CalendarDays,
+  Timer,
   Bell,
   BookOpen,
   Users,
@@ -39,6 +40,7 @@ import {
   CircleHelp,
   GraduationCap,
   ShieldAlert,
+  Menu,
 } from "lucide-react";
 import { supabase, configured, rpc, rows, openFile, type Row } from "@/lib/api";
 import {
@@ -50,12 +52,16 @@ import {
 } from "@/lib/cache";
 import { Avatar, ErrorBox, Form, Modal, Skeleton } from "./ui";
 import { Schedule } from "./schedule";
+import { Upcoming } from "./upcoming";
 import { useAcademic } from "@/lib/queries";
 import { Notices, NoticeDetailModal } from "./notices";
 import { Library } from "./library";
 import { Friends } from "./friends";
 import { TeachersDirectory } from "./teachers-directory";
 import { Profile, ProfileForm } from "./profile";
+import { HamburgerDrawer } from "./hamburger-drawer";
+import { BatchFund } from "./batch-fund";
+import { BloodNetwork } from "./blood-network";
 import { enablePush, removePush, restorePush, syncPushIdentity } from "@/lib/push";
 const ClassMateAI = lazy(() => import("./classmate-ai"));
 const Manage = lazy(() => import("./manage"));
@@ -82,6 +88,8 @@ export type Context = {
   changeBatch?: (batch: string) => void;
   manageAttendance?: () => void;
   transit?: () => void;
+  openDrawer?: () => void;
+  openBatchFund?: () => void;
 };
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -745,19 +753,21 @@ function SessionApp() {
       </main>
       </>
     );
-  if (activeBan)
+  if (activeBan) {
+    const isPerm = Boolean(activeBan.ends_at && new Date(activeBan.ends_at).getFullYear() >= new Date().getFullYear() + 50);
     return <main className="ban-gate" role="alertdialog" aria-modal="true" aria-labelledby="ban-title" aria-describedby="ban-reason">
       <section className="ban-gate-card">
         <div className="ban-gate-emblem"><ShieldAlert size={30} strokeWidth={1.8}/></div>
         <span className="ban-gate-kicker">ACCOUNT ACCESS NOTICE</span>
-        <h1 id="ban-title">ClassMate access is paused</h1>
-        <p className="ban-gate-intro">Your account has a temporary restriction for this batch.</p>
+        <h1 id="ban-title">{isPerm ? "Account permanently restricted" : "ClassMate access is paused"}</h1>
+        <p className="ban-gate-intro">{isPerm ? "Your account has been permanently restricted by batch administration." : "Your account has a temporary restriction for this batch."}</p>
         <div className="ban-gate-reason"><span>REASON</span><p id="ban-reason">{activeBan.reason?.trim() || "No reason was provided. Please contact your batch representative for details."}</p></div>
-        <div className="ban-gate-return"><span>ACCESS EXPECTED TO RETURN</span><strong>{activeBan.ends_at ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dhaka" }).format(new Date(activeBan.ends_at)) + " (Bangladesh time)" : "When the restriction expires"}</strong></div>
+        <div className="ban-gate-return"><span>ACCESS EXPECTED TO RETURN</span><strong>{isPerm ? "Permanent restriction · Access revoked indefinitely" : (activeBan.ends_at ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dhaka" }).format(new Date(activeBan.ends_at)) + " (Bangladesh time)" : "When the restriction expires")}</strong></div>
         <div className="ban-gate-help"><strong>Need a review?</strong><span>Contact your batch CR or a ClassMate administrator. They can review or remove the restriction.</span></div>
         <div className="ban-gate-lock"><Lock size={15}/> This notice stays until access is restored.</div>
       </section>
     </main>;
+  }
   return (
     <>
       <AndroidInstallPopup />
@@ -1025,6 +1035,8 @@ function TabDeck({
     }
     return value === "timetable" ? (
       <Schedule ctx={active} />
+    ) : value === "upcoming" ? (
+      <Upcoming ctx={active} />
     ) : value === "notices" ? (
       <Notices ctx={active} />
     ) : value === "library" ? (
@@ -1088,7 +1100,44 @@ function Home({
   const [androidDownload, setAndroidDownload] = useState(false);
   const [aboutDeveloper, setAboutDeveloper] = useState(false),
     [signingOut, setSigningOut] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [teachersModal, setTeachersModal] = useState(false);
+  const [batchFundModal, setBatchFundModal] = useState(false);
+  const [bloodNetworkModal, setBloodNetworkModal] = useState(false);
   const [desktop, setDesktop] = useState(false);
+  const [foregroundToast, setForegroundToast] = useState<{
+    id: string;
+    title: string;
+    body: string;
+    kind?: string;
+    record?: string;
+    assessment_id?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      const title = detail.title && !/^ClassMate(?: update)?$/i.test(detail.title) ? detail.title : "ClassMate";
+      const body = detail.body || "Your batch has a new update.";
+      setForegroundToast({
+        id: detail.event_id || String(Date.now()),
+        title,
+        body,
+        kind: detail.kind,
+        record: detail.record_id,
+        assessment_id: detail.assessment_id,
+      });
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setForegroundToast(null), 6000);
+    };
+    window.addEventListener("classmate:push-in-app", handler);
+    return () => {
+      window.removeEventListener("classmate:push-in-app", handler);
+      clearTimeout(timeout);
+    };
+  }, []);
   useEffect(() => {
     const media = matchMedia("(min-width: 1001px)");
     const update = () => setDesktop(media.matches);
@@ -1193,6 +1242,7 @@ function Home({
       if (
         [
           "timetable",
+          "upcoming",
           "attendance",
           "admin-attendance",
           "notices",
@@ -1280,6 +1330,8 @@ function Home({
       history.pushState({ classmateTransit: true }, "", "/#transit");
       setTab("transit");
     } : undefined,
+    openDrawer: () => setDrawerOpen(true),
+    openBatchFund: () => setBatchFundModal(true),
   };
   const isTeacher = profile.role === "teacher";
   const isAdmin = profile.role === "admin" || owner.data === true;
@@ -1287,6 +1339,7 @@ function Home({
     ? ([
         ["timetable", "Timetable", CalendarDays],
         ["attendance", "Attendance", Radio],
+        ["upcoming", "Upcoming", Timer],
         ["library", "Courses", BookOpen],
         ["notices", "Notices", Bell],
         ["friends", "Students", Users],
@@ -1294,6 +1347,7 @@ function Home({
       ] as const)
     : ([
         ["timetable", "Timetable", CalendarDays],
+        ["upcoming", "Upcoming", Timer],
         ...(hasBusTransit ? [["transit", "Transit", Bus] as const] : []),
         ...(isAdmin ? [["admin-attendance", "Manage Attendance", Radio] as const] : []),
         ["notices", "Notices", Bell],
@@ -1307,17 +1361,16 @@ function Home({
     ? ([
         ["timetable", "Timetable", CalendarDays],
         ["attendance", "Attendance", Radio],
+        ["upcoming", "Upcoming", Timer],
         ["library", "Courses", BookOpen],
-        ["notices", "Notices", Bell],
-        ["friends", "Students", Users],
-        ["profile", "Settings", Settings],
+        ["profile", "Profile", User],
       ] as const)
     : ([
         ["timetable", "Timetable", CalendarDays],
         ["notices", "Notices", Bell],
-        ["friends", "Batch", Users],
+        ["upcoming", "Upcoming", Timer],
         ["library", "Courses", BookOpen],
-        ["profile", "Settings", Settings],
+        ["profile", "Profile", User],
       ] as const);
   const select = (value: string) => {
     if (value === tab) return;
@@ -1329,19 +1382,21 @@ function Home({
         value === "friends"
           ? "batch"
           : value === "profile"
-          ? "settings"
+          ? "profile"
           : value === "transit"
           ? "transit"
           : value === "library"
           ? "courses"
           : value === "admin-attendance"
           ? "attendance"
+          : value === "upcoming"
+          ? "upcoming"
           : value
       }`
     );
   };
   const navigationTab =
-    tab === "ai" || (!desktop && (tab === "admin-attendance" || tab === "teachers" || tab === "transit"))
+    tab === "ai" || (!desktop && (tab === "admin-attendance" || tab === "teachers" || tab === "transit" || tab === "friends"))
       ? "profile"
       : desktop && tab === "notices"
       ? "timetable"
@@ -1478,19 +1533,140 @@ function Home({
       {aboutDeveloper && (
         <AboutDeveloper user={user} close={() => setAboutDeveloper(false)} />
       )}
+      <HamburgerDrawer
+        ctx={ctx}
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        theme={theme}
+        setTheme={setTheme}
+        signOut={signOut}
+        onNavigateTab={(target) => {
+          if (target === "teachers") {
+            setTeachersModal(true);
+          } else if (target === "batch-fund") {
+            setBatchFundModal(true);
+          } else if (target === "blood") {
+            setBloodNetworkModal(true);
+          } else {
+            select(target);
+          }
+        }}
+        onOpenTransit={hasBusTransit ? () => select("transit") : undefined}
+        onOpenTeachers={() => setTeachersModal(true)}
+        onOpenBatchFund={() => setBatchFundModal(true)}
+        onOpenBloodNetwork={() => setBloodNetworkModal(true)}
+        onOpenAboutDev={() => setAboutDeveloper(true)}
+      />
+      {teachersModal && (
+        <Modal title="Teachers Directory" close={() => setTeachersModal(false)}>
+          <TeachersDirectory ctx={ctx} />
+        </Modal>
+      )}
+      {batchFundModal && (
+        <Modal title="Batch Fund" close={() => setBatchFundModal(false)}>
+          <BatchFund ctx={ctx} onBack={() => setBatchFundModal(false)} />
+        </Modal>
+      )}
+      {bloodNetworkModal && (
+        <BloodNetwork ctx={ctx} close={() => setBloodNetworkModal(false)} />
+      )}
       <nav className="bottom-nav" aria-label="Main navigation">
-        {mobileDestinations.map(([value, label, Icon]) => (
-          <button
-            key={value}
-            aria-current={navigationTab === value ? "page" : undefined}
-            className={navigationTab === value ? "selected" : ""}
-            onClick={() => select(value)}
-          >
-            <span className="nav-icon"><Icon size={21} />{unreadCount(value)>0 && <span className="unread-badge" aria-label={`${unreadCount(value)} unread`}>{unreadCount(value)>99 ? "99+" : unreadCount(value)}</span>}</span>
-            <span>{label}</span>
-          </button>
-        ))}
+        {mobileDestinations.map(([value, label, Icon]) => {
+          const isSelected = navigationTab === value;
+          const isProfile = value === "profile";
+          return (
+            <button
+              key={value}
+              aria-current={isSelected ? "page" : undefined}
+              aria-label={label}
+              className={isSelected ? "selected" : ""}
+              onClick={() => {
+                if (value === tab) {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  const mainEl = document.querySelector("main");
+                  if (mainEl) mainEl.scrollTo({ top: 0, behavior: "smooth" });
+                } else {
+                  select(value);
+                }
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                  try {
+                    navigator.vibrate(10);
+                  } catch {}
+                }
+              }}
+            >
+              {isProfile ? (
+                <span className={`ig-avatar-ring ${isSelected ? "active" : ""}`}>
+                  <span className="ig-avatar-inner">
+                    {profile.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.full_name || "Profile"}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : profile.full_name?.trim() ? (
+                      profile.full_name.trim()[0].toUpperCase()
+                    ) : (
+                      <User size={14} strokeWidth={2.4} />
+                    )}
+                  </span>
+                </span>
+              ) : (
+                <span className="nav-icon">
+                  <Icon size={24} strokeWidth={isSelected ? 2.5 : 1.8} />
+                  {unreadCount(value) > 0 && (
+                    <span
+                      className="ig-badge-dot"
+                      aria-label={`${unreadCount(value)} unread updates`}
+                    />
+                  )}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
+
+      {foregroundToast && (
+        <div className="in-app-push-toast" role="alert">
+          <div className="in-app-push-icon">
+            <Bell size={18} />
+          </div>
+          <div className="in-app-push-content">
+            <strong>{foregroundToast.title}</strong>
+            <span>{foregroundToast.body}</span>
+          </div>
+          <div className="in-app-push-actions">
+            <button
+              type="button"
+              className="in-app-push-btn-view"
+              onClick={() => {
+                const t = foregroundToast;
+                setForegroundToast(null);
+                if (t.kind === "blood_request") {
+                  select("friends");
+                } else if (t.kind === "assessment_reminder" || t.kind === "assessment") {
+                  select("upcoming");
+                } else if (t.kind === "batch_fund_deposit" || t.kind === "batch_fund_update") {
+                  select("friends");
+                } else {
+                  select("notices");
+                }
+              }}
+            >
+              View
+            </button>
+            <button
+              type="button"
+              className="in-app-push-btn-dismiss"
+              onClick={() => setForegroundToast(null)}
+              aria-label="Dismiss notification"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

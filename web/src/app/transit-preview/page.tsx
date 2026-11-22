@@ -71,6 +71,15 @@ const Transit = dynamic(() => import("../../components/transit").then((m) => m.T
           ২৮টি বাস স্টপ
         </span>
       </div>
+      {/* Crawlable fallback content for search engines & accessibility */}
+      <div style={{ marginTop: 24, maxWidth: 480, fontSize: 13, lineHeight: 1.6, color: "#94a3b8" }}>
+        <p style={{ margin: "0 0 8px 0" }}>
+          মওলানা ভাসানী বিজ্ঞান ও প্রযুক্তি বিশ্ববিদ্যালয় (MBSTU) ক্যাম্পাস ও টাঙ্গাইল শহরের মধ্যে চলাচলকারী বাসসমূহের লাইভ জিপিএস লোকেশন ও শিডিউল।
+        </p>
+        <p style={{ margin: 0, fontSize: 11.5, color: "#64748b" }}>
+          প্রধান স্টপেজ: ক্যাম্পাস গেট · সন্তোষ · নতুন বাস স্ট্যান্ড · পুরাতন বাস স্ট্যান্ড · জেলা প্রশাসকের কার্যালয় · নিরালা মোড় · সাবালিয়া · করটিয়া।
+        </p>
+      </div>
     </div>
   )
 });

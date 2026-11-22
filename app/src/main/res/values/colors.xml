@@ -60,6 +60,7 @@
     <color name="cm_notice_screen_bg">#E5DDD5</color>
     <color name="cm_notice_premium_general">#8757E7</color>
     <color name="cm_notice_premium_cancel">#D65C70</color>
+    <color name="cm_shimmer_placeholder">#E2E8F0</color>
 
     <!-- WhatsApp-style Message Info Palette -->
     <color name="wa_read_green">#00A884</color>

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const siteUrl = "https://classmatebd.vercel.app";
@@ -31,9 +33,6 @@ export const metadata: Metadata = {
   publisher: "ClassMate",
   verification: {
     google: "N1jaz91POPN5mOXCtWpSiuQUC1Z5dIon3079aDpR1SE",
-  },
-  alternates: {
-    canonical: "./",
   },
   openGraph: {
     type: "website",
@@ -167,7 +166,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }

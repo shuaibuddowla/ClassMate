@@ -88,6 +88,11 @@ export async function buildStudentCardMetadata(id: string): Promise<Metadata> {
   return {
     title: `${name}${roll} · ClassMate Smart ID`,
     description: `${dept} · Batch ${student.batch_name || "Campus"} · MBSTU Verified Student Identity Card`,
+    robots: {
+      index: false,
+      follow: false,
+      noarchive: true,
+    },
     alternates: {
       canonical: `https://classmatebd.vercel.app/c/${id}`,
     },

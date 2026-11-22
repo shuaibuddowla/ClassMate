@@ -10288,51 +10288,42 @@ class ClassMateAuthActivity : AppCompatActivity() {
         }
 
         val uri = targetIntent?.data ?: return
+        val scheme = uri.scheme?.lowercase().orEmpty()
+        val host = uri.host?.lowercase().orEmpty()
+        val path = uri.path.orEmpty()
+        val fragment = uri.fragment.orEmpty()
 
-        if (uri.scheme == "https" && uri.host == "classmatebd.vercel.app") {
+        val isWebMatch = (scheme == "https" || scheme == "http") &&
+            (host == "classmatebd.vercel.app" || host.endsWith(".vercel.app") || host == "classmate.com" || host == "classmate-app.com")
+        val isCustomScheme = scheme == "classmate"
 
-            val path = uri.path.orEmpty()
-
-            val fragment = uri.fragment.orEmpty()
-
+        if (isWebMatch || isCustomScheme) {
             val queryFile = uri.getQueryParameter("file") ?: uri.getQueryParameter("id")
-
-
-
             val queryNotice = uri.getQueryParameter("notice")
 
             val noticeId = when {
-
-                queryNotice != null && queryNotice.length == 36 -> queryNotice
-
-                path.startsWith("/n/") -> path.removePrefix("/n/").split("?")[0].split("/")[0].trim()
-
-                fragment.startsWith("notices/") -> fragment.removePrefix("notices/").split("?")[0].trim()
-
+                isCustomScheme && (host == "notice" || host == "n") -> {
+                    path.removePrefix("/").split("?")[0].split("/")[0].trim().ifBlank { null }
+                }
+                isCustomScheme && path.startsWith("/n/") -> {
+                    path.removePrefix("/n/").split("?")[0].split("/")[0].trim().ifBlank { null }
+                }
+                !queryNotice.isNullOrBlank() -> queryNotice.trim()
+                path.startsWith("/n/") -> path.removePrefix("/n/").split("?")[0].split("/")[0].trim().ifBlank { null }
+                path.startsWith("/notice/") -> path.removePrefix("/notice/").split("?")[0].split("/")[0].trim().ifBlank { null }
+                fragment.startsWith("notices/") -> fragment.removePrefix("notices/").split("?")[0].trim().ifBlank { null }
                 else -> null
-
             }
 
-
-
             if (!noticeId.isNullOrBlank()) {
-
                 targetIntent.data = null
-
                 selectHomeTab(R.id.nav_notices)
-
                 window.decorView.postDelayed({
-
                     if (::academicScreens.isInitialized) {
-
                         academicScreens.openDirectNotice(noticeId)
-
                     }
-
                 }, 400)
-
                 return
-
             }
 
 
