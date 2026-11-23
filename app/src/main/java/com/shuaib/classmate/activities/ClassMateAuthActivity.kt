@@ -4379,6 +4379,21 @@ class ClassMateAuthActivity : AppCompatActivity() {
             }
         }
 
+        val screenName = when (tab) {
+            R.id.nav_timetable -> "Timetable"
+            R.id.nav_notices -> "Notices"
+            R.id.nav_upcoming -> "UpcomingAssessments"
+            R.id.nav_pdf -> "CoursesLibrary"
+            R.id.nav_transit -> "TransitTracker"
+            R.id.nav_friends -> "Batchmates"
+            R.id.nav_manage -> "AdminManage"
+            else -> "Profile"
+        }
+        com.shuaib.classmate.utils.ClassMateAnalytics.logScreen(screenName)
+        if (selectedBatchLabel.isNotBlank()) {
+            com.shuaib.classmate.utils.ClassMateAnalytics.setUserBatch(selectedBatchLabel)
+        }
+
 
 
         if (tab != R.id.nav_manage) {

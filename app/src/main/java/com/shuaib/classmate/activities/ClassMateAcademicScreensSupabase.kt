@@ -4386,6 +4386,7 @@ internal class ClassMateAcademicScreensSupabase(
 
                 card.setOnClickListener {
                     com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    com.shuaib.classmate.utils.ClassMateAnalytics.logScreen("PeriodCompanion", "PeriodSheet")
                     com.shuaib.classmate.ui.PeriodCompanionBottomSheet.show(
                         activity = activity,
                         period = p,
@@ -6165,8 +6166,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun showNoticeContent(item: JSONObject, query: String = "") {
-
-
+        com.shuaib.classmate.utils.ClassMateAnalytics.logScreen("NoticeDetail", "NoticeReaderSheet")
 
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_notice_detail, null, false)
 
@@ -10485,6 +10485,7 @@ internal class ClassMateAcademicScreensSupabase(
     private val triggerOpenPostAssessmentSheet = androidx.compose.runtime.mutableStateOf(false)
 
     fun openPostAssessmentSheet() {
+        com.shuaib.classmate.utils.ClassMateAnalytics.logScreen("PostAssessment", "AssessmentSheet")
         val authAct = activity as? ClassMateAuthActivity
         authAct?.selectHomeTab(R.id.nav_upcoming)
         triggerOpenPostAssessmentSheet.value = true
@@ -10497,6 +10498,7 @@ internal class ClassMateAcademicScreensSupabase(
     fun openDirectAssessment(assessmentId: String) {
         val cleanId = assessmentId.trim()
         if (cleanId.isBlank()) return
+        com.shuaib.classmate.utils.ClassMateAnalytics.logScreen("AssessmentDetail", "AssessmentSheet")
         pendingTargetAssessmentId.value = cleanId
         val authAct = activity as? ClassMateAuthActivity
         authAct?.selectHomeTab(R.id.nav_upcoming)
@@ -10701,6 +10703,15 @@ internal class ClassMateAcademicScreensSupabase(
                 },
                 onIsAtTopChanged = { isTop ->
                     swipeRefresh.isEnabled = isTop
+                },
+                onOpenHamburger = {
+                    com.shuaib.classmate.ui.ClassMateHamburgerSheet.show(
+                        activity = activity,
+                        scope = scope,
+                        batchId = if (bId.isNotBlank()) ({ bId }) else batchId,
+                        batchLabel = batchLabel,
+                        profile = profile
+                    )
                 },
                 triggerOpenPostSheet = triggerOpenPostAssessmentSheet.value,
                 onPostSheetOpened = { triggerOpenPostAssessmentSheet.value = false },

@@ -63,6 +63,14 @@ fun AssessmentTimelineCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            val courseLabel = when {
+                assessment.courseCode.isNotBlank() && assessment.courseTitle.isNotBlank() ->
+                    "${assessment.courseCode} · ${assessment.courseTitle}"
+                assessment.courseCode.isNotBlank() -> assessment.courseCode
+                assessment.courseTitle.isNotBlank() -> assessment.courseTitle
+                else -> "Academic Assessment"
+            }
+
             // Header: Course code + Standardized Type badge (vector icon + shortName)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -70,7 +78,7 @@ fun AssessmentTimelineCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${assessment.courseCode.ifBlank { "Course" }} · ${assessment.courseTitle}",
+                    text = courseLabel,
                     fontSize = 12.sp,
                     fontFamily = PlusJakartaBold,
                     fontWeight = FontWeight.Bold,

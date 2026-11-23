@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -118,6 +119,7 @@ fun UpcomingAssessmentsScreen(
     // Intercept system back button when in History view, returning to Upcoming
     BackHandler(enabled = isHistoryOpen) {
         isHistoryOpen = false
+        selectedFilter = AssessmentFilter.All
     }
 
     var selectedDetailAssessment by remember { mutableStateOf<AssessmentItem?>(null) }
@@ -176,260 +178,357 @@ fun UpcomingAssessmentsScreen(
             .fillMaxSize()
             .background(AssessmentColors.screenBackgroundColor(isDark))
     ) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 96.dp, bottom = 120.dp)
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Hero Section: Elevated Card with Gradient Border
-            if (!isHistoryOpen && heroAssessment != null) {
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                        AssessmentHeroCard(
-                            assessment = heroAssessment,
-                            onClick = { selectedDetailAssessment = heroAssessment },
-                            isDark = isDark
+            // Pinned App Brand Header with solid background and scroll-aware hairline
+            val showHeaderDivider by remember {
+                derivedStateOf {
+                    listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 8
+                }
+            }
+
+            Surface(
+                color = AssessmentColors.screenBackgroundColor(isDark),
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, top = 6.dp, end = 16.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isHistoryOpen) {
+                                // Back Navigation Button (38dp x 38dp) to return to Upcoming
+                                IconButton(
+                                    onClick = {
+                                        isHistoryOpen = false
+                                        selectedFilter = AssessmentFilter.All
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_arrow_back),
+                                        contentDescription = "Back to Upcoming",
+                                        tint = AssessmentColors.primaryTextColor(isDark),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            } else {
+                                // Hamburger Menu Button (38dp x 38dp)
+                                IconButton(
+                                    onClick = onOpenHamburger,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_hamburger_menu),
+                                        contentDescription = "Menu",
+                                        tint = AssessmentColors.primaryTextColor(isDark),
+                                        modifier = Modifier.size(23.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            Text(
+                                text = if (isHistoryOpen) "Assessment History" else "Upcoming",
+                                fontSize = 24.sp,
+                                fontFamily = PlusJakartaBold,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = AssessmentColors.primaryTextColor(isDark),
+                                letterSpacing = (-0.4).sp,
+                                maxLines = 1
+                            )
+                        }
+
+                        if (!isHistoryOpen) {
+                            // Dedicated History Button in top right corner (only visible on Upcoming page)
+                            Surface(
+                                onClick = {
+                                    isHistoryOpen = true
+                                    selectedFilter = AssessmentFilter.All
+                                },
+                                shape = RoundedCornerShape(50),
+                                color = if (isDark) Color(0xFF141D30).copy(alpha = 0.9f) else Color(0xFFF1F5F9).copy(alpha = 0.95f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isDark) Color(0x30FFFFFF) else Color(0x1F000000)
+                                )
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_clock),
+                                        contentDescription = null,
+                                        tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "History",
+                                        fontSize = 12.sp,
+                                        fontFamily = PlusJakartaBold,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF475569)
+                                    )
+                                }
+                            }
+                        } else {
+                            // Subtle Record Count badge on History page
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (isDark) Color(0xFF141D30).copy(alpha = 0.85f) else Color(0xFFF1F5F9).copy(alpha = 0.85f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isDark) Color(0x28FFFFFF) else Color(0x15000000)
+                                )
+                            ) {
+                                Text(
+                                    text = "${pastItems.size} Records",
+                                    fontSize = 11.5.sp,
+                                    fontFamily = PlusJakartaBold,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF64748B),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (showHeaderDivider) {
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
                         )
                     }
                 }
-            } else if (!isHistoryOpen && upcomingItems.isEmpty()) {
-                // All caught up banner
-                item {
+            }
+
+            // Body: Dedicated empty state when no upcoming items exist, or LazyColumn
+            if (!isHistoryOpen && upcomingItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (isDark) Color(0xFF131A2A) else Color(0xFFFFFFFF)
                         ),
                         border = BorderStroke(
                             1.dp,
                             if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
-                        )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 4.dp else 2.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(20.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_check),
-                                contentDescription = null,
-                                tint = Color(0xFF10B981),
-                                modifier = Modifier.size(36.dp)
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF10B981).copy(alpha = if (isDark) 0.18f else 0.12f),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_check),
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Text(
+                                text = "All Caught Up!",
+                                fontSize = 18.sp,
+                                fontFamily = PlusJakartaBold,
+                                fontWeight = FontWeight.Bold,
+                                color = AssessmentColors.primaryTextColor(isDark)
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    text = "All Caught Up!",
-                                    fontSize = 16.sp,
-                                    fontFamily = PlusJakartaBold,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AssessmentColors.primaryTextColor(isDark)
-                                )
-                                Text(
-                                    text = "No pending assessments or deadlines right now.",
-                                    fontSize = 12.5.sp,
-                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                                )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = "No pending tests, quizzes, or assignments right now. You're completely up to date!",
+                                fontSize = 13.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+
+                            if (pastItems.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Surface(
+                                    onClick = {
+                                        isHistoryOpen = true
+                                        selectedFilter = AssessmentFilter.All
+                                    },
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFEEF2FF),
+                                    border = BorderStroke(1.dp, if (isDark) Color(0x30FFFFFF) else Color(0xFFC7D2FE))
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_clock),
+                                            contentDescription = null,
+                                            tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF4F46E5),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "View Assessment History (${pastItems.size})",
+                                            fontSize = 12.sp,
+                                            fontFamily = PlusJakartaBold,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF4338CA)
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-
-            // Filter Chips Row
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
-                AssessmentFilterRow(
-                    selectedFilter = selectedFilter,
-                    onFilterSelected = { selectedFilter = it },
-                    showPastArchive = isHistoryOpen,
-                    onTogglePastArchive = { isHistoryOpen = it },
-                    isDark = isDark
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-
-            // Section Subheader
-            item {
-                val headerText = when {
-                    isHistoryOpen -> "Past Records (${displayList.size})"
-                    selectedFilter != AssessmentFilter.All -> "${selectedFilter.label} (${displayList.size})"
-                    else -> "Coming Up (${displayList.size})"
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = headerText,
-                        fontSize = 14.5.sp,
-                        fontFamily = PlusJakartaBold,
-                        fontWeight = FontWeight.Bold,
-                        color = AssessmentColors.primaryTextColor(isDark)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-            }
-
-            // Timeline Items
-            if (displayList.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp, horizontal = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isDark) Color(0xFF141D30) else Color(0xFFE2E8F0),
-                            border = BorderStroke(1.dp, if (isDark) Color(0x28FFFFFF) else Color(0x10000000)),
-                            modifier = Modifier.size(54.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_assignment),
-                                    contentDescription = null,
-                                    tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (isHistoryOpen) "No past or completed assessments found" else "No upcoming assessments for this filter",
-                            fontSize = 14.sp,
-                            fontFamily = PlusJakartaBold,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AssessmentColors.primaryTextColor(isDark)
-                        )
-                        Text(
-                            text = if (isHistoryOpen) "Past exams and completed deadlines will be archived here." else "New class tests, quizzes and assignments will appear here.",
-                            fontSize = 12.sp,
-                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                            textAlign = TextAlign.Center
-                        )
                     }
                 }
             } else {
-                items(displayList, key = { it.id }) { item ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                        AssessmentTimelineCard(
-                            assessment = item,
-                            onClick = { selectedDetailAssessment = item },
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)
+                ) {
+                    // Hero Section: Elevated Card (shown in Upcoming when 'All' is selected and hero item exists)
+                    if (!isHistoryOpen && selectedFilter == AssessmentFilter.All && heroAssessment != null) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                AssessmentHeroCard(
+                                    assessment = heroAssessment,
+                                    onClick = { selectedDetailAssessment = heroAssessment },
+                                    isDark = isDark
+                                )
+                            }
+                        }
+                    }
+
+                    // Filter Chips Row
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AssessmentFilterRow(
+                            selectedFilter = selectedFilter,
+                            onFilterSelected = { selectedFilter = it },
+                            showPastArchive = isHistoryOpen,
+                            onTogglePastArchive = { isHistoryOpen = it },
                             isDark = isDark
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
                     }
-                }
-            }
-        }
 
-        // Floating Transparent App Brand Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 12.dp, top = 6.dp, end = 16.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isHistoryOpen) {
-                    // Back Navigation Button (38dp x 38dp) to return to Upcoming
-                    IconButton(
-                        onClick = { isHistoryOpen = false },
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = "Back to Upcoming",
-                            tint = AssessmentColors.primaryTextColor(isDark),
-                            modifier = Modifier.size(24.dp)
-                        )
+                    // Section Subheader (Aligned flush with cards at 16.dp)
+                    item {
+                        val headerText = when {
+                            isHistoryOpen -> "Past Records (${displayList.size})"
+                            selectedFilter != AssessmentFilter.All -> "${selectedFilter.label} (${displayList.size})"
+                            else -> "Coming Up (${displayList.size})"
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = headerText,
+                                fontSize = 14.sp,
+                                fontFamily = PlusJakartaBold,
+                                fontWeight = FontWeight.Bold,
+                                color = AssessmentColors.primaryTextColor(isDark)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
-                } else {
-                    // Hamburger Menu Button (38dp x 38dp)
-                    IconButton(
-                        onClick = onOpenHamburger,
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_hamburger_menu),
-                            contentDescription = "Menu",
-                            tint = AssessmentColors.primaryTextColor(isDark),
-                            modifier = Modifier.size(23.dp)
-                        )
+
+                    // Timeline Items or Contextual Empty State
+                    if (displayList.isEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 40.dp, horizontal = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isDark) Color(0xFF141D30) else Color(0xFFE2E8F0),
+                                    border = BorderStroke(1.dp, if (isDark) Color(0x28FFFFFF) else Color(0x10000000)),
+                                    modifier = Modifier.size(54.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_assignment),
+                                            contentDescription = null,
+                                            tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (isHistoryOpen) "No past records found" else "No upcoming ${selectedFilter.label.lowercase()}s",
+                                    fontSize = 14.5.sp,
+                                    fontFamily = PlusJakartaBold,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AssessmentColors.primaryTextColor(isDark)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isHistoryOpen) {
+                                        "Past exams and completed deadlines will be archived here."
+                                    } else {
+                                        "No upcoming ${selectedFilter.label.lowercase()}s scheduled. Check back later."
+                                    },
+                                    fontSize = 12.5.sp,
+                                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    } else {
+                        items(displayList, key = { it.id }) { item ->
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                                AssessmentTimelineCard(
+                                    assessment = item,
+                                    onClick = { selectedDetailAssessment = item },
+                                    isDark = isDark
+                                )
+                            }
+                        }
                     }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Text(
-                    text = if (isHistoryOpen) "Assessment History" else "Upcoming",
-                    fontSize = 24.sp,
-                    fontFamily = PlusJakartaBold,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = AssessmentColors.primaryTextColor(isDark),
-                    letterSpacing = (-0.4).sp,
-                    maxLines = 1
-                )
-            }
-
-            if (!isHistoryOpen) {
-                // Dedicated History Button in top right corner (only visible on Upcoming page)
-                Surface(
-                    onClick = { isHistoryOpen = true },
-                    shape = RoundedCornerShape(50),
-                    color = if (isDark) Color(0xFF141D30).copy(alpha = 0.9f) else Color(0xFFF1F5F9).copy(alpha = 0.95f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isDark) Color(0x30FFFFFF) else Color(0x1F000000)
-                    )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_clock),
-                            contentDescription = null,
-                            tint = if (isDark) Color(0xFFA5B4FC) else Color(0xFF64748B),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "History",
-                            fontSize = 12.sp,
-                            fontFamily = PlusJakartaBold,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF475569)
-                        )
-                    }
-                }
-            } else {
-                // Subtle Record Count badge on History page
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isDark) Color(0xFF141D30).copy(alpha = 0.85f) else Color(0xFFF1F5F9).copy(alpha = 0.85f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isDark) Color(0x28FFFFFF) else Color(0x15000000)
-                    )
-                ) {
-                    Text(
-                        text = "${pastItems.size} Records",
-                        fontSize = 11.5.sp,
-                        fontFamily = PlusJakartaBold,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF64748B),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
                 }
             }
         }

@@ -56,7 +56,7 @@ android {
         applicationId = "com.shuaib.classmate"
         minSdk = 26
         targetSdk = 34
-        val appVersionCode = 48
+        val appVersionCode = 49
         versionCode = appVersionCode
         versionName = "1.1.$appVersionCode"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -136,6 +136,7 @@ dependencies {
 
     // Firebase BOM
     implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)

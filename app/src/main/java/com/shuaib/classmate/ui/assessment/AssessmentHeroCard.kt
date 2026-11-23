@@ -79,9 +79,9 @@ fun AssessmentHeroCard(
     } else {
         Brush.linearGradient(
             colors = listOf(
+                Color(0xFFFFFFFF),
                 Color(0xFFF8FAFC),
-                Color(0xFFEEF2FF),
-                Color(0xFFE0E7FF)
+                Color(0xFFEEF2FF)
             )
         )
     }
@@ -208,9 +208,17 @@ fun AssessmentHeroCard(
 
                 Spacer(modifier = Modifier.height(13.dp))
 
+                val courseLabel = when {
+                    assessment.courseCode.isNotBlank() && assessment.courseTitle.isNotBlank() ->
+                        "${assessment.courseCode} · ${assessment.courseTitle}"
+                    assessment.courseCode.isNotBlank() -> assessment.courseCode
+                    assessment.courseTitle.isNotBlank() -> assessment.courseTitle
+                    else -> "Academic Assessment"
+                }
+
                 // Course Code & Name (High contrast crisp typography)
                 Text(
-                    text = "${assessment.courseCode.ifBlank { "Course" }} · ${assessment.courseTitle.ifBlank { "Academic Assessment" }}",
+                    text = courseLabel,
                     fontSize = 12.5.sp,
                     fontFamily = PlusJakartaBold,
                     fontWeight = FontWeight.Bold,
