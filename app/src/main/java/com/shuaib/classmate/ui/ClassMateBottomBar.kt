@@ -114,6 +114,7 @@ fun ClassMateFloatingNavigationBar(
     onQuickActionRequest: ((ClassMateTab) -> List<TabQuickAction>)? = null,
     isDark: Boolean = isSystemInDarkTheme()
 ) {
+    val view = androidx.compose.ui.platform.LocalView.current
     val haptic = LocalHapticFeedback.current
 
     // Instagram solid monochrome palette
@@ -192,11 +193,12 @@ fun ClassMateFloatingNavigationBar(
                                     indication = null,
                                     interactionSource = interactionSource,
                                     onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        com.shuaib.classmate.utils.HapticHelper.selectionTick(view)
                                         onTabSelected(tab)
                                     },
                                     onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        view.isHapticFeedbackEnabled = true
+                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                                         if (onTabLongClick != null) {
                                             onTabLongClick.invoke(tab)
                                         } else {

@@ -14,12 +14,20 @@ object HapticHelper {
      * Subtle, tactile tick for tabs, filter chips, and selector pills.
      */
     fun selectionTick(view: View) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_TICK)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        view.isHapticFeedbackEnabled = true
+        val constant = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> HapticFeedbackConstants.SEGMENT_TICK
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> HapticFeedbackConstants.CLOCK_TICK
+            else -> HapticFeedbackConstants.KEYBOARD_TAP
+        }
+        val performed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            view.performHapticFeedback(constant)
         } else {
-            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            @Suppress("DEPRECATION")
+            view.performHapticFeedback(constant, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING)
+        }
+        if (!performed) {
+            selectionTick(view.context)
         }
     }
 
@@ -27,7 +35,7 @@ object HapticHelper {
         try {
             val vibrator = getVibrator(context)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             } else {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(15)

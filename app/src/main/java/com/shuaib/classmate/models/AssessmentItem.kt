@@ -84,10 +84,9 @@ data class AssessmentItem(
         }
     }
 
-    fun getUrgencyLevel(): UrgencyLevel {
+    fun getUrgencyLevel(now: LocalDateTime = LocalDateTime.now()): UrgencyLevel {
         if (isPast()) return UrgencyLevel.PAST
         val dt = getDeadlineDateTime() ?: return UrgencyLevel.UPCOMING
-        val now = LocalDateTime.now()
         val minutesRemaining = ChronoUnit.MINUTES.between(now, dt)
         if (minutesRemaining < 0) return UrgencyLevel.PAST
         val hoursRemaining = minutesRemaining / 60
@@ -115,20 +114,24 @@ data class AssessmentItem(
         }
     }
 
-    fun getFormattedCountdown(): String {
+    fun getFormattedCountdown(now: LocalDateTime = LocalDateTime.now()): String {
         val dt = getDeadlineDateTime() ?: return "Upcoming"
-        val now = LocalDateTime.now()
         if (dt.isBefore(now)) return "Past"
 
-        val days = ChronoUnit.DAYS.between(now, dt)
-        val hours = ChronoUnit.HOURS.between(now, dt) % 24
-        val minutes = ChronoUnit.MINUTES.between(now, dt) % 60
+        val totalMinutes = ChronoUnit.MINUTES.between(now, dt)
+        if (totalMinutes <= 0) return "Due now"
+
+        val totalHours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        val days = totalHours / 24
+        val remHours = totalHours % 24
 
         return when {
-            days > 1 -> "In ${days} days ${hours}h"
-            days == 1L -> "Tomorrow (${hours}h remaining)"
-            hours > 0 -> "In ${hours}h ${minutes}m"
-            minutes > 0 -> "In ${minutes} minutes!"
+            days > 0 && remHours > 0 -> "In ${days}d ${remHours}h"
+            days > 0 -> "In ${days}d"
+            totalHours > 0 && minutes > 0 -> "In ${totalHours}h ${minutes}m"
+            totalHours > 0 -> "In ${totalHours}h"
+            minutes > 0 -> "In ${minutes}m"
             else -> "Due now"
         }
     }
