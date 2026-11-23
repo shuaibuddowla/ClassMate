@@ -1007,6 +1007,10 @@ internal class ClassMateAcademicScreensSupabase(
             when (tab) {
                 R.id.nav_upcoming -> {
                     stopNoticePoller()
+                    val isDarkTheme = com.shuaib.classmate.utils.AppPreferences(activity).isAppInDarkMode(activity)
+                    val insetsController = androidx.core.view.WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                    insetsController.isAppearanceLightStatusBars = !isDarkTheme
+                    activity.window.statusBarColor = android.graphics.Color.TRANSPARENT
                 }
                 R.id.nav_timetable -> {
                     stopNoticePoller()

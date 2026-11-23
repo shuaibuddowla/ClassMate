@@ -52,7 +52,7 @@ enum class ClassMateTab(
 ) {
     TIMETABLE(R.id.nav_timetable, "Timetable", R.drawable.ic_timetable_outline, R.drawable.ic_timetable),
     NOTICES(R.id.nav_notices, "Notices", R.drawable.ic_bell_outline, R.drawable.ic_notice),
-    UPCOMING(R.id.nav_upcoming, "Upcoming", R.drawable.ic_upcoming_outline, R.drawable.ic_upcoming),
+    UPCOMING(R.id.nav_upcoming, "Assessments", R.drawable.ic_upcoming_outline, R.drawable.ic_upcoming),
     COURSES(R.id.nav_pdf, "Courses", R.drawable.ic_academic_cap_outline, R.drawable.ic_academic_cap_filled),
     TRANSIT(R.id.nav_transit, "Transit", R.drawable.ic_bus_outline, R.drawable.ic_bus_filled),
     BATCH(R.id.nav_friends, "Batch", R.drawable.ic_batch_friends, R.drawable.ic_batch_friends_filled),

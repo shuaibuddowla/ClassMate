@@ -88,6 +88,18 @@ fun UpcomingAssessmentsScreen(
     val allAssessments by repository.assessmentsFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = (view.context as? android.app.Activity)?.window
+            if (window != null) {
+                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
+                insetsController.isAppearanceLightStatusBars = !isDark
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+            }
+        }
+    }
+
     val listState = rememberLazyListState()
     val isAtTop by remember {
         derivedStateOf {
@@ -217,7 +229,7 @@ fun UpcomingAssessmentsScreen(
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_arrow_back),
-                                        contentDescription = "Back to Upcoming",
+                                        contentDescription = "Back to Assessments",
                                         tint = AssessmentColors.primaryTextColor(isDark),
                                         modifier = Modifier.size(24.dp)
                                     )
@@ -240,7 +252,7 @@ fun UpcomingAssessmentsScreen(
                             Spacer(modifier = Modifier.width(6.dp))
 
                             Text(
-                                text = if (isHistoryOpen) "Assessment History" else "Upcoming",
+                                text = if (isHistoryOpen) "Assessment History" else "Assessments",
                                 fontSize = 24.sp,
                                 fontFamily = PlusJakartaBold,
                                 fontWeight = FontWeight.ExtraBold,
@@ -498,8 +510,26 @@ fun UpcomingAssessmentsScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
+                                val filterName = when (selectedFilter) {
+                                    AssessmentFilter.All -> "assessments"
+                                    AssessmentFilter.ClassTest -> "class tests"
+                                    AssessmentFilter.Assignment -> "assignments"
+                                    AssessmentFilter.Quiz -> "quizzes"
+                                    AssessmentFilter.LabReport -> "lab reports"
+                                    AssessmentFilter.Presentation -> "presentations"
+                                }
+                                val emptyTitle = if (isHistoryOpen) {
+                                    if (selectedFilter == AssessmentFilter.All) "No past records found" else "No past $filterName found"
+                                } else {
+                                    "No upcoming $filterName"
+                                }
+                                val emptySubtitle = if (isHistoryOpen) {
+                                    if (selectedFilter == AssessmentFilter.All) "Past exams and completed deadlines will be archived here." else "Past $filterName will be archived here."
+                                } else {
+                                    "No upcoming $filterName scheduled. Check back later."
+                                }
                                 Text(
-                                    text = if (isHistoryOpen) "No past records found" else "No upcoming ${selectedFilter.label.lowercase()}s",
+                                    text = emptyTitle,
                                     fontSize = 14.5.sp,
                                     fontFamily = PlusJakartaBold,
                                     fontWeight = FontWeight.SemiBold,
@@ -507,11 +537,7 @@ fun UpcomingAssessmentsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (isHistoryOpen) {
-                                        "Past exams and completed deadlines will be archived here."
-                                    } else {
-                                        "No upcoming ${selectedFilter.label.lowercase()}s scheduled. Check back later."
-                                    },
+                                    text = emptySubtitle,
                                     fontSize = 12.5.sp,
                                     color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
                                     textAlign = TextAlign.Center
