@@ -603,6 +603,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val studentName = tx.optString("student_name")
         val dateStr = tx.optString("transacted_at")
         val canEdit = if (isPending) isCr else tx.optBoolean("can_edit", isCr)
+        val createdByName = tx.optString("created_by_name").takeIf { it.isNotBlank() && it != "null" }
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -614,10 +615,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 topMargin = dp(6)
             }
             layoutParams = lp
-            isClickable = canEdit
-            isFocusable = canEdit
-            if (canEdit) {
-                if (isPending) {
+            isClickable = true
+            isFocusable = true
+            if (isPending) {
+                if (canEdit) {
                     setOnClickListener {
                         MaterialAlertDialogBuilder(this@ClassMateBatchFundActivity)
                             .setTitle("Pending Offline Transaction")
@@ -631,9 +632,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             }
                             .show()
                     }
-                } else {
-                    setOnClickListener { showTransactionActionsDialog(tx) }
                 }
+            } else {
+                setOnClickListener { showTransactionDetailsDialog(tx) }
             }
         }
 
@@ -671,11 +672,16 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
         val formattedDate = if (isPending) "Just now" else formatTransactionDate(dateStr)
         val tvSub = TextView(this).apply {
-            val subText = if (studentName.isNotBlank() && studentName != "null") {
-                val subTitle = if (title.isNotBlank() && !title.equals(studentName, ignoreCase = true)) title else (if (isInflow) "Deposit" else "Expense")
-                if (formattedDate.isNotBlank()) "$subTitle • $formattedDate" else subTitle
-            } else {
-                if (formattedDate.isNotBlank()) "From batch fund • $formattedDate" else "From batch fund"
+            val shortCreator = createdByName?.trim()?.split(" ")?.firstOrNull().orEmpty()
+            val subText = buildString {
+                if (studentName.isNotBlank() && studentName != "null") {
+                    val subTitle = if (title.isNotBlank() && !title.equals(studentName, ignoreCase = true)) title else (if (isInflow) "Deposit" else "Expense")
+                    append(subTitle)
+                } else {
+                    append("From batch fund")
+                }
+                if (formattedDate.isNotBlank()) append(" • $formattedDate")
+                if (shortCreator.isNotBlank()) append(" • by $shortCreator")
             }
             text = subText
             setTextColor(getColor(R.color.cm_text_secondary))
@@ -1136,10 +1142,10 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     for (tx in mergedList) {
                         val row = createTransactionRow(tx)
                         val isPending = tx.optBoolean("is_offline_pending", false)
-                        if (isCr && !isPending) {
+                        if (!isPending) {
                             row.setOnClickListener {
                                 dialog.dismiss()
-                                showTransactionActionsDialog(tx)
+                                showTransactionDetailsDialog(tx)
                             }
                         }
                         container.addView(row)
@@ -1970,27 +1976,118 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(shareIntent, "Share Batch Fund Statement"))
     }
 
+    private fun formatTransactionTimestamp(isoTimestamp: String?): String {
+        if (isoTimestamp.isNullOrBlank() || isoTimestamp == "null") return "Not recorded"
+        return try {
+            val zdt = java.time.ZonedDateTime.parse(isoTimestamp)
+            val dhakaTime = zdt.withZoneSameInstant(java.time.ZoneId.of("Asia/Dhaka"))
+            dhakaTime.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", java.util.Locale.ENGLISH))
+        } catch (_: Exception) {
+            try {
+                val odt = java.time.OffsetDateTime.parse(isoTimestamp)
+                val dhakaTime = odt.atZoneSameInstant(java.time.ZoneId.of("Asia/Dhaka"))
+                dhakaTime.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", java.util.Locale.ENGLISH))
+            } catch (_: Exception) {
+                isoTimestamp.take(19).replace("T", " ")
+            }
+        }
+    }
+
     // ==========================================
-    // EDIT / DELETE TRANSACTION DIALOG
+    // TRANSACTION DETAILS SHEET (AUDIT & ACTIONS)
     // ==========================================
-    private fun showTransactionActionsDialog(tx: JSONObject) {
+    private fun showTransactionDetailsDialog(tx: JSONObject) {
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_fund_transaction_details_sheet, null, false)
+        dialog.setContentView(view)
+
+        dialog.setOnShowListener {
+            val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            if (bottomSheet != null) {
+                val behavior = BottomSheetBehavior.from(bottomSheet)
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                behavior.skipCollapsed = true
+            }
+        }
+
         val id = tx.optString("id")
         val currentTitle = tx.optString("title")
         val currentAmount = tx.optDouble("amount")
         val currentStudent = tx.optString("student_name")
+        val currentStudentId = tx.optString("student_id")
         val isDeposit = tx.optString("type") == "inflow"
+        val transDate = tx.optString("transacted_at")
+        val createdAt = tx.optString("created_at")
+        val createdByName = tx.optString("created_by_name").ifBlank { "Batch Admin" }
+        val canEdit = tx.optBoolean("can_edit", isCr)
 
-        val options = arrayOf("Edit Transaction", "Delete Transaction")
-        MaterialAlertDialogBuilder(this)
-            .setTitle(if (isDeposit) "Manage Deposit" else "Manage Expense")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showEditTransactionDialog(tx)
-                    1 -> confirmDeleteTransaction(id, currentTitle, currentAmount)
-                }
+        view.findViewById<View>(R.id.btnDismissDetailsSheet)?.setOnClickListener { dialog.dismiss() }
+
+        val tvTypeBadge = view.findViewById<TextView>(R.id.tvTxTypeBadge)
+        val tvAmountLarge = view.findViewById<TextView>(R.id.tvTxAmountLarge)
+        val tvTitleHeader = view.findViewById<TextView>(R.id.tvTxTitleHeader)
+        val bannerAmountCard = view.findViewById<View>(R.id.bannerAmountCard)
+
+        if (isDeposit) {
+            tvTypeBadge.text = "DEPOSIT (+)"
+            tvTypeBadge.setTextColor(0xFF0D9488.toInt())
+            tvAmountLarge.text = "+ ৳ ${formatMoney(currentAmount)}"
+            tvAmountLarge.setTextColor(0xFF0D9488.toInt())
+            bannerAmountCard.setBackgroundResource(R.drawable.bg_fund_tile_cyan)
+        } else {
+            tvTypeBadge.text = "EXPENSE (-)"
+            tvTypeBadge.setTextColor(0xFFDC2626.toInt())
+            tvAmountLarge.text = "- ৳ ${formatMoney(currentAmount)}"
+            tvAmountLarge.setTextColor(0xFFDC2626.toInt())
+            bannerAmountCard.setBackgroundResource(R.drawable.bg_fund_tile_orange)
+        }
+        tvTitleHeader.text = currentTitle
+
+        // Student row
+        val rowTxStudent = view.findViewById<View>(R.id.rowTxStudent)
+        val tvTxStudentValue = view.findViewById<TextView>(R.id.tvTxStudentValue)
+        if (isDeposit && currentStudent.isNotBlank() && currentStudent != "null") {
+            rowTxStudent.visibility = View.VISIBLE
+            val studentLabel = if (currentStudentId.isNotBlank() && currentStudentId != "null") {
+                "$currentStudent ($currentStudentId)"
+            } else {
+                currentStudent
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            tvTxStudentValue.text = studentLabel
+        } else {
+            rowTxStudent.visibility = View.GONE
+        }
+
+        // Date row
+        view.findViewById<TextView>(R.id.tvTxDateValue)?.text = formatTransactionDate(transDate).ifBlank { transDate }
+
+        // Audit section: Recorded by & Timestamp
+        view.findViewById<TextView>(R.id.tvTxRecordedBy)?.text = "Recorded by $createdByName"
+        view.findViewById<TextView>(R.id.tvTxEntryTime)?.text = "Entry time: ${formatTransactionTimestamp(createdAt)}"
+
+        // Actions
+        val layoutTxCrActions = view.findViewById<View>(R.id.layoutTxCrActions)
+        val btnTxClose = view.findViewById<View>(R.id.btnTxClose)
+
+        if (isCr && canEdit) {
+            layoutTxCrActions.visibility = View.VISIBLE
+            btnTxClose.visibility = View.GONE
+
+            view.findViewById<View>(R.id.btnTxDelete)?.setOnClickListener {
+                dialog.dismiss()
+                confirmDeleteTransaction(id, currentTitle, currentAmount)
+            }
+            view.findViewById<View>(R.id.btnTxEdit)?.setOnClickListener {
+                dialog.dismiss()
+                showEditTransactionDialog(tx)
+            }
+        } else {
+            layoutTxCrActions.visibility = View.GONE
+            btnTxClose.visibility = View.VISIBLE
+            btnTxClose.setOnClickListener { dialog.dismiss() }
+        }
+
+        dialog.show()
     }
 
     private fun showEditTransactionDialog(tx: JSONObject) {
@@ -1999,6 +2096,11 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         val etAmount = view.findViewById<TextInputEditText>(R.id.etEditAmount)
         val etTitle = view.findViewById<TextInputEditText>(R.id.etEditTitle)
         val etStudent = view.findViewById<TextInputEditText>(R.id.etEditStudentName)
+
+        val createdByName = tx.optString("created_by_name").ifBlank { "Batch Admin" }
+        val createdAt = tx.optString("created_at")
+        view.findViewById<TextView>(R.id.tvEditRecordedBy)?.text = "Recorded by $createdByName"
+        view.findViewById<TextView>(R.id.tvEditEntryTime)?.text = "Entry time: ${formatTransactionTimestamp(createdAt)}"
 
         val isDeposit = tx.optString("type", "inflow") == "inflow"
         val curAmt = tx.optDouble("amount", 0.0)

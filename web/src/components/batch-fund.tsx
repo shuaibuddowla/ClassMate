@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Check,
   X,
+  UserCheck,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import type { RosterStudent } from "@/lib/batch-fund-parser";
@@ -254,7 +255,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
                     tx={tx}
                     isCr={isCr}
                     onClick={() => {
-                      if (isCr) setSelectedTx(tx);
+                      setSelectedTx(tx);
                     }}
                   />
                 ))}
@@ -340,7 +341,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
                   tx={tx}
                   isCr={isCr}
                   onClick={() => {
-                    if (isCr) setSelectedTx(tx);
+                    setSelectedTx(tx);
                   }}
                 />
               ))}
@@ -550,28 +551,35 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
         />
       )}
 
-      {/* Modal: Edit or Delete Transaction */}
+      {/* Modal: Edit or View Transaction Details */}
       {selectedTx && (
-        <EditTransactionModal
-          tx={selectedTx}
-          batchId={ctx.batch}
-          close={() => setSelectedTx(null)}
-          onSuccess={() => {
-            setSelectedTx(null);
-            qc.invalidateQueries({
-              queryKey: [ctx.user, ctx.batch, "batch-fund-summary"],
-            });
-            qc.invalidateQueries({
-              queryKey: [ctx.user, ctx.batch, "batch-fund-transactions"],
-            });
-            qc.invalidateQueries({
-              queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
-            });
-            qc.invalidateQueries({
-              queryKey: [ctx.user, ctx.batch, "batch-fund-payers"],
-            });
-          }}
-        />
+        isCr ? (
+          <EditTransactionModal
+            tx={selectedTx}
+            batchId={ctx.batch}
+            close={() => setSelectedTx(null)}
+            onSuccess={() => {
+              setSelectedTx(null);
+              qc.invalidateQueries({
+                queryKey: [ctx.user, ctx.batch, "batch-fund-summary"],
+              });
+              qc.invalidateQueries({
+                queryKey: [ctx.user, ctx.batch, "batch-fund-transactions"],
+              });
+              qc.invalidateQueries({
+                queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
+              });
+              qc.invalidateQueries({
+                queryKey: [ctx.user, ctx.batch, "batch-fund-payers"],
+              });
+            }}
+          />
+        ) : (
+          <TransactionDetailsModal
+            tx={selectedTx}
+            close={() => setSelectedTx(null)}
+          />
+        )
       )}
 
       {/* Modal: Edit Fund Description */}
@@ -633,17 +641,19 @@ function TransactionRow({
     bgClass = "bg-blue-soft";
   }
 
-  // Format Date
+  // Format Date and Creator
   const dateStr = tx.transacted_at
     ? new Date(tx.transacted_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       })
     : "";
+  const createdByName = (tx.created_by_name || "").trim();
+  const shortCreator = createdByName ? createdByName.split(" ")[0] : "";
 
   return (
     <div
-      className={`activity-row ${isCr ? "clickable-row" : ""}`}
+      className="activity-row clickable-row"
       onClick={onClick}
     >
       <div className={`activity-avatar ${bgClass}`}>{iconContent}</div>
@@ -654,6 +664,7 @@ function TransactionRow({
         <span className="activity-sub">
           {tx.student_name ? tx.title : "From batch fund"}
           {dateStr ? ` • ${dateStr}` : ""}
+          {shortCreator ? ` • by ${shortCreator}` : ""}
         </span>
       </div>
       <div className={`activity-amount ${isInflow ? "inflow" : "outflow"}`}>
@@ -1142,6 +1153,33 @@ function EditTransactionModal({
 
   return (
     <Modal title="Edit Transaction" close={close}>
+      {/* Audit verification card */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "10px 12px",
+        backgroundColor: "var(--surface-container, rgba(0,0,0,0.03))",
+        borderRadius: "10px",
+        fontSize: "13px",
+        color: "var(--muted, #64748b)",
+        marginBottom: "14px",
+        border: "1px solid var(--border, #e2e8f0)",
+      }}>
+        <UserCheck size={18} style={{ color: "var(--primary, #0d9488)", flexShrink: 0 }} />
+        <div>
+          <div>Recorded by <strong style={{ color: "var(--fg, #0f172a)" }}>{tx.created_by_name || "Batch Admin"}</strong></div>
+          {tx.created_at && (
+            <div style={{ fontSize: "11px", opacity: 0.85, marginTop: "2px" }}>
+              Entry time: {new Date(tx.created_at).toLocaleString("en-US", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {error && <ErrorBox error={error} />}
       <form onSubmit={handleUpdate} className="manual-entry-form">
         <div className="form-group">
@@ -1244,6 +1282,93 @@ function EditTransactionModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// Modal for Viewing Transaction Details (Read-only transparency for students)
+function TransactionDetailsModal({
+  tx,
+  close,
+}: {
+  tx: Row;
+  close: () => void;
+}) {
+  const isInflow = tx.type === "inflow";
+  const amountNum = Number(tx.amount || 0);
+  const formattedDate = tx.transacted_at
+    ? new Date(tx.transacted_at).toLocaleDateString("en-US", {
+        dateStyle: "medium",
+      })
+    : "Not specified";
+
+  return (
+    <Modal title="Transaction Details" close={close}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Header Amount */}
+        <div style={{
+          textAlign: "center",
+          padding: "16px",
+          borderRadius: "12px",
+          background: isInflow ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
+          border: isInflow ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)",
+        }}>
+          <span style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: isInflow ? "#15803d" : "#b91c1c" }}>
+            {isInflow ? "Deposit (+)" : "Expense (-)"}
+          </span>
+          <div style={{ fontSize: "28px", fontWeight: 800, marginTop: "4px", color: isInflow ? "#15803d" : "#b91c1c" }}>
+            {isInflow ? `+ ৳ ${amountNum.toLocaleString()}` : `- ৳ ${amountNum.toLocaleString()}`}
+          </div>
+          <div style={{ fontSize: "15px", fontWeight: 600, marginTop: "4px" }}>
+            {tx.title}
+          </div>
+        </div>
+
+        {/* Details list */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px" }}>
+          {isInflow && tx.student_name && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ color: "var(--muted)" }}>Batchmate:</span>
+              <strong style={{ textAlign: "right" }}>
+                {tx.student_name} {tx.student_id ? `(${tx.student_id})` : ""}
+              </strong>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+            <span style={{ color: "var(--muted)" }}>Transacted Date:</span>
+            <strong>{formattedDate}</strong>
+          </div>
+        </div>
+
+        {/* Audit Verification */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          padding: "12px",
+          backgroundColor: "var(--surface-container, rgba(0,0,0,0.03))",
+          borderRadius: "10px",
+          border: "1px solid var(--border, #e2e8f0)",
+          fontSize: "13px",
+        }}>
+          <UserCheck size={20} style={{ color: "var(--primary, #0d9488)", flexShrink: 0 }} />
+          <div>
+            <div>Recorded by <strong style={{ color: "var(--fg, #0f172a)" }}>{tx.created_by_name || "Batch Admin"}</strong></div>
+            {tx.created_at && (
+              <div style={{ fontSize: "11.5px", color: "var(--muted, #64748b)", marginTop: "2px" }}>
+                Entry time: {new Date(tx.created_at).toLocaleString("en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <button type="button" className="secondary" onClick={close} style={{ alignSelf: "flex-end" }}>
+          Close
+        </button>
+      </div>
     </Modal>
   );
 }

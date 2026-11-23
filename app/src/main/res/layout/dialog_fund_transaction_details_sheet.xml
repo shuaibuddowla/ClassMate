@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet"
+    android:padding="20dp">
+
+    <!-- Handle Bar -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="#CBD5E1"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Header Section with Close Button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Transaction Details"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/btnDismissDetailsSheet"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/ic_close"
+            app:tint="@color/cm_text_muted"
+            android:contentDescription="Close" />
+    </LinearLayout>
+
+    <!-- Amount Card Banner -->
+    <LinearLayout
+        android:id="@+id/bannerAmountCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/bg_fund_tile_cyan"
+        android:padding="16dp"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:id="@+id/tvTxTypeBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DEPOSIT (+)"
+            android:textColor="#0D9488"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:id="@+id/tvTxAmountLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+ ৳ 500"
+            android:textColor="#0D9488"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/tvTxTitleHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Picnic Tour 2026"
+            android:textColor="@color/cm_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
+    <!-- Details Info Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_fund_card"
+        android:padding="14dp"
+        android:layout_marginBottom="14dp">
+
+        <!-- Student Row (visible for deposits) -->
+        <LinearLayout
+            android:id="@+id/rowTxStudent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_users"
+                app:tint="@color/cm_text_muted"
+                android:contentDescription="Student" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:text="Batchmate"
+                android:textColor="@color/cm_text_muted"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvTxStudentValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Md. Shahriyar Kabir (CE25017)"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Date Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_calendar"
+                app:tint="@color/cm_text_muted"
+                android:contentDescription="Date" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:text="Transacted Date"
+                android:textColor="@color/cm_text_muted"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvTxDateValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="23 Nov 2026"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Audit Card: Recorded By -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_fund_tile_cyan"
+        android:padding="12dp"
+        android:layout_marginBottom="20dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_admin"
+            app:tint="#0D9488"
+            android:contentDescription="Audit" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/tvTxRecordedBy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recorded by Shuaib"
+                android:textColor="@color/cm_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTxEntryTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Entry time: 23 Nov 2026, 01:45 PM"
+                android:textColor="@color/cm_text_muted"
+                android:textSize="11.5sp"
+                android:layout_marginTop="1dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Actions Row -->
+    <LinearLayout
+        android:id="@+id/layoutTxCrActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTxDelete"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Delete"
+            android:textColor="#DC2626"
+            android:textSize="14sp"
+            app:cornerRadius="12dp"
+            android:layout_marginEnd="10dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTxEdit"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1.4"
+            android:text="Edit Transaction"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:backgroundTint="#0D9488"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnTxClose"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Close"
+        android:visibility="gone"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>
