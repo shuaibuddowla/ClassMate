@@ -1052,6 +1052,9 @@ internal class ClassMateAcademicScreensSupabase(
                             librarySnapshot = restoreLibraryCache(batchId())
                         }
                     }
+                    root.findViewById<View>(R.id.libraryCategoryToggle)?.let { toggle ->
+                        toggle.post { updateLibrarySegment(root, false) }
+                    }
                 }
                 R.id.nav_transit -> {
                     stopNoticePoller()

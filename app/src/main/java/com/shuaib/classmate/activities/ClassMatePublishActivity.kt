@@ -49,6 +49,16 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import com.shuaib.classmate.ui.notice.NoticeAttachment
+import com.shuaib.classmate.ui.notice.NoticeCourseChoice
+import com.shuaib.classmate.ui.notice.PostNoticeScreen
+import com.shuaib.classmate.ui.notice.RecentNoticeItem
+import com.shuaib.classmate.ui.notice.VoiceRecordingState
 
 data class CourseEntry(
     val offeringId: String,
@@ -106,6 +116,20 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
     private val selectedNoticeAttachments = mutableListOf<NoticeAttachmentDraft>()
     private var onNoticeAttachmentChanged: (() -> Unit)? = null
+
+    // Compose State for PostNoticeScreen
+    private val composeNoticeAttachments = mutableStateListOf<NoticeAttachment>()
+    private var composeMessageText by mutableStateOf("")
+    private var composeManualTitle by mutableStateOf("")
+    private var composeShowManualTitleBox by mutableStateOf(false)
+    private var composeVoiceState by mutableStateOf(VoiceRecordingState.IDLE)
+    private var composeVoiceTimerText by mutableStateOf("0:00")
+    private var composeIsSubmitting by mutableStateOf(false)
+    private var composeSubmissionStepText by mutableStateOf("")
+    private var composeShowAiProgressDialog by mutableStateOf(false)
+    private var composeCourses by mutableStateOf<List<NoticeCourseChoice>>(emptyList())
+    private var composeSemesterLabel by mutableStateOf("")
+    private var composeRecentNotices by mutableStateOf<List<RecentNoticeItem>>(emptyList())
 
     // Gemini Multimodal Voice Recording State
     private var mediaRecorder: android.media.MediaRecorder? = null
@@ -475,6 +499,129 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         if (batch.isBlank()) { finish(); return }
 
+        composeMessageText = state?.getString("compose_message_text").orEmpty()
+        composeManualTitle = state?.getString("compose_manual_title").orEmpty()
+        composeShowManualTitleBox = state?.getBoolean("compose_show_manual_title", false) ?: false
+
+        if (!upload) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
+                isAppearanceLightStatusBars = light
+                isAppearanceLightNavigationBars = light
+            }
+
+            onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (!composeIsSubmitting) {
+                        finish()
+                    } else {
+                        Toast.makeText(this@ClassMatePublishActivity, "Notice is publishing in background", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                }
+            })
+
+            syncComposeAttachments()
+            onNoticeAttachmentChanged = {
+                syncComposeAttachments()
+            }
+
+            val cachedCourses = getCachedCourses(batch)
+            courses = cachedCourses
+            composeCourses = cachedCourses.map { NoticeCourseChoice(it.offeringId, it.code, it.title) }
+            val cachedSem = getSharedPreferences("cm_publish_cache", Context.MODE_PRIVATE).getString("sem_$batch", null)
+            if (!cachedSem.isNullOrBlank()) {
+                composeSemesterLabel = cachedSem
+            }
+
+            loadRecentNotices(batch)
+
+            val composeView = ComposeView(this).apply {
+                setContent {
+                    PostNoticeScreen(
+                        batchLabel = intent.getStringExtra("batch_label").orEmpty(),
+                        semesterLabel = composeSemesterLabel,
+                        isTeacher = intent.getStringExtra("role") == "teacher",
+                        courses = composeCourses,
+                        recentNotices = composeRecentNotices,
+                        messageText = composeMessageText,
+                        onMessageChange = { composeMessageText = it },
+                        attachments = composeNoticeAttachments,
+                        onRemoveAttachment = { index ->
+                            if (index in selectedNoticeAttachments.indices) {
+                                selectedNoticeAttachments.removeAt(index)
+                                syncComposeAttachments()
+                            }
+                        },
+                        onAddPhotosClick = { checkAndRequestPhotoPermission() },
+                        onAddPdfClick = { checkAndRequestPdfPermission() },
+                        voiceState = composeVoiceState,
+                        voiceTimerText = composeVoiceTimerText,
+                        onVoiceClick = { handleVoiceClick() },
+                        manualTitle = composeManualTitle,
+                        onManualTitleChange = { composeManualTitle = it },
+                        showManualTitleBox = composeShowManualTitleBox,
+                        onToggleManualTitleBox = { composeShowManualTitleBox = it },
+                        onSubmitGeneralNotice = { title, body, courseOfferingId ->
+                            submitComposeGeneralNotice(title, body, courseOfferingId)
+                        },
+                        onSubmitCancellation = { courseOfferingId, dateOption ->
+                            submitComposeCancellation(courseOfferingId, dateOption)
+                        },
+                        onSubmitPoll = { q, opts, isMulti, isAnon, dur ->
+                            submitComposePoll(q, opts, isMulti, isAnon, dur)
+                        },
+                        onClose = { finish() },
+                        isSubmitting = composeIsSubmitting,
+                        submissionStepText = composeSubmissionStepText,
+                        showAiProgressDialog = composeShowAiProgressDialog,
+                        onRunInBackground = {
+                            Toast.makeText(applicationContext, "Notice is publishing in background…", Toast.LENGTH_SHORT).show()
+                            composeShowAiProgressDialog = false
+                            setResult(RESULT_OK)
+                            finish()
+                        }
+                    )
+                }
+            }
+            setContentView(composeView)
+
+            lifecycleScope.launch {
+                try {
+                    val semesterObj = ClassMateAuthApi.rows("semesters", "select=id,semester_number&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)
+                    val semester = semesterObj?.optString("id")
+                    val semNum = semesterObj?.optInt("semester_number", 0) ?: 0
+                    val semTitle = if (semNum > 0) "Semester $semNum" else "Semester 3"
+                    composeSemesterLabel = semTitle
+                    val offerings = if (semester == null) JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
+                    val catalog = ClassMateCourses.catalog(batch)
+                    val catalogMap = (0 until catalog.length()).map { catalog.getJSONObject(it) }.associateBy { it.getString("id") }
+
+                    val teacher = intent.getStringExtra("role") == "teacher"
+                    val assigned = if (teacher) ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.${intent.getStringExtra("profile_id")}&active=eq.true").let { rows ->
+                        (0 until rows.length()).map { rows.getJSONObject(it).getString("semester_course_id") }.toSet()
+                    } else null
+
+                    val freshCourses = (0 until offerings.length()).map { offerings.getJSONObject(it) }
+                        .filter { assigned == null || it.getString("id") in assigned }
+                        .map { off ->
+                            val offId = off.getString("id")
+                            val cat = catalogMap[off.getString("course_id")]
+                            val code = cat?.optString("course_code") ?: "Course"
+                            val title = cat?.optString("course_title") ?: ""
+                            CourseEntry(offId, code, title)
+                        }
+
+                    var finalCourses = freshCourses
+                    courses = finalCourses
+                    composeCourses = finalCourses.map { NoticeCourseChoice(it.offeringId, it.code, it.title) }
+                    saveCachedCourses(batch, finalCourses, semTitle)
+                } catch (_: Exception) {}
+            }
+            return
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -680,6 +827,9 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putString("compose_message_text", composeMessageText)
+        outState.putString("compose_manual_title", composeManualTitle)
+        outState.putBoolean("compose_show_manual_title", composeShowManualTitleBox)
         outState.putString("upload_mode", uploadMode)
         outState.putString("link_url", urlInput?.text?.toString() ?: restoredLinkUrl)
         outState.putString("file_uri", uri?.toString())
@@ -2672,8 +2822,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
         selectedNoticeAttachments.forEachIndexed { index, item ->
             val initialLabel = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
             withContext(Dispatchers.Main) {
-                status.visibility = View.VISIBLE
-                status.text = "$initialLabel 0%"
+                if (::status.isInitialized) {
+                    status.visibility = View.VISIBLE
+                    status.text = "$initialLabel 0%"
+                }
                 onProgressText?.invoke("$initialLabel 0%")
             }
             repository.uploadSupabaseNoticeAttachment(
@@ -2686,12 +2838,469 @@ class ClassMatePublishActivity : AppCompatActivity() {
             ) { pct ->
                 runOnUiThread {
                     val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
-                    status.text = "$label $pct%"
+                    if (::status.isInitialized) {
+                        status.text = "$label $pct%"
+                    }
                     onProgressText?.invoke("$label $pct%")
                 }
             }
         }
     }
+
+    private fun syncComposeAttachments() {
+        composeNoticeAttachments.clear()
+        selectedNoticeAttachments.forEach { draft ->
+            composeNoticeAttachments.add(
+                NoticeAttachment(
+                    uri = draft.uri,
+                    name = draft.name,
+                    mimeType = draft.mimeType,
+                    sizeBytes = draft.sizeBytes,
+                    isPdf = draft.isPdf
+                )
+            )
+        }
+    }
+
+    private fun checkAndRequestAudioPermission(onGranted: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            onGranted()
+        } else {
+            onAudioPermissionGranted = onGranted
+            requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun handleVoiceClick() {
+        if (composeVoiceState == VoiceRecordingState.RECORDING) {
+            stopVoiceRecordingAndTranscribeCompose()
+        } else if (composeVoiceState == VoiceRecordingState.IDLE) {
+            checkAndRequestAudioPermission {
+                startVoiceRecordingCompose()
+            }
+        }
+    }
+
+    private fun startVoiceRecordingCompose() {
+        try {
+            val cacheDir = externalCacheDir ?: cacheDir
+            audioRecordFile = java.io.File(cacheDir, "gemini_voice_${System.currentTimeMillis()}.m4a")
+
+            mediaRecorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                android.media.MediaRecorder(this@ClassMatePublishActivity)
+            } else {
+                @Suppress("DEPRECATION")
+                android.media.MediaRecorder()
+            }).apply {
+                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(16000)
+                setAudioEncodingBitRate(16000)
+                setAudioChannels(1)
+                setOutputFile(audioRecordFile!!.absolutePath)
+                prepare()
+                start()
+            }
+
+            isRecordingVoice = true
+            voiceRecordStartTime = System.currentTimeMillis()
+            composeVoiceState = VoiceRecordingState.RECORDING
+            composeVoiceTimerText = "0:00"
+
+            voiceAmplitudeJob?.cancel()
+            voiceAmplitudeJob = lifecycleScope.launch {
+                while (isRecordingVoice) {
+                    val sec = ((System.currentTimeMillis() - voiceRecordStartTime) / 1000).toInt()
+                    val m = sec / 60
+                    val s = sec % 60
+                    composeVoiceTimerText = String.format(Locale.getDefault(), "%d:%02d", m, s)
+                    delay(300)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ClassMateVoice", "Failed to start recording: ${e.message}")
+            Toast.makeText(this, "Could not start microphone recording", Toast.LENGTH_SHORT).show()
+            mediaRecorder = null
+            isRecordingVoice = false
+            composeVoiceState = VoiceRecordingState.IDLE
+        }
+    }
+
+    private fun stopVoiceRecordingAndTranscribeCompose() {
+        if (!isRecordingVoice) return
+        isRecordingVoice = false
+        voiceAmplitudeJob?.cancel()
+        voiceAmplitudeJob = null
+
+        val elapsed = System.currentTimeMillis() - voiceRecordStartTime
+        try {
+            mediaRecorder?.apply {
+                stop()
+                release()
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ClassMateVoice", "MediaRecorder stop failed: ${e.message}")
+        }
+        mediaRecorder = null
+
+        val file = audioRecordFile
+        if (elapsed < 500 || file == null || !file.exists() || file.length() < 100) {
+            composeVoiceState = VoiceRecordingState.IDLE
+            file?.delete()
+            Toast.makeText(this, "Tap to speak, tap again to finish", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        composeVoiceState = VoiceRecordingState.TRANSCRIBING
+
+        lifecycleScope.launch {
+            val bytes = withContext(Dispatchers.IO) {
+                try { file.readBytes() } catch (_: Exception) { ByteArray(0) }
+            }
+            withContext(Dispatchers.IO) {
+                try { file.delete() } catch (_: Exception) {}
+            }
+
+            if (bytes.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    composeVoiceState = VoiceRecordingState.IDLE
+                    Toast.makeText(this@ClassMatePublishActivity, "Could not capture audio", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            withContext(Dispatchers.IO) {
+                ClassMateAuthApi.restoreSession()
+            }
+
+            val result = withContext(Dispatchers.IO) {
+                com.shuaib.classmate.services.AIService.transcribeAudio(bytes, "audio/mp4")
+            }
+
+            withContext(Dispatchers.Main) {
+                composeVoiceState = VoiceRecordingState.IDLE
+                if (result.isSuccess) {
+                    val text = result.getOrNull().orEmpty().trim()
+                    if (text.isNotBlank()) {
+                        val existing = composeMessageText.trim()
+                        composeMessageText = if (existing.isEmpty()) text else "$existing $text"
+                    } else {
+                        Toast.makeText(this@ClassMatePublishActivity, "No speech recognized in audio", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    val err = result.exceptionOrNull()?.message ?: "Voice transcription failed"
+                    android.util.Log.e("ClassMateVoice", "Gemini transcription error: $err", result.exceptionOrNull())
+                    Toast.makeText(this@ClassMatePublishActivity, "Gemini transcription error: $err", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun submitComposeGeneralNotice(manualTitle: String, rawBody: String, courseOfferingId: String?) {
+        if (composeIsSubmitting) return
+        if (rawBody.isBlank()) {
+            Toast.makeText(this, "Write your notice message first", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val appCtx = applicationContext
+        val teacher = intent.getStringExtra("role") == "teacher"
+        if (teacher && courseOfferingId.isNullOrBlank()) {
+            Toast.makeText(this, "No assigned course available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        composeIsSubmitting = true
+        composeShowAiProgressDialog = true
+        composeSubmissionStepText = if (manualTitle.isNotBlank()) "Publishing notice to batch feed…" else "Analyzing notice content & language structure with ClassMate AI…"
+
+        if (!com.shuaib.classmate.activities.ClassMateAcademicCache.online(this)) {
+            val pending = com.shuaib.classmate.workers.PendingNotice(
+                batchId = batch,
+                title = if (manualTitle.isNotBlank()) manualTitle else null,
+                body = rawBody,
+                courseId = courseOfferingId,
+                isTeacher = teacher
+            )
+            com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(appCtx, pending)
+            composeShowAiProgressDialog = false
+            composeIsSubmitting = false
+            Toast.makeText(appCtx, "Offline: Notice saved to queue. It will post automatically once connection returns.", Toast.LENGTH_LONG).show()
+            setResult(RESULT_OK)
+            finish()
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            var finalTitle = manualTitle
+            var finalBody = rawBody
+
+            if (finalTitle.isBlank()) {
+                try {
+                    withContext(Dispatchers.Main) {
+                        composeSubmissionStepText = "Detecting optimal title & smart category with ClassMate AI…"
+                    }
+                    val reqId = java.util.UUID.randomUUID().toString()
+                    val response = ClassMateAuthApi.ai(
+                        JSONObject()
+                            .put("mode", "auto_notice")
+                            .put("batch_id", batch)
+                            .put("request_id", reqId)
+                            .put("text", rawBody)
+                    )
+                    val result = response.optJSONObject("result")
+                    val detected = result?.optString("title")?.trim().orEmpty()
+                    val formatted = result?.optString("body")?.trim().orEmpty()
+                    if (detected.isNotBlank()) finalTitle = detected
+                    if (formatted.isNotBlank()) finalBody = formatted
+                } catch (e: Exception) {
+                    android.util.Log.w("ClassMatePublish", "AI title detection failed: ${e.message}")
+                }
+            }
+
+            // Fallback check: if AI detection failed and title remains blank
+            if (finalTitle.isBlank()) {
+                withContext(Dispatchers.Main) {
+                    composeIsSubmitting = false
+                    composeShowAiProgressDialog = false
+                    composeShowManualTitleBox = true
+                    Toast.makeText(appCtx, "AI title detection could not generate a title. Please enter a title manually.", Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
+
+            try {
+                withContext(Dispatchers.Main) {
+                    composeSubmissionStepText = "Publishing notice to batch feed…"
+                }
+                val postRes = ClassMateAuthApi.rpc(
+                    "post_notice",
+                    JSONObject().put("target_batch", batch)
+                        .put("target_course", if (courseOfferingId != null) courseOfferingId else JSONObject.NULL)
+                        .put("notice_title", finalTitle)
+                        .put("notice_body", finalBody)
+                )
+                val newNoticeId = postRes.optString("id").orEmpty()
+                if (selectedNoticeAttachments.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        composeSubmissionStepText = "Uploading attachments & syncing feed…"
+                    }
+                    uploadNoticeAttachmentIfAny(newNoticeId) { text ->
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            composeSubmissionStepText = text
+                        }
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    composeShowAiProgressDialog = false
+                    composeIsSubmitting = false
+                    Toast.makeText(appCtx, "Notice published successfully!", Toast.LENGTH_SHORT).show()
+                    val data = Intent().putExtra("created_notice", postRes.toString())
+                    setResult(RESULT_OK, data)
+                    finish()
+                }
+            } catch (netErr: Exception) {
+                com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
+                    appCtx,
+                    com.shuaib.classmate.workers.PendingNotice(
+                        batchId = batch,
+                        title = finalTitle,
+                        body = finalBody,
+                        courseId = courseOfferingId,
+                        isTeacher = teacher
+                    )
+                )
+
+                withContext(Dispatchers.Main) {
+                    composeShowAiProgressDialog = false
+                    composeIsSubmitting = false
+                    Toast.makeText(
+                        appCtx,
+                        "Offline: Notice saved to queue. It will post automatically once connection returns.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    setResult(RESULT_OK)
+                    finish()
+                }
+            }
+        }
+    }
+
+    private fun submitComposeCancellation(courseOfferingId: String, dateOption: String) {
+        if (composeIsSubmitting) return
+        composeIsSubmitting = true
+        val appCtx = applicationContext
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val changeDate = LocalDate.now().plusDays(if (dateOption == "Tomorrow") 1 else 0).toString()
+                val res = ClassMateAuthApi.rpc(
+                    "post_cancellation_notice",
+                    JSONObject().put("target_batch", batch)
+                        .put("target_course", courseOfferingId)
+                        .put("change_date", changeDate)
+                )
+                withContext(Dispatchers.Main) {
+                    composeIsSubmitting = false
+                    Toast.makeText(appCtx, "Class cancellation posted!", Toast.LENGTH_SHORT).show()
+                    val data = Intent().putExtra("created_notice", res.toString())
+                    setResult(RESULT_OK, data)
+                    finish()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    composeIsSubmitting = false
+                    Toast.makeText(appCtx, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun submitComposePoll(
+        question: String,
+        options: List<String>,
+        isMulti: Boolean,
+        isAnon: Boolean,
+        durationHours: Any
+    ) {
+        if (composeIsSubmitting) return
+        if (question.isBlank() || options.size < 2) {
+            Toast.makeText(this, "Please enter a question and at least 2 options", Toast.LENGTH_SHORT).show()
+            return
+        }
+        composeIsSubmitting = true
+        val appCtx = applicationContext
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val res = ClassMateAuthApi.rpc(
+                    "publish_batch_poll",
+                    JSONObject()
+                        .put("target_batch", batch)
+                        .put("poll_question", question)
+                        .put("poll_options", JSONArray(options))
+                        .put("poll_description", "")
+                        .put("is_multiple_choice", isMulti)
+                        .put("is_anonymous", isAnon)
+                        .put("duration_hours", durationHours)
+                )
+                withContext(Dispatchers.Main) {
+                    composeIsSubmitting = false
+                    Toast.makeText(appCtx, "Poll published successfully!", Toast.LENGTH_SHORT).show()
+                    val data = Intent().putExtra("created_notice", res.toString())
+                    setResult(RESULT_OK, data)
+                    finish()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    composeIsSubmitting = false
+                    Toast.makeText(appCtx, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun loadRecentNotices(batchId: String) {
+        if (batchId.isBlank()) return
+        val currentUserId = ClassMateAuthApi.notificationIdentity()?.optString("id") ?: ""
+
+        // 1. Instant local cache read
+        val cached = com.shuaib.classmate.notices.NoticeCacheStore.readCache(this, currentUserId, batchId)
+        if (cached != null && cached.notices.isNotEmpty()) {
+            composeRecentNotices = cached.notices.take(3).map { n ->
+                val id = n.optString("id")
+                val author = cached.authors[id]?.optString("full_name")?.takeIf { it.isNotBlank() }
+                    ?: cached.authors[n.optString("author_id")]?.optString("full_name")?.takeIf { it.isNotBlank() }
+                RecentNoticeItem(
+                    id = id,
+                    title = n.optString("title").ifBlank { "Notice" },
+                    body = n.optString("body").trim(),
+                    category = n.optString("category").ifBlank { "NOTICE" }.uppercase(),
+                    authorName = if (!author.isNullOrBlank()) "By $author" else "Class Notice",
+                    timeAgo = formatNoticeTimeAgo(n.optString("published_at")),
+                    hasAttachment = n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null"
+                )
+            }
+        }
+
+        // 2. Background fresh sync
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val rows = ClassMateAuthApi.rows("notices", "select=*&batch_id=eq.$batchId&order=published_at.desc&limit=3")
+                if (rows.length() > 0) {
+                    val targetIds = JSONArray()
+                    val noticeList = mutableListOf<JSONObject>()
+                    for (i in 0 until rows.length()) {
+                        rows.optJSONObject(i)?.let {
+                            noticeList.add(it)
+                            targetIds.put(it.optString("id"))
+                        }
+                    }
+
+                    val details = runCatching {
+                        ClassMateAuthApi.rpc("notice_feed_details", JSONObject().put("target_ids", targetIds))
+                    }.getOrNull()
+
+                    val authorsMap = mutableMapOf<String, JSONObject>()
+                    details?.optJSONArray("authors")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            arr.optJSONObject(i)?.let { a ->
+                                val key = a.optString("notice_id").ifBlank { a.optString("id") }
+                                authorsMap[key] = a
+                            }
+                        }
+                    }
+
+                    val items = noticeList.map { n ->
+                        val id = n.optString("id")
+                        val author = authorsMap[id]?.optString("full_name")?.takeIf { it.isNotBlank() }
+                            ?: authorsMap[n.optString("author_id")]?.optString("full_name")?.takeIf { it.isNotBlank() }
+                        RecentNoticeItem(
+                            id = id,
+                            title = n.optString("title").ifBlank { "Notice" },
+                            body = n.optString("body").trim(),
+                            category = n.optString("category").ifBlank { "NOTICE" }.uppercase(),
+                            authorName = if (!author.isNullOrBlank()) "By $author" else "Class Notice",
+                            timeAgo = formatNoticeTimeAgo(n.optString("published_at")),
+                            hasAttachment = n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null"
+                        )
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        composeRecentNotices = items
+                    }
+                }
+            } catch (_: Exception) {
+                // Silently fallback to cached notices
+            }
+        }
+    }
+
+    private fun formatNoticeTimeAgo(value: String): String = runCatching {
+        if (value.isBlank()) return ""
+        val instant = runCatching { java.time.Instant.parse(value) }.getOrNull()
+            ?: return value.replace('T', ' ').take(16)
+        val zonedDateTime = instant.atZone(java.time.ZoneId.systemDefault())
+        val localDate = zonedDateTime.toLocalDate()
+        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(localDate, today)
+        val timeStr = zonedDateTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.ENGLISH))
+
+        when {
+            daysBetween == 0L -> {
+                val diffMinutes = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()
+                when {
+                    diffMinutes < 1 -> "Just now"
+                    diffMinutes < 60 -> "${diffMinutes}m ago"
+                    else -> "Today, $timeStr"
+                }
+            }
+            daysBetween == 1L -> "Yesterday"
+            daysBetween in 2..6 -> zonedDateTime.format(java.time.format.DateTimeFormatter.ofPattern("EEE", java.util.Locale.ENGLISH))
+            localDate.year == today.year -> zonedDateTime.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM", java.util.Locale.ENGLISH))
+            else -> zonedDateTime.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH))
+        }
+    }.getOrDefault("")
 
     private fun perform(action: suspend () -> JSONObject?) {
         if (busy) return

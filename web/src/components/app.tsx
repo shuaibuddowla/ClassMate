@@ -299,7 +299,7 @@ function SessionApp() {
         saveIdentity(p);
         const signed = new URL(location.href).searchParams.has("signedin");
         history.replaceState({}, "", location.pathname + location.hash);
-        if (p.verification_status === "active" && p.role !== "teacher") {
+        if (p.verification_status === "active") {
           if (existing.length === 0) setStage("account");
           else if (
             !p.profile_completed_at &&
@@ -308,9 +308,9 @@ function SessionApp() {
           )
             setStage("profile");
           else if (
-            signed &&
             "Notification" in window &&
-            Notification.permission !== "granted"
+            Notification.permission !== "granted" &&
+            !sessionStorage.getItem("classmate:notif-dismissed")
           )
             setStage("notifications");
         }
@@ -872,7 +872,13 @@ function SessionApp() {
           >
             Enable notifications
           </button>
-          <button className="text-button" onClick={() => setStage("")}>
+          <button
+            className="text-button"
+            onClick={() => {
+              sessionStorage.setItem("classmate:notif-dismissed", "1");
+              setStage("");
+            }}
+          >
             Not now
           </button>
         </Modal>
