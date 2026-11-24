@@ -282,7 +282,15 @@ fun ClassMateBatchFundScreen(
                     FintechWalletHeroCard(
                         summary = summary,
                         hideBalance = hideBalance,
-                        onTogglePrivacy = { hideBalance = !hideBalance }
+                        onTogglePrivacy = { hideBalance = !hideBalance },
+                        onFilterInflow = {
+                            feedMode = "activity"
+                            activityFilter = "inflow"
+                        },
+                        onFilterOutflow = {
+                            feedMode = "activity"
+                            activityFilter = "outflow"
+                        }
                     )
                 }
 
@@ -820,7 +828,9 @@ fun ClassMateBatchFundScreen(
 private fun FintechWalletHeroCard(
     summary: FundSummary,
     hideBalance: Boolean,
-    onTogglePrivacy: () -> Unit
+    onTogglePrivacy: () -> Unit,
+    onFilterInflow: () -> Unit = {},
+    onFilterOutflow: () -> Unit = {}
 ) {
     Surface(
         shape = RoundedCornerShape(28.dp),
@@ -1004,48 +1014,66 @@ private fun FintechWalletHeroCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_fund_arrow_down_left),
-                            contentDescription = null,
-                            tint = Color(0xFF6EE7B7),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            text = "In ",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF6EE7B7)
-                        )
-                        Text(
-                            text = formatTaka(summary.totalCollected),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6EE7B7)
-                        )
+                    Surface(
+                        onClick = onFilterInflow,
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.06f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_fund_arrow_down_left),
+                                contentDescription = null,
+                                tint = Color(0xFF6EE7B7),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                text = "In ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF6EE7B7)
+                            )
+                            Text(
+                                text = formatTaka(summary.totalCollected),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF6EE7B7)
+                            )
+                        }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_fund_arrow_up_right),
-                            contentDescription = null,
-                            tint = Color(0xFFFDA4AF),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            text = "Out ",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFFDA4AF)
-                        )
-                        Text(
-                            text = formatTaka(summary.totalSpent),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFDA4AF)
-                        )
+                    Surface(
+                        onClick = onFilterOutflow,
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.06f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_fund_arrow_up_right),
+                                contentDescription = null,
+                                tint = Color(0xFFFDA4AF),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                text = "Out ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFFDA4AF)
+                            )
+                            Text(
+                                text = formatTaka(summary.totalSpent),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFDA4AF)
+                            )
+                        }
                     }
                 }
             }

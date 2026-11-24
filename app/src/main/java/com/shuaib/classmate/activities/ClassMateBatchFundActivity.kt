@@ -333,6 +333,40 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
         }
     }
 
+    private fun deduceCampaignPerStudent(campaignTitle: String, coll: Double, paid: Int): Double {
+        val clean = campaignTitle.trim().lowercase()
+        val matchingTxs = transactionsState.filter {
+            it.type == "inflow" && (
+                it.campaign.trim().lowercase() == clean ||
+                it.title.trim().lowercase() == clean ||
+                clean.contains(it.campaign.trim().lowercase()) ||
+                it.campaign.trim().lowercase().contains(clean)
+            )
+        }
+        if (matchingTxs.isNotEmpty()) {
+            val amounts = matchingTxs.map { it.amount }.filter { it > 0.0 }
+            if (amounts.isNotEmpty()) {
+                val freq = amounts.groupingBy { it }.eachCount()
+                val mode = freq.maxByOrNull { it.value }?.key
+                if (mode != null && mode > 0.0) {
+                    return mode
+                }
+            }
+        }
+        // Fallback: if coll and paid exist, snap to closest standard contribution tier
+        if (paid > 0 && coll > 0) {
+            val avg = coll / paid
+            val candidateSteps = listOf(5000.0, 4300.0, 2000.0, 1500.0, 1000.0, 500.0, 200.0, 100.0, 50.0, 40.0, 30.0, 20.0)
+            for (step in candidateSteps) {
+                if (Math.abs(avg - step) / step < 0.08) {
+                    return step
+                }
+            }
+            return Math.round(avg).toDouble()
+        }
+        return 500.0
+    }
+
     private fun populateCampaigns(colArray: JSONArray) {
         val list = mutableListOf<JSONObject>()
         for (i in 0 until colArray.length()) {
@@ -350,7 +384,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             val coll = obj.optDouble("total_amount", obj.optDouble("total_collected", 0.0))
             val paid = obj.optInt("payment_count", obj.optInt("paid_count", 0))
             val total = rawRosterList.size.coerceAtLeast(58)
-            val perStudent = if (paid > 0 && coll > 0) Math.round(coll / paid).toDouble() else 500.0
+            val perStudent = deduceCampaignPerStudent(title, coll, paid)
             FundCampaignItem(
                 id = id,
                 name = title,
@@ -456,6 +490,21 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
             transactionsState.clear()
             transactionsState.addAll(list)
+
+            // Refine perStudent for existing campaigns using the loaded transactions
+            if (campaignsState.isNotEmpty()) {
+                val updated = campaignsState.map { camp ->
+                    val deduced = deduceCampaignPerStudent(camp.name, camp.collected, camp.paid)
+                    if (deduced > 0.0 && deduced != camp.perStudent) {
+                        camp.copy(perStudent = deduced)
+                    } else {
+                        camp
+                    }
+                }
+                campaignsState.clear()
+                campaignsState.addAll(updated)
+            }
+
             rebuildStudentsList()
         }
 
@@ -472,7 +521,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         put("filter_type", "all")
                         put("query_text", "")
                         put("result_offset", 0)
-                        put("page_limit", 100)
+                        put("page_limit", 1000)
                     }
                 )
                 val txArray = JSONArray(responseText)
