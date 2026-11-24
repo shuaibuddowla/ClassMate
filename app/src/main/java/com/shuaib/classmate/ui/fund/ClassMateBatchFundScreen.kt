@@ -2,6 +2,7 @@ package com.shuaib.classmate.ui.fund
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,6 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -83,6 +87,9 @@ fun ClassMateBatchFundScreen(
     val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
     val borderColor = if (isDark) Color.White.copy(alpha = 0.07f) else Color(0xFFE2E8F0)
 
+    val listState = rememberLazyListState()
+    val showScrollToTop by remember { derivedStateOf { listState.firstVisibleItemIndex > 1 } }
+
     var hideBalance by remember { mutableStateOf(false) }
     var userSelectedCampaignId by remember { mutableStateOf<String?>(null) }
 
@@ -96,8 +103,24 @@ fun ClassMateBatchFundScreen(
             ?: FundCampaignItem("general", "General Fund", 0, 0, 0.0, 0.0)
     }
 
+    val totalSlides = if (summary.isCr) campaigns.size + 1 else campaigns.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { totalSlides })
+
+    LaunchedEffect(pagerState.currentPage, campaigns.toList()) {
+        if (campaigns.isNotEmpty() && pagerState.currentPage < campaigns.size) {
+            userSelectedCampaignId = campaigns[pagerState.currentPage].id
+        }
+    }
+
+    LaunchedEffect(currentCampaignId, campaigns.toList()) {
+        val targetIdx = campaigns.indexOfFirst { it.id == currentCampaignId }
+        if (targetIdx >= 0 && targetIdx != pagerState.currentPage) {
+            pagerState.animateScrollToPage(targetIdx)
+        }
+    }
+
     var feedMode by remember { mutableStateOf("activity") } // "activity" or "dues"
-    var activityFilter by remember { mutableStateOf("all") } // "all", "inflow", "outflow"
+    var activityFilter by remember { mutableStateOf("campaign") } // "campaign", "all", "inflow", "outflow"
     var duesFilter by remember { mutableStateOf("unpaid") } // "unpaid", "paid", "all"
     var searchQuery by remember { mutableStateOf("") }
 
@@ -111,11 +134,19 @@ fun ClassMateBatchFundScreen(
         students.filter { it.paidMap[currentCampaignId] != true }
     }
 
-    val filteredTxs = remember(transactions.toList(), activityFilter, searchQuery) {
+    val filteredTxs = remember(transactions.toList(), activityFilter, activeCamp.name, activeCamp.id, searchQuery) {
         val q = searchQuery.trim().lowercase()
+        val campName = activeCamp.name.trim().lowercase()
+        val campId = activeCamp.id.trim().lowercase()
         transactions.filter { tx ->
-            if (activityFilter == "inflow" && tx.type != "inflow") return@filter false
-            if (activityFilter == "outflow" && tx.type != "outflow") return@filter false
+            if (activityFilter == "campaign") {
+                val txCamp = tx.campaign.trim().lowercase()
+                if (txCamp != campName && txCamp != campId) return@filter false
+            } else if (activityFilter == "inflow" && tx.type != "inflow") {
+                return@filter false
+            } else if (activityFilter == "outflow" && tx.type != "outflow") {
+                return@filter false
+            }
             if (q.isNotEmpty()) {
                 val matchTitle = tx.title.lowercase().contains(q)
                 val matchStudent = tx.studentName?.lowercase()?.contains(q) == true
@@ -241,6 +272,7 @@ fun ClassMateBatchFundScreen(
                 .padding(innerPadding)
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -289,27 +321,23 @@ fun ClassMateBatchFundScreen(
                     }
                 }
 
-                // 4. ACTIVE COLLECTION CARD
+                // 4. INSTAGRAM-STYLE COLLECTION CAROUSEL
                 item {
-                    ActiveCollectionCard(
+                    InstagramCollectionCarousel(
                         campaigns = campaigns,
-                        activeCamp = activeCamp,
+                        pagerState = pagerState,
+                        totalSlides = totalSlides,
                         students = students,
                         isCr = summary.isCr,
+                        isDark = isDark,
                         surfaceBg = surfaceBg,
                         surface2Bg = surface2Bg,
                         borderColor = borderColor,
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
-                        onSelectCampaign = { userSelectedCampaignId = it },
                         onAddCampaign = { drawerMode = FundDrawerMode.NewCampaign },
-                        onActionClick = {
-                            if (summary.isCr) {
-                                drawerMode = FundDrawerMode.QuickCollect
-                            } else {
-                                feedMode = "dues"
-                            }
-                        }
+                        onQuickCollect = { drawerMode = FundDrawerMode.QuickCollect },
+                        onViewDues = { feedMode = "dues" }
                     )
                 }
 
@@ -322,9 +350,10 @@ fun ClassMateBatchFundScreen(
                         onSearchChange = { searchQuery = it },
                         filterText = if (feedMode == "activity") {
                             when (activityFilter) {
+                                "campaign" -> if (activeCamp.name.length > 12) "${activeCamp.name.take(12)}…" else activeCamp.name
                                 "inflow" -> "Inflow"
                                 "outflow" -> "Outflow"
-                                else -> "All"
+                                else -> "All Activity"
                             }
                         } else {
                             when (duesFilter) {
@@ -336,9 +365,10 @@ fun ClassMateBatchFundScreen(
                         onFilterCycle = {
                             if (feedMode == "activity") {
                                 activityFilter = when (activityFilter) {
+                                    "campaign" -> "all"
                                     "all" -> "inflow"
                                     "inflow" -> "outflow"
-                                    else -> "all"
+                                    else -> "campaign"
                                 }
                             } else {
                                 duesFilter = when (duesFilter) {
@@ -557,6 +587,38 @@ fun ClassMateBatchFundScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Floating Scroll-to-Top FAB
+            AnimatedVisibility(
+                visible = showScrollToTop,
+                enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 2 },
+                exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 24.dp)
+            ) {
+                Surface(
+                    onClick = {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    shape = CircleShape,
+                    color = if (isDark) Color(0xFF1E2638) else Color.White,
+                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.15f) else Color(0xFFCBD5E1)),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.size(46.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_chevron_up),
+                            contentDescription = "Scroll to top",
+                            tint = if (isDark) Color.White else Color(0xFF0F172A),
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }
@@ -1225,25 +1287,158 @@ private fun StudentPersonalStatusBanner(
     }
 }
 
-// 4. ACTIVE COLLECTION CARD
+// 4. INSTAGRAM-STYLE COLLECTION CAROUSEL
 @Composable
-private fun ActiveCollectionCard(
+private fun InstagramCollectionCarousel(
     campaigns: List<FundCampaignItem>,
-    activeCamp: FundCampaignItem,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    totalSlides: Int,
     students: List<FundStudentDue>,
     isCr: Boolean,
+    isDark: Boolean,
     surfaceBg: Color,
     surface2Bg: Color,
     borderColor: Color,
     textPrimary: Color,
     textSecondary: Color,
-    onSelectCampaign: (String) -> Unit,
+    onAddCampaign: () -> Unit,
+    onQuickCollect: () -> Unit,
+    onViewDues: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            pageSpacing = 12.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            if (campaigns.isEmpty()) {
+                if (isCr) {
+                    AddNewCollectionSlideCard(
+                        isDark = isDark,
+                        surfaceBg = surfaceBg,
+                        surface2Bg = surface2Bg,
+                        borderColor = borderColor,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        onClick = onAddCampaign
+                    )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = surfaceBg,
+                        border = BorderStroke(1.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "No Active Collections",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "There are currently no active collections running for your batch.",
+                                fontSize = 12.sp,
+                                color = textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else if (page < campaigns.size) {
+                val camp = campaigns[page]
+                CampaignSlideCard(
+                    camp = camp,
+                    isCr = isCr,
+                    isDark = isDark,
+                    surfaceBg = surfaceBg,
+                    surface2Bg = surface2Bg,
+                    borderColor = borderColor,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary,
+                    onAddCampaign = onAddCampaign,
+                    onActionClick = {
+                        if (isCr) onQuickCollect() else onViewDues()
+                    }
+                )
+            } else {
+                // "+ Add New Collection" Slide for CR
+                AddNewCollectionSlideCard(
+                    isDark = isDark,
+                    surfaceBg = surfaceBg,
+                    surface2Bg = surface2Bg,
+                    borderColor = borderColor,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary,
+                    onClick = onAddCampaign
+                )
+            }
+        }
+
+        // Instagram-style Pagination Dots
+        if (totalSlides > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (i in 0 until totalSlides) {
+                    val isSelected = i == pagerState.currentPage
+                    val width by animateDpAsState(
+                        targetValue = if (isSelected) 18.dp else 6.dp,
+                        animationSpec = tween(durationMillis = 200),
+                        label = "dot_width"
+                    )
+                    val dotColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            Color(0xFF6366F1)
+                        } else {
+                            if (isDark) Color.White.copy(alpha = 0.2f) else Color(0xFFCBD5E1)
+                        },
+                        animationSpec = tween(durationMillis = 200),
+                        label = "dot_color"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(width = width, height = 6.dp)
+                            .clip(CircleShape)
+                            .background(dotColor)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampaignSlideCard(
+    camp: FundCampaignItem,
+    isCr: Boolean,
+    isDark: Boolean,
+    surfaceBg: Color,
+    surface2Bg: Color,
+    borderColor: Color,
+    textPrimary: Color,
+    textSecondary: Color,
     onAddCampaign: () -> Unit,
     onActionClick: () -> Unit
 ) {
-    val unpaidCount = (activeCamp.total - activeCamp.paid).coerceAtLeast(0)
-    val target = activeCamp.total * activeCamp.perStudent
-    val pct = if (activeCamp.total > 0) ((activeCamp.paid * 100) / activeCamp.total).coerceIn(0, 100) else 0
+    val unpaidCount = (camp.total - camp.paid).coerceAtLeast(0)
+    val target = camp.total * camp.perStudent
+    val pct = if (camp.total > 0) ((camp.paid * 100) / camp.total).coerceIn(0, 100) else 0
 
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -1255,100 +1450,116 @@ private fun ActiveCollectionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Collection Chips Row + "+"
+            // Header: Category Pill & Plus button (if CR) + Progress %
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "COLLECTION",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = textSecondary,
-                    letterSpacing = 0.5.sp
-                )
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(campaigns) { c ->
-                        val selected = c.id == activeCamp.id
-                        Surface(
-                            onClick = { onSelectCampaign(c.id) },
-                            shape = CircleShape,
-                            color = if (selected) Color(0xFF6366F1) else surface2Bg
-                        ) {
-                            Text(
-                                text = c.name,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selected) Color.White else textSecondary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
+                    // Small Category Tag
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF6366F1).copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "COLLECTION",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF6366F1),
+                            letterSpacing = 0.6.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
                     }
 
                     if (isCr) {
-                        item {
-                            Surface(
-                                onClick = onAddCampaign,
-                                shape = CircleShape,
-                                color = surface2Bg,
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "+",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF6366F1)
-                                    )
-                                }
+                        Surface(
+                            onClick = onAddCampaign,
+                            shape = CircleShape,
+                            color = surface2Bg,
+                            border = BorderStroke(1.dp, borderColor),
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "+",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF6366F1)
+                                )
                             }
                         }
                     }
                 }
+
+                // Percentage Badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF6366F1).copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = "$pct%",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF6366F1),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                    )
+                }
             }
 
-            // Title, Subtitle, Percentage
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
+            // Title & Target Amount Breakdown
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = camp.name,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     Text(
-                        text = activeCamp.name,
-                        fontSize = 16.sp,
+                        text = formatTaka(camp.collected),
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = textPrimary
                     )
                     Text(
-                        text = "${formatTaka(activeCamp.collected)} of ${formatTaka(target)} • ${formatTaka(activeCamp.perStudent)}/student",
+                        text = "of ${formatTaka(target)}",
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textSecondary
+                    )
+                    Text(
+                        text = "•",
+                        fontSize = 12.sp,
+                        color = textSecondary.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "${formatTaka(camp.perStudent)}/student",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
                         color = textSecondary
                     )
                 }
-                Text(
-                    text = "$pct%",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF6366F1)
-                )
             }
 
-            // Gradient Progress Bar
+            // Multi-Gradient Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.08f))
+                    .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color(0xFFE2E8F0))
             ) {
                 Box(
                     modifier = Modifier
@@ -1363,80 +1574,26 @@ private fun ActiveCollectionCard(
                 )
             }
 
-            // Bottom Row: Stacked Unpaid Avatars + CTA
+            // Footer: Paid/Unpaid Summary (Clean, no stacked circles) + Action CTA
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Stacked avatars
-                    val unpaidStudents = remember(students, activeCamp.id) {
-                        students.filter { it.paidMap[activeCamp.id] != true }
-                    }
-                    if (unpaidStudents.isNotEmpty()) {
-                        val preview = unpaidStudents.take(3)
-                        val extra = (unpaidStudents.size - preview.size).coerceAtLeast(0)
-                        Row(modifier = Modifier.padding(end = 8.dp)) {
-                            preview.forEachIndexed { idx, s ->
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = (-idx * 8).dp)
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFF43F5E).copy(alpha = 0.15f))
-                                        .border(1.5.dp, surfaceBg, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = s.fullName.take(1).uppercase(),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFF43F5E)
-                                    )
-                                }
-                            }
-                            if (extra > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = (-preview.size * 8).dp)
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(surface2Bg)
-                                        .border(1.5.dp, surfaceBg, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "+$extra",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = textSecondary
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF10B981).copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_check),
-                                contentDescription = null,
-                                tint = Color(0xFF10B981),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                    }
-
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (unpaidCount == 0) Color(0xFF10B981) else Color(0xFFF59E0B))
+                    )
                     Text(
-                        text = "${activeCamp.paid} paid • $unpaidCount unpaid",
+                        text = "${camp.paid} paid • $unpaidCount unpaid",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         color = textSecondary
                     )
                 }
@@ -1448,12 +1605,13 @@ private fun ActiveCollectionCard(
                     color = Color(0xFF6366F1).copy(alpha = 0.12f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = if (isCr) "Quick Collect" else "View unpaid",
-                            fontSize = 11.sp,
+                            text = if (isCr) "Quick Collect" else "View dues",
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF6366F1)
                         )
@@ -1465,6 +1623,77 @@ private fun ActiveCollectionCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddNewCollectionSlideCard(
+    isDark: Boolean,
+    surfaceBg: Color,
+    surface2Bg: Color,
+    borderColor: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(24.dp),
+        color = surfaceBg,
+        border = BorderStroke(1.2.dp, Color(0xFF6366F1).copy(alpha = if (isDark) 0.35f else 0.25f)),
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 24.dp, horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF6366F1).copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6366F1)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Add New Collection",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = textPrimary
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Create a custom target & track dues per student",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = textSecondary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFF6366F1)
+            ) {
+                Text(
+                    text = "New Campaign",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
             }
         }
     }
