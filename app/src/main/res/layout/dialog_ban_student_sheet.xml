@@ -37,7 +37,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:src="@drawable/ic_ban_restriction"
-                app:tint="#DC2626"
+                app:tint="@color/cm_error"
                 android:contentDescription="Ban icon" />
         </FrameLayout>
 
@@ -131,7 +131,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Student"
-            android:textColor="#475569"
+            android:textColor="@color/cm_text_secondary"
             android:textSize="11sp"
             android:textStyle="bold"
             android:background="@drawable/bg_ban_role_pill"
@@ -225,7 +225,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/ic_warning_triangle"
-            app:tint="#DC2626"
+            app:tint="@color/cm_error"
             android:contentDescription="Permanent warning" />
 
         <TextView
@@ -234,7 +234,7 @@
             android:layout_weight="1"
             android:layout_marginStart="10dp"
             android:text="Permanent restriction. The student will be locked out indefinitely across Android and Web until manually lifted by an administrator."
-            android:textColor="#991B1B"
+            android:textColor="@color/cm_notice_cancel_text"
             android:textSize="12sp"
             android:textStyle="bold"
             android:lineSpacingExtra="2dp" />
@@ -346,7 +346,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:src="@drawable/ic_info"
-            app:tint="#D97706"
+            app:tint="@color/cm_warning"
             android:contentDescription="Notice info" />
 
         <TextView
@@ -355,7 +355,7 @@
             android:layout_weight="1"
             android:layout_marginStart="10dp"
             android:text="The student will be blocked from accessing batch notices, routines, and materials until the ban expires or is lifted."
-            android:textColor="#92400E"
+            android:textColor="@color/cm_warning"
             android:textSize="12sp"
             android:lineSpacingExtra="2dp" />
     </LinearLayout>

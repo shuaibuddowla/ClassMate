@@ -282,6 +282,15 @@
         <item name="colorControlActivated">@color/cm_primary</item>
         <item name="colorSurfaceContainerHigh">@color/cm_surface</item>
     </style>
+    <style name="Theme.ClassMate.PopupMenu" parent="Theme.ClassMate">
+        <item name="android:colorBackground">@color/cm_surface</item>
+        <item name="colorSurface">@color/cm_surface</item>
+        <item name="colorSurfaceContainer">@color/cm_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/cm_surface</item>
+        <item name="android:textColor">@color/cm_text_primary</item>
+        <item name="android:textColorPrimary">@color/cm_text_primary</item>
+        <item name="android:textColorSecondary">@color/cm_text_secondary</item>
+    </style>
     <style name="Theme.ClassMate.Translucent" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackground">@android:color/transparent</item>

@@ -53,6 +53,16 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
     private var viewerIsOwner=false
     private var onMemberStateChanged: ((String,Boolean?,Boolean?,Boolean)->Unit)?=null
     private val pages=linkedMapOf<String,List<JSONObject>>()
+    private var searchHeaderView: View? = null
+    private var searchBackCallback: androidx.activity.OnBackPressedCallback? = null
+
+    fun handleBackPressed(): Boolean {
+        if (searchHeaderView?.visibility == View.VISIBLE) {
+            searchBackCallback?.handleOnBackPressed()
+            return true
+        }
+        return false
+    }
     private fun dp(n: Int)=(n*activity.resources.displayMetrics.density).toInt()
     private fun text(value: String,size: Float=14f,primary: Boolean=false)=TextView(activity).apply {
         text=value; textSize=size; setTextColor(activity.getColor(if(primary) R.color.cm_text_primary else R.color.cm_text_secondary))
@@ -103,7 +113,15 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
                 }
                 setImageResource(R.drawable.ic_arrow_back)
                 imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
-                setBackgroundResource(R.drawable.bg_settings_icon)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(12).toFloat()
+                    setColor(activity.getColor(R.color.cm_surface))
+                    setStroke(dp(1), activity.getColor(R.color.cm_border))
+                }
+                val tv = android.util.TypedValue()
+                activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                foreground = ContextCompat.getDrawable(activity, tv.resourceId)
                 setPadding(dp(9), dp(9), dp(9), dp(9))
                 isClickable = true
                 isFocusable = true
@@ -121,7 +139,15 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
             setImageResource(R.drawable.ic_search_modern)
             imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
-            setBackgroundResource(R.drawable.bg_settings_icon)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(12).toFloat()
+                setColor(activity.getColor(R.color.cm_surface))
+                setStroke(dp(1), activity.getColor(R.color.cm_border))
+            }
+            val tv = android.util.TypedValue()
+            activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+            foreground = ContextCompat.getDrawable(activity, tv.resourceId)
             setPadding(dp(9), dp(9), dp(9), dp(9))
             isClickable = true
             isFocusable = true
@@ -147,16 +173,29 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             }
             setPadding(dp(6), 0, dp(8), 0)
         }
+        searchHeaderView = searchHeader
 
         val btnBack = ImageView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
             setImageResource(R.drawable.ic_arrow_back)
             imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = activity.getDrawable(android.R.drawable.list_selector_background)
+            val tv = android.util.TypedValue()
+            activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+            background = ContextCompat.getDrawable(activity, tv.resourceId)
             contentDescription = "Back to Batch"
         }
         searchHeader.addView(btnBack)
+
+        val ivSearchIcon = ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply {
+                marginStart = dp(4)
+            }
+            setImageResource(R.drawable.ic_search_modern)
+            imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_muted))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        searchHeader.addView(ivSearchIcon)
 
         val input = TextInputEditText(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, -1, 1f).apply {
@@ -166,7 +205,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             background = null
             setSingleLine(true)
             setTextColor(activity.getColor(R.color.cm_text_primary))
-            setHintTextColor(activity.getColor(R.color.cm_text_secondary))
+            setHintTextColor(activity.getColor(R.color.cm_text_muted))
             hint = if (teacher()) "Search name, ID, or blood group" else "Search name, ID, or blood group (e.g. O+)"
             textSize = 13.5f
             filters = arrayOf(android.text.InputFilter.LengthFilter(100))
@@ -179,26 +218,39 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             setImageResource(R.drawable.ic_close)
             imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_secondary))
             setPadding(dp(7), dp(7), dp(7), dp(7))
+            val tv = android.util.TypedValue()
+            activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+            background = ContextCompat.getDrawable(activity, tv.resourceId)
             visibility = View.GONE
             contentDescription = "Clear search"
         }
         searchHeader.addView(btnClear)
         header.addView(searchHeader)
 
+        val backPressedCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                input.setText("")
+                searchHeader.visibility = View.GONE
+                titleContainer.visibility = View.VISIBLE
+                isEnabled = false
+                val imm = activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(input.windowToken, 0)
+            }
+        }
+        searchBackCallback = backPressedCallback
+        activity.onBackPressedDispatcher.addCallback(activity, backPressedCallback)
+
         btnSearch.setOnClickListener {
             titleContainer.visibility = View.GONE
             searchHeader.visibility = View.VISIBLE
+            backPressedCallback.isEnabled = true
             input.requestFocus()
             val imm = activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
             imm?.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
         }
 
         btnBack.setOnClickListener {
-            input.setText("")
-            searchHeader.visibility = View.GONE
-            titleContainer.visibility = View.VISIBLE
-            val imm = activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
-            imm?.hideSoftInputFromWindow(input.windowToken, 0)
+            backPressedCallback.handleOnBackPressed()
         }
 
         btnClear.setOnClickListener {
@@ -385,7 +437,10 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             load(true)
         }
         swipeRefresh.setOnRefreshListener { load(true) }
-        input.doAfterTextChanged { load(true,true) }
+        input.doAfterTextChanged {
+            btnClear.visibility = if (it.isNullOrBlank()) View.GONE else View.VISIBLE
+            load(true, true)
+        }
         retry.setOnClickListener { load(offset==0) }
         var friendsDownTravel = 0
         var friendsUpTravel = 0
@@ -440,7 +495,11 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
     }) {
         override fun onCreateViewHolder(parent: ViewGroup,type: Int): FriendHolder {
             val card=MaterialCardView(activity).apply {
-                radius=dp(16).toFloat(); cardElevation=0f; setCardBackgroundColor(activity.getColor(R.color.cm_surface))
+                radius=dp(16).toFloat()
+                cardElevation=0f
+                setCardBackgroundColor(activity.getColor(R.color.cm_surface))
+                strokeWidth = dp(1)
+                strokeColor = activity.getColor(R.color.cm_border)
                 layoutParams=RecyclerView.LayoutParams(-1,-2).apply { bottomMargin=dp(8) }
                 isClickable=true; isFocusable=true
             }
@@ -460,7 +519,16 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
 
             val labels=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),0,dp(8),0) }
             val name=text("",16f,true).apply { setTypeface(null,1) }
-            val actions=ImageView(activity).apply { setImageResource(R.drawable.ic_more_vert); contentDescription="Student actions"; visibility=View.GONE; setPadding(dp(8),dp(8),dp(8),dp(8)) }
+            val actions=ImageView(activity).apply {
+                setImageResource(R.drawable.ic_more_vert)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_primary))
+                contentDescription="Student actions"
+                visibility=View.GONE
+                setPadding(dp(8),dp(8),dp(8),dp(8))
+                val tv = android.util.TypedValue()
+                activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+                background = ContextCompat.getDrawable(activity, tv.resourceId)
+            }
             val badgeRow=LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL; setPadding(0,dp(4),0,0) }
             val badge=text("Admin",11f,true).apply {
                 setPadding(dp(8),dp(3),dp(8),dp(3)); setTextColor(activity.getColor(R.color.cm_primary))
@@ -470,7 +538,12 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
             val id=text("",12f).apply { setPadding(0,dp(4),0,0) }
             labels.addView(name); labels.addView(badgeRow); labels.addView(id); row.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
             row.addView(actions,LinearLayout.LayoutParams(dp(40),dp(40)))
-            row.addView(ImageView(activity).apply { setImageResource(R.drawable.ic_chevron_right); importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO },LinearLayout.LayoutParams(dp(18),dp(18)))
+            val chevron = ImageView(activity).apply {
+                setImageResource(R.drawable.ic_chevron_right)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.cm_text_muted))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            row.addView(chevron, LinearLayout.LayoutParams(dp(18),dp(18)))
             card.addView(row)
             return FriendHolder(card,avatar,onlineDot,name,id,badge,actions)
         }
@@ -544,7 +617,8 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         isCr: Boolean,
         onStateChanged: (Boolean?,Boolean?,Boolean)->Unit
     ) {
-        val popup=android.widget.PopupMenu(activity,anchor)
+        val wrapper = androidx.appcompat.view.ContextThemeWrapper(activity, R.style.Theme_ClassMate_PopupMenu)
+        val popup = androidx.appcompat.widget.PopupMenu(wrapper, anchor)
         val profileId=member.optString("profile_id")
         val fullName=member.optString("full_name").ifBlank { "this student" }
         val targetIsCr=member.optBoolean("is_cr")
@@ -643,7 +717,7 @@ internal class ClassMateFriendsScreen(private val activity: AppCompatActivity,pr
         val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancelBan)
 
         val durationOptions = listOf("3 Days", "7 Days", "Custom Days", "Permanent Ban")
-        val durationAdapter = android.widget.ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, durationOptions)
+        val durationAdapter = android.widget.ArrayAdapter(activity, R.layout.item_course_dropdown, durationOptions)
         actvBanDuration?.setAdapter(durationAdapter)
         actvBanDuration?.setText(durationOptions[0], false)
         actvBanDuration?.setOnClickListener {

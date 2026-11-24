@@ -71,6 +71,15 @@ class ClassMateBatchActivity : AppCompatActivity() {
             onBack = { finish() }
         )
 
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!friendsScreen.handleBackPressed()) {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+
         friendsScreen.render(container, batchLabel)
     }
 }
