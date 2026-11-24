@@ -103,13 +103,58 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE -> "channel_disabled"
             else -> "displayed"
         }
-        val eventKey=inputData.getString("event_id") ?: inputData.getString("record_id")
-        val ledger=ClassMatePushLedger(context,identity.optString("id"))
-        if (state == "displayed" && (eventKey==null || !ledger.contains(eventKey))) {
-            if(release) {
+
+        val asmtId = if (assessmentReminder) {
+            inputData.getString("assessment_id") ?: inputData.getString("record_id") ?: ""
+        } else ""
+        val rawReminderType = if (assessmentReminder) {
+            inputData.getString("reminder_type")?.trim() ?: ""
+        } else ""
+        val reminderType = if (assessmentReminder) {
+            when {
+                rawReminderType.isNotBlank() -> rawReminderType
+                (inputData.getString("title") ?: "").contains("Tomorrow", ignoreCase = true) ||
+                (inputData.getString("body") ?: "").contains("tomorrow", ignoreCase = true) ||
+                (inputData.getString("title") ?: "").contains("24h", ignoreCase = true) -> "24h"
+                else -> "2h"
+            }
+        } else ""
+
+        if (assessmentReminder && asmtId.isNotBlank()) {
+            if (com.shuaib.classmate.services.ClassMateAssessmentReminderReceiver.isReminderAlreadyDelivered(context, asmtId, reminderType)) {
+                android.util.Log.d("PushWorker", "Assessment reminder for $asmtId ($reminderType) already delivered locally, suppressing duplicate push")
+                val event = inputData.getString("event_id")
+                val hash = inputData.getString("token_hash")
+                if (event != null && hash != null) {
+                    runCatching {
+                        ClassMateAuthApi.rpcText(
+                            "report_notification_receipt",
+                            JSONObject().put("target_event", event)
+                                .put("target_hash", hash)
+                                .put("target_state", "suppressed_duplicate")
+                                .put("target_version", BuildConfig.VERSION_CODE)
+                        )
+                    }
+                }
+                return Result.success()
+            }
+        }
+
+        val eventKey = when {
+            inputData.getString("event_id") != null -> inputData.getString("event_id")
+            assessmentReminder && asmtId.isNotBlank() -> "${asmtId}_$reminderType"
+            else -> inputData.getString("record_id")
+        }
+        val ledger = ClassMatePushLedger(context, identity.optString("id"))
+        if (state == "displayed" && (eventKey == null || !ledger.contains(eventKey))) {
+            if (release) {
                 UpdateNotifications.show(context, inputData.getString("title") ?: "ClassMate update",
                     "Tap to review the latest update.", UpdateActionActivity.ACTION_PROMPT, notificationId = 3902)
             } else {
+                if (assessmentReminder && asmtId.isNotBlank()) {
+                    com.shuaib.classmate.services.ClassMateAssessmentReminderReceiver.markReminderDelivered(context, asmtId, reminderType)
+                    com.shuaib.classmate.services.ClassMateAssessmentReminderScheduler.cancelSingle(context, asmtId, reminderType)
+                }
                 val key = inputData.getString("record_id") ?: id.toString()
                 val targetNoticeId = inputData.getString("record_id")
                     ?: inputData.getString("noticeId")
@@ -176,7 +221,13 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 }
                 val notification=builder.build()
                 try {
-                    manager.notify(key.hashCode(), notification)
+                    if (assessmentReminder && asmtId.isNotBlank()) {
+                        val notifTag = com.shuaib.classmate.services.ClassMateAssessmentReminderReceiver.notificationTag(asmtId, reminderType)
+                        val notifId = com.shuaib.classmate.services.ClassMateAssessmentReminderReceiver.requestCode(asmtId, reminderType)
+                        manager.notify(notifTag, notifId, notification)
+                    } else {
+                        manager.notify(key.hashCode(), notification)
+                    }
                     if (!blood && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         val summaryNotification = NotificationCompat.Builder(context, channel)
                             .setSmallIcon(R.drawable.ic_classmate_notification)
@@ -237,7 +288,8 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             val fields = listOf(
                 "project_ref", "recipient_id", "batch_id", "kind", "record_id", "event_id",
                 "token_hash", "version_code", "version_name", "title", "body", "blood_match",
-                "expires_at", "session_id", "course_code", "course_title", "assessment_id", "routine_slot_id"
+                "expires_at", "session_id", "course_code", "course_title", "assessment_id", "routine_slot_id",
+                "reminder_type"
             )
             val data = Data.Builder().apply { fields.forEach { key -> values[key]?.let { putString(key,it.take(500)) } } }.build()
             val work = OneTimeWorkRequestBuilder<ClassMatePushWorker>().setInputData(data)

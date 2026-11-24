@@ -57,8 +57,33 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "AssessmentReminder"
-        private const val PREFS_NAME = "classmate_assessment_alarms"
-        private const val CHANNEL_ID = "classmate_assessments"
+        const val PREFS_NAME = "classmate_assessment_alarms"
+        const val CHANNEL_ID = "classmate_assessments"
+
+        fun notificationTag(assessmentId: String, reminderType: String): String {
+            return "asmt_${assessmentId}_$reminderType"
+        }
+
+        fun requestCode(id: String, reminderType: String): Int {
+            val suffix = if (reminderType == "24h") 24 else 2
+            return ((id.hashCode() * 31) + suffix) and 0x7FFFFFFF
+        }
+
+        fun isReminderAlreadyDelivered(context: Context, assessmentId: String, reminderType: String): Boolean {
+            if (assessmentId.isBlank()) return false
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val dedupKey = "delivered_${assessmentId}_$reminderType"
+            val lastDelivered = prefs.getLong(dedupKey, 0L)
+            val now = System.currentTimeMillis()
+            return lastDelivered > 0L && (now - lastDelivered) < 12 * 3600 * 1000L
+        }
+
+        fun markReminderDelivered(context: Context, assessmentId: String, reminderType: String) {
+            if (assessmentId.isBlank()) return
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val dedupKey = "delivered_${assessmentId}_$reminderType"
+            prefs.edit().putLong(dedupKey, System.currentTimeMillis()).apply()
+        }
 
         fun deliver(
             context: Context,
@@ -93,16 +118,12 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
                 return
             }
 
-            // Deduplication (prevents double alert between AlarmManager and WorkManager fallback)
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val dedupKey = "delivered_${assessmentId}_${reminderType}"
-            val lastDelivered = prefs.getLong(dedupKey, 0L)
-            val now = System.currentTimeMillis()
-            if (lastDelivered > 0L && (now - lastDelivered) < 12 * 3600 * 1000L) {
-                Log.d(TAG, "Reminder $dedupKey already delivered recently, skipping")
+            // Deduplication (prevents double alert between FCM Push, AlarmManager, and WorkManager fallback)
+            if (isReminderAlreadyDelivered(context, assessmentId, reminderType)) {
+                Log.d(TAG, "Reminder for $assessmentId ($reminderType) already delivered recently, skipping")
                 return
             }
-            prefs.edit().putLong(dedupKey, now).apply()
+            markReminderDelivered(context, assessmentId, reminderType)
 
             val notifTitle = if (reminderType == "24h") {
                 if (timeStr.isNotBlank()) "Reminder: $typeName tomorrow at $timeStr" else "Reminder: $typeName tomorrow"
@@ -145,13 +166,9 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .build()
 
-            NotificationManagerCompat.from(context).notify(requestCode, notification)
+            val notifTag = notificationTag(assessmentId, reminderType)
+            NotificationManagerCompat.from(context).notify(notifTag, requestCode, notification)
             Log.d(TAG, "Delivered on-device reminder for $assessmentId ($reminderType)")
-        }
-
-        fun requestCode(id: String, reminderType: String): Int {
-            val suffix = if (reminderType == "24h") 24 else 2
-            return ((id.hashCode() * 31) + suffix) and 0x7FFFFFFF
         }
     }
 }
@@ -251,6 +268,12 @@ object ClassMateAssessmentReminderScheduler {
             return
         }
 
+        // If reminder was already delivered (either by FCM push or earlier alarm), don't schedule
+        if (ClassMateAssessmentReminderReceiver.isReminderAlreadyDelivered(context, item.id, reminderType)) {
+            Log.d(TAG, "Reminder ${item.id} ($reminderType) was already delivered, skipping schedule")
+            return
+        }
+
         // 1. AlarmManager exact / inexact scheduling
         try {
             if (Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()) {
@@ -285,28 +308,38 @@ object ClassMateAssessmentReminderScheduler {
         Log.d(TAG, "Scheduled on-device $reminderType reminder for ${item.id} in ${delayMs / 1000 / 60} minutes")
     }
 
-    fun cancelForAssessment(context: Context, assessmentId: String) {
+    fun cancelSingle(context: Context, assessmentId: String, reminderType: String) {
         if (assessmentId.isBlank()) return
         val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val work = WorkManager.getInstance(context)
-
-        listOf("24h", "2h").forEach { type ->
-            val workName = "asmt_rem_${assessmentId}_$type"
-            val requestCode = ClassMateAssessmentReminderReceiver.requestCode(assessmentId, type)
-            val intent = Intent(context, ClassMateAssessmentReminderReceiver::class.java)
-            val pending = PendingIntent.getBroadcast(
-                context,
-                requestCode,
-                intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            )
-            if (pending != null && manager != null) {
-                manager.cancel(pending)
-                pending.cancel()
-            }
-            work.cancelUniqueWork(workName)
+        val workName = "asmt_rem_${assessmentId}_$reminderType"
+        val requestCode = ClassMateAssessmentReminderReceiver.requestCode(assessmentId, reminderType)
+        val intent = Intent(context, ClassMateAssessmentReminderReceiver::class.java)
+        val pending = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pending != null && manager != null) {
+            manager.cancel(pending)
+            pending.cancel()
         }
-        Log.d(TAG, "Cancelled on-device reminders for $assessmentId")
+        work.cancelUniqueWork(workName)
+        Log.d(TAG, "Cancelled on-device $reminderType reminder for $assessmentId")
+    }
+
+    fun cancelForAssessment(context: Context, assessmentId: String) {
+        if (assessmentId.isBlank()) return
+        val notifManager = NotificationManagerCompat.from(context)
+        listOf("24h", "2h").forEach { type ->
+            cancelSingle(context, assessmentId, type)
+            notifManager.cancel(
+                ClassMateAssessmentReminderReceiver.notificationTag(assessmentId, type),
+                ClassMateAssessmentReminderReceiver.requestCode(assessmentId, type)
+            )
+        }
+        Log.d(TAG, "Cancelled on-device reminders and notifications for $assessmentId")
     }
 
     fun rescheduleAll(context: Context, items: List<AssessmentItem>) {
