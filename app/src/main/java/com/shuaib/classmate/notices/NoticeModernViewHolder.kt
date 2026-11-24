@@ -144,12 +144,26 @@ class NoticeModernViewHolder(
             cardRoot.strokeWidth = (1f * density).toInt()
         }
 
+        val titleContainer = tvTitle.parent as? android.view.ViewGroup
+        val titleLp = titleContainer?.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+
         if (model.isPoll) {
             ivNoticeIllustration.visibility = View.GONE
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
+            if (titleLp != null && titleLp.marginEnd != 0) {
+                titleLp.marginEnd = 0
+                titleContainer.layoutParams = titleLp
+            }
         } else {
             ivNoticeIllustration.visibility = View.VISIBLE
             ivNoticeIllustration.setImageResource(iconRes)
             ivNoticeIllustration.imageTintList = null
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
+            val defaultMargin = (8 * density).toInt()
+            if (titleLp != null && titleLp.marginEnd != defaultMargin) {
+                titleLp.marginEnd = defaultMargin
+                titleContainer.layoutParams = titleLp
+            }
         }
 
         // Title and Body
@@ -392,9 +406,13 @@ class NoticeModernViewHolder(
             val dp = { n: Int -> (n * density).toInt() }
             val avatarOverlap = dp(14)
             val avatarSize = dp(22)
-            val shownCount = minOf(seenAvatarsList.size, count)
 
-            seenAvatarsList.take(shownCount).forEachIndexed { index, avatarUrl ->
+            // Strictly show at most 3 avatar photos
+            val maxPhotos = 3
+            val photosToShow = seenAvatarsList.take(minOf(maxPhotos, count))
+            val numPhotos = photosToShow.size
+
+            photosToShow.forEachIndexed { index, avatarUrl ->
                 val image = de.hdodenhof.circleimageview.CircleImageView(itemView.context).apply {
                     borderWidth = dp(1)
                     borderColor = ContextCompat.getColor(itemView.context, R.color.cm_surface)
@@ -418,12 +436,15 @@ class NoticeModernViewHolder(
                 }
             }
 
-            val remainingCount = (count - shownCount).coerceAtLeast(0)
-            if (count > 3 && remainingCount > 0) {
+            // 4th slot: White circular avatar counter badge shown when count > 3 and there are more readers
+            val remainingCount = (count - numPhotos).coerceAtLeast(0)
+            val showBadge = count > 3 && remainingCount > 0
+            if (showBadge) {
                 val counterBadge = TextView(itemView.context).apply {
-                    textSize = if (remainingCount > 99) 8f else 9.5f
+                    textSize = if (remainingCount > 99) 7.5f else 9f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                     gravity = android.view.Gravity.CENTER
+                    includeFontPadding = false
                     setTextColor(0xFF0F172A.toInt())
                     val shape = android.graphics.drawable.GradientDrawable().apply {
                         shape = android.graphics.drawable.GradientDrawable.OVAL
@@ -437,9 +458,18 @@ class NoticeModernViewHolder(
                 seenAvatars.addView(
                     counterBadge,
                     FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
-                        marginStart = shownCount * avatarOverlap
+                        marginStart = numPhotos * avatarOverlap
                     }
                 )
+            }
+
+            // Lock exact width on seenAvatars to permanently stick in the bottom right corner without overflowing
+            val totalBubbles = numPhotos + (if (showBadge) 1 else 0)
+            val exactWidth = if (totalBubbles > 0) ((totalBubbles - 1) * avatarOverlap) + avatarSize else 0
+            val lp = seenAvatars.layoutParams
+            if (lp != null && lp.width != exactWidth) {
+                lp.width = exactWidth
+                seenAvatars.layoutParams = lp
             }
         }
     }
