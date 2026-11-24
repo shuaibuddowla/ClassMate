@@ -24,23 +24,15 @@ This memory file serves as the definitive engineering knowledge base and memory 
 
 ## 1. High-Level Overview & Core Concepts
 
-- **Upcoming Assessment Deadline Reminders (Unified Hybrid Delivery & Zero Duplication)**:
-  - **Dual Pipeline Convergence**: Reminders are supported via both remote FCM push (from Supabase cron outbox) and on-device offline scheduling (`AlarmManager.setExactAndAllowWhileIdle()` with `WorkManager` fallback in `ClassMateAssessmentReminderScheduler`).
-  - **Root Cause of Twin Notifications (Resolved)**:
-    - Previously, both Supabase pg_cron FCM push ("Reminder: Class Test Tomorrow") and on-device `AlarmManager` ("Reminder: CT tomorrow at 11:00 AM") fired at the exact same 24-hour mark.
-    - Because each had different notification IDs (`assessment_id.hashCode()` vs `requestCode(assessmentId, reminderType)`), no shared deduplication check, and no tag, Android displayed two separate notifications simultaneously in the system tray.
-  - **Unified Deduplication Solution**:
-    1. **Shared Deduplication Registry**: `classmate_assessment_alarms` SharedPreferences tracks `delivered_${assessmentId}_${reminderType}` with a 12-hour deduplication window.
-    2. **Remote Push Interception (`ClassMatePushWorker.kt`)**: When an `assessment_reminder` FCM arrives, it checks `isReminderAlreadyDelivered(...)`. If already shown locally, the duplicate push is suppressed. If not, it marks it delivered, cancels the pending local `AlarmManager`/`WorkManager` alarm via `cancelSingle(context, assessmentId, reminderType)`, and displays the rich notification.
-    3. **Local Alarm Interception (`ClassMateAssessmentReminderReceiver.kt`)**: Before delivering, checks `isReminderAlreadyDelivered(...)`. If remote push already delivered the reminder, the alarm exits silently.
-    4. **Shared Notification Slot**: Both remote and local pipelines post with identical tag `notificationTag(asmtId, reminderType)` (`asmt_${id}_${type}`) and ID `requestCode(asmtId, reminderType)`. Even under edge-case race conditions, Android updates the single slot in place.
+- **Upcoming Assessment Deadline Reminders (100% On-Device Zero-Compute Engine)**:
+  - **Zero Supabase Compute Guarantee**: All server-side polling and pg_cron scheduling (`classmate-assessment-reminders`) are completely unscheduled and disabled (migration `202611240002_unschedule_assessment_reminders_cron.sql`). This ensures Supabase never wakes up or expends free compute quota for assessment polling.
+  - **On-Device Hybrid Engine**: Reminders are scheduled locally on the student's Android device using `AlarmManager.setExactAndAllowWhileIdle()` with `WorkManager` fallback (`ClassMateAssessmentReminderScheduler`).
   - **Alert Cadence**: Fires exactly 24 hours (deadline - 24h) and 2 hours (deadline - 2h) before the deadline in Asia/Dhaka timezone.
-  - **100% Offline Capable**: Fires even when mobile data or campus Wi-Fi is off.
+  - **100% Offline Capable**: Fires even when mobile data or campus Wi-Fi is completely disconnected.
   - **Lifecycle & Persistence**:
     - Automatic scheduling on assessment sync in `AssessmentRepository.saveStoredRealAssessments()`.
     - Cancellation on assessment deletion in `AssessmentRepository.deleteAssessment()`.
     - Reboot persistence: Rescheduled on device reboot via `BootReceiver`.
-    - Push sync: When an assessment announcement push arrives, `ClassMatePushWorker` silently refreshes and schedules alarms.
     - Channel: `classmate_assessments` (High priority).
     - Tapping opens `ClassMateAuthActivity` to `R.id.nav_upcoming` and presents the assessment detail bottom sheet.
   - Automatically schedules 24-hour and 2-hour deadline alerts in Asia/Dhaka time (BST, UTC+6) via classmate.assessment_reminders table and trigger classmate.sync_assessment_reminders().
