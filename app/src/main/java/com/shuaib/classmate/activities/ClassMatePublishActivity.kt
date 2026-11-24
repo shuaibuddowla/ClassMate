@@ -1306,19 +1306,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
         chatInputCapsule.addView(btnVoiceInput)
 
-        // Hint text under the capsule
-        val silentHint = TextView(this).apply {
-            text = "Banglish auto-converts to Bengali. English remains English. Start with /silent to post without push alerts."
-            textSize = 11.5f
-            setTextColor(getColor(R.color.cm_text_muted))
-            setLineSpacing(0f, 1.25f)
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = dp(6)
-                marginStart = dp(6)
-                marginEnd = dp(6)
-            }
-        }
-        messageComposerBox.addView(silentHint)
+
 
         var dotPulseAnimator: android.animation.ObjectAnimator? = null
         fun startDotPulse() {
@@ -3200,6 +3188,31 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
     }
 
+    private fun parseRecentNoticeCategory(categoryRaw: String, typeRaw: String): String {
+        val raw = categoryRaw.ifBlank { typeRaw }.trim().lowercase()
+        return when (raw) {
+            "exam", "ct", "class_test", "classtest" -> "CLASS TEST"
+            "assignment", "deadline", "task" -> "ASSIGNMENT"
+            "cancellation", "cancel", "class_cancel" -> "CLASS CANCEL"
+            "poll", "survey" -> "POLL"
+            "routine", "schedule" -> "ROUTINE"
+            "resource", "material" -> "RESOURCE"
+            "", "notice", "general", "general_notice", "general notice" -> "GENERAL"
+            else -> raw.uppercase()
+        }
+    }
+
+    private fun resolveNoticeAuthor(notice: JSONObject, authorsMap: Map<String, JSONObject>?): String {
+        val id = notice.optString("id")
+        val authorId = notice.optString("author_id").ifBlank { notice.optString("posted_by") }.ifBlank { notice.optString("created_by") }
+        val name = authorsMap?.get(id)?.optString("full_name")?.takeIf { it.isNotBlank() }
+            ?: authorsMap?.get(authorId)?.optString("full_name")?.takeIf { it.isNotBlank() }
+            ?: authorsMap?.get(authorId)?.optString("name")?.takeIf { it.isNotBlank() }
+            ?: notice.optString("author_name").takeIf { it.isNotBlank() }
+            ?: notice.optString("created_by_name").takeIf { it.isNotBlank() }
+        return if (!name.isNullOrBlank()) "By $name" else "By Class Representative"
+    }
+
     private fun loadRecentNotices(batchId: String) {
         if (batchId.isBlank()) return
         val currentUserId = ClassMateAuthApi.notificationIdentity()?.optString("id") ?: ""
@@ -3209,14 +3222,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
         if (cached != null && cached.notices.isNotEmpty()) {
             composeRecentNotices = cached.notices.take(3).map { n ->
                 val id = n.optString("id")
-                val author = cached.authors[id]?.optString("full_name")?.takeIf { it.isNotBlank() }
-                    ?: cached.authors[n.optString("author_id")]?.optString("full_name")?.takeIf { it.isNotBlank() }
                 RecentNoticeItem(
                     id = id,
-                    title = n.optString("title").ifBlank { "Notice" },
+                    title = n.optString("title").ifBlank { "Announcement" },
                     body = n.optString("body").trim(),
-                    category = n.optString("category").ifBlank { "NOTICE" }.uppercase(),
-                    authorName = if (!author.isNullOrBlank()) "By $author" else "Class Notice",
+                    category = parseRecentNoticeCategory(n.optString("category"), n.optString("type")),
+                    authorName = resolveNoticeAuthor(n, cached.authors),
                     timeAgo = formatNoticeTimeAgo(n.optString("published_at")),
                     hasAttachment = n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null"
                 )
@@ -3253,14 +3264,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
                     val items = noticeList.map { n ->
                         val id = n.optString("id")
-                        val author = authorsMap[id]?.optString("full_name")?.takeIf { it.isNotBlank() }
-                            ?: authorsMap[n.optString("author_id")]?.optString("full_name")?.takeIf { it.isNotBlank() }
                         RecentNoticeItem(
                             id = id,
-                            title = n.optString("title").ifBlank { "Notice" },
+                            title = n.optString("title").ifBlank { "Announcement" },
                             body = n.optString("body").trim(),
-                            category = n.optString("category").ifBlank { "NOTICE" }.uppercase(),
-                            authorName = if (!author.isNullOrBlank()) "By $author" else "Class Notice",
+                            category = parseRecentNoticeCategory(n.optString("category"), n.optString("type")),
+                            authorName = resolveNoticeAuthor(n, authorsMap),
                             timeAgo = formatNoticeTimeAgo(n.optString("published_at")),
                             hasAttachment = n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null"
                         )

@@ -1569,9 +1569,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
+        AppPreferences(this).setHasRequestedNotificationPermission(true)
         AppPreferences(this).setNotificationsEnabled(granted)
-
-
 
         if (granted) {
 
@@ -2773,7 +2772,12 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-            } else { registerFcmToken() }
+            } else {
+                registerFcmToken()
+                window.decorView.postDelayed({
+                    if (homeShown && !isFinishing) requestNotificationPermissionIfNeeded()
+                }, 800)
+            }
 
 
 
@@ -3161,13 +3165,23 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
             val shownStep=welcomeStep
 
-
-
-            if(shownStep==3) notificationOfferShown=true
-
-
-
             val permission=Build.VERSION.SDK_INT<33 || ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED
+
+            if(shownStep==3) {
+                notificationOfferShown=true
+                if (Build.VERSION.SDK_INT >= 33 && !permission) {
+                    val prefs = AppPreferences(this)
+                    val previouslyAsked = prefs.hasRequestedNotificationPermission()
+                    if (!previouslyAsked || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                        prefs.setHasRequestedNotificationPermission(true)
+                        moveWelcomeStep(shownStep, 0)
+                        welcomeDialog?.dismiss()
+                        welcomeDialog = null
+                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        return
+                    }
+                }
+            }
 
 
 
@@ -3616,16 +3630,11 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         window.decorView.postDelayed({
-
-            if(homeShown && welcomeStep==0 && !isFinishing) {
-
-                offerNotificationPermission(); registerFcmToken()
-
+            if(homeShown && !isFinishing) {
+                requestNotificationPermissionIfNeeded()
                 if(notificationsEnabled()) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
-
             }
-
-        },1200)
+        }, 800)
 
 
 
@@ -6565,35 +6574,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-    private fun requestNotificationPermissionIfNeeded() {
 
-
-
-        if (Build.VERSION.SDK_INT >= 33 && !askedNotificationPermission &&
-
-
-
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-
-
-
-                != PackageManager.PERMISSION_GRANTED) {
-
-
-
-            askedNotificationPermission = true
-
-
-
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-
-
-
-        }
-
-
-
-    }
 
 
 
@@ -6908,18 +6889,9 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-        if(homeShown && welcomeStep==0 && ClassMateAuthApi.hasSavedSession()) {
-
-
-
-            val offered=offerNotificationPermission(); registerFcmToken()
-
-
-
+        if(homeShown && ClassMateAuthApi.hasSavedSession()) {
+            val offered=requestNotificationPermissionIfNeeded(); registerFcmToken()
             if(!offered) com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
-
-
-
         }
 
 
@@ -6948,63 +6920,67 @@ class ClassMateAuthActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    private var notificationOfferShown=false
+    private var notificationOfferShown = false
 
+    private fun requestNotificationPermissionIfNeeded(force: Boolean = false): Boolean {
+        if (!force && notificationOfferShown) return false
+        if (isFinishing || isDestroyed) return false
+        if (notificationsEnabled()) {
+            registerFcmToken()
+            return false
+        }
 
+        val prefs = AppPreferences(this)
+        val isAndroid13Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-    private fun offerNotificationPermission(): Boolean {
+        if (isAndroid13Plus) {
+            val notGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
 
+            if (notGranted) {
+                notificationOfferShown = true
+                val hasPreviouslyRequested = prefs.hasRequestedNotificationPermission()
+                val isPermanentlyDenied = hasPreviouslyRequested &&
+                        !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
 
+                if (isPermanentlyDenied) {
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("Enable Notifications")
+                        .setMessage("Notifications are disabled for ClassMate. Allow notifications in system settings to receive routine changes, notices, and class updates.")
+                        .setPositiveButton("Open Settings") { _, _ -> openNotificationSettings() }
+                        .setNegativeButton("Later") { _, _ ->
+                            com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
+                        }
+                        .show()
+                } else {
+                    prefs.setHasRequestedNotificationPermission(true)
+                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                return true
+            }
+        }
 
-        if(profile?.optString("role")=="teacher") return false
+        if (!notificationsEnabled()) {
+            notificationOfferShown = true
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Stay updated")
+                .setMessage("Enable notifications for notices, class changes, blood requests and app updates.")
+                .setPositiveButton("Enable") { _, _ -> enableNotificationsFromProfile() }
+                .setNegativeButton("Later") { _, _ ->
+                    com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this)
+                }
+                .show()
+            return true
+        }
 
-
-
-        if(!homeShown || welcomeStep!=0 || notificationOfferShown || notificationsEnabled()) return false
-
-
-
-        notificationOfferShown=true
-
-
-
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-
-
-
-            .setTitle("Stay updated")
-
-
-
-            .setMessage("Enable notifications for notices, class changes, blood requests and app updates.")
-
-
-
-            .setPositiveButton("Enable") { _, _ -> enableNotificationsFromProfile() }
-
-
-
-            .setNegativeButton("Later") { _, _ -> com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this) }.show()
-
-
-
-        return true
-
-
-
+        return false
     }
 
-
-
-
-
-
+    private fun offerNotificationPermission(): Boolean = requestNotificationPermissionIfNeeded()
 
     private fun registerFcmToken() {
-
-
-
-        if(profile?.optString("role")=="teacher") return
 
 
 
@@ -7105,37 +7081,13 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
     private fun enableNotificationsFromProfile() {
-
-
-
         AppPreferences(this).setNotificationsEnabled(true)
-
-
-
         if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) {
-
-
-
-            val asked=welcomeProgress.getBoolean("notification_permission_requested",false)
-
-
-
+            val asked=AppPreferences(this).hasRequestedNotificationPermission()
             if(asked && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
-
-
-
-            else { welcomeProgress.edit().putBoolean("notification_permission_requested",true).apply(); notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
-
-
-
+            else { AppPreferences(this).setHasRequestedNotificationPermission(true); notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
         } else if(!notificationsEnabled()) openNotificationSettings()
-
-
-
         else { registerFcmToken(); com.shuaib.classmate.update.UpdateCoordinator.promptOnOpen(this) }
-
-
-
     }
 
 

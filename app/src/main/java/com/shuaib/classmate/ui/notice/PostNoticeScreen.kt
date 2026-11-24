@@ -125,6 +125,23 @@ fun PostNoticeScreen(
 
     val primaryColor = if (isDark) Color(0xFF818CF8) else Color(0xFF4F46E5)
 
+    // Clean display of Semester badge vs Batch subtitle
+    val extractedSemester = remember(semesterLabel, batchLabel) {
+        if (semesterLabel.isNotBlank()) semesterLabel
+        else if (batchLabel.contains("Semester", ignoreCase = true)) {
+            val parts = batchLabel.split("·", "-").map { it.trim() }
+            parts.firstOrNull { it.contains("Semester", ignoreCase = true) }.orEmpty()
+        } else ""
+    }
+
+    val cleanBatchSubtitle = remember(batchLabel, extractedSemester) {
+        if (extractedSemester.isNotBlank() && batchLabel.contains(extractedSemester)) {
+            batchLabel.replace(extractedSemester, "").trim().trim('·', '-', ' ', '•')
+        } else {
+            batchLabel
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -144,12 +161,12 @@ fun PostNoticeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 6.dp, top = 4.dp, end = 16.dp, bottom = 8.dp),
+                        .padding(start = 6.dp, top = 6.dp, end = 16.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
                         onClick = onClose,
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_arrow_back),
@@ -159,7 +176,7 @@ fun PostNoticeScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Column(
                         modifier = Modifier.weight(1f)
@@ -172,10 +189,9 @@ fun PostNoticeScreen(
                             color = AssessmentColors.primaryTextColor(isDark),
                             letterSpacing = (-0.3).sp
                         )
-                        val subtitle = if (semesterLabel.isNotBlank()) "$semesterLabel · $batchLabel" else batchLabel
-                        if (subtitle.isNotBlank()) {
+                        if (cleanBatchSubtitle.isNotBlank()) {
                             Text(
-                                text = subtitle,
+                                text = cleanBatchSubtitle,
                                 fontSize = 12.sp,
                                 fontFamily = PlusJakartaBold,
                                 fontWeight = FontWeight.Normal,
@@ -185,11 +201,27 @@ fun PostNoticeScreen(
                             )
                         }
                     }
+
+                    if (extractedSemester.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = primaryColor.copy(alpha = if (isDark) 0.18f else 0.10f)
+                        ) {
+                            Text(
+                                text = extractedSemester,
+                                fontSize = 11.5.sp,
+                                fontFamily = PlusJakartaBold,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryColor,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
 
                 HorizontalDivider(
                     thickness = 0.5.dp,
-                    color = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+                    color = if (isDark) Color(0x1FFFFFFF) else Color(0x0F000000)
                 )
             }
         }
@@ -197,9 +229,12 @@ fun PostNoticeScreen(
         val density = LocalDensity.current
         val imeBottom = WindowInsets.ime.getBottom(density)
         val navBottom = WindowInsets.navigationBars.getBottom(density)
-        val formBottomPadding = with(density) {
-            if (noticeType != NoticePostingType.GENERAL) maxOf(imeBottom, navBottom).toDp() else 0.dp
-        }
+        val imeBottomDp = with(density) { imeBottom.toDp() }
+        val navBottomDp = with(density) { navBottom.toDp() }
+
+        // When keyboard opens, dynamically pad by keyboard height + breathing space
+        val composerBottomPadding = if (imeBottom > 0) imeBottomDp + 6.dp else navBottomDp + 6.dp
+        val formBottomPadding = if (imeBottom > 0) imeBottomDp + 16.dp else navBottomDp + 16.dp
 
         // Body with Scroll
         Column(
@@ -207,7 +242,12 @@ fun PostNoticeScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 10.dp + formBottomPadding)
+                .padding(
+                    start = 18.dp,
+                    end = 18.dp,
+                    top = 10.dp,
+                    bottom = 10.dp + if (noticeType != NoticePostingType.GENERAL) formBottomPadding else 0.dp
+                )
         ) {
             // Notice Type Selector (Upper Three-Option System)
             Text(
@@ -596,14 +636,10 @@ fun PostNoticeScreen(
 
         // WhatsApp-Style Composer Bar (Shown in GENERAL Notice mode, docked above keyboard)
         if (noticeType == NoticePostingType.GENERAL) {
-            val bottomInsetDp = with(density) {
-                maxOf(imeBottom, navBottom).toDp()
-            }
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = bottomInsetDp)
+                    .padding(bottom = composerBottomPadding)
             ) {
                 // Attachments preview strip (PDF pill or photo carousel) directly above composer
                 if (attachments.isNotEmpty()) {
@@ -968,15 +1004,19 @@ fun RecentNoticePeekCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = notice.authorName,
-                    fontSize = 11.5.sp,
-                    fontFamily = PlusJakartaBold,
-                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                if (notice.authorName.isNotBlank()) {
+                    Text(
+                        text = notice.authorName,
+                        fontSize = 11.5.sp,
+                        fontFamily = PlusJakartaBold,
+                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
 
                 if (notice.hasAttachment) {
                     Surface(

@@ -9477,7 +9477,13 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.libraryCategoryToggle).post { updateLibrarySegment(root, false) }
+        val toggle = root.v<View>(R.id.libraryCategoryToggle)
+        toggle.addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+            if (right - left > 0) {
+                updateLibrarySegment(root, false)
+            }
+        }
+        toggle.post { updateLibrarySegment(root, false) }
 
 
 
@@ -9548,69 +9554,39 @@ internal class ClassMateAcademicScreensSupabase(
 
 
     private fun updateLibrarySegment(root: View, animate: Boolean) {
-
-
-
         if (!root.isAttachedToWindow) return
 
-
-
         val track = root.v<View>(R.id.libraryCategoryToggle)
-
-
-
         val indicator = root.v<View>(R.id.libraryCategoryIndicator)
 
+        val paddingHorizontal = track.paddingLeft + track.paddingRight
+        val availableWidth = track.width - paddingHorizontal
+        val width = availableWidth / 2
 
-
-        val width = (track.width - track.paddingLeft - track.paddingRight) / 2
-
-
-
-        if (width <= 0) return
-
-
-
-        indicator.layoutParams = indicator.layoutParams.apply { this.width = width }
-
-
-
-        val index = if (libraryCategory == "lab") 1 else 0
-
-
-
-        val target = (index * width).toFloat()
-
-
-
-        indicator.animate().cancel()
-
-
-
-        if (animate) indicator.animate().translationX(target).setDuration(180).start()
-
-
-
-        else indicator.translationX = target
-
-
-
-        listOf("theory" to R.id.btnCategoryRegular, "lab" to R.id.btnCategoryLab).forEach { (value, id) ->
-
-
-
-            root.v<TextView>(id).setTextColor(activity.getColor(
-
-
-
-                if (libraryCategory == value) R.color.cm_text_inverse else R.color.cm_text_secondary))
-
-
-
+        if (width <= 0) {
+            track.post { updateLibrarySegment(root, false) }
+            return
         }
 
+        if (indicator.layoutParams.width != width) {
+            indicator.layoutParams = indicator.layoutParams.apply { this.width = width }
+            indicator.requestLayout()
+        }
 
+        val index = if (libraryCategory == "lab") 1 else 0
+        val target = (index * width).toFloat()
 
+        indicator.animate().cancel()
+        if (animate && indicator.width > 0 && indicator.isShown) {
+            indicator.animate().translationX(target).setDuration(180).start()
+        } else {
+            indicator.translationX = target
+        }
+
+        listOf("theory" to R.id.btnCategoryRegular, "lab" to R.id.btnCategoryLab).forEach { (value, id) ->
+            root.v<TextView>(id).setTextColor(activity.getColor(
+                if (libraryCategory == value) R.color.cm_text_inverse else R.color.cm_text_secondary))
+        }
     }
 
 
