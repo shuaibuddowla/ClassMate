@@ -312,7 +312,61 @@ private fun ClassMateHamburgerModalSheet(
                     }
                 }
 
-                // SECTION 1: CAMPUS & ACADEMIC
+                // SECTION 1: BATCH HUB
+                Text(
+                    text = "BATCH HUB",
+                    fontFamily = jakartaBold,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = colorResource(R.color.cm_text_muted),
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                )
+
+                DrawerMenuItem(
+                    title = "Batchmates",
+                    subtitle = "Student roster, rolls & contact info",
+                    iconRes = R.drawable.ic_batch_friends,
+                    iconTint = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
+                    jakartaBold = jakartaBold,
+                    isDark = isDark,
+                    onClick = {
+                        dismissAndRun {
+                            val intent = Intent(activity, ClassMateBatchActivity::class.java).apply {
+                                putExtra("EXTRA_BATCH_ID", batchId())
+                                putExtra("EXTRA_BATCH_LABEL", batchLabel())
+                                putExtra("EXTRA_ROLE", role)
+                            }
+                            activity.startActivity(intent)
+                        }
+                    }
+                )
+
+                DrawerMenuItem(
+                    title = "Student Fund",
+                    subtitle = "Treasury balance, collections & expenses",
+                    iconRes = R.drawable.ic_fund_wallet,
+                    iconTint = if (isDark) Color(0xFFFB923C) else Color(0xFFEA580C),
+                    jakartaBold = jakartaBold,
+                    isDark = isDark,
+                    onClick = {
+                        dismissAndRun {
+                            val intent = Intent(activity, ClassMateBatchFundActivity::class.java).apply {
+                                putExtra("batch_id", batchId())
+                                putExtra("batch_label", batchLabel())
+                            }
+                            activity.startActivity(intent)
+                        }
+                    }
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                    thickness = 1.dp,
+                    color = colorResource(R.color.cm_border).copy(alpha = 0.4f)
+                )
+
+                // SECTION 2: CAMPUS & ACADEMIC
                 Text(
                     text = "CAMPUS & ACADEMIC",
                     fontFamily = jakartaBold,
@@ -373,60 +427,6 @@ private fun ClassMateHamburgerModalSheet(
                     onClick = {
                         dismissAndRun {
                             ClassMateSpotlightTour.start(activity, force = true)
-                        }
-                    }
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-                    thickness = 1.dp,
-                    color = colorResource(R.color.cm_border).copy(alpha = 0.4f)
-                )
-
-                // SECTION 2: BATCH HUB
-                Text(
-                    text = "BATCH HUB",
-                    fontFamily = jakartaBold,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
-                    color = colorResource(R.color.cm_text_muted),
-                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                )
-
-                DrawerMenuItem(
-                    title = "Batchmates",
-                    subtitle = "Student roster, rolls & contact info",
-                    iconRes = R.drawable.ic_batch_friends,
-                    iconTint = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488),
-                    jakartaBold = jakartaBold,
-                    isDark = isDark,
-                    onClick = {
-                        dismissAndRun {
-                            val intent = Intent(activity, ClassMateBatchActivity::class.java).apply {
-                                putExtra("EXTRA_BATCH_ID", batchId())
-                                putExtra("EXTRA_BATCH_LABEL", batchLabel())
-                                putExtra("EXTRA_ROLE", role)
-                            }
-                            activity.startActivity(intent)
-                        }
-                    }
-                )
-
-                DrawerMenuItem(
-                    title = "Batch Fund",
-                    subtitle = "Treasury balance, collections & expenses",
-                    iconRes = R.drawable.ic_fund_wallet,
-                    iconTint = if (isDark) Color(0xFFFB923C) else Color(0xFFEA580C),
-                    jakartaBold = jakartaBold,
-                    isDark = isDark,
-                    onClick = {
-                        dismissAndRun {
-                            val intent = Intent(activity, ClassMateBatchFundActivity::class.java).apply {
-                                putExtra("batch_id", batchId())
-                                putExtra("batch_label", batchLabel())
-                            }
-                            activity.startActivity(intent)
                         }
                     }
                 )

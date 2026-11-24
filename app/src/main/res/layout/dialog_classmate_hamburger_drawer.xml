@@ -168,6 +168,138 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- SECTION: BATCH HUB -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="BATCH HUB"
+            android:textSize="11sp"
+            android:fontFamily="@font/plus_jakarta_sans_bold"
+            android:letterSpacing="0.08"
+            android:textColor="@color/cm_text_muted"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Item: Batchmates -->
+        <LinearLayout
+            android:id="@+id/menuBatchmates"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingVertical="11dp"
+            android:paddingHorizontal="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <FrameLayout
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_tile_batch_icon">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_batch_friends"
+                    app:tint="#0D9488" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Batchmates"
+                    android:textSize="14.5sp"
+                    android:fontFamily="@font/plus_jakarta_sans_bold"
+                    android:textColor="@color/cm_text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Student roster, rolls &amp; contact info"
+                    android:textSize="12sp"
+                    android:textColor="@color/cm_text_secondary" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/cm_text_muted" />
+        </LinearLayout>
+
+        <!-- Item: Student Fund -->
+        <LinearLayout
+            android:id="@+id/menuBatchFund"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingVertical="11dp"
+            android:paddingHorizontal="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <FrameLayout
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_tile_fund_icon">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_fund_wallet"
+                    app:tint="#EA580C" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="14dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Student Fund"
+                    android:textSize="14.5sp"
+                    android:fontFamily="@font/plus_jakarta_sans_bold"
+                    android:textColor="@color/cm_text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Treasury balance, collections &amp; expenses"
+                    android:textSize="12sp"
+                    android:textColor="@color/cm_text_secondary" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@color/cm_text_muted" />
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/cm_border"
+            android:layout_marginVertical="10dp" />
+
         <!-- SECTION: CAMPUS & ACADEMIC -->
         <TextView
             android:layout_width="wrap_content"
@@ -282,138 +414,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
                     android:text="Faculty contacts &amp; assigned courses"
-                    android:textSize="12sp"
-                    android:textColor="@color/cm_text_secondary" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:src="@drawable/ic_chevron_right"
-                app:tint="@color/cm_text_muted" />
-        </LinearLayout>
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/cm_border"
-            android:layout_marginVertical="10dp" />
-
-        <!-- SECTION: BATCH HUB -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="BATCH HUB"
-            android:textSize="11sp"
-            android:fontFamily="@font/plus_jakarta_sans_bold"
-            android:letterSpacing="0.08"
-            android:textColor="@color/cm_text_muted"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Item: Batchmates -->
-        <LinearLayout
-            android:id="@+id/menuBatchmates"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingVertical="11dp"
-            android:paddingHorizontal="4dp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true">
-
-            <FrameLayout
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_tile_batch_icon">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_batch_friends"
-                    app:tint="#0D9488" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Batchmates"
-                    android:textSize="14.5sp"
-                    android:fontFamily="@font/plus_jakarta_sans_bold"
-                    android:textColor="@color/cm_text_primary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="Student roster, rolls &amp; contact info"
-                    android:textSize="12sp"
-                    android:textColor="@color/cm_text_secondary" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:src="@drawable/ic_chevron_right"
-                app:tint="@color/cm_text_muted" />
-        </LinearLayout>
-
-        <!-- Item: Batch Fund -->
-        <LinearLayout
-            android:id="@+id/menuBatchFund"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingVertical="11dp"
-            android:paddingHorizontal="4dp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true">
-
-            <FrameLayout
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_tile_fund_icon">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_fund_wallet"
-                    app:tint="#EA580C" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Batch Fund"
-                    android:textSize="14.5sp"
-                    android:fontFamily="@font/plus_jakarta_sans_bold"
-                    android:textColor="@color/cm_text_primary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="Treasury balance, collections &amp; expenses"
                     android:textSize="12sp"
                     android:textColor="@color/cm_text_secondary" />
             </LinearLayout>
