@@ -39,6 +39,8 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
         val fund = inputData.getString("kind") in setOf("batch_fund_deposit", "batch_fund_update", "batch_fund_reminder")
         val attendance = inputData.getString("kind") in setOf("attendance_open", "attendance_marked")
         val assessmentReminder = inputData.getString("kind") == "assessment_reminder"
+        val noticeUpdated = inputData.getString("kind") == "notice_updated"
+        val noticeDeleted = inputData.getString("kind") == "notice_deleted"
         if (identity == null || (!release && !blood && identity.optString("role") == "student" && identity.optString("batch_id") != inputData.getString("batch_id"))) {
             try {
                 identity = ClassMateAuthApi.initializeProfile()
@@ -69,14 +71,53 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             } catch (_:Exception) { return if(runAttemptCount<3) Result.retry() else Result.failure() }
         }
         val manager = context.getSystemService(NotificationManager::class.java)
+        if (noticeDeleted) {
+            val targetId = inputData.getString("record_id")
+            if (!targetId.isNullOrBlank()) {
+                manager.cancel(targetId.hashCode())
+                val batchId = inputData.getString("batch_id") ?: identity.optString("batch_id")
+                val groupKey = "classmate_group_batch_${batchId.ifBlank { "general" }}"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val remainingInGroup = manager.activeNotifications.count {
+                        it.id != groupKey.hashCode() && it.notification.group == groupKey
+                    }
+                    if (remainingInGroup == 0) {
+                        manager.cancel(groupKey.hashCode())
+                    }
+                }
+                ClassMateInAppPush.notify(
+                    InAppNotificationEvent(
+                        title = "",
+                        body = "",
+                        kind = "notice_deleted",
+                        recordId = targetId,
+                        openTab = "notices"
+                    )
+                )
+            }
+            val event = inputData.getString("event_id")
+            val hash = inputData.getString("token_hash")
+            if (event != null && hash != null) {
+                runCatching {
+                    ClassMateAuthApi.rpcText(
+                        "report_notification_receipt",
+                        JSONObject().put("target_event", event)
+                            .put("target_hash", hash)
+                            .put("target_state", "displayed")
+                            .put("target_version", BuildConfig.VERSION_CODE)
+                    )
+                }
+            }
+            return Result.success()
+        }
         val matched = blood && inputData.getString("blood_match") == "true"
         val channel = when {
             matched -> "classmate_blood_emergency"
             release -> UpdateNotifications.CHANNEL_ID
-            assessmentReminder -> "classmate_assessments"
-            inputData.getString("kind") == "class_change" -> "classmate_cancellations"
-            inputData.getString("kind") == "notice" -> "classmate_notices"
-            else -> "classmate_notifications"
+            assessmentReminder -> com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_ASSESSMENTS
+            inputData.getString("kind") == "class_change" -> com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_CANCELLATIONS
+            inputData.getString("kind") in setOf("notice", "notice_updated") -> com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_NOTICES
+            else -> com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_GENERAL
         }
         if(matched && Build.VERSION.SDK_INT>=26) {
             manager.createNotificationChannel(android.app.NotificationChannel(channel,"Verified blood requests",NotificationManager.IMPORTANCE_HIGH).apply {
@@ -84,18 +125,8 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 enableVibration(true)
                 setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"),android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build())
             })
-        } else if (Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(channel) == null) {
-            val (name, desc) = when (channel) {
-                "classmate_assessments" -> "Upcoming Assessments & Deadlines" to "Reminders for upcoming class tests, quizzes, and assignments"
-                "classmate_notices" -> "ClassMate Notices" to "Notifications for ClassMate updates"
-                "classmate_cancellations" -> "ClassMate Cancellations" to "Notifications for cancelled classes"
-                UpdateNotifications.CHANNEL_ID -> "ClassMate Updates" to "App release announcements"
-                else -> "ClassMate Notifications" to "General class schedules, notices, and updates"
-            }
-            manager.createNotificationChannel(android.app.NotificationChannel(channel, name, NotificationManager.IMPORTANCE_HIGH).apply {
-                description = desc
-                enableVibration(true)
-            })
+        } else {
+            com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(context)
         }
         val state = when {
             !AppPreferences(context).isNotificationsEnabled() -> "app_notifications_disabled"
@@ -146,7 +177,18 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
             else -> inputData.getString("record_id")
         }
         val ledger = ClassMatePushLedger(context, identity.optString("id"))
-        if (state == "displayed" && (eventKey == null || !ledger.contains(eventKey))) {
+        val isActiveNoticeForUpdate = if (noticeUpdated && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val recId = inputData.getString("record_id")
+            !recId.isNullOrBlank() && manager.activeNotifications.any { it.id == recId.hashCode() }
+        } else {
+            false
+        }
+        val shouldRenderNotification = if (noticeUpdated) {
+            state == "displayed" && isActiveNoticeForUpdate && (eventKey == null || !ledger.contains(eventKey))
+        } else {
+            state == "displayed" && (eventKey == null || !ledger.contains(eventKey))
+        }
+        if (shouldRenderNotification) {
             if (release) {
                 UpdateNotifications.show(context, inputData.getString("title") ?: "ClassMate update",
                     "Tap to review the latest update.", UpdateActionActivity.ACTION_PROMPT, notificationId = 3902)
@@ -196,7 +238,10 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 }
                 val pending = PendingIntent.getActivity(context,key.hashCode(),intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 val rawTitle = inputData.getString("title") ?: "ClassMate update"
-                val rawBody = inputData.getString("body") ?: "New class update available"
+                val pushKind = inputData.getString("kind") ?: ""
+                val isPollPush = inputData.getString("is_poll") == "true" || !inputData.getString("poll_id").isNullOrBlank()
+                val rawBody = inputData.getString("body")?.takeIf { it.isNotBlank() }
+                    ?: if (isPollPush) "Tap Vote to cast your vote on this poll" else "New class update available"
                 val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawTitle, isForNotification = true)
                 val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(context, rawBody, isForNotification = true)
                 val batchId = inputData.getString("batch_id") ?: identity.optString("batch_id")
@@ -208,6 +253,10 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     .setGroup(groupKey)
                     .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
                     .setOnlyAlertOnce(true).setAutoCancel(true)
+                    .apply {
+                        if (noticeUpdated) setSilent(true)
+                        else if (!blood) setSound(com.shuaib.classmate.utils.ClassMateNotificationChannels.soundUri(context))
+                    }
                 if(blood) {
                     builder.setColor(0xFFC43E52.toInt())
                     if(matched) builder.setSound(android.net.Uri.parse("android.resource://${context.packageName}/raw/blood_alert"))
@@ -217,6 +266,28 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                     bloodDetails?.optString("attendant_phone")?.takeIf { it.matches(Regex("\\+[1-9][0-9]{7,14}")) }?.let { phone ->
                         val call=PendingIntent.getActivity(context,(key+"call").hashCode(),Intent(Intent.ACTION_DIAL,android.net.Uri.parse("tel:$phone")),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                         builder.addAction(R.drawable.ic_classmate_notification,"Call attendant",call)
+                    }
+                } else {
+                    val isNoticePush = !release && !fund && !attendance && !assessmentReminder &&
+                        pushKind in setOf("notice", "notice_updated") && !targetNoticeId.isNullOrBlank()
+                    if (isNoticePush && isPollPush) {
+                        builder.addAction(
+                            R.drawable.ic_poll_square_selected,
+                            "Vote",
+                            pending
+                        )
+                    } else if (isNoticePush) {
+                        com.shuaib.classmate.notices.NoticeNotificationActionReceiver.attachNoticeActions(
+                            context = context,
+                            builder = builder,
+                            noticeId = targetNoticeId!!,
+                            notificationId = key.hashCode(),
+                            channelId = channel,
+                            groupKey = groupKey,
+                            title = formattedTitle.toString(),
+                            body = formattedBody.toString(),
+                            liked = false
+                        )
                     }
                 }
                 val notification=builder.build()
@@ -257,6 +328,20 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 } catch (_: SecurityException) { return Result.failure() }
             }
         }
+        if (noticeUpdated && !shouldRenderNotification) {
+            // Even if the system notification was dismissed, notify the open feed to refresh live
+            inputData.getString("record_id")?.let { recId ->
+                ClassMateInAppPush.notify(
+                    InAppNotificationEvent(
+                        title = inputData.getString("title") ?: "",
+                        body = inputData.getString("body") ?: "",
+                        kind = "notice_updated",
+                        recordId = recId,
+                        openTab = "notices"
+                    )
+                )
+            }
+        }
         if(state=="displayed" && eventKey!=null) ledger.record(eventKey)
         // Automatic checks remain useful even when Android notifications are disabled.
         if(release) UpdateCoordinator.enqueueReleaseCheck(context)
@@ -289,7 +374,7 @@ class ClassMatePushWorker(context: Context, params: WorkerParameters) : Coroutin
                 "project_ref", "recipient_id", "batch_id", "kind", "record_id", "event_id",
                 "token_hash", "version_code", "version_name", "title", "body", "blood_match",
                 "expires_at", "session_id", "course_code", "course_title", "assessment_id", "routine_slot_id",
-                "reminder_type"
+                "reminder_type", "poll_id", "is_poll"
             )
             val data = Data.Builder().apply { fields.forEach { key -> values[key]?.let { putString(key,it.take(500)) } } }.build()
             val work = OneTimeWorkRequestBuilder<ClassMatePushWorker>().setInputData(data)

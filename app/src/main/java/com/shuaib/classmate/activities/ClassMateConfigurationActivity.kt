@@ -29,13 +29,20 @@ import org.json.JSONObject
 class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
     private val batch by lazy { intent.getStringExtra("batch_id").orEmpty() }
     private val role by lazy { intent.getStringExtra("role").orEmpty() }
+    private val isServerOwner by lazy { intent.getBooleanExtra("is_server_owner", false) }
+    private val isCr by lazy { intent.getBooleanExtra("is_cr", false) }
     private val mode by lazy { intent.getStringExtra("mode") ?: "courses" }
     private lateinit var rowsHost: LinearLayout
+    private var wizardCard: MaterialCardView? = null
     private var courses=emptyList<JSONObject>()
+    private var departmentCatalog=emptyList<JSONObject>()
     private var request: Job?=null
     private var generation=0
     private var editor: androidx.appcompat.app.AlertDialog?=null
     private var semesterAvailable=false
+    private var activeSemesterNumber=0
+    private var routineSlotCount=0
+    private var checklistExpanded=true
     private var openedTarget=false
     private val pendingCRChanges=mutableSetOf<String>()
     private fun rows(a: JSONArray)=(0 until a.length()).map { a.getJSONObject(it) }
@@ -64,12 +71,23 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
             text="＋ Add teacher"; isAllCaps=false; setOnClickListener { addTeacher() }
         },LinearLayout.LayoutParams(-1,dp(56)))
         if(mode=="courses") {
+            if (role != "teacher") {
+                wizardCard = MaterialCardView(this).apply {
+                    radius = dp(16).toFloat()
+                    cardElevation = 0f
+                    strokeWidth = dp(1)
+                    strokeColor = getColor(R.color.cm_border)
+                    setCardBackgroundColor(getColor(R.color.cm_surface))
+                    visibility = View.GONE
+                }
+                form.panel.addView(wizardCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+            }
             form.panel.addView(MaterialButton(this).apply { text="＋ Add course"; isAllCaps=false; cornerRadius=dp(16); setOnClickListener {
                 if(semesterAvailable) courseForm(null) else promptSelectRunningSemester { courseForm(null) }
             } },LinearLayout.LayoutParams(-1,dp(56)))
             form.panel.addView(MaterialButton(this,null,com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text="Choose an existing course"; isAllCaps=false; setOnClickListener {
-                    if(semesterAvailable) catalogPicker() else promptSelectRunningSemester { catalogPicker() }
+                text="Quick-select from catalog"; isAllCaps=false; setOnClickListener {
+                    if(semesterAvailable) quickSelectCatalogCourses() else promptSelectRunningSemester { quickSelectCatalogCourses() }
                 }
             })
         }
@@ -105,12 +123,40 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                     records.forEach { o ->
                         val email = clean(o, "email")
                         val sid = clean(o, "student_id")
+                        val oid = clean(o, "id")
                         val title = if (email.isNotBlank() && sid.isNotBlank()) "$sid ($email)" else email.ifBlank { sid }
                         val bName = clean(o, "batch_name").ifBlank {
                             "${clean(o, "department_code").uppercase()} Batch ${o.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(o.optInt("academic_session"))}"
                         }
                         val r = clean(o, "reason").ifBlank { "No reason specified" }
-                        card(title, "$bName\n$r") { overrideForm(email.ifBlank { sid }, clean(o, "effective_batch_id"), o) }
+                        card(
+                            title = title,
+                            detail = "$bName\n$r",
+                            onDelete = {
+                                MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity)
+                                    .setTitle("Remove batch override?")
+                                    .setMessage("Remove override for $title?")
+                                    .setPositiveButton("Remove") { _, _ ->
+                                        lifecycleScope.launch {
+                                            try {
+                                                ClassMateAuthApi.rpc(
+                                                    "delete_batch_override",
+                                                    JSONObject()
+                                                        .put("target_student_id", email.ifBlank { sid })
+                                                        .put("target_override_id", oid.ifBlank { JSONObject.NULL })
+                                                )
+                                                setResult(RESULT_OK)
+                                                Toast.makeText(this@ClassMateConfigurationActivity, "Override removed", Toast.LENGTH_SHORT).show()
+                                                load()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(this@ClassMateConfigurationActivity, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e), Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }
+                                    .setNegativeButton("Cancel", null)
+                                    .show()
+                            }
+                        ) { overrideForm(email.ifBlank { sid }, clean(o, "effective_batch_id"), o) }
                     }
                     status.text=if(records.isEmpty()) "No overrides configured. Add an override for a dropout student." else "${records.size} overrides configured"
                 } else if(mode=="teachers") {
@@ -123,9 +169,25 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                     if(!openedTarget && !target.isNullOrBlank()) { openedTarget=true; records.find {it.optString("id")==target}?.let {teacherForm(it)} }
                     status.text=if(records.isEmpty()) "Add a teacher while configuring a course." else "${records.size} teachers"
                 } else {
-                    val semesters=ClassMateAuthApi.rows("semesters","select=id&batch_id=eq.$batch&status=eq.active&limit=1")
+                    val semesters=ClassMateAuthApi.rows("semesters","select=id,semester_number&batch_id=eq.$batch&status=eq.active&limit=1")
                     courses=rows(ClassMateCourses.catalog(batch)); semesterAvailable=semesters.length()>0
+                    activeSemesterNumber = semesters.optJSONObject(0)?.optInt("semester_number", 0) ?: 0
+                    val offeringIds = courses.mapNotNull { it.optString("offering_id").takeIf { id -> id.isNotBlank() } }
+                    routineSlotCount = if (semesterAvailable && offeringIds.isNotEmpty()) {
+                        runCatching {
+                            ClassMateAuthApi.rows("routine_slots", "select=id&semester_course_id=in.(${offeringIds.joinToString(",")})").length()
+                        }.getOrDefault(0)
+                    } else 0
+                    if (departmentCatalog.isEmpty() && batch.isNotBlank()) {
+                        runCatching {
+                            val dept = ClassMateAuthApi.rows("batches", "select=department_id&id=eq.$batch").optJSONObject(0)?.optString("department_id").orEmpty()
+                            if (dept.isNotBlank()) {
+                                departmentCatalog = rows(ClassMateAuthApi.rows("courses", "select=id,course_code,course_title,course_type,credit&department_id=eq.$dept&order=course_code"))
+                            }
+                        }
+                    }
                     if(version!=generation) return@launch
+                    updateSetupWizardCard()
                     rowsHost.removeAllViews(); courses.forEach { c -> card("${c.optString("course_code")} · ${c.optString("course_title")}",
                         listOf(c.optString("course_type").replaceFirstChar { it.uppercase() },clean(c,"teacher_name").ifBlank { "Teacher not added" }).joinToString(" · "),
                         onDelete = { deleteCourse(c) }
@@ -197,12 +259,15 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                         lifecycleScope.launch {
                             try {
                                 ClassMateAuthApi.rpc("publish_semester", JSONObject().put("target_semester", semId))
+                                ClassMateAcademicCache.clearSemesterScopedCaches(this@ClassMateConfigurationActivity, batch)
+                                ClassMateAcademicCache.syncActiveSemester(this@ClassMateConfigurationActivity, batch, semId)
+                                setResult(RESULT_OK)
                                 Toast.makeText(this@ClassMateConfigurationActivity, "Semester $semNum is now active!", Toast.LENGTH_SHORT).show()
                                 semesterAvailable = true
                                 load()
                                 onSemesterActivated()
                             } catch (e: Exception) {
-                                Toast.makeText(this@ClassMateConfigurationActivity, "Failed to activate semester: ${e.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@ClassMateConfigurationActivity, "Failed to activate semester: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)}", Toast.LENGTH_LONG).show()
                             } finally {
                                 busy = false
                             }
@@ -215,6 +280,187 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
             }
         }
     }
+    private fun updateSetupWizardCard() {
+        val card = wizardCard ?: return
+        if (role == "teacher" || mode != "courses") {
+            card.visibility = View.GONE
+            return
+        }
+        card.visibility = View.VISIBLE
+        card.removeAllViews()
+
+        val step1Done = semesterAvailable
+        val step2Done = courses.isNotEmpty()
+        val step3Done = semesterAvailable && courses.isNotEmpty() && routineSlotCount > 0
+        val completedCount = listOf(step1Done, step2Done, step3Done).count { it }
+        val allDone = completedCount == 3
+
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        headerRow.addView(TextView(this).apply {
+            text = if (allDone) "✓ Batch Setup Complete" else "Batch Setup Checklist"
+            textSize = 15f
+            setTypeface(null, 1)
+            setTextColor(getColor(if (allDone) R.color.cm_primary else R.color.cm_text_primary))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+
+        headerRow.addView(TextView(this).apply {
+            text = if (allDone && !checklistExpanded) "Show ▾" else "$completedCount/3 Done"
+            textSize = 12f
+            setTypeface(null, 1)
+            setTextColor(getColor(if (allDone) R.color.cm_primary else R.color.cm_text_secondary))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setBackgroundResource(if (allDone) R.drawable.bg_badge_green else R.drawable.bg_badge_blue)
+            if (allDone) {
+                setOnClickListener {
+                    checklistExpanded = !checklistExpanded
+                    updateSetupWizardCard()
+                }
+            }
+        })
+        box.addView(headerRow)
+
+        if (allDone && !checklistExpanded) {
+            box.addView(TextView(this).apply {
+                text = "Semester ${if (activeSemesterNumber > 0) activeSemesterNumber else ""} · ${courses.size} courses · $routineSlotCount class slots ready"
+                textSize = 12.5f
+                setTextColor(getColor(R.color.cm_text_secondary))
+                setPadding(0, dp(6), 0, 0)
+            })
+            card.addView(box)
+            return
+        }
+
+        box.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 3
+            progress = completedCount
+            progressTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.cm_primary))
+            layoutParams = LinearLayout.LayoutParams(-1, dp(6)).apply {
+                topMargin = dp(10)
+                bottomMargin = dp(6)
+            }
+        })
+
+        fun stepRow(stepText: String, done: Boolean, actionLabel: String?, onClick: () -> Unit) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(6), 0, dp(2))
+            }
+            row.addView(TextView(this).apply {
+                text = if (done) "✓  $stepText" else "○  $stepText"
+                textSize = 13f
+                setTypeface(null, if (done) 1 else 0)
+                setTextColor(getColor(if (done) R.color.cm_primary else R.color.cm_text_secondary))
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (actionLabel != null) {
+                row.addView(MaterialButton(this, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+                    text = actionLabel
+                    isAllCaps = false
+                    textSize = 12f
+                    setOnClickListener { onClick() }
+                }, LinearLayout.LayoutParams(-2, dp(36)))
+            }
+            box.addView(row)
+        }
+
+        stepRow(
+            if (step1Done) {
+                if (activeSemesterNumber > 0) "1. Semester $activeSemesterNumber active" else "1. Running semester active"
+            } else "1. Activate running semester",
+            step1Done,
+            if (step1Done) "Switch" else "Select"
+        ) { promptSelectRunningSemester {} }
+
+        stepRow(
+            if (step2Done) "2. ${courses.size} courses added" else "2. Add courses from catalog",
+            step2Done,
+            if (step2Done) "Add more" else "Quick-select"
+        ) {
+            if (semesterAvailable) quickSelectCatalogCourses() else promptSelectRunningSemester { quickSelectCatalogCourses() }
+        }
+
+        stepRow(
+            if (step3Done) "3. Weekly routine ready ($routineSlotCount slots)" else "3. Add class periods in Schedule",
+            step3Done,
+            if (step3Done) "Collapse" else "Open Schedule"
+        ) {
+            if (step3Done) {
+                checklistExpanded = false
+                updateSetupWizardCard()
+            } else {
+                setResult(RESULT_OK)
+                finish()
+            }
+        }
+
+        card.addView(box)
+    }
+
+    private fun quickSelectCatalogCourses() {
+        if (!semesterAvailable || busy) return
+        lifecycleScope.launch {
+            try {
+                if (departmentCatalog.isEmpty()) {
+                    val dept = ClassMateAuthApi.rows("batches", "select=department_id&id=eq.$batch").getJSONObject(0).getString("department_id")
+                    departmentCatalog = rows(ClassMateAuthApi.rows("courses", "select=id,course_code,course_title,course_type,credit&department_id=eq.$dept&order=course_code"))
+                }
+                val existingCodes = courses.map { it.optString("course_code").replace(Regex("\\s+"), "").uppercase() }.toSet()
+                val available = departmentCatalog.filter {
+                    it.optString("course_code").replace(Regex("\\s+"), "").uppercase() !in existingCodes
+                }
+                if (available.isEmpty()) {
+                    Toast.makeText(this@ClassMateConfigurationActivity, "All department catalog courses are already in this batch. Use + Add course for new ones.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                val labels = available.map { "${it.optString("course_code")} · ${it.optString("course_title")}" }.toTypedArray()
+                val checked = BooleanArray(available.size) { false }
+                MaterialAlertDialogBuilder(this@ClassMateConfigurationActivity)
+                    .setTitle("Quick-select courses")
+                    .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                        checked[which] = isChecked
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Add selected") { _, _ ->
+                        val picked = available.filterIndexed { idx, _ -> checked[idx] }
+                        if (picked.isEmpty()) return@setPositiveButton
+                        busy = true
+                        status.visibility = View.VISIBLE
+                        status.text = "Adding ${picked.size} courses…"
+                        lifecycleScope.launch {
+                            var added = 0
+                            picked.forEach { c ->
+                                runCatching {
+                                    ClassMateAuthApi.rpc("add_batch_course", JSONObject()
+                                        .put("target_batch", batch)
+                                        .put("target_code", c.optString("course_code"))
+                                        .put("target_title", c.optString("course_title"))
+                                        .put("target_type", c.optString("course_type").ifBlank { "theory" })
+                                        .put("target_credit", if (c.isNull("credit")) JSONObject.NULL else c.optDouble("credit"))
+                                    )
+                                    added++
+                                }
+                            }
+                            busy = false
+                            setResult(RESULT_OK)
+                            Toast.makeText(this@ClassMateConfigurationActivity, "Added $added courses! Tap any course to assign its teacher.", Toast.LENGTH_LONG).show()
+                            load()
+                        }
+                    }
+                    .show()
+            } catch (e: Exception) {
+                Toast.makeText(this@ClassMateConfigurationActivity, e.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun catalogPicker() {
         if(!semesterAvailable || busy) return
         lifecycleScope.launch {
@@ -460,6 +706,13 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         f.label("Courses can be Theory or Practical/Lab. Names ending in Lab or Practical are recognized automatically.")
         val code = f.field("Course code *").apply { setText(initial?.optString("course_code")); filters = arrayOf(android.text.InputFilter.LengthFilter(30)) }
         val name = f.field("Course name *").apply { setText(initial?.optString("course_title")); filters = arrayOf(android.text.InputFilter.LengthFilter(200)) }
+        val autoSuggestHint = TextView(this).apply {
+            textSize = 12f
+            setTextColor(getColor(R.color.cm_primary))
+            visibility = View.GONE
+            setPadding(0, dp(2), 0, dp(4))
+        }
+        f.panel.addView(autoSuggestHint)
 
         val categories = arrayOf("Theory Course", "Practical / Lab Course")
         val categoryBox = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedExposedDropdownMenuStyle).apply {
@@ -571,6 +824,40 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         f.panel.addView(addTeacherBtn)
 
         val credit = f.field("Credit (optional)").apply { inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL; setText(initial?.optString("credit")?.takeUnless { it == "null" }) }
+        if (current == null && existing == null) {
+            var lastAutoTitle = ""
+            code.doAfterTextChanged { s ->
+                val norm = s?.toString().orEmpty().replace(Regex("\\s+"), "").uppercase()
+                if (norm.length < 4) {
+                    autoSuggestHint.visibility = View.GONE
+                    return@doAfterTextChanged
+                }
+                val match = departmentCatalog.firstOrNull {
+                    it.optString("course_code").replace(Regex("\\s+"), "").uppercase() == norm
+                }
+                if (match != null) {
+                    val mTitle = match.optString("course_title")
+                    val mType = match.optString("course_type")
+                    val mCredit = match.optString("credit").takeUnless { it == "null" || it.isBlank() }
+                    val curTitle = name.text?.toString().orEmpty().trim()
+                    if (curTitle.isBlank() || curTitle == lastAutoTitle) {
+                        name.setText(mTitle)
+                        lastAutoTitle = mTitle
+                    }
+                    val isLab = mType in listOf("lab", "practical", "sessional") ||
+                        mTitle.trim().endsWith("lab", ignoreCase = true) ||
+                        mTitle.trim().endsWith("sessional", ignoreCase = true)
+                    categoryDropdown.setText(if (isLab) "Practical / Lab Course" else "Theory Course", false)
+                    if (mCredit != null && credit.text.isNullOrBlank()) {
+                        credit.setText(mCredit)
+                    }
+                    autoSuggestHint.text = "✓ Auto-filled from department catalog (${match.optString("course_code")})"
+                    autoSuggestHint.visibility = View.VISIBLE
+                } else {
+                    autoSuggestHint.visibility = View.GONE
+                }
+            }
+        }
         val error = f.status()
         val builder = MaterialAlertDialogBuilder(this).setTitle(if (current == null) "Add course" else "Edit course").setView(f.scroll)
             .setNegativeButton("Cancel", null).setPositiveButton(if (current == null) "Add course" else "Save", null)
@@ -832,7 +1119,7 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         val f=ClassMateFormUi(this)
         f.label("Assigns a specific batch to a student, overriding their default cohort. Works with university email or student ID.")
         val studentId=f.field("University Email or Student ID").apply {
-            hint = "e.g. s2110823125@ru.ac.bd or CE23045"
+            hint = "e.g. ce23045@mbstu.ac.bd or CE23045"
             setText(prefillStudentId ?: currentOverride?.optString("email").takeUnless { it.isNullOrBlank() } ?: currentOverride?.optString("student_id").orEmpty())
             filters=arrayOf(android.text.InputFilter.LengthFilter(60))
         }
@@ -849,19 +1136,32 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
         if(currentOverride!=null) builder.setNeutralButton("Delete",null)
         lifecycleScope.launch {
             try {
-                val batches=rows(ClassMateAuthApi.rows("batches","select=id,batch_number,academic_session,department_id&is_active=eq.true&order=batch_number"))
+                val canPickAnyBatch = isServerOwner || role == "admin"
+                val batchFilter = if (!canPickAnyBatch && batch.isNotBlank()) "&id=eq.$batch" else ""
+                val batches=rows(ClassMateAuthApi.rows("batches","select=id,batch_number,academic_session,department_id&is_active=eq.true$batchFilter&order=batch_number"))
+                if (batches.isEmpty()) {
+                    Toast.makeText(this@ClassMateConfigurationActivity, "No active batch available for overrides.", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
                 val depts=rows(ClassMateAuthApi.rows("departments","select=id,code&is_active=eq.true")).associate { it.getString("id") to it.getString("code").uppercase() }
-                val targetBatchId=prefillBatchId ?: currentOverride?.optString("effective_batch_id").orEmpty()
+                val targetBatchId=prefillBatchId ?: currentOverride?.optString("effective_batch_id").orEmpty().ifBlank { batch }
                 val initialIndex=batches.indexOfFirst { it.optString("id")==targetBatchId }.coerceAtLeast(0)
-                val choice=f.choice("Effective batch",batches.map {
-                    val d=depts[it.optString("department_id")] ?: "Dept"
-                    "$d Batch ${it.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}"
-                })
-                if(batches.isNotEmpty() && initialIndex<batches.size) choice.setSelection(initialIndex)
+                val choice = if (canPickAnyBatch && batches.size > 1) {
+                    f.choice("Effective batch", batches.map {
+                        val d=depts[it.optString("department_id")] ?: "Dept"
+                        "$d Batch ${it.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(it.optInt("academic_session"))}"
+                    }).also { if (initialIndex < batches.size) it.setSelection(initialIndex) }
+                } else {
+                    val only = batches.first()
+                    val d = depts[only.optString("department_id")] ?: "Dept"
+                    f.label("Effective batch: $d Batch ${only.optInt("batch_number")} · Session ${ClassMateAcademicSession.format(only.optInt("academic_session"))}")
+                    null
+                }
                 val dialog=builder.create()
                 dialog.show()
                 dialog.getButton(-1).setOnClickListener {
-                    val batch=batches.getOrNull(choice.selectedItemPosition) ?: return@setOnClickListener
+                    val chosenBatch=if (choice != null) batches.getOrNull(choice.selectedItemPosition) else batches.firstOrNull()
+                    chosenBatch ?: return@setOnClickListener
                     val sid=studentId.text.toString().trim()
                     if(sid.length<4) {
                         error.visibility=View.VISIBLE; error.text="Enter a valid university email or student ID"; return@setOnClickListener
@@ -872,13 +1172,13 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                         try {
                             ClassMateAuthApi.rpc("set_batch_override",JSONObject()
                                 .put("target_student_id",sid)
-                                .put("target_batch",batch.getString("id"))
+                                .put("target_batch",chosenBatch.getString("id"))
                                 .put("target_reason",reason.text.toString().trim()))
                             setResult(RESULT_OK); dialog.dismiss()
                             if(mode=="overrides") load()
                             else Toast.makeText(this@ClassMateConfigurationActivity,"Override saved for $sid",Toast.LENGTH_SHORT).show()
                         } catch(e: Exception) {
-                            error.visibility=View.VISIBLE; error.text=e.message
+                            error.visibility=View.VISIBLE; error.text=com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
                         } finally {
                             busy=false; dialog.getButton(-1).isEnabled=true
                         }
@@ -888,20 +1188,23 @@ class ClassMateConfigurationActivity : ClassMateScheduleEditor() {
                     val sid=currentOverride?.optString("email").takeUnless { it.isNullOrBlank() }
                         ?: currentOverride?.optString("student_id")
                         ?: studentId.text.toString().trim()
+                    val oid=currentOverride?.optString("id").orEmpty()
                     if(busy) return@setOnClickListener
                     busy=true
                     lifecycleScope.launch {
                         try {
-                            ClassMateAuthApi.rpc("delete_batch_override",JSONObject().put("target_student_id",sid))
+                            ClassMateAuthApi.rpc("delete_batch_override",JSONObject()
+                                .put("target_student_id",sid)
+                                .put("target_override_id", oid.ifBlank { JSONObject.NULL }))
                             setResult(RESULT_OK); dialog.dismiss()
                             if(mode=="overrides") load()
                         } catch(e: Exception) {
-                            error.visibility=View.VISIBLE; error.text=e.message
+                            error.visibility=View.VISIBLE; error.text=com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
                         } finally { busy=false }
                     }
                 }
             } catch(e: Exception) {
-                Toast.makeText(this@ClassMateConfigurationActivity,e.message,Toast.LENGTH_LONG).show()
+                Toast.makeText(this@ClassMateConfigurationActivity,com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e),Toast.LENGTH_LONG).show()
             }
         }
     }

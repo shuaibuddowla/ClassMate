@@ -53,6 +53,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     private var pollerJob: Job? = null
 
     // Views
+    private lateinit var cardHardwareStation: MaterialCardView
     private lateinit var tvStationStatusTitle: TextView
     private lateinit var badgeStationStatus: TextView
     private lateinit var layoutActiveSessionDetails: View
@@ -66,8 +67,13 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     private lateinit var tabCards: MaterialButton
     private lateinit var swipeRefreshCourses: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     private lateinit var scrollCardsView: View
+    private lateinit var layoutCourseFilterHeader: View
+    private lateinit var tvBatchAttendanceSummary: TextView
+    private lateinit var etCourseSearch: EditText
+    private lateinit var ivClearCourseSearch: View
     private lateinit var progressCourses: ProgressBar
     private lateinit var tvCoursesEmpty: TextView
+    private lateinit var emptyCoursesState: View
     private lateinit var containerCourseCards: LinearLayout
 
     private lateinit var actvStudentSearch: AutoCompleteTextView
@@ -85,6 +91,8 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     private var coursesList: MutableList<JSONObject> = mutableListOf()
     private var studentsList: MutableList<JSONObject> = mutableListOf()
     private var selectedStudentObj: JSONObject? = null
+    private var pendingAutoStartAttendance: Boolean = false
+    private var courseSearchQuery: String = ""
     private var nfcAdapter: NfcAdapter? = null
     private var nfcPendingIntent: PendingIntent? = null
     private var activeCardWriteDialog: androidx.appcompat.app.AlertDialog? = null
@@ -95,8 +103,10 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
         batchId = intent.getStringExtra("EXTRA_BATCH_ID") ?: ""
         batchLabel = intent.getStringExtra("EXTRA_BATCH_LABEL") ?: "Batch Attendance"
+        pendingAutoStartAttendance = intent.getBooleanExtra("EXTRA_AUTO_START_ATTENDANCE", false)
 
         bindViews()
+        applySafeInsets()
         setupListeners()
         selectTab(true)
 
@@ -145,6 +155,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
             openWebAttendance()
         }
 
+        cardHardwareStation = findViewById(R.id.cardHardwareStation)
         tvStationStatusTitle = findViewById(R.id.tvStationStatusTitle)
         badgeStationStatus = findViewById(R.id.badgeStationStatus)
         layoutActiveSessionDetails = findViewById(R.id.layoutActiveSessionDetails)
@@ -158,8 +169,13 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         tabCards = findViewById(R.id.tabCards)
         swipeRefreshCourses = findViewById(R.id.swipeRefreshCourses)
         scrollCardsView = findViewById(R.id.scrollCardsView)
+        layoutCourseFilterHeader = findViewById(R.id.layoutCourseFilterHeader)
+        tvBatchAttendanceSummary = findViewById(R.id.tvBatchAttendanceSummary)
+        etCourseSearch = findViewById(R.id.etCourseSearch)
+        ivClearCourseSearch = findViewById(R.id.ivClearCourseSearch)
         progressCourses = findViewById(R.id.progressCourses)
         tvCoursesEmpty = findViewById(R.id.tvCoursesEmpty)
+        emptyCoursesState = findViewById(R.id.emptyCoursesState)
         containerCourseCards = findViewById(R.id.containerCourseCards)
 
         actvStudentSearch = findViewById(R.id.actvStudentSearch)
@@ -201,6 +217,38 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
         btnSaveCard.setOnClickListener {
             ClassMateHaptics.selection(it)
             saveStudentCard()
+        }
+
+        etCourseSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                courseSearchQuery = s?.toString()?.trim().orEmpty()
+                ivClearCourseSearch.visibility = if (courseSearchQuery.isNotBlank()) View.VISIBLE else View.GONE
+                renderCourseCards()
+            }
+        })
+
+        ivClearCourseSearch.setOnClickListener {
+            ClassMateHaptics.selection(it)
+            etCourseSearch.setText("")
+        }
+    }
+
+    private fun applySafeInsets() {
+        val topBar = findViewById<View>(R.id.layoutTopAppBar)
+        val initialTop = topBar.paddingTop
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(topBar) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            view.setPadding(view.paddingLeft, initialTop + bars.top, view.paddingRight, view.paddingBottom)
+            insets
+        }
+        val initialBottom = swipeRefreshCourses.paddingBottom
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(swipeRefreshCourses) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, initialBottom + bars.bottom)
+            scrollCardsView.setPadding(scrollCardsView.paddingLeft, scrollCardsView.paddingTop, scrollCardsView.paddingRight, bars.bottom)
+            insets
         }
     }
 
@@ -251,6 +299,9 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
                 if (res != null && res.optString("status") == "ACTIVE") {
                     activeSessionId = res.optString("session_id")
+                    val density = resources.displayMetrics.density
+                    cardHardwareStation.strokeColor = Color.parseColor("#10B981")
+                    cardHardwareStation.strokeWidth = (2 * density).toInt()
                     tvStationStatusTitle.text = "Now Taking Attendance"
                     badgeStationStatus.text = "LIVE"
                     badgeStationStatus.setBackgroundResource(R.drawable.bg_badge_green)
@@ -268,6 +319,9 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     btnCloseSession.visibility = View.VISIBLE
                 } else {
                     activeSessionId = null
+                    val density = resources.displayMetrics.density
+                    cardHardwareStation.strokeColor = getColor(R.color.cm_border)
+                    cardHardwareStation.strokeWidth = (1 * density).toInt()
                     tvStationStatusTitle.text = "Station Standby"
                     badgeStationStatus.text = "IDLE"
                     badgeStationStatus.setBackgroundResource(R.drawable.bg_badge_paused)
@@ -291,16 +345,164 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
             return
         }
 
-        val courseNames = coursesList.map {
-            "${it.optString("course_code")} · ${it.optString("course_title")}"
-        }.toTypedArray()
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val density = resources.displayMetrics.density
+        val rootLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * density).toInt(), (16 * density).toInt(), (20 * density).toInt(), (24 * density).toInt())
+            setBackgroundColor(getColor(R.color.cm_surface))
+        }
 
+        val handle = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams((40 * density).toInt(), (4 * density).toInt()).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = (14 * density).toInt()
+            }
+            setBackgroundColor(getColor(R.color.cm_border))
+        }
+        rootLayout.addView(handle)
+
+        val tvSheetTitle = TextView(this).apply {
+            text = "Start Attendance"
+            textSize = 19f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(getColor(R.color.cm_text_primary))
+        }
+        val tvSheetSub = TextView(this).apply {
+            text = "Select a course below to open an attendance session"
+            textSize = 13f
+            setTextColor(getColor(R.color.cm_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = (2 * density).toInt()
+                bottomMargin = (14 * density).toInt()
+            }
+        }
+        rootLayout.addView(tvSheetTitle)
+        rootLayout.addView(tvSheetSub)
+
+        val scrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.55).toInt()
+            )
+            isVerticalScrollBarEnabled = false
+        }
+        val listLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val sortedCourses = coursesList.sortedWith(
+            compareByDescending<JSONObject> { it.optInt("total_sessions", 0) > 0 }
+                .thenBy { it.optString("course_code") }
+        )
+
+        sortedCourses.forEach { course ->
+            val code = course.optString("course_code")
+            val title = course.optString("course_title")
+            val teacher = course.optString("teacher_name").takeIf { it.isNotBlank() && it != "null" } ?: "Instructor"
+            val sessionsCount = course.optInt("total_sessions", 0)
+            val offeringId = course.optString("semester_course_id")
+
+            val itemCard = MaterialCardView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = (10 * density).toInt()
+                }
+                radius = 14 * density
+                cardElevation = 0f
+                setCardBackgroundColor(getColor(R.color.cm_card))
+                strokeColor = getColor(R.color.cm_border)
+                strokeWidth = (1 * density).toInt()
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    ClassMateHaptics.selection(it)
+                    sheet.dismiss()
+                    confirmStartAdHocSession(offeringId, code, title)
+                }
+            }
+
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((14 * density).toInt(), (12 * density).toInt(), (14 * density).toInt(), (12 * density).toInt())
+            }
+
+            val infoCol = LinearLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val badgeRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val tvCodeBadge = TextView(this).apply {
+                text = code
+                textSize = 11.5f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#10B981"))
+                setBackgroundResource(R.drawable.bg_badge_green)
+                setPadding((8 * density).toInt(), (2 * density).toInt(), (8 * density).toInt(), (2 * density).toInt())
+            }
+            val tvSessBadge = TextView(this).apply {
+                text = if (sessionsCount > 0) "$sessionsCount sessions" else "No sessions yet"
+                textSize = 11f
+                setTextColor(getColor(R.color.cm_text_muted))
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    marginStart = (8 * density).toInt()
+                }
+            }
+            badgeRow.addView(tvCodeBadge)
+            badgeRow.addView(tvSessBadge)
+
+            val tvTitleView = TextView(this).apply {
+                text = title
+                textSize = 14.5f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(getColor(R.color.cm_text_primary))
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (5 * density).toInt()
+                }
+            }
+            val tvTeacherView = TextView(this).apply {
+                text = teacher
+                textSize = 12f
+                setTextColor(getColor(R.color.cm_text_secondary))
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = (2 * density).toInt()
+                }
+            }
+
+            infoCol.addView(badgeRow)
+            infoCol.addView(tvTitleView)
+            infoCol.addView(tvTeacherView)
+
+            val ivChevron = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams((18 * density).toInt(), (18 * density).toInt()).apply {
+                    marginStart = (8 * density).toInt()
+                }
+                setImageResource(R.drawable.ic_chevron_right)
+                imageTintList = ColorStateList.valueOf(getColor(R.color.cm_text_muted))
+            }
+
+            row.addView(infoCol)
+            row.addView(ivChevron)
+            itemCard.addView(row)
+            listLayout.addView(itemCard)
+        }
+
+        scrollView.addView(listLayout)
+        rootLayout.addView(scrollView)
+        sheet.setContentView(rootLayout)
+        sheet.show()
+    }
+
+    private fun confirmStartAdHocSession(courseOfferingId: String, courseCode: String, courseTitle: String) {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Start Attendance for Course")
-            .setItems(courseNames) { _, which ->
-                val selected = coursesList[which]
-                val courseOfferingId = selected.optString("semester_course_id")
-                val courseCode = selected.optString("course_code")
+            .setTitle("Confirm Attendance Session")
+            .setMessage("Are you sure you want to start an attendance session for $courseCode · $courseTitle?")
+            .setPositiveButton("Yes, Start Session") { _, _ ->
                 startAdHocSession(courseOfferingId, courseCode)
             }
             .setNegativeButton("Cancel", null)
@@ -308,6 +510,8 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     }
 
     private fun startAdHocSession(courseOfferingId: String, courseCode: String) {
+        btnTakeAttendance.isEnabled = false
+        btnTakeAttendance.text = "Starting..."
         lifecycleScope.launch {
             try {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Starting session on ESP32 station...", Toast.LENGTH_SHORT).show()
@@ -315,7 +519,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                     .put("target_semester_course", courseOfferingId)
                     .put("target_device", "ESP32-READER-01")
 
-                val result = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     ClassMateAuthApi.rpc("start_adhoc_attendance_session", params)
                 }
 
@@ -323,7 +527,10 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 checkStationStatus()
                 loadCourses()
             } catch (e: Exception) {
-                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to start: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to start: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)}", Toast.LENGTH_LONG).show()
+            } finally {
+                btnTakeAttendance.isEnabled = true
+                btnTakeAttendance.text = "Take Attendance"
             }
         }
     }
@@ -341,6 +548,8 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
     }
 
     private fun closeSession(sessionId: String) {
+        btnCloseSession.isEnabled = false
+        btnCloseSession.text = "Closing..."
         lifecycleScope.launch {
             try {
                 Toast.makeText(this@ClassMateAdminAttendanceActivity, "Closing session...", Toast.LENGTH_SHORT).show()
@@ -353,7 +562,10 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 checkStationStatus()
                 loadCourses()
             } catch (e: Exception) {
-                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to close: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to close: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)}", Toast.LENGTH_LONG).show()
+            } finally {
+                btnCloseSession.isEnabled = true
+                btnCloseSession.text = "Close Attendance Session"
             }
         }
     }
@@ -376,14 +588,25 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 }
 
                 renderCourseCards()
-            } catch (e: Exception) {
-                tvCoursesEmpty.visibility = View.VISIBLE
-                val isNetworkError = e is java.net.UnknownHostException || e.message?.contains("Unable to resolve host", ignoreCase = true) == true
-                tvCoursesEmpty.text = if (isNetworkError) {
-                    "No internet connection. Please check your Wi-Fi or mobile data."
-                } else {
-                    "Failed to load courses: ${e.message}"
+                if (pendingAutoStartAttendance) {
+                    pendingAutoStartAttendance = false
+                    if (activeSessionId == null && coursesList.isNotEmpty()) {
+                        showTakeAttendanceCoursePicker()
+                    } else if (activeSessionId != null) {
+                        Toast.makeText(this@ClassMateAdminAttendanceActivity, "An attendance session is already running.", Toast.LENGTH_SHORT).show()
+                    }
                 }
+            } catch (e: Exception) {
+                pendingAutoStartAttendance = false
+                tvCoursesEmpty.visibility = View.GONE
+                layoutCourseFilterHeader.visibility = View.GONE
+                containerCourseCards.removeAllViews()
+                com.shuaib.classmate.utils.EmptyStateHelper.showError(
+                    container = emptyCoursesState,
+                    title = "Unable to load courses",
+                    errorMessage = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e),
+                    onRetry = { loadCourses() }
+                )
             } finally {
                 progressCourses.visibility = View.GONE
                 swipeRefreshCourses.isRefreshing = false
@@ -393,14 +616,72 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
     private fun renderCourseCards() {
         containerCourseCards.removeAllViews()
+        tvCoursesEmpty.visibility = View.GONE
         if (coursesList.isEmpty()) {
-            tvCoursesEmpty.visibility = View.VISIBLE
+            layoutCourseFilterHeader.visibility = View.GONE
+            com.shuaib.classmate.utils.EmptyStateHelper.show(
+                container = emptyCoursesState,
+                iconRes = R.drawable.ic_library_outline,
+                title = "No courses found",
+                subtitle = "Add semester courses first so you can start attendance sessions and export rosters.",
+                actionText = "Refresh",
+                onAction = { loadCourses() }
+            )
             return
         }
-        tvCoursesEmpty.visibility = View.GONE
 
+        layoutCourseFilterHeader.visibility = View.VISIBLE
+        val totalSessionsAll = coursesList.sumOf { it.optInt("total_sessions", 0) }
+        val avgAll = coursesList.map { it.optInt("average_percentage", 0) }.average().toInt()
+        tvBatchAttendanceSummary.text = "${coursesList.size} ${if (coursesList.size == 1) "Course" else "Courses"} · $totalSessionsAll Sessions · $avgAll% Avg"
+
+        val filteredCourses = if (courseSearchQuery.isBlank()) {
+            coursesList
+        } else {
+            coursesList.filter {
+                it.optString("course_code").contains(courseSearchQuery, true) ||
+                    it.optString("course_title").contains(courseSearchQuery, true) ||
+                    it.optString("teacher_name").contains(courseSearchQuery, true)
+            }
+        }
+
+        if (filteredCourses.isEmpty()) {
+            com.shuaib.classmate.utils.EmptyStateHelper.show(
+                container = emptyCoursesState,
+                iconRes = R.drawable.ic_search_modern,
+                title = "No matching courses",
+                subtitle = "No courses matched \"$courseSearchQuery\".",
+                actionText = "Clear Search",
+                onAction = { etCourseSearch.setText("") }
+            )
+            return
+        }
+
+        com.shuaib.classmate.utils.EmptyStateHelper.hide(emptyCoursesState)
+
+        val takenCourses = filteredCourses.filter { it.optInt("total_sessions", 0) > 0 }
+        val untakenCourses = filteredCourses.filter { it.optInt("total_sessions", 0) <= 0 }
         val density = resources.displayMetrics.density
-        coursesList.forEach { course ->
+
+        fun addSectionHeader(label: String, count: Int) {
+            val tvHeader = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = (8 * density).toInt()
+                    bottomMargin = (8 * density).toInt()
+                }
+                text = "$label ($count)"
+                textSize = 11.5f
+                typeface = Typeface.DEFAULT_BOLD
+                letterSpacing = 0.08f
+                setTextColor(getColor(R.color.cm_text_muted))
+            }
+            containerCourseCards.addView(tvHeader)
+        }
+
+        fun addCourseCard(course: JSONObject) {
             val card = MaterialCardView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -439,12 +720,19 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
             }
 
-            val avgPct = course.optInt("average_percentage", 0)
+            val totalSessions = course.optInt("total_sessions", 0)
+            val avgPct = course.optInt("average_percentage", 0).coerceIn(0, 100)
             val tvPct = TextView(this).apply {
-                text = "$avgPct% Avg"
+                text = if (totalSessions > 0) "$avgPct% Avg" else "No sessions"
                 textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(if (avgPct >= 75) Color.parseColor("#10B981") else Color.parseColor("#F59E0B"))
+                setTextColor(
+                    when {
+                        totalSessions <= 0 -> getColor(R.color.cm_text_muted)
+                        avgPct >= 75 -> Color.parseColor("#10B981")
+                        else -> Color.parseColor("#F59E0B")
+                    }
+                )
             }
 
             headerRow.addView(tvCode)
@@ -469,7 +757,6 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
             // Teacher & Stats
             val teacherName = course.optString("teacher_name").takeIf { it.isNotBlank() && it != "null" } ?: "Assigned Faculty"
-            val totalSessions = course.optInt("total_sessions", 0)
             val enrolled = course.optInt("enrolled_students", 0)
 
             val tvMeta = TextView(this).apply {
@@ -496,16 +783,42 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
             }
 
+            val btnStart = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                layoutParams = LinearLayout.LayoutParams(0, (40 * density).toInt(), 0.9f).apply {
+                    marginEnd = (6 * density).toInt()
+                }
+                text = "Start"
+                textSize = 11.5f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#10B981"))
+                strokeColor = ColorStateList.valueOf(Color.parseColor("#10B981"))
+                cornerRadius = (10 * density).toInt()
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                setOnClickListener {
+                    ClassMateHaptics.selection(it)
+                    if (activeSessionId != null) {
+                        Toast.makeText(this@ClassMateAdminAttendanceActivity, "Close the active session first.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        confirmStartAdHocSession(
+                            course.optString("semester_course_id"),
+                            course.optString("course_code"),
+                            course.optString("course_title")
+                        )
+                    }
+                }
+            }
+
             val btnViewRoster = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                 layoutParams = LinearLayout.LayoutParams(0, (40 * density).toInt(), 1f).apply {
-                    marginEnd = (8 * density).toInt()
+                    marginEnd = (6 * density).toInt()
                 }
-                text = "View Day-wise"
+                text = "Roster"
                 textSize = 11.5f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(getColor(R.color.cm_text_primary))
                 strokeColor = ColorStateList.valueOf(getColor(R.color.cm_border))
                 cornerRadius = (10 * density).toInt()
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
                 setOnClickListener {
                     ClassMateHaptics.selection(it)
                     showCourseMatrixDialog(course)
@@ -514,7 +827,7 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
 
             val btnExport = MaterialButton(this).apply {
                 layoutParams = LinearLayout.LayoutParams(0, (40 * density).toInt(), 1f)
-                text = "Export Excel"
+                text = "Excel"
                 textSize = 11.5f
                 typeface = Typeface.DEFAULT_BOLD
                 backgroundTintList = ColorStateList.valueOf(Color.parseColor("#10B981"))
@@ -523,18 +836,29 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
                 iconTint = ColorStateList.valueOf(Color.WHITE)
                 cornerRadius = (10 * density).toInt()
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
                 setOnClickListener {
                     ClassMateHaptics.selection(it)
                     exportCourseExcel(course.optString("semester_course_id"), course.optString("course_code"))
                 }
             }
 
+            actionRow.addView(btnStart)
             actionRow.addView(btnViewRoster)
             actionRow.addView(btnExport)
             inner.addView(actionRow)
 
             card.addView(inner)
             containerCourseCards.addView(card)
+        }
+
+        if (takenCourses.isNotEmpty()) {
+            addSectionHeader("SESSIONS TAKEN", takenCourses.size)
+            takenCourses.forEach { addCourseCard(it) }
+        }
+        if (untakenCourses.isNotEmpty()) {
+            addSectionHeader("NOT STARTED YET", untakenCourses.size)
+            untakenCourses.forEach { addCourseCard(it) }
         }
     }
 
@@ -870,11 +1194,15 @@ class ClassMateAdminAttendanceActivity : AppCompatActivity() {
                 sortStudentsWithReaddLast(studentsList)
                 NfcCardLocalCache.cacheRoster(this@ClassMateAdminAttendanceActivity, studentsList, batchLabel)
 
-                tvStudentDirectoryCount.text = "${studentsList.size} Students"
+                val registeredCount = studentsList.count {
+                    val uid = it.optString("rfid_card_uid").trim()
+                    uid.isNotEmpty() && uid != "null"
+                }
+                tvStudentDirectoryCount.text = "$registeredCount/${studentsList.size} Cards Registered"
                 setupStudentAutocomplete()
                 renderStudentDirectoryCards()
             } catch (e: Exception) {
-                // Handle error
+                Toast.makeText(this@ClassMateAdminAttendanceActivity, "Failed to load students: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)}", Toast.LENGTH_SHORT).show()
             } finally {
                 progressStudents.visibility = View.GONE
             }

@@ -74,7 +74,16 @@ class AssessmentRepository private constructor(private val context: Context) {
         activeBatchId = resolvedBatch
 
         val remoteList = runCatching {
-            val rows = ClassMateAuthApi.rows("assessments", "select=*&batch_id=eq.$resolvedBatch&order=deadline_date.asc,deadline_time.asc")
+            val activeSemId = runCatching {
+                ClassMateAuthApi.rows("semesters", "select=id&batch_id=eq.$resolvedBatch&status=eq.active&limit=1")
+                    .optJSONObject(0)?.optString("id").orEmpty()
+            }.getOrDefault("")
+            val query = if (activeSemId.isNotBlank()) {
+                "select=*&batch_id=eq.$resolvedBatch&semester_id=eq.$activeSemId&order=deadline_date.asc,deadline_time.asc"
+            } else {
+                "select=*&batch_id=eq.$resolvedBatch&order=deadline_date.asc,deadline_time.asc"
+            }
+            val rows = ClassMateAuthApi.rows("assessments", query)
             val list = mutableListOf<AssessmentItem>()
             for (i in 0 until rows.length()) {
                 val o = rows.optJSONObject(i) ?: continue
@@ -160,35 +169,35 @@ class AssessmentRepository private constructor(private val context: Context) {
             // Update UI flow immediately
             _assessmentsFlow.value = currentReal.sortedBy { it.getDeadlineDateTime() }
 
-            // 2. Launch background sync to Supabase & Firestore so editing/saving is instantaneous
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                if (isUuid(batchId)) {
-                    runCatching {
-                        val payload = JSONObject().apply {
-                            put("id", id)
-                            put("batch_id", batchId)
-                            if (isUuid(realItem.courseId)) {
-                                put("course_id", realItem.courseId)
-                            } else {
-                                put("course_id", JSONObject.NULL)
-                            }
-                            put("course_code", realItem.courseCode)
-                            put("course_title", realItem.courseTitle)
-                            put("type", if (realItem.type == "ct") "class_test" else realItem.type)
-                            put("title", realItem.title)
-                            put("deadline_date", realItem.deadlineDate)
-                            put("deadline_time", realItem.deadlineTime)
-                            put("room", realItem.room)
-                            put("syllabus", realItem.syllabus)
-                            if (isUuid(realItem.noticeId)) put("notice_id", realItem.noticeId) else put("notice_id", JSONObject.NULL)
-                            put("posted_by", realItem.postedBy)
-                            put("created_at", realItem.createdAt)
+            // 2. Sync to Supabase before returning so follow-up notice linking never races
+            if (isUuid(batchId)) {
+                runCatching {
+                    val payload = JSONObject().apply {
+                        put("id", id)
+                        put("batch_id", batchId)
+                        if (isUuid(realItem.courseId)) {
+                            put("course_id", realItem.courseId)
+                        } else {
+                            put("course_id", JSONObject.NULL)
                         }
-                        ClassMateAuthApi.upsert("assessments", payload)
-                    }.onFailure { Log.e(TAG, "Supabase assessment sync omitted: ${it.message}", it) }
-                }
+                        put("course_code", realItem.courseCode)
+                        put("course_title", realItem.courseTitle)
+                        put("type", if (realItem.type == "ct") "class_test" else realItem.type)
+                        put("title", realItem.title)
+                        put("deadline_date", realItem.deadlineDate)
+                        put("deadline_time", realItem.deadlineTime)
+                        put("room", realItem.room)
+                        put("syllabus", realItem.syllabus)
+                        if (isUuid(realItem.noticeId)) put("notice_id", realItem.noticeId) else put("notice_id", JSONObject.NULL)
+                        put("posted_by", realItem.postedBy)
+                        put("created_at", realItem.createdAt)
+                    }
+                    ClassMateAuthApi.upsert("assessments", payload)
+                }.onFailure { Log.e(TAG, "Supabase assessment sync omitted: ${it.message}", it) }
+            }
 
-                // 3. Sync to Firestore if configured
+            // 3. Sync to Firestore in background if configured
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 runCatching {
                     val db = FirebaseFirestore.getInstance()
                     val firestoreMap = hashMapOf<String, Any>(

@@ -153,6 +153,8 @@ class NoticeFeedAdapter(
                         o.isPoll == n.isPoll &&
                         o.assessmentId == n.assessmentId &&
                         o.resourceId == n.resourceId &&
+                        o.resourceFileType == n.resourceFileType &&
+                        o.resourceLinkUrl == n.resourceLinkUrl &&
                         o.classChangeId == n.classChangeId &&
                         o.isReadByMe == n.isReadByMe &&
                         o.readCount == n.readCount &&

@@ -100,37 +100,45 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
     }
 
     private fun setupActionCards() {
-        // --- Section 1: Batch & Academic Management (CR & Admin) ---
+        // --- Section 1: Batch & Academic Management (CR, Teacher & Admin) ---
+        val isTeacherOnly = role == "teacher" && !isServerOwner && !isCr
         bindActionCard(
             cardView = tileManageCourses,
             title = "Manage Courses",
-            subtitle = "Add, edit and organize courses and teacher assignments",
+            subtitle = if (isTeacherOnly) "View and manage your assigned courses" else "Add, edit and organize courses and teacher assignments",
             iconRes = R.drawable.ic_library_filled,
             accentColor = Color.parseColor("#3B82F6")
         ) {
-            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "courses")
+            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "courses", isServerOwner, isCr)
             startActivity(intent)
         }
 
-        bindActionCard(
-            cardView = tileBatchOverrides,
-            title = "Batch Overrides & Dropouts",
-            subtitle = "Manage retake students and cross-batch overrides",
-            iconRes = R.drawable.ic_refresh,
-            accentColor = Color.parseColor("#EC4899")
-        ) {
-            val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "overrides")
-            startActivity(intent)
-        }
+        if (isTeacherOnly) {
+            tileBatchOverrides.visibility = View.GONE
+            tileActiveSemester.visibility = View.GONE
+        } else {
+            tileBatchOverrides.visibility = View.VISIBLE
+            tileActiveSemester.visibility = View.VISIBLE
+            bindActionCard(
+                cardView = tileBatchOverrides,
+                title = "Batch Overrides & Dropouts",
+                subtitle = if (isServerOwner || role == "admin") "Manage retake students across any batch" else "Add retake or repeat students to your batch",
+                iconRes = R.drawable.ic_refresh,
+                accentColor = Color.parseColor("#EC4899")
+            ) {
+                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "overrides", isServerOwner, isCr)
+                startActivity(intent)
+            }
 
-        bindActionCard(
-            cardView = tileActiveSemester,
-            title = "Switch Active Semester",
-            subtitle = "Advance to next semester or switch active progression",
-            iconRes = R.drawable.ic_academic_cap,
-            accentColor = Color.parseColor("#06B6D4")
-        ) {
-            showSemesterSwitchDialog()
+            bindActionCard(
+                cardView = tileActiveSemester,
+                title = "Switch Active Semester",
+                subtitle = "Advance to next semester (keeps all batch notices)",
+                iconRes = R.drawable.ic_academic_cap,
+                accentColor = Color.parseColor("#06B6D4")
+            ) {
+                showSemesterSwitchDialog()
+            }
         }
 
         // --- Section 2: Admin Only (Server Owner & Admins) ---
@@ -145,7 +153,7 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                 iconRes = R.drawable.ic_users,
                 accentColor = Color.parseColor("#0EA5E9")
             ) {
-                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "people")
+                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "people", isServerOwner, isCr)
                 startActivity(intent)
             }
 
@@ -156,7 +164,7 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                 iconRes = R.drawable.ic_storage,
                 accentColor = Color.parseColor("#64748B")
             ) {
-                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "catalog")
+                val intent = ClassMateCourses.intent(this, batchId, batchLabel, role, profileId, "catalog", isServerOwner, isCr)
                 startActivity(intent)
             }
 
@@ -281,56 +289,134 @@ class ClassMateBatchAdminActivity : AppCompatActivity() {
                 }
 
                 val semesters = (0 until rows.length()).map { rows.getJSONObject(it) }
-                val items = semesters.map { s ->
-                    val num = s.optInt("semester_number")
-                    val status = s.optString("status")
-                    when (status) {
-                        "active" -> "Semester $num  •  Active (Current) ✓"
-                        "completed" -> "Semester $num  •  Completed"
-                        "not_started" -> "Semester $num  •  Draft"
-                        else -> "Semester $num ($status)"
+                val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this@ClassMateBatchAdminActivity)
+                val d = resources.displayMetrics.density
+                val rootLayout = android.widget.LinearLayout(this@ClassMateBatchAdminActivity).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    setPadding((20 * d).toInt(), (16 * d).toInt(), (20 * d).toInt(), (24 * d).toInt())
+                    setBackgroundColor(getColor(R.color.cm_surface))
+                }
+                rootLayout.addView(View(this@ClassMateBatchAdminActivity).apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams((40 * d).toInt(), (4 * d).toInt()).apply {
+                        gravity = android.view.Gravity.CENTER_HORIZONTAL
+                        bottomMargin = (14 * d).toInt()
                     }
-                }.toTypedArray()
+                    setBackgroundColor(getColor(R.color.cm_border))
+                })
+                rootLayout.addView(TextView(this@ClassMateBatchAdminActivity).apply {
+                    text = "Switch Active Semester"
+                    textSize = 19f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(getColor(R.color.cm_text_primary))
+                })
+                rootLayout.addView(TextView(this@ClassMateBatchAdminActivity).apply {
+                    text = "Courses, timetable, files & assessments switch cleanly. Batch notices stay preserved."
+                    textSize = 12.5f
+                    setTextColor(getColor(R.color.cm_text_secondary))
+                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2).apply {
+                        topMargin = (4 * d).toInt()
+                        bottomMargin = (14 * d).toInt()
+                    }
+                })
 
-                MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                    .setTitle("Select Active Semester")
-                    .setItems(items) { _, which ->
-                        val selected = semesters[which]
-                        val semNum = selected.optInt("semester_number")
-                        val semId = selected.optString("id")
-                        val status = selected.optString("status")
+                val scroll = android.widget.ScrollView(this@ClassMateBatchAdminActivity).apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.52).toInt())
+                }
+                val listLayout = android.widget.LinearLayout(this@ClassMateBatchAdminActivity).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                }
 
-                        if (status == "active") {
-                            Toast.makeText(this@ClassMateBatchAdminActivity, "Semester $semNum is already active", Toast.LENGTH_SHORT).show()
-                            return@setItems
-                        }
+                semesters.forEach { selected ->
+                    val semNum = selected.optInt("semester_number")
+                    val semId = selected.optString("id")
+                    val status = selected.optString("status")
+                    val isCurrent = status == "active"
 
-                        val actionText = if (status == "completed") "Reactivate" else "Publish"
-                        val messageText = if (status == "completed") {
-                            "Reactivating Semester $semNum will set its courses and weekly timetable routine back as active for this batch."
-                        } else {
-                            "Publishing Semester $semNum will make it active for this batch and complete the current semester. All notices remain intact."
-                        }
-
-                        MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
-                            .setTitle("$actionText Semester $semNum?")
-                            .setMessage(messageText)
-                            .setPositiveButton(actionText) { _, _ ->
-                                lifecycleScope.launch {
-                                    try {
-                                        ClassMateAuthApi.rpc("publish_semester", JSONObject().put("target_semester", semId))
-                                        Toast.makeText(this@ClassMateBatchAdminActivity, "Semester $semNum is now active!", Toast.LENGTH_SHORT).show()
-                                        loadBatchData()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(this@ClassMateBatchAdminActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    val itemCard = com.google.android.material.card.MaterialCardView(this@ClassMateBatchAdminActivity).apply {
+                        layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (8 * d).toInt() }
+                        radius = 14 * d
+                        cardElevation = 0f
+                        setCardBackgroundColor(getColor(R.color.cm_card))
+                        strokeColor = if (isCurrent) getColor(R.color.cm_primary) else getColor(R.color.cm_border)
+                        strokeWidth = if (isCurrent) (2 * d).toInt() else (1 * d).toInt()
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener {
+                            ClassMateHaptics.selection(it)
+                            if (isCurrent) {
+                                Toast.makeText(this@ClassMateBatchAdminActivity, "Semester $semNum is already active", Toast.LENGTH_SHORT).show()
+                                return@setOnClickListener
+                            }
+                            sheet.dismiss()
+                            val actionText = if (status == "completed") "Reactivate" else "Switch to"
+                            val messageText = "This switches the whole batch to Semester $semNum. Previous semester courses, routine, files, and assessments will be hidden, while all batch notices remain intact."
+                            MaterialAlertDialogBuilder(this@ClassMateBatchAdminActivity)
+                                .setTitle("$actionText Semester $semNum?")
+                                .setMessage(messageText)
+                                .setPositiveButton("Confirm Switch") { _, _ ->
+                                    lifecycleScope.launch {
+                                        try {
+                                            ClassMateAuthApi.rpc("publish_semester", JSONObject().put("target_semester", semId))
+                                            ClassMateAcademicCache.clearSemesterScopedCaches(this@ClassMateBatchAdminActivity, batchId)
+                                            ClassMateAcademicCache.syncActiveSemester(this@ClassMateBatchAdminActivity, batchId, semId)
+                                            setResult(RESULT_OK)
+                                            Toast.makeText(this@ClassMateBatchAdminActivity, "Batch switched to Semester $semNum!", Toast.LENGTH_SHORT).show()
+                                            loadBatchData()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(this@ClassMateBatchAdminActivity, "Failed: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)}", Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 }
-                            }
-                            .setNegativeButton("Cancel", null)
-                            .show()
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
                     }
-                    .setNegativeButton("Close", null)
-                    .show()
+
+                    val row = android.widget.LinearLayout(this@ClassMateBatchAdminActivity).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
+                    }
+                    row.addView(TextView(this@ClassMateBatchAdminActivity).apply {
+                        text = "Semester $semNum"
+                        textSize = 15f
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setTextColor(getColor(R.color.cm_text_primary))
+                    }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+
+                    row.addView(TextView(this@ClassMateBatchAdminActivity).apply {
+                        text = when (status) {
+                            "active" -> "ACTIVE"
+                            "completed" -> "COMPLETED"
+                            else -> "DRAFT"
+                        }
+                        textSize = 11f
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                        setPadding((8 * d).toInt(), (3 * d).toInt(), (8 * d).toInt(), (3 * d).toInt())
+                        when (status) {
+                            "active" -> {
+                                setBackgroundResource(R.drawable.bg_badge_green)
+                                setTextColor(Color.parseColor("#10B981"))
+                            }
+                            "completed" -> {
+                                setBackgroundResource(R.drawable.bg_badge_blue)
+                                setTextColor(getColor(R.color.cm_primary))
+                            }
+                            else -> {
+                                setBackgroundResource(R.drawable.bg_badge_paused)
+                                setTextColor(getColor(R.color.cm_text_muted))
+                            }
+                        }
+                    })
+
+                    itemCard.addView(row)
+                    listLayout.addView(itemCard)
+                }
+
+                scroll.addView(listLayout)
+                rootLayout.addView(scroll)
+                sheet.setContentView(rootLayout)
+                sheet.show()
             } catch (e: Exception) {
                 Toast.makeText(this@ClassMateBatchAdminActivity, "Could not load semesters: ${e.message}", Toast.LENGTH_SHORT).show()
             }

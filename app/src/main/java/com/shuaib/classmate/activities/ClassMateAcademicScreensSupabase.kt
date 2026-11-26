@@ -751,6 +751,15 @@ internal class ClassMateAcademicScreensSupabase(
 
     fun invalidateNotices() { noticeSyncedAt=0L; noticeTranslations.clear(); translatedNotices.clear(); expandedNoticeIds.clear(); noticeRequest++; noticeFeed=emptyList(); noticeBatch=""; noticeHasMore=true; noticeLoadingOlder=false; noticeOfflineTail=emptyList() }
 
+    fun refreshNoticesLive() {
+        noticeSyncedAt = 0L
+        tabRoots[R.id.nav_notices]?.let { root ->
+            if (active(root)) {
+                loadNotices(root, preserveOlder = true)
+            }
+        }
+    }
+
 
 
     fun onNoticeCreated(createdNotice: JSONObject) {
@@ -763,7 +772,12 @@ internal class ClassMateAcademicScreensSupabase(
 
         if (id.isBlank()) return
 
-
+        createdNotice.optJSONArray("_local_attachments")?.let { localAtts ->
+            if (localAtts.length() > 0) {
+                noticeAttachments[id] = (0 until localAtts.length()).mapNotNull { localAtts.optJSONObject(it) }
+            }
+            createdNotice.remove("_local_attachments")
+        }
 
         noticeFeed = (listOf(createdNotice) + noticeFeed).distinctBy { it.optString("id") }
 
@@ -1261,6 +1275,10 @@ internal class ClassMateAcademicScreensSupabase(
 
     fun updateTabHeaderColors(root: View, scrolledDown: Boolean) {
         val isDark = com.shuaib.classmate.utils.AppPreferences(activity).isAppInDarkMode(activity)
+        val stateKey = "${isDark}_$scrolledDown"
+        if (root.getTag(R.id.tag_header_scrolled_state) == stateKey) return
+        root.setTag(R.id.tag_header_scrolled_state, stateKey)
+
         val window = activity.window
         val insetsController = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
 
@@ -1302,10 +1320,6 @@ internal class ClassMateAcademicScreensSupabase(
         //   Scrolled down (scrolledDown = true) -> White (#FFFFFF)
         val isHeaderDark = !scrolledDown
         insetsController.isAppearanceLightStatusBars = isHeaderDark
-
-        val currentState = root.getTag(R.id.tag_header_scrolled_state) as? Boolean
-        if (currentState == scrolledDown) return
-        root.setTag(R.id.tag_header_scrolled_state, scrolledDown)
 
         val targetColor = if (scrolledDown) android.graphics.Color.WHITE else android.graphics.Color.parseColor("#0F172A")
         val startColor = title.currentTextColor
@@ -1771,7 +1785,10 @@ internal class ClassMateAcademicScreensSupabase(
                     }?.start()
                 }
                 pendingTransitBusId?.let { targetBus ->
-                    webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$targetBus'); }", null)
+                    val safeBus = targetBus.replace(Regex("[^A-Za-z0-9_-]"), "")
+                    if (safeBus.isNotEmpty()) {
+                        webView.evaluateJavascript("if (window.__classmateSelectBus) { window.__classmateSelectBus('$safeBus'); }", null)
+                    }
                     pendingTransitBusId = null
                 }
             }
@@ -1779,16 +1796,37 @@ internal class ClassMateAcademicScreensSupabase(
 
         webView.addJavascriptInterface(bridge, "ClassMateNativeBridge")
 
+        fun isTrustedTransitOrigin(urlOrOrigin: String?): Boolean {
+            if (urlOrOrigin.isNullOrBlank()) return false
+            if (urlOrOrigin.startsWith("file:///android_asset/", ignoreCase = true) || urlOrOrigin == "file://") return true
+            val uri = runCatching { Uri.parse(urlOrOrigin) }.getOrNull() ?: return false
+            return uri.scheme.equals("https", ignoreCase = true) &&
+                uri.host?.lowercase() in setOf("classmatebd.vercel.app", "classmate-web-editor.vercel.app")
+        }
+
         webView.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: android.webkit.GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                callback?.invoke(origin, isTrustedTransitOrigin(origin), false)
             }
         }
 
         webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: android.webkit.WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): Boolean {
+                val url = request?.url?.toString()
+                if (isTrustedTransitOrigin(url)) return false
+                if (!url.isNullOrBlank()) {
+                    runCatching {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                }
+                return true
+            }
             override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 // Let JavaScript bridge onMapReady or safety fallback dismiss shimmer
@@ -1902,23 +1940,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.btnAddPeriod).apply {
-
-
-
-            visibility = if (profile().optString("role") in setOf("admin", "teacher") ||
-
-
-
-                profile().optBoolean("is_cr")) View.VISIBLE else View.GONE
-
-
-
-            setOnClickListener { onAddPeriod(null, selectedDay) }
-
-
-
-        }
+        root.v<View>(R.id.btnAddPeriod).visibility = View.GONE
 
         bindHamburgerMenu(root)
 
@@ -1937,7 +1959,7 @@ internal class ClassMateAcademicScreensSupabase(
                 onConfigure()
             }
             root.findViewById<View>(R.id.btnCrGuideAddRoutine)?.setOnClickListener {
-                activity.startActivity(android.content.Intent(activity, TimetableManagementActivity::class.java))
+                onAddPeriod(null, selectedDay)
             }
         }
 
@@ -2130,8 +2152,6 @@ internal class ClassMateAcademicScreensSupabase(
 
             root.v<View>(R.id.tvGreetingWave).visibility = if (special) View.GONE else View.VISIBLE
 
-
-
             root.v<View>(R.id.busSummary).visibility = View.GONE
 
 
@@ -2184,27 +2204,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            timetable.btnAddPeriod.apply {
-
-
-
-                val canEdit = if (busMode) false
-
-
-
-                    else profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
-
-
-
-                visibility = if (canEdit && !calendarMode) View.VISIBLE else View.GONE
-
-
-
-                setOnClickListener { if (busMode) onAddBus(null,busDayKind()) else onAddPeriod(null, selectedDay) }
-
-
-
-            }
+            timetable.btnAddPeriod.visibility = View.GONE
 
             val canManageSpeedDial = profile().optString("role") in setOf("admin", "teacher") || profile().optBoolean("is_cr")
             root.findViewById<View>(R.id.btnSpeedDialFab)?.visibility = if (canManageSpeedDial && !calendarMode) View.VISIBLE else View.GONE
@@ -2397,12 +2397,27 @@ internal class ClassMateAcademicScreensSupabase(
             }
         }
 
+        val btnStartAttendance = root.findViewById<View>(R.id.btnSpeedDialStartAttendance)
         val btnPostAssessment = root.findViewById<View>(R.id.btnSpeedDialPostAssessment)
+
+        val isNotices = root.findViewById<View>(R.id.rvNotices) != null
+        val isCourses = root.findViewById<View>(R.id.etLibrarySearch) != null
+        btnStartAttendance?.visibility = if (isTimetable || isNotices || isCourses) View.VISIBLE else View.GONE
 
         fabSpeedDial.setOnClickListener {
             android.util.Log.d("SPEED_DIAL", "fabSpeedDial clicked! isSpeedDialOpen=$isSpeedDialOpen")
             com.shuaib.classmate.utils.HapticHelper.lightPop(it)
             setSpeedDialState(!isSpeedDialOpen)
+        }
+
+        btnStartAttendance?.setOnClickListener {
+            com.shuaib.classmate.utils.HapticHelper.mediumThud(it)
+            setSpeedDialState(false)
+            val intent = Intent(activity, ClassMateAdminAttendanceActivity::class.java)
+                .putExtra("EXTRA_BATCH_ID", batchId())
+                .putExtra("EXTRA_BATCH_LABEL", batchLabel())
+                .putExtra("EXTRA_AUTO_START_ATTENDANCE", true)
+            activity.startActivity(intent)
         }
 
         btnPostAssessment?.setOnClickListener {
@@ -2934,22 +2949,12 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                    liveOpenSessionsMap.clear()
-
-
-
-                    liveOpenSessionsMap.putAll(latestMap)
-
-
-
-                    if (active(root) && !busMode && !calendarMode && !attendanceMode) {
-
-
-
-                        root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
-
-
-
+                    if (latestMap != liveOpenSessionsMap) {
+                        liveOpenSessionsMap.clear()
+                        liveOpenSessionsMap.putAll(latestMap)
+                        if (active(root) && !busMode && !calendarMode && !attendanceMode) {
+                            root.findViewById<RecyclerView>(R.id.rvPeriods)?.adapter?.notifyDataSetChanged()
+                        }
                     }
 
 
@@ -3658,6 +3663,9 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
+                    if (!semester.isNullOrBlank()) {
+                        ClassMateAcademicCache.syncActiveSemester(activity, selectedBatch, semester)
+                    }
                     val offerings = (if (semester == null) emptyList() else rows(ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester"))).filter {profile().optString("role")!="teacher" || it.optString("id") in visibleIds}
 
 
@@ -3932,7 +3940,114 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            root.v<View>(R.id.busSummary).visibility = View.GONE
+            fun parseBusTime(raw: String): LocalTime? {
+                val cleaned = raw.trim().uppercase(java.util.Locale.US)
+                if (cleaned.isBlank()) return null
+                val patterns = listOf("h:mm a", "hh:mm a", "H:mm", "HH:mm", "HH:mm:ss")
+                for (p in patterns) {
+                    val parsed = runCatching { LocalTime.parse(cleaned, DateTimeFormatter.ofPattern(p, java.util.Locale.US)) }.getOrNull()
+                    if (parsed != null) return parsed
+                }
+                return null
+            }
+
+            fun extractDepartures(item: JSONObject, arrayKey: String, singleKey: String): List<String> {
+                val arr = item.optJSONArray(arrayKey)
+                if (arr != null && arr.length() > 0) {
+                    return (0 until arr.length()).mapNotNull { idx -> arr.optString(idx).trim().takeIf { it.isNotBlank() } }
+                }
+                val single = item.optString(singleKey).trim()
+                return if (single.isNotBlank() && !single.equals("null", true)) listOf(hour(single)) else emptyList()
+            }
+
+            val todayDate = LocalDate.now()
+            val nowTime = LocalTime.now()
+            val isTodaySchedule = effectiveDate == todayDate
+            val isPastSchedule = effectiveDate.isBefore(todayDate)
+
+            val renderEntries = if (!requestedBusMode) {
+                entries
+            } else {
+                // Sort buses so those with an upcoming departure today appear first
+                entries.sortedBy { item ->
+                    if (!isTodaySchedule) return@sortedBy 0L
+                    val allTimes = (extractDepartures(item, "campus_departures", "departure_time") +
+                        extractDepartures(item, "city_departures", "city_departure_time"))
+                        .mapNotNull { parseBusTime(it) }
+                    val soonest = allTimes.filter { !it.isBefore(nowTime) }.minOrNull()
+                    soonest?.toSecondOfDay()?.toLong() ?: Long.MAX_VALUE
+                }
+            }
+
+            if (requestedBusMode && renderEntries.isNotEmpty()) {
+                val busSummaryView = root.v<View>(R.id.busSummary)
+                busSummaryView.visibility = View.VISIBLE
+                busSummaryView.setOnClickListener {
+                    com.shuaib.classmate.ui.ClassMateHaptics.selection(it)
+                    openTransitForBus("")
+                }
+
+                var bestCampus: Triple<LocalTime, String, String>? = null
+                var bestCity: Triple<LocalTime, String, String>? = null
+
+                renderEntries.forEach { item ->
+                    val bName = item.optString("bus_name_en").takeIf { it.isNotBlank() }
+                        ?: item.optString("bus_name_bn", item.optString("route_name"))
+                    extractDepartures(item, "campus_departures", "departure_time").forEach { raw ->
+                        val t = parseBusTime(raw) ?: return@forEach
+                        if (!isTodaySchedule || !t.isBefore(nowTime)) {
+                            if (bestCampus == null || t.isBefore(bestCampus!!.first)) {
+                                bestCampus = Triple(t, raw, bName)
+                            }
+                        }
+                    }
+                    extractDepartures(item, "city_departures", "city_departure_time").forEach { raw ->
+                        val t = parseBusTime(raw) ?: return@forEach
+                        if (!isTodaySchedule || !t.isBefore(nowTime)) {
+                            if (bestCity == null || t.isBefore(bestCity!!.first)) {
+                                bestCity = Triple(t, raw, bName)
+                            }
+                        }
+                    }
+                }
+
+                val finishedToday = isTodaySchedule && bestCampus == null && bestCity == null
+                val compactHero = isPastSchedule || finishedToday
+                root.v<View>(R.id.busSummaryTimes).visibility = if (compactHero) View.GONE else View.VISIBLE
+                root.v<View>(R.id.tvBusSummaryStatus).visibility = if (compactHero) View.VISIBLE else View.GONE
+                text(root, R.id.tvBusSummaryTitle, when {
+                    isPastSchedule -> "Past schedule"
+                    finishedToday -> "Service ended for today"
+                    isTodaySchedule -> "Next departures · Tap for live map"
+                    else -> "First departures · ${effectiveDate.format(DateTimeFormatter.ofPattern("d MMM"))}"
+                })
+                text(root, R.id.tvBusSummaryStatus, if (isPastSchedule) "Viewing past bus schedule." else "All scheduled trips for today are complete.")
+
+                fun formatCountdown(t: LocalTime): String {
+                    val mins = java.time.Duration.between(nowTime, t).toMinutes()
+                    return when {
+                        mins <= 0 -> "Departing now"
+                        mins < 60 -> "In ${mins}m"
+                        else -> "In ${mins / 60}h ${mins % 60}m"
+                    }
+                }
+
+                if (!compactHero) {
+                    text(root, R.id.tvNextCampus, bestCampus?.second ?: "No more")
+                    root.v<TextView>(R.id.tvNextCampus).textSize = if (bestCampus == null) 16f else 22f
+                    text(root, R.id.tvNextCampusHint, bestCampus?.let {
+                        if (isTodaySchedule) "${it.third} · ${formatCountdown(it.first)}" else it.third
+                    } ?: "No trips remaining")
+
+                    text(root, R.id.tvNextCity, bestCity?.second ?: "No more")
+                    root.v<TextView>(R.id.tvNextCity).textSize = if (bestCity == null) 16f else 22f
+                    text(root, R.id.tvNextCityHint, bestCity?.let {
+                        if (isTodaySchedule) "${it.third} · ${formatCountdown(it.first)}" else it.third
+                    } ?: "No trips remaining")
+                }
+            } else {
+                root.v<View>(R.id.busSummary).visibility = View.GONE
+            }
 
             val empty = entries.isEmpty()
 
@@ -3994,28 +4109,18 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, entries) { card, item ->
+            if (requestedBusMode) recycler(root, R.id.rvPeriods, R.layout.item_student_bus_schedule, renderEntries) { card, item ->
                 val isMbstu = item.optBoolean("is_mbstu", false) || item.has("campus_departures")
                 val busNo = item.optString("bus_no", item.optString("id"))
                 val busNameBn = item.optString("bus_name_bn", item.optString("route_name"))
                 val busNameEn = item.optString("bus_name_en", "")
-                val pilotContact = item.optString("pilot_contact", "")
-                val campusArr = item.optJSONArray("campus_departures")
-                val cityArr = item.optJSONArray("city_departures")
+                val density = activity.resources.displayMetrics.density
 
                 card.v<View>(R.id.tvBusScheduleName).visibility = View.VISIBLE
                 text(card, R.id.tvBusScheduleName, if (isMbstu) busNameBn else item.optString("route_name"))
 
-                val tvBusTag = card.v<TextView>(R.id.tvBusTag)
-                if (isMbstu && busNo.isNotBlank()) {
-                    tvBusTag.visibility = View.VISIBLE
-                    tvBusTag.text = "#$busNo"
-                } else {
-                    tvBusTag.visibility = View.GONE
-                }
-
                 val tvBusSubtitle = card.v<TextView>(R.id.tvBusSubtitle)
-                if (isMbstu && busNameEn.isNotBlank()) {
+                if (isMbstu && busNameEn.isNotBlank() && !busNameEn.equals(busNo, true) && !busNameEn.equals(busNameBn, true)) {
                     tvBusSubtitle.visibility = View.VISIBLE
                     tvBusSubtitle.text = busNameEn
                 } else {
@@ -4031,39 +4136,105 @@ internal class ClassMateAcademicScreensSupabase(
                     }
                 }
 
-                val tvRouteName = card.v<TextView>(R.id.tvRouteName)
-                if (isMbstu) {
-                    tvRouteName.visibility = View.VISIBLE
-                    tvRouteName.text = item.optString("route_name", "মাভাবিপ্রবি ক্যাম্পাস ⇄ নিরালা (শহর কেন্দ্র)")
-                } else {
-                    tvRouteName.visibility = View.GONE
+                val campusList = extractDepartures(item, "campus_departures", "departure_time")
+                val cityList = extractDepartures(item, "city_departures", "city_departure_time")
+
+                fun bindDirectionRow(
+                    times: List<String>,
+                    labelId: Int,
+                    labelText: String,
+                    badgeId: Int,
+                    chipsId: Int,
+                    emptyId: Int
+                ) {
+                    text(card, labelId, labelText)
+                    val tvBadge = card.v<TextView>(badgeId)
+                    val chipsContainer = card.v<LinearLayout>(chipsId)
+                    val tvEmpty = card.v<TextView>(emptyId)
+                    chipsContainer.removeAllViews()
+
+                    if (times.isEmpty()) {
+                        tvBadge.visibility = View.GONE
+                        tvEmpty.visibility = View.VISIBLE
+                        return
+                    }
+                    tvEmpty.visibility = View.GONE
+
+                    val parsedList = times.map { it to parseBusTime(it) }
+                    val nextPair = if (isTodaySchedule) {
+                        parsedList.firstOrNull { (_, t) -> t != null && !t.isBefore(nowTime) }
+                    } else {
+                        parsedList.firstOrNull()
+                    }
+
+                    val allDoneToday = isTodaySchedule && nextPair == null
+                    if (isTodaySchedule && nextPair?.second != null) {
+                        val mins = java.time.Duration.between(nowTime, nextPair.second).toMinutes()
+                        tvBadge.visibility = View.VISIBLE
+                        tvBadge.setBackgroundResource(R.drawable.bg_badge_emerald)
+                        tvBadge.setTextColor(android.graphics.Color.parseColor("#10B981"))
+                        tvBadge.text = when {
+                            mins <= 0 -> "Now"
+                            mins < 60 -> "Next in ${mins}m"
+                            else -> "Next in ${mins / 60}h ${mins % 60}m"
+                        }
+                    } else if (allDoneToday) {
+                        tvBadge.visibility = View.VISIBLE
+                        tvBadge.setBackgroundResource(R.drawable.bg_badge_paused)
+                        tvBadge.setTextColor(activity.getColor(R.color.cm_text_muted))
+                        tvBadge.text = "Done today"
+                    } else {
+                        tvBadge.visibility = View.GONE
+                    }
+
+                    parsedList.forEach { (rawStr, parsedTime) ->
+                        val isNext = nextPair != null && rawStr == nextPair.first
+                        val isPassed = isTodaySchedule && parsedTime != null && parsedTime.isBefore(nowTime)
+                        val chip = TextView(activity).apply {
+                            text = rawStr
+                            textSize = 12.5f
+                            typeface = if (isNext) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                            setPadding((11 * density).toInt(), (6 * density).toInt(), (11 * density).toInt(), (6 * density).toInt())
+                            setBackgroundResource(if (isNext) R.drawable.bg_badge_blue else R.drawable.bg_toggle_container)
+                            setTextColor(
+                                activity.getColor(
+                                    when {
+                                        isNext -> R.color.cm_primary
+                                        isPassed -> R.color.cm_text_disabled
+                                        else -> R.color.cm_text_primary
+                                    }
+                                )
+                            )
+                            alpha = if (isPassed) 0.45f else 1f
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply {
+                                marginEnd = (8 * density).toInt()
+                            }
+                        }
+                        chipsContainer.addView(chip)
+                    }
                 }
 
-                val campusList = if (campusArr != null) (0 until campusArr.length()).map { campusArr.optString(it) } else emptyList()
-                val cityList = if (cityArr != null) (0 until cityArr.length()).map { cityArr.optString(it) } else emptyList()
-
-                text(card, R.id.tvCampusDepartureLabel, "ক্যাম্পাস ➔ শহর")
-                text(card, R.id.tvCampusDeparture, if (campusList.isNotEmpty()) campusList.first() else hour(item.optString("departure_time")))
-
-                val tvCampusDepartureList = card.v<TextView>(R.id.tvCampusDepartureList)
-                if (campusList.size > 1) {
-                    tvCampusDepartureList.visibility = View.VISIBLE
-                    tvCampusDepartureList.text = campusList.joinToString("  •  ")
-                } else {
-                    tvCampusDepartureList.visibility = View.GONE
-                }
+                bindDirectionRow(
+                    times = campusList,
+                    labelId = R.id.tvCampusDepartureLabel,
+                    labelText = "Campus → City",
+                    badgeId = R.id.tvCampusStatusBadge,
+                    chipsId = R.id.layoutCampusChips,
+                    emptyId = R.id.tvCampusEmpty
+                )
 
                 card.v<View>(R.id.cityDepartureColumn).visibility = View.VISIBLE
-                text(card, R.id.tvCityDepartureLabel, "শহর ➔ ক্যাম্পাস")
-                text(card, R.id.tvCityDeparture, if (cityList.isNotEmpty()) cityList.first() else hour(item.optString("city_departure_time")))
-
-                val tvCityDepartureList = card.v<TextView>(R.id.tvCityDepartureList)
-                if (cityList.size > 1) {
-                    tvCityDepartureList.visibility = View.VISIBLE
-                    tvCityDepartureList.text = cityList.joinToString("  •  ")
-                } else {
-                    tvCityDepartureList.visibility = View.GONE
-                }
+                bindDirectionRow(
+                    times = cityList,
+                    labelId = R.id.tvCityDepartureLabel,
+                    labelText = "City → Campus",
+                    badgeId = R.id.tvCityStatusBadge,
+                    chipsId = R.id.layoutCityChips,
+                    emptyId = R.id.tvCityEmpty
+                )
 
                 if (!isMbstu && canEditBus()) {
                     card.setOnClickListener { com.shuaib.classmate.ui.ClassMateHaptics.selection(it); onAddBus(item, requestedBusKind) }
@@ -5129,19 +5300,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.btnPostNotice).apply {
-
-
-
-            visibility = if (canPost) View.VISIBLE else View.GONE
-
-
-
-            setOnClickListener { onPostNotice() }
-
-
-
-        }
+        root.v<View>(R.id.btnPostNotice).visibility = View.GONE
 
 
 
@@ -5763,18 +5922,37 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        if(profile().optString("role")=="teacher") {
-
-
-
-            text(root,R.id.tvEmptyTitle,"You haven’t posted any notices")
-
-
-
-            text(root,R.id.tvEmptySubtitle,"Try posting your first course notice!")
-
-
-
+        if (filtered.isEmpty()) {
+            val role = profile().optString("role")
+            val canPost = role in setOf("admin", "teacher") || profile().optBoolean("is_cr")
+            val btnReset = root.findViewById<TextView>(R.id.btnEmptyReset)
+            val btnPost = root.findViewById<TextView>(R.id.btnEmptyPost)
+            if (search.isNotBlank()) {
+                text(root, R.id.tvEmptyTitle, "No matching notices")
+                text(root, R.id.tvEmptySubtitle, "No notices matched \"$search\".")
+                btnReset?.apply {
+                    visibility = View.VISIBLE
+                    text = "Clear Search"
+                    setOnClickListener { root.v<EditText>(R.id.etNoticeSearch).setText("") }
+                }
+                btnPost?.visibility = View.GONE
+            } else {
+                btnReset?.visibility = View.GONE
+                if (role == "teacher") {
+                    text(root, R.id.tvEmptyTitle, "You haven’t posted any notices")
+                    text(root, R.id.tvEmptySubtitle, "Try posting your first course notice!")
+                } else if (canPost) {
+                    text(root, R.id.tvEmptyTitle, "No notices posted yet")
+                    text(root, R.id.tvEmptySubtitle, "Post an announcement, class update, or exam alert for your batch.")
+                } else {
+                    text(root, R.id.tvEmptyTitle, "No notices yet")
+                    text(root, R.id.tvEmptySubtitle, "Class updates and announcements from your CR and teachers will appear here.")
+                }
+                btnPost?.apply {
+                    visibility = if (canPost) View.VISIBLE else View.GONE
+                    setOnClickListener { onPostNotice() }
+                }
+            }
         }
 
 
@@ -5793,7 +5971,8 @@ internal class ClassMateAcademicScreensSupabase(
         val list = root.v<RecyclerView>(R.id.rvNotices)
         list.visibility = if (isShimmering && filtered.isEmpty()) View.GONE else View.VISIBLE
 
-        list.setItemViewCacheSize(12)
+        list.setItemViewCacheSize(16)
+        list.recycledViewPool.setMaxRecycledViews(NoticeFeedAdapter.VIEW_TYPE_NOTICE, 16)
         (list.itemAnimator as? androidx.recyclerview.widget.SimpleItemAnimator)?.supportsChangeAnimations = false
 
         if (list.layoutManager == null) list.layoutManager = com.shuaib.classmate.ui.SafeLinearLayoutManager(activity)
@@ -5816,18 +5995,51 @@ internal class ClassMateAcademicScreensSupabase(
             }
 
             override fun onOpenFile(attachment: NoticeAttachmentItem) {
-                if (attachment.url.isNotBlank()) {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.url))
+                val rawUrl = attachment.url.trim()
+                if (rawUrl.isBlank()) {
+                    Toast.makeText(activity, "Attachment URL is unavailable", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                val uri = Uri.parse(rawUrl)
+                if (uri.scheme.equals("content", ignoreCase = true)) {
+                    runCatching {
+                        val mime = attachment.fileType.ifBlank { "application/pdf" }
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, mime)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
                         activity.startActivity(intent)
-                    } catch (e: Exception) {
+                    }.onFailure { e ->
+                        Toast.makeText(activity, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+                val openedCustomTab = runCatching {
+                    androidx.browser.customtabs.CustomTabsIntent.Builder()
+                        .setShowTitle(true)
+                        .build()
+                        .apply { intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                        .launchUrl(activity, uri)
+                    true
+                }.getOrDefault(false)
+                if (!openedCustomTab) {
+                    runCatching {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    }.onFailure { e ->
                         Toast.makeText(activity, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
 
             override fun onOpenProtectedResource(resourceId: String) {
-                openFile(JSONObject().put("id", resourceId))
+                val matched = noticeResources.values.firstOrNull { it.optString("id") == resourceId }
+                val payload = JSONObject().put("id", resourceId)
+                matched?.optString("link_url")?.takeIf { it.isNotBlank() && !it.equals("null", true) }?.let {
+                    payload.put("link_url", it)
+                }
+                openFile(payload)
             }
 
             override fun onOpenImages(imageUrls: List<String>, initialIndex: Int) {
@@ -5906,7 +6118,8 @@ internal class ClassMateAcademicScreensSupabase(
                     currentUserId = pId,
                     currentRole = currentRole,
                     isCr = isCr,
-                    highlightedId = highlightedNoticeId
+                    highlightedId = highlightedNoticeId,
+                    resourcesMap = noticeResources
                 )
                 add(NoticeFeedRow.NoticeCard(model))
             }
@@ -6260,25 +6473,15 @@ internal class ClassMateAcademicScreensSupabase(
 
 
         if (resourceId != null) {
-
-
-
             fileAttachmentCard.visibility = View.VISIBLE
-
-
-
             btnOpenResource.setOnClickListener {
-
-
-
-                openFile(JSONObject().put("id", resourceId))
-
-
-
+                val resObj = noticeResources[item.optString("id")]
+                val payload = JSONObject().put("id", resourceId)
+                resObj?.optString("link_url")?.takeIf { it.isNotBlank() && !it.equals("null", true) }?.let {
+                    payload.put("link_url", it)
+                }
+                openFile(payload)
             }
-
-
-
         } else {
 
 
@@ -7252,6 +7455,10 @@ internal class ClassMateAcademicScreensSupabase(
     }
 
     private fun showPollVotesSheet(root: View, pollData: JSONObject) {
+        if (pollData.optBoolean("is_anonymous", false)) {
+            Toast.makeText(activity, "Voter identities are hidden for anonymous polls", Toast.LENGTH_SHORT).show()
+            return
+        }
         val pollId = pollData.optString("poll_id").ifBlank { pollData.optString("id") }
         if (pollId.isBlank()) return
 
@@ -8655,50 +8862,14 @@ internal class ClassMateAcademicScreensSupabase(
 
 
             if (coursesList.isEmpty()) {
-
-
-
-                val tvEmpty = TextView(activity).apply {
-
-
-
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-
-
-
-                        topMargin = (24 * density).toInt()
-
-
-
-                        bottomMargin = (24 * density).toInt()
-
-
-
-                    }
-
-
-
-                    text = "No attendance sessions recorded yet for your courses."
-
-
-
-                    gravity = android.view.Gravity.CENTER
-
-
-
-                    textSize = 13f
-
-
-
-                    setTextColor(activity.getColor(R.color.cm_text_muted))
-
-
-
-                }
-
-
-
-                coursesContainer.addView(tvEmpty)
+                val emptyView = activity.layoutInflater.inflate(R.layout.view_empty_state, coursesContainer, false)
+                com.shuaib.classmate.utils.EmptyStateHelper.show(
+                    container = emptyView,
+                    iconRes = R.drawable.ic_calendar,
+                    title = "No attendance recorded yet",
+                    subtitle = "Attendance sessions for your courses will appear here once your CR or teacher starts taking attendance."
+                )
+                coursesContainer.addView(emptyView)
 
 
 
@@ -9238,19 +9409,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-        root.v<View>(R.id.btnUploadPdf).apply {
-
-
-
-            visibility = if (canUpload) View.VISIBLE else View.GONE
-
-
-
-            setOnClickListener { onUpload() }
-
-
-
-        }
+        root.v<View>(R.id.btnUploadPdf).visibility = View.GONE
 
 
 
@@ -9349,7 +9508,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            root.v<View>(R.id.btnUploadPdf).visibility = if (canUpload) View.VISIBLE else View.GONE
+            root.v<View>(R.id.btnUploadPdf).visibility = View.GONE
 
 
 
@@ -9361,7 +9520,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            loadLibrary(root)
+            librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) } ?: loadLibrary(root)
 
 
 
@@ -9381,7 +9540,9 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { loadLibrary(root) }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) }
+            }
 
 
 
@@ -9417,7 +9578,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                if (librarySnapshot?.batchId == batchId()) loadLibrary(root)
+                librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) }
 
 
 
@@ -9445,7 +9606,7 @@ internal class ClassMateAcademicScreensSupabase(
 
 
 
-                if (librarySnapshot?.batchId == batchId()) loadLibrary(root)
+                librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) }
 
 
 
@@ -9467,7 +9628,7 @@ internal class ClassMateAcademicScreensSupabase(
 
             librarySnapshot = null
 
-
+            refreshAttendanceCount()
 
             loadLibrary(root)
 
@@ -9622,6 +9783,7 @@ internal class ClassMateAcademicScreensSupabase(
         }
 
         try {
+            var loadedFromServer = false
             val snapshot = if (!ClassMateAcademicCache.online(activity)) {
                 cachedSnap ?: restoreLibraryCache(selectedBatch) ?: LibrarySnapshot(selectedBatch, emptyList(), emptyMap(), emptyList(), mutableSetOf())
             } else {
@@ -9629,20 +9791,33 @@ internal class ClassMateAcademicScreensSupabase(
                     val semesters = ClassMateAuthApi.rows("semesters",
                         "select=id&batch_id=eq.$selectedBatch&status=eq.active&limit=1")
                     val semester = semesters.optJSONObject(0)?.optString("id")
+                    if (!semester.isNullOrBlank()) {
+                        ClassMateAcademicCache.syncActiveSemester(activity, selectedBatch, semester)
+                    }
                     coroutineScope {
                         val offeringsJob = async { if (semester == null) emptyList() else rows(
                             ClassMateAuthApi.rows("semester_courses",
-                                "select=id,course_id&semester_id=eq.$semester")) }
+                                "select=id,course_id,code_override,title_override&semester_id=eq.$semester")) }
                         val coursesJob = async { rows(ClassMateCourses.catalog(selectedBatch))
                             .associateBy { it.getString("id") } }
                         val filesJob = async { rows(ClassMateAuthApi.rows("file_metadata",
                             "select=id,title,file_type,category,size_bytes,created_at,semester_course_id,link_url" +
-                                "&batch_id=eq.$selectedBatch&status=eq.active&order=created_at.desc&limit=100")) }
-                        val favoritesJob = async { rows(ClassMateAuthApi.rows("file_favorites",
-                            "select=file_id&profile_id=eq.${profile().getString("id")}"))
-                            .map { it.getString("file_id") }.toMutableSet() }
-                        LibrarySnapshot(selectedBatch, offeringsJob.await(), coursesJob.await(),
-                            filesJob.await(), favoritesJob.await()).also {
+                                "&batch_id=eq.$selectedBatch&status=eq.active&order=created_at.desc&limit=500")) }
+                        val favoritesJob = async {
+                            runCatching {
+                                rows(ClassMateAuthApi.rows("file_favorites",
+                                    "select=file_id&profile_id=eq.${profile().getString("id")}"))
+                                    .map { it.getString("file_id") }.toMutableSet()
+                            }.getOrDefault(mutableSetOf())
+                        }
+                        val offeringsList = offeringsJob.await()
+                        val activeOfferingIds = offeringsList.map { it.optString("id") }.toSet()
+                        val scopedFiles = if (semester == null) emptyList() else filesJob.await().filter {
+                            it.optString("semester_course_id") in activeOfferingIds
+                        }
+                        LibrarySnapshot(selectedBatch, offeringsList, coursesJob.await(),
+                            scopedFiles, favoritesJob.await()).also {
+                            loadedFromServer = true
                             librarySnapshot = it
                             saveLibraryCache(it)
                         }
@@ -9652,196 +9827,33 @@ internal class ClassMateAcademicScreensSupabase(
                 }
             }
 
-
-
-            val offerings = snapshot.offerings
-
-
-
-            if (snapshot.offerings.isEmpty() && active(root) && root.getTag(R.id.tvLibrarySubtitle) != "setup_prompted" &&
-
-
-
-                (profile().optString("role")=="admin" || profile().optBoolean("is_cr"))) {
-
-
-
-                root.setTag(R.id.tvLibrarySubtitle,"setup_prompted")
-
-
-
-                ClassMateCourses.prompt(activity,onConfigure)
-
-
-
+            val setupPrefs = activity.getSharedPreferences("cm_batch_setup_prefs", android.content.Context.MODE_PRIVATE)
+            val batchConfiguredKey = "batch_configured_$selectedBatch"
+            val profileId = profile().optString("id")
+            val promptedKey = "setup_prompted_${profileId}_$selectedBatch"
+            val isBatchConfigured = snapshot.offerings.isNotEmpty() || snapshot.courses.isNotEmpty() || snapshot.files.isNotEmpty()
+            if (loadedFromServer) {
+                setupPrefs.edit().putBoolean(batchConfiguredKey, isBatchConfigured).apply()
             }
 
+            val isCrOrAdmin = profile().optString("role") == "admin" || profile().optBoolean("is_cr")
+            val alreadyConfigured = isBatchConfigured || setupPrefs.getBoolean(batchConfiguredKey, false)
+            val alreadyPrompted = setupPrefs.getBoolean(promptedKey, false)
 
-
-            val courses = snapshot.courses
-
-
-
-            val files = snapshot.files
-
-
-
-            val favoriteIds = snapshot.favoriteIds
+            if (loadedFromServer &&
+                !alreadyConfigured &&
+                !alreadyPrompted &&
+                isCrOrAdmin &&
+                active(root) &&
+                root.getTag(R.id.tvLibrarySubtitle) != "setup_prompted"
+            ) {
+                root.setTag(R.id.tvLibrarySubtitle, "setup_prompted")
+                setupPrefs.edit().putBoolean(promptedKey, true).apply()
+                ClassMateCourses.prompt(activity, onConfigure)
+            }
 
             if (selectedBatch != batchId()) return@launch
-
-
-
-            val selectedFilter = libraryFilter
-
-
-
-            val selectedCategory = libraryCategory
-
-
-
-            val query = root.v<EditText>(R.id.etLibrarySearch).text.toString().trim()
-
-
-
-            val courseNames = offerings.associate { it.optString("id") to courses[it.optString("course_id")]?.optString("course_title").orEmpty() }
-
-
-
-            val visibleFiles = files.filter { file ->
-
-
-
-                (query.isBlank() || file.optString("title").contains(query, true) || courseNames[file.optString("semester_course_id")].orEmpty().contains(query, true))
-
-
-
-            }
-
-
-
-            updateLibraryFilterChips(root)
-
-
-
-            val isOnline = ClassMateAcademicCache.online(activity)
-            val subView = root.findViewById<TextView>(R.id.tvLibrarySubtitle)
-            if (!isOnline) {
-                subView?.visibility = View.VISIBLE
-                subView?.text = "Offline · Last synced"
-            } else {
-                subView?.visibility = View.GONE
-            }
-
-
-
-            root.v<View>(R.id.tvRecentEmpty).visibility = if (visibleFiles.isEmpty()) View.VISIBLE else View.GONE
-
-
-
-            recycler(root, R.id.rvRecent, R.layout.item_recent_pdf, if (query.isBlank()) visibleFiles.take(3) else visibleFiles) { card, file ->
-
-
-
-                bindLibraryFile(root, card, file, favoriteIds, courseNames)
-
-
-
-            }
-
-
-
-            val selected = offerings.mapNotNull { offering ->
-
-
-
-                courses[offering.optString("course_id")]?.let { course -> offering to course }
-
-
-
-            }.filter { it.second.optString("course_type") == selectedCategory && (query.isBlank() ||
-
-
-
-                it.second.optString("course_title").contains(query, true) || it.second.optString("course_code").contains(query, true) ||
-
-
-
-                visibleFiles.any { file -> file.optString("semester_course_id") == it.first.optString("id") }) }
-
-
-
-            val items = selected.map { pair -> JSONObject(pair.second.toString())
-
-
-
-                .put("offering_id", pair.first.getString("id")) }
-
-
-
-            root.v<View>(R.id.tvNoSubjectResults).visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-
-
-
-            text(root, R.id.tvLibrarySummary, "${items.size} courses")
-
-
-
-            listOf(R.id.rvRegular, R.id.rvLab, R.id.rvOther).forEach { root.v<View>(it).visibility = View.GONE }
-
-
-
-            val listId = if (selectedCategory == "lab") R.id.rvLab else R.id.rvRegular
-
-
-
-            root.v<View>(listId).visibility = View.VISIBLE
-
-
-
-            recycler(root, listId, R.layout.item_subject_card, items) { card, course ->
-
-
-
-                card.v<TextView>(R.id.tvSubjectName).text = ClassMateNoticeText.styled(card.v(R.id.tvSubjectName), course.optString("course_title"), query)
-
-
-
-                text(card, R.id.tvSubjectCode, course.optString("course_code"))
-
-
-
-                val count = visibleFiles.count { it.optString("semester_course_id") == course.optString("offering_id") }
-
-
-
-                text(card, R.id.tvPdfCount, if (count == 0) "No files" else "$count files")
-
-
-
-                card.setOnClickListener {
-
-
-
-                    onOpenCourse(course.optString("offering_id"), course.optString("course_title"),
-
-
-
-                        profile().optString("role") in setOf("admin", "teacher") ||
-
-
-
-                            profile().optBoolean("is_cr"))
-
-
-
-                }
-
-
-
-            }
-
-
+            renderLibrarySnapshot(root, snapshot)
 
         } finally {
             refresh.isRefreshing = false
@@ -9851,8 +9863,157 @@ internal class ClassMateAcademicScreensSupabase(
             if (libraryLoadingRoot === root) libraryLoadingRoot = null
         }
 
+    }
 
+    private fun renderLibrarySnapshot(root: View, snapshot: LibrarySnapshot) {
+        val offerings = snapshot.offerings
+        val courses = snapshot.courses
+        val files = snapshot.files
+        val favoriteIds = snapshot.favoriteIds
 
+        val selectedFilter = libraryFilter
+        val selectedCategory = libraryCategory
+        val query = root.v<EditText>(R.id.etLibrarySearch).text.toString().trim()
+
+        fun resolvedCourseTitle(offering: JSONObject, catalog: JSONObject): String =
+            offering.optString("title_override").takeIf { it.isNotBlank() && !it.equals("null", true) }
+                ?: catalog.optString("course_title")
+
+        fun resolvedCourseCode(offering: JSONObject, catalog: JSONObject): String =
+            offering.optString("code_override").takeIf { it.isNotBlank() && !it.equals("null", true) }
+                ?: catalog.optString("course_code")
+
+        val courseNames = offerings.associate { offering ->
+            val cat = courses[offering.optString("course_id")]
+            offering.optString("id") to (if (cat != null) resolvedCourseTitle(offering, cat) else "")
+        }
+
+        val visibleFiles = files.filter { file ->
+            val fileId = file.optString("id")
+            val cat = file.optString("category").trim().lowercase()
+            val matchesFilter = when (selectedFilter) {
+                "Notes" -> cat == "notes" || cat == "note"
+                "Slides" -> cat == "slides" || cat == "slide"
+                "Questions" -> cat == "questions" || cat == "question" || cat == "syllabus" ||
+                    file.optString("title").contains("question", true)
+                "Starred" -> fileId in favoriteIds
+                else -> true
+            }
+            val matchesQuery = query.isBlank() ||
+                file.optString("title").contains(query, true) ||
+                courseNames[file.optString("semester_course_id")].orEmpty().contains(query, true)
+            matchesFilter && matchesQuery
+        }
+
+        updateLibraryFilterChips(root)
+
+        val isOnline = ClassMateAcademicCache.online(activity)
+        val subView = root.findViewById<TextView>(R.id.tvLibrarySubtitle)
+        if (!isOnline) {
+            subView?.visibility = View.VISIBLE
+            subView?.text = "Offline · Last synced"
+        } else {
+            subView?.visibility = View.GONE
+        }
+
+        val recentEmptyView = root.v<TextView>(R.id.tvRecentEmpty)
+        recentEmptyView.visibility = if (visibleFiles.isEmpty()) View.VISIBLE else View.GONE
+        if (visibleFiles.isEmpty()) {
+            recentEmptyView.text = when {
+                query.isNotBlank() -> "No files match \"$query\""
+                selectedFilter != "All" -> "No ${selectedFilter.lowercase()} files uploaded yet"
+                else -> "Nothing new this week — course materials will appear here"
+            }
+        }
+
+        recycler(root, R.id.rvRecent, R.layout.item_recent_pdf, if (query.isBlank() && selectedFilter == "All") visibleFiles.take(3) else visibleFiles) { card, file ->
+            bindLibraryFile(root, card, file, favoriteIds, courseNames)
+        }
+
+        val selected = offerings.mapNotNull { offering ->
+            courses[offering.optString("course_id")]?.let { course -> offering to course }
+        }.filter { (offering, course) ->
+            val title = resolvedCourseTitle(offering, course)
+            val code = resolvedCourseCode(offering, course)
+            course.optString("course_type") == selectedCategory && (query.isBlank() ||
+                title.contains(query, true) || code.contains(query, true) ||
+                visibleFiles.any { file -> file.optString("semester_course_id") == offering.optString("id") })
+        }
+
+        val items = selected.map { (offering, course) ->
+            JSONObject(course.toString())
+                .put("offering_id", offering.getString("id"))
+                .put("course_title", resolvedCourseTitle(offering, course))
+                .put("course_code", resolvedCourseCode(offering, course))
+        }
+
+        root.v<View>(R.id.tvNoSubjectResults).visibility = View.GONE
+        root.findViewById<View>(R.id.emptySubjectsState)?.let { emptyBox ->
+            if (items.isEmpty()) {
+                val canConfigure = profile().optString("role") == "admin" || profile().optBoolean("is_cr")
+                when {
+                    query.isNotBlank() -> com.shuaib.classmate.utils.EmptyStateHelper.show(
+                        container = emptyBox,
+                        iconRes = R.drawable.ic_search_modern,
+                        title = "No courses match \"$query\"",
+                        subtitle = "Try a different course title or code, or clear your search.",
+                        actionText = "Clear Search",
+                        onAction = { root.v<EditText>(R.id.etLibrarySearch).setText("") }
+                    )
+                    offerings.isEmpty() && canConfigure -> com.shuaib.classmate.utils.EmptyStateHelper.show(
+                        container = emptyBox,
+                        iconRes = R.drawable.ic_library_outline,
+                        title = "No courses configured yet",
+                        subtitle = "Add your semester courses so classmates can access materials and attendance.",
+                        actionText = "Set Up Courses",
+                        onAction = { onConfigure() }
+                    )
+                    offerings.isEmpty() -> com.shuaib.classmate.utils.EmptyStateHelper.show(
+                        container = emptyBox,
+                        iconRes = R.drawable.ic_library_outline,
+                        title = "No courses added yet",
+                        subtitle = "Your CR hasn't set up the semester courses yet. Pull down to refresh.",
+                        actionText = "Refresh",
+                        onAction = { loadLibrary(root) }
+                    )
+                    else -> {
+                        val otherLabel = if (selectedCategory == "lab") "Theory" else "Lab"
+                        com.shuaib.classmate.utils.EmptyStateHelper.show(
+                            container = emptyBox,
+                            iconRes = R.drawable.ic_library_outline,
+                            title = "No ${if (selectedCategory == "lab") "lab" else "theory"} courses",
+                            subtitle = "No courses in this category yet. Switch to $otherLabel courses to view the rest.",
+                            actionText = "View $otherLabel Courses",
+                            onAction = {
+                                val targetId = if (selectedCategory == "lab") R.id.btnCategoryRegular else R.id.btnCategoryLab
+                                root.findViewById<View>(targetId)?.performClick()
+                            }
+                        )
+                    }
+                }
+            } else {
+                com.shuaib.classmate.utils.EmptyStateHelper.hide(emptyBox)
+            }
+        }
+
+        text(root, R.id.tvLibrarySummary, "${items.size} ${if (items.size == 1) "course" else "courses"}")
+
+        listOf(R.id.rvRegular, R.id.rvLab, R.id.rvOther).forEach { root.v<View>(it).visibility = View.GONE }
+
+        val listId = if (selectedCategory == "lab") R.id.rvLab else R.id.rvRegular
+        root.v<View>(listId).visibility = View.VISIBLE
+
+        recycler(root, listId, R.layout.item_subject_card, items) { card, course ->
+            card.v<TextView>(R.id.tvSubjectName).text = ClassMateNoticeText.styled(card.v(R.id.tvSubjectName), course.optString("course_title"), query)
+            text(card, R.id.tvSubjectCode, course.optString("course_code"))
+            val count = visibleFiles.count { it.optString("semester_course_id") == course.optString("offering_id") }
+            text(card, R.id.tvPdfCount, if (count == 0) "No files" else "$count ${if (count == 1) "file" else "files"}")
+            card.setOnClickListener {
+                onOpenCourse(course.optString("offering_id"), course.optString("course_title"),
+                    profile().optString("role") in setOf("admin", "teacher") ||
+                        profile().optBoolean("is_cr"))
+            }
+        }
     }
 
 
@@ -10019,33 +10180,29 @@ internal class ClassMateAcademicScreensSupabase(
 
                 launch(root) {
 
+                    runCatching {
 
+                        if (fileId in favorites) ClassMateAuthApi.delete("file_favorites",
 
-                    if (fileId in favorites) ClassMateAuthApi.delete("file_favorites",
+                            "profile_id=eq.${profile().getString("id")}&file_id=eq.$fileId")
 
+                        else ClassMateAuthApi.insert("file_favorites", JSONObject()
 
+                            .put("profile_id", profile().getString("id")).put("file_id", fileId))
 
-                        "profile_id=eq.${profile().getString("id")}&file_id=eq.$fileId")
+                        if (fileId in favorites) librarySnapshot?.favoriteIds?.remove(fileId)
 
+                        else librarySnapshot?.favoriteIds?.add(fileId)
 
+                        librarySnapshot?.let { saveLibraryCache(it) }
 
-                    else ClassMateAuthApi.insert("file_favorites", JSONObject()
+                    }.onFailure {
+                        android.widget.Toast.makeText(activity, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(it), android.widget.Toast.LENGTH_SHORT).show()
+                    }
 
-
-
-                        .put("profile_id", profile().getString("id")).put("file_id", fileId))
-
-
-
-                    if (fileId in favorites) librarySnapshot?.favoriteIds?.remove(fileId)
-
-
-
-                    else librarySnapshot?.favoriteIds?.add(fileId)
-
-
-
-                    if (active(root)) loadLibrary(root)
+                    if (active(root)) {
+                        librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) }
+                    }
 
 
 
@@ -10107,39 +10264,29 @@ internal class ClassMateAcademicScreensSupabase(
 
                     .setPositiveButton("Delete permanently") { _, _ -> launch(root) {
 
+                        runCatching {
 
+                            ClassMateAuthApi.deleteResource(fileId)
 
-                        ClassMateAuthApi.deleteResource(fileId)
+                            ClassMateAcademicCache.removeResourceNotice(activity, profile().optString("id"), batchId(), fileId)
 
+                            noticeFeed = noticeFeed.filterNot { it.optString("resource_id") == fileId }
 
+                            librarySnapshot?.let { snapshot ->
 
-                        ClassMateAcademicCache.removeResourceNotice(activity, profile().optString("id"), batchId(), fileId)
+                                val updated = snapshot.copy(files = snapshot.files.filterNot { it.optString("id") == fileId })
+                                librarySnapshot = updated
+                                saveLibraryCache(updated)
 
+                            }
 
-
-                        noticeFeed = noticeFeed.filterNot { it.optString("resource_id") == fileId }
-
-
-
-                        librarySnapshot?.let { snapshot ->
-
-
-
-                            librarySnapshot = snapshot.copy(files = snapshot.files.filterNot {
-
-
-
-                                it.optString("id") == fileId })
-
-
-
+                        }.onFailure {
+                            android.widget.Toast.makeText(activity, com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(it), android.widget.Toast.LENGTH_LONG).show()
                         }
 
-
-
-                        if (active(root)) loadLibrary(root)
-
-
+                        if (active(root)) {
+                            librarySnapshot?.takeIf { it.batchId == batchId() }?.let { renderLibrarySnapshot(root, it) }
+                        }
 
                     } }.setNegativeButton("Cancel", null).show()
 
@@ -10660,6 +10807,24 @@ internal class ClassMateAcademicScreensSupabase(
                                 val nRepo = com.shuaib.classmate.repositories.NoticeRepository.getInstance(activity)
                                 val nid = nRepo.publishSupabaseBatchNotice(bId, title, body)
                                 onCreated?.invoke(nid)
+                                noticeSyncedAt = 0L
+                                withContext(Dispatchers.Main) {
+                                    activity.findViewById<View>(R.id.rvNotices)?.let { rv ->
+                                        var p: android.view.ViewParent? = rv.parent
+                                        while (p is View && p.id != R.id.swipeRefresh) p = p.parent
+                                        (p as? View ?: root).let { noticeRoot ->
+                                            if (noticeRoot.isAttachedToWindow) loadNotices(noticeRoot)
+                                        }
+                                    }
+                                }
+                            }.onFailure { err ->
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        activity,
+                                        "Assessment saved, but notice failed: ${com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(err)}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
                             }
                         }
                     }
@@ -10676,7 +10841,7 @@ internal class ClassMateAcademicScreensSupabase(
                 },
                 courseFilesLookup = { courseId ->
                     val files = librarySnapshot?.files ?: emptyList()
-                    files.filter { it.optString("course_id") == courseId }
+                    files.filter { it.optString("semester_course_id") == courseId }
                 },
                 onOpenFile = { fileObj ->
                     openFile(fileObj)
@@ -11656,7 +11821,7 @@ fun openDirectNotice(noticeId: String) = launch(activity.window.decorView) {
 
                     }
 
-                    val canManageAttendance = isAdmin || isServerOwner
+                    val canManageAttendance = isAdmin || isServerOwner || canManage
 
 
 
@@ -12120,7 +12285,7 @@ fun openDirectNotice(noticeId: String) = launch(activity.window.decorView) {
 
 
 
-            val channelBlocked = android.os.Build.VERSION.SDK_INT >= 26 && activity.getSystemService(android.app.NotificationManager::class.java).getNotificationChannel("classmate_notifications")?.importance == android.app.NotificationManager.IMPORTANCE_NONE
+            val channelBlocked = com.shuaib.classmate.utils.ClassMateNotificationChannels.isGeneralChannelDisabled(activity)
 
 
 

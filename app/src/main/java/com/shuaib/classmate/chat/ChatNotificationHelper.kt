@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object ChatNotificationHelper {
-    const val CHANNEL_ID = "chat_messages"
+    const val CHANNEL_ID = com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_CHAT
     const val CHANNEL_NAME = "Chat Messages"
     const val GROUP_KEY = "com.shuaib.classmate.CHAT"
     const val REPLY_ACTION = "com.shuaib.classmate.REPLY_ACTION"
@@ -59,6 +59,7 @@ object ChatNotificationHelper {
                 }
             }
 
+            com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(context)
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_classmate_notification)
                 .setAutoCancel(true)
@@ -66,7 +67,8 @@ object ChatNotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setGroup(GROUP_KEY)
                 .setGroupSummary(false)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+                .setSound(com.shuaib.classmate.utils.ClassMateNotificationChannels.soundUri(context))
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

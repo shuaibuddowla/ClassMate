@@ -256,73 +256,7 @@ class ClassMateApp : Application() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(NotificationManager::class.java)
-
-            // Chat Channel
-            val chatChannel = NotificationChannel(
-                ChatNotificationHelper.CHANNEL_ID,
-                ChatNotificationHelper.CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "ClassMate chat message notifications"
-                enableLights(true)
-                enableVibration(true)
-                setShowBadge(true)
-            }
-
-            // General Notifications Channel
-            val generalChannel = NotificationChannel(
-                "classmate_notifications",
-                "ClassMate Notifications",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifications for class schedules, notices, and polls"
-            }
-
-            // Notices Channel
-            val noticesChannel = NotificationChannel(
-                "classmate_notices",
-                "ClassMate Notices",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifications for ClassMate updates"
-            }
-
-            // Cancellations Channel
-            val cancellationsChannel = NotificationChannel(
-                "classmate_cancellations",
-                "ClassMate Cancellations",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifications for cancelled classes"
-            }
-
-            // Library Uploads Channel
-            val libraryUploadsChannel = NotificationChannel(
-                com.shuaib.classmate.workers.LibraryUploadWorker.CHANNEL_ID,
-                "Library Uploads",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Progress notifications for background library file uploads"
-            }
-
-            // Assessments Channel
-            val assessmentsChannel = NotificationChannel(
-                "classmate_assessments",
-                "Upcoming Assessments & Deadlines",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Reminders for upcoming class tests, quizzes, and assignments"
-                enableLights(true)
-                enableVibration(true)
-                setShowBadge(true)
-            }
-
-            notificationManager.createNotificationChannels(
-                listOf(chatChannel, generalChannel, noticesChannel, cancellationsChannel, libraryUploadsChannel, assessmentsChannel)
-            )
-        }
+        com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(this)
     }
 
     private fun applyThemePreference(prefs: AppPreferences) {

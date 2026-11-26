@@ -73,6 +73,7 @@ sealed class FundDrawerMode {
     data class Remind(val campaignName: String) : FundDrawerMode()
     object NewCampaign : FundDrawerMode()
     data class TxDetail(val tx: FundTransactionItem) : FundDrawerMode()
+    data class EditTx(val tx: FundTransactionItem) : FundDrawerMode()
 }
 
 data class UndoAction(

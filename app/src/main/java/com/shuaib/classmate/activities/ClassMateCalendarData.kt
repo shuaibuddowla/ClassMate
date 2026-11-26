@@ -15,12 +15,68 @@ internal class ClassMateCalendarData(
     private val isRu: () -> Boolean = { false },
     private val user: () -> String
 ) {
-    private val refreshMutex = Mutex()
-    fun snapshot(year: Int) = ClassMateAcademicCache.read(context, user(), "university", "calendar_$year")
-    fun events(year: Int): List<JSONObject> {
-        val array = snapshot(year)?.optJSONArray("events") ?: JSONArray()
-        return (0 until array.length()).map(array::getJSONObject)
+    internal data class ParsedEvent(
+        val raw: JSONObject,
+        val start: LocalDate,
+        val end: LocalDate,
+        val scope: String,
+        val title: String,
+        val provisional: Boolean
+    ) {
+        fun includes(date: LocalDate): Boolean = !date.isBefore(start) && !date.isAfter(end)
     }
+
+    private data class CachedYear(
+        val snapshot: JSONObject?,
+        val events: List<ParsedEvent>
+    )
+
+    private val refreshMutex = Mutex()
+    private val memoryCache = mutableMapOf<Int, CachedYear>()
+    private var cachedUser: String? = null
+
+    private fun ensureUserCache(): MutableMap<Int, CachedYear> {
+        val currentUser = user()
+        if (cachedUser != currentUser) {
+            memoryCache.clear()
+            cachedUser = currentUser
+        }
+        return memoryCache
+    }
+
+    private fun loadYear(year: Int): CachedYear {
+        val cache = ensureUserCache()
+        cache[year]?.let { return it }
+        val snap = ClassMateAcademicCache.read(context, user(), "university", "calendar_$year")
+        val array = snap?.optJSONArray("events") ?: JSONArray()
+        val parsed = ArrayList<ParsedEvent>(array.length())
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val start = runCatching { LocalDate.parse(obj.getString("start_date")) }.getOrNull() ?: continue
+            val end = runCatching { LocalDate.parse(obj.getString("end_date")) }.getOrNull() ?: start
+            parsed.add(
+                ParsedEvent(
+                    raw = obj,
+                    start = start,
+                    end = end,
+                    scope = obj.optString("scope"),
+                    title = obj.optString("title"),
+                    provisional = obj.optBoolean("provisional")
+                )
+            )
+        }
+        return CachedYear(snap, parsed).also { cache[year] = it }
+    }
+
+    fun snapshot(year: Int): JSONObject? = loadYear(year).snapshot
+    fun events(year: Int): List<JSONObject> = loadYear(year).events.map { it.raw }
+    fun parsedEvents(year: Int): List<ParsedEvent> = loadYear(year).events
+
+    fun isFresh(year: Int): Boolean {
+        val snap = snapshot(year) ?: return false
+        return System.currentTimeMillis() - snap.optLong("saved_at") < 300_000
+    }
+
     suspend fun refresh(year: Int, force: Boolean = false) = refreshMutex.withLock {
         val old = snapshot(year)
         if (!ClassMateAcademicCache.online(context)) return@withLock
@@ -30,22 +86,30 @@ internal class ClassMateCalendarData(
         val publication = ClassMateAuthApi.rows("academic_calendar_publications", "select=title,notes,source_note&year=eq.$year&limit=1").optJSONObject(0)
         ClassMateAcademicCache.save(context, user(), "university", "calendar_$year",
             JSONObject().put("events", data).put("publication", publication).put("saved_at", System.currentTimeMillis()).put("synced_at", System.currentTimeMillis()))
+        ensureUserCache().remove(year)
     }
-    fun kindFor(date: LocalDate): String {
-        val today = events(date.year).filter { includes(it, date) }
+    fun kindFor(date: LocalDate, yearEvents: List<ParsedEvent> = parsedEvents(date.year), weekends: Set<DayOfWeek> = weekendDays()): String {
+        var calHoliday = false
+        var calWorking = false
+        for (ev in yearEvents) {
+            if (ev.includes(date)) {
+                if (ev.scope == "university") calHoliday = true
+                else if (ev.scope == "working_day") calWorking = true
+            }
+        }
         return ClassMateBusDays.kindFor(
             date,
-            calendarHoliday = today.any { it.optString("scope") == "university" },
-            calendarWorkingDay = today.any { it.optString("scope") == "working_day" },
-            weekendDays = weekendDays(),
+            calendarHoliday = calHoliday,
+            calendarWorkingDay = calWorking,
+            weekendDays = weekends,
             isRu = isRu()
         )
     }
-    fun classClosure(date: LocalDate): String? {
-        val matching = events(date.year).filter { includes(it, date) }
-        if (!ClassMateCalendarRules.classesClosed(date, matching.map { it.getString("scope") }.toSet(), weekendDays = weekendDays(), isRu = isRu())) return null
-        return matching.filter { it.getString("scope") in setOf("classes", "university") }
-            .map { it.getString("title") }.distinct().joinToString(" · ").ifBlank { "Weekly holiday" }
+    fun classClosure(date: LocalDate, yearEvents: List<ParsedEvent> = parsedEvents(date.year), weekends: Set<DayOfWeek> = weekendDays()): String? {
+        val matching = yearEvents.filter { it.includes(date) }
+        if (!ClassMateCalendarRules.classesClosed(date, matching.map { it.scope }.toSet(), weekendDays = weekends, isRu = isRu())) return null
+        return matching.filter { it.scope == "classes" || it.scope == "university" }
+            .map { it.title }.distinct().joinToString(" · ").ifBlank { "Weekly holiday" }
     }
     fun applyChange(saved: JSONObject?, previous: JSONObject?) {
         val bounds = listOfNotNull(saved, previous)
@@ -59,6 +123,7 @@ internal class ClassMateCalendarData(
                 if (saved != null && !LocalDate.parse(saved.getString("end_date")).isBefore(LocalDate.of(year, 1, 1)) &&
                     !LocalDate.parse(saved.getString("start_date")).isAfter(LocalDate.of(year, 12, 31))) kept.put(saved)
                 ClassMateAcademicCache.save(context, user(), "university", "calendar_$year", old.put("synced_at", old.optLong("synced_at", old.optLong("saved_at"))).put("events", kept).put("saved_at", 0L))
+                ensureUserCache().remove(year)
             }
         }
     }

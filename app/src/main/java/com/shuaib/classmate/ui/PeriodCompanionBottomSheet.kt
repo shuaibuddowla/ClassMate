@@ -33,7 +33,6 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.shuaib.classmate.R
 import com.shuaib.classmate.activities.MainActivity
-import com.shuaib.classmate.activities.TimetableManagementActivity
 import com.shuaib.classmate.data.remote.supabase.ClassMateAuthApi
 import com.shuaib.classmate.models.Period
 import kotlinx.coroutines.Dispatchers
@@ -237,15 +236,10 @@ object PeriodCompanionBottomSheet {
             }
 
             // 2. CR & Authorized Admin Action: Change Period Button
-            btnChangePeriod.isVisible = isAdmin
+            btnChangePeriod.isVisible = isAdmin && onChangePeriod != null
             btnChangePeriod.setOnClickListener {
                 dialog.dismiss()
-                if (onChangePeriod != null) {
-                    onChangePeriod.invoke()
-                } else {
-                    val intent = Intent(activity, TimetableManagementActivity::class.java)
-                    activity.startActivity(intent)
-                }
+                onChangePeriod?.invoke()
             }
 
             // Teacher summary initial preview
@@ -713,7 +707,6 @@ object PeriodCompanionBottomSheet {
             "chem" -> "Department of Chemistry"
             "eco" -> "Department of Economics"
             "acct" -> "Department of Accounting"
-            "fisheries" -> "Faculty of Fisheries"
             else -> if (code.isNotBlank()) code.uppercase(Locale.getDefault()) else "Academic Faculty"
         }
     }

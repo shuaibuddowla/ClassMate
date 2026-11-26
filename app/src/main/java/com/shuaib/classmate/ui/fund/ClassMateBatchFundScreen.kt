@@ -57,6 +57,7 @@ fun ClassMateBatchFundScreen(
     transactions: List<FundTransactionItem>,
     students: List<FundStudentDue>,
     currentUserId: String,
+    initialOpenAddFund: Boolean = false,
     onBackClick: () -> Unit,
     onShareReport: () -> Unit,
     onUpdatePurpose: (String) -> Unit,
@@ -65,6 +66,16 @@ fun ClassMateBatchFundScreen(
     onDirectCollectSingle: (student: FundStudentDue, campaignName: String, perStudent: Double) -> Unit,
     onToggleStudentUnpaid: (student: FundStudentDue, campaignName: String) -> Unit,
     onSaveTransaction: (
+        isDeposit: Boolean,
+        name: String,
+        studentId: String?,
+        studentProfileId: String?,
+        amount: Double,
+        method: String,
+        reason: String
+    ) -> Unit,
+    onUpdateTransaction: (
+        tx: FundTransactionItem,
         isDeposit: Boolean,
         name: String,
         studentId: String?,
@@ -124,7 +135,11 @@ fun ClassMateBatchFundScreen(
     var duesFilter by remember { mutableStateOf("unpaid") } // "unpaid", "paid", "all"
     var searchQuery by remember { mutableStateOf("") }
 
-    var drawerMode by remember { mutableStateOf<FundDrawerMode>(FundDrawerMode.None) }
+    var drawerMode by remember {
+        mutableStateOf<FundDrawerMode>(
+            if (initialOpenAddFund) FundDrawerMode.Record(txType = "deposit") else FundDrawerMode.None
+        )
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
@@ -811,8 +826,31 @@ fun ClassMateBatchFundScreen(
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         onClose = { drawerMode = FundDrawerMode.None },
+                        onEdit = { drawerMode = FundDrawerMode.EditTx(mode.tx) },
                         onDelete = {
                             onDeleteTransaction(mode.tx)
+                            drawerMode = FundDrawerMode.None
+                        }
+                    )
+                }
+                is FundDrawerMode.EditTx -> {
+                    val editTx = mode.tx
+                    AddFundRecordSheet(
+                        initialType = if (editTx.type == "outflow") "expense" else "deposit",
+                        prefillStudent = editTx.studentName ?: editTx.title,
+                        prefillTitle = editTx.campaign,
+                        editingTx = editTx,
+                        campaigns = campaigns,
+                        activeCampaign = activeCamp.name,
+                        students = students,
+                        isDark = isDark,
+                        surface2Bg = surface2Bg,
+                        borderColor = borderColor,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        onClose = { drawerMode = FundDrawerMode.None },
+                        onSave = { isDeposit, name, sId, pId, amt, method, reason ->
+                            onUpdateTransaction(editTx, isDeposit, name, sId, pId, amt, method, reason)
                             drawerMode = FundDrawerMode.None
                         }
                     )
@@ -845,18 +883,38 @@ private fun FintechWalletHeroCard(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF1C2042),
-                            Color(0xFF151830),
-                            Color(0xFF0E1120)
+                            Color(0xFF1E1B4B),
+                            Color(0xFF171C3A),
+                            Color(0xFF0F172A)
                         ),
                         start = Offset(0f, 0f),
                         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                     )
                 )
-                .padding(20.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Top Row: Available Balance + Privacy Toggle + Live Badge
+            // Subtle decorative ambient glow in top-right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 36.dp, y = (-36).dp)
+                    .size(148.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF6366F1).copy(alpha = 0.28f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                // Top Row: Available Balance + Privacy Toggle + Live & Entries Pill
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -864,11 +922,11 @@ private fun FintechWalletHeroCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Available Balance",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
+                            text = "AVAILABLE BALANCE",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
                             color = Color(0xFFC7D2FE).copy(alpha = 0.85f),
-                            letterSpacing = 0.3.sp
+                            letterSpacing = 0.9.sp
                         )
                         Spacer(Modifier.width(6.dp))
                         IconButton(
@@ -878,19 +936,19 @@ private fun FintechWalletHeroCard(
                             Icon(
                                 painter = painterResource(if (hideBalance) R.drawable.ic_fund_eye_off else R.drawable.ic_eye_outline),
                                 contentDescription = "Privacy toggle",
-                                tint = Color(0xFFC7D2FE).copy(alpha = 0.8f),
+                                tint = Color(0xFFC7D2FE).copy(alpha = 0.85f),
                                 modifier = Modifier.size(15.dp)
                             )
                         }
                     }
 
-                    // Live Pill
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.10f)
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.10f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
@@ -901,177 +959,199 @@ private fun FintechWalletHeroCard(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                text = "Live",
+                                text = "Live • ${summary.txCount} entries",
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF6EE7B7)
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFE0E7FF)
                             )
                         }
                     }
                 }
 
-                // Balance Numbers + Entries count
+                // Main Balance
                 Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Text(
-                        text = if (hideBalance) "৳ •••••" else formatTaka(summary.currentBalance),
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        lineHeight = 38.sp
-                    )
-                    Text(
-                        text = "${summary.txCount} entries",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFC7D2FE).copy(alpha = 0.7f),
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
-
-                // Cash vs Digital (bKash/Nagad) Mini Pills
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Cash Pill
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_fund_banknote),
-                                contentDescription = null,
-                                tint = Color(0xFF6EE7B7),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Cash ",
-                                fontSize = 11.sp,
-                                color = Color(0xFFE2E8F0)
-                            )
-                            Text(
-                                text = if (hideBalance) "••••" else formatTaka(summary.cashBalance),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    // MFS Pill
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_fund_smartphone),
-                                contentDescription = null,
-                                tint = Color(0xFFF472B6),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "MFS ",
-                                fontSize = 11.sp,
-                                color = Color(0xFFE2E8F0)
-                            )
-                            Text(
-                                text = if (hideBalance) "••••" else formatTaka(summary.mfsBalance),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-
-                // Inflow / Outflow Footer
-                Spacer(Modifier.height(14.dp))
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = Color.White.copy(alpha = 0.10f)
+                Text(
+                    text = if (hideBalance) "৳ •••••" else formatTaka(summary.currentBalance),
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    letterSpacing = (-0.8).sp,
+                    lineHeight = 42.sp
                 )
-                Spacer(Modifier.height(12.dp))
+
+                // Cash & MFS 2-column Breakdown Tiles
+                Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF10B981).copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_fund_banknote),
+                                    contentDescription = null,
+                                    tint = Color(0xFF6EE7B7),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Cash",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFC7D2FE).copy(alpha = 0.75f)
+                                )
+                                Text(
+                                    text = if (hideBalance) "••••" else formatTaka(summary.cashBalance),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFEC4899).copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_fund_smartphone),
+                                    contentDescription = null,
+                                    tint = Color(0xFFF472B6),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "MFS",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFC7D2FE).copy(alpha = 0.75f)
+                                )
+                                Text(
+                                    text = if (hideBalance) "••••" else formatTaka(summary.mfsBalance),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Inflow / Outflow 2-Column Interactive Bar
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
                         onClick = onFilterInflow,
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.06f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFF10B981).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFF34D399).copy(alpha = 0.22f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_fund_arrow_down_left),
-                                contentDescription = null,
-                                tint = Color(0xFF6EE7B7),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(Modifier.width(5.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_fund_arrow_down_left),
+                                    contentDescription = null,
+                                    tint = Color(0xFF6EE7B7),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = "Inflow",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFA7F3D0)
+                                )
+                            }
                             Text(
-                                text = "In ",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF6EE7B7)
-                            )
-                            Text(
-                                text = formatTaka(summary.totalCollected),
+                                text = if (hideBalance) "••••" else formatTaka(summary.totalCollected),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF6EE7B7)
+                                color = Color(0xFF6EE7B7),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
                     Surface(
                         onClick = onFilterOutflow,
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.06f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFFF43F5E).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFFFB7185).copy(alpha = 0.22f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_fund_arrow_up_right),
-                                contentDescription = null,
-                                tint = Color(0xFFFDA4AF),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(Modifier.width(5.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_fund_arrow_up_right),
+                                    contentDescription = null,
+                                    tint = Color(0xFFFDA4AF),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = "Outflow",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFFECDD3)
+                                )
+                            }
                             Text(
-                                text = "Out ",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFFDA4AF)
-                            )
-                            Text(
-                                text = formatTaka(summary.totalSpent),
+                                text = if (hideBalance) "••••" else formatTaka(summary.totalSpent),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFDA4AF)
+                                color = Color(0xFFFDA4AF),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -1467,17 +1547,26 @@ private fun CampaignSlideCard(
     val unpaidCount = (camp.total - camp.paid).coerceAtLeast(0)
     val target = camp.total * camp.perStudent
     val pct = if (camp.total > 0) ((camp.paid * 100) / camp.total).coerceIn(0, 100) else 0
+    val accentColor = Color(camp.colorHex)
 
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = surfaceBg,
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = if (isDark) 0.28f else 0.18f)),
         shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = if (isDark) 0.12f else 0.06f),
+                            Color.Transparent
+                        )
+                    )
+                )
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -1494,15 +1583,28 @@ private fun CampaignSlideCard(
                     // Small Category Tag
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF6366F1).copy(alpha = 0.12f)
+                        color = accentColor.copy(alpha = 0.14f)
                     ) {
                         Text(
                             text = "COLLECTION",
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6366F1),
+                            color = accentColor,
                             letterSpacing = 0.6.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = surface2Bg
+                    ) {
+                        Text(
+                            text = "Details below ↓",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textSecondary,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                         )
                     }
 
@@ -1519,7 +1621,7 @@ private fun CampaignSlideCard(
                                     text = "+",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF6366F1)
+                                    color = accentColor
                                 )
                             }
                         }
@@ -1529,13 +1631,13 @@ private fun CampaignSlideCard(
                 // Percentage Badge
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF6366F1).copy(alpha = 0.12f)
+                    color = accentColor.copy(alpha = 0.14f)
                 ) {
                     Text(
                         text = "$pct%",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF6366F1),
+                        color = accentColor,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                     )
                 }
@@ -1545,8 +1647,8 @@ private fun CampaignSlideCard(
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text = camp.name,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1557,9 +1659,9 @@ private fun CampaignSlideCard(
                 ) {
                     Text(
                         text = formatTaka(camp.collected),
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = textPrimary
+                        color = accentColor
                     )
                     Text(
                         text = "of ${formatTaka(target)}",
@@ -1596,7 +1698,7 @@ private fun CampaignSlideCard(
                         .clip(CircleShape)
                         .background(
                             Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFF34D399))
+                                colors = listOf(accentColor, accentColor.copy(alpha = 0.78f), Color(0xFF34D399))
                             )
                         )
                 )
@@ -1630,7 +1732,7 @@ private fun CampaignSlideCard(
                 Surface(
                     onClick = onActionClick,
                     shape = CircleShape,
-                    color = Color(0xFF6366F1).copy(alpha = 0.12f)
+                    color = accentColor.copy(alpha = 0.14f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
@@ -1641,12 +1743,12 @@ private fun CampaignSlideCard(
                             text = if (isCr) "Quick Collect" else "View dues",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6366F1)
+                            color = accentColor
                         )
                         Icon(
                             painter = painterResource(R.drawable.ic_chevron_right),
                             contentDescription = null,
-                            tint = Color(0xFF6366F1),
+                            tint = accentColor,
                             modifier = Modifier.size(13.dp)
                         )
                     }
@@ -2476,6 +2578,7 @@ private fun AddFundRecordSheet(
     initialType: String,
     prefillStudent: String?,
     prefillTitle: String?,
+    editingTx: FundTransactionItem? = null,
     campaigns: List<FundCampaignItem>,
     activeCampaign: String,
     students: List<FundStudentDue>,
@@ -2498,9 +2601,65 @@ private fun AddFundRecordSheet(
     var txType by remember { mutableStateOf(initialType) }
     val isDep = txType == "deposit"
     var nameInput by remember { mutableStateOf(prefillStudent ?: "") }
-    var amountInput by remember { mutableStateOf("") }
-    var method by remember { mutableStateOf("Cash") }
-    var reasonInput by remember { mutableStateOf(prefillTitle ?: activeCampaign) }
+    var selectedStudent by remember {
+        mutableStateOf(
+            if (editingTx != null && editingTx.type != "outflow") {
+                students.firstOrNull {
+                    (!editingTx.studentProfileId.isNullOrBlank() && it.profileId == editingTx.studentProfileId) ||
+                        (!editingTx.studentId.isNullOrBlank() && it.studentId.equals(editingTx.studentId, ignoreCase = true)) ||
+                        it.fullName.equals(editingTx.studentName ?: editingTx.title, ignoreCase = true)
+                }
+            } else {
+                prefillStudent?.trim()?.takeIf { it.isNotEmpty() }?.let { pre ->
+                    students.firstOrNull {
+                        it.fullName.equals(pre, ignoreCase = true) ||
+                            it.studentId.equals(pre, ignoreCase = true)
+                    }
+                }
+            }
+        )
+    }
+    var amountInput by remember {
+        mutableStateOf(
+            editingTx?.amount?.takeIf { it > 0 }?.let { amt ->
+                if (amt % 1.0 == 0.0) amt.toInt().toString() else amt.toString()
+            } ?: ""
+        )
+    }
+    var method by remember { mutableStateOf(editingTx?.method ?: "Cash") }
+    val defaultCampaignName = remember(campaigns, activeCampaign) {
+        campaigns.firstOrNull()?.name ?: activeCampaign
+    }
+    var reasonInput by remember { mutableStateOf(prefillTitle ?: defaultCampaignName) }
+
+    val matchingStudents = remember(nameInput, students, selectedStudent, isDep) {
+        val q = nameInput.trim().lowercase()
+        if (!isDep || q.isEmpty() || selectedStudent != null) {
+            emptyList()
+        } else {
+            students.mapNotNull { s ->
+                val fullLower = s.fullName.lowercase()
+                val sidLower = s.studentId.lowercase()
+                val words = fullLower.split(' ', '-', '.', '_')
+                val wordPrefix = words.any { it.startsWith(q) }
+                val idPrefix = sidLower.startsWith(q)
+                val anyContains = fullLower.contains(q) || sidLower.contains(q)
+                when {
+                    fullLower.startsWith(q) || idPrefix -> 0 to s
+                    wordPrefix -> 1 to s
+                    anyContains -> 2 to s
+                    else -> null
+                }
+            }
+                .sortedWith(compareBy<Pair<Int, FundStudentDue>> { it.first }.thenBy { it.second.fullName.lowercase() })
+                .map { it.second }
+                .take(6)
+        }
+    }
+
+    val activeCampId = remember(reasonInput, campaigns) {
+        campaigns.firstOrNull { it.name.equals(reasonInput.trim(), ignoreCase = true) }?.id
+    }
 
     Column(
         modifier = Modifier
@@ -2514,7 +2673,11 @@ private fun AddFundRecordSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (isDep) "Add Fund" else "Record Expense",
+                text = when {
+                    editingTx != null -> "Edit Transaction"
+                    isDep -> "Add Fund"
+                    else -> "Record Expense"
+                },
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary
@@ -2585,12 +2748,131 @@ private fun AddFundRecordSheet(
             )
             OutlinedTextField(
                 value = nameInput,
-                onValueChange = { nameInput = it },
-                placeholder = { Text(if (isDep) "Search student or type name..." else "e.g. Tour Bus Rent, Banner Print", fontSize = 12.sp) },
+                onValueChange = { newVal ->
+                    nameInput = newVal
+                    if (selectedStudent != null && !selectedStudent!!.fullName.equals(newVal.trim(), ignoreCase = true)) {
+                        selectedStudent = null
+                    }
+                },
+                placeholder = { Text(if (isDep) "Search student or type ID..." else "e.g. Tour Bus Rent, Banner Print", fontSize = 12.sp) },
+                leadingIcon = if (isDep) {
+                    {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_search_modern),
+                            contentDescription = null,
+                            tint = if (selectedStudent != null) Color(0xFF10B981) else textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else null,
+                trailingIcon = if (nameInput.isNotEmpty()) {
+                    {
+                        IconButton(
+                            onClick = {
+                                nameInput = ""
+                                selectedStudent = null
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_close),
+                                contentDescription = "Clear",
+                                tint = textSecondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                } else null,
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // Live Word-by-Word Student Suggestions
+            if (matchingStudents.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = surface2Bg,
+                    border = BorderStroke(1.dp, borderColor),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        matchingStudents.forEachIndexed { idx, s ->
+                            if (idx > 0) {
+                                HorizontalDivider(thickness = 0.5.dp, color = borderColor.copy(alpha = 0.6f))
+                            }
+                            val isPaidForCamp = activeCampId != null && s.paidMap[activeCampId] == true
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedStudent = s
+                                        nameInput = s.fullName
+                                        if (amountInput.isBlank()) {
+                                            val campAmt = campaigns.firstOrNull {
+                                                it.name.equals(reasonInput.trim(), ignoreCase = true)
+                                            }?.perStudent ?: 0.0
+                                            if (campAmt > 0) {
+                                                amountInput = if (campAmt % 1.0 == 0.0) campAmt.toInt().toString() else campAmt.toString()
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF6366F1).copy(alpha = 0.14f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = s.fullName.trim().take(1).uppercase().ifEmpty { "?" },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6366F1)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = s.fullName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (s.studentId.isNotBlank()) {
+                                        Text(
+                                            text = "ID: ${s.studentId}",
+                                            fontSize = 11.sp,
+                                            color = textSecondary
+                                        )
+                                    }
+                                }
+                                if (activeCampId != null) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isPaidForCamp) Color(0xFF10B981).copy(alpha = 0.14f) else Color(0xFFF59E0B).copy(alpha = 0.14f)
+                                    ) {
+                                        Text(
+                                            text = if (isPaidForCamp) "Paid" else "Due",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isPaidForCamp) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Amount Input + Quick Chips + Method
@@ -2659,39 +2941,41 @@ private fun AddFundRecordSheet(
             }
         }
 
-        // Campaign / Tag
-        Column {
-            Text(
-                text = "Campaign / Tag",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textSecondary,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            OutlinedTextField(
-                value = reasonInput,
-                onValueChange = { reasonInput = it },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
+        // Campaign / Tag (Deposits only — Expenses can be for anything)
+        if (isDep) {
+            Column {
+                Text(
+                    text = "Campaign / Tag",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textSecondary,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                OutlinedTextField(
+                    value = reasonInput,
+                    onValueChange = { reasonInput = it },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(campaigns) { c ->
-                    val sel = reasonInput.equals(c.name, ignoreCase = true)
-                    Surface(
-                        onClick = { reasonInput = c.name },
-                        shape = CircleShape,
-                        color = if (sel) Color(0xFF6366F1) else surface2Bg
-                    ) {
-                        Text(
-                            text = c.name,
-                            fontSize = 11.sp,
-                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                            color = if (sel) Color.White else textSecondary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(campaigns) { c ->
+                        val sel = reasonInput.equals(c.name, ignoreCase = true)
+                        Surface(
+                            onClick = { reasonInput = c.name },
+                            shape = CircleShape,
+                            color = if (sel) Color(0xFF6366F1) else surface2Bg
+                        ) {
+                            Text(
+                                text = c.name,
+                                fontSize = 11.sp,
+                                fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (sel) Color.White else textSecondary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -2702,10 +2986,12 @@ private fun AddFundRecordSheet(
             onClick = {
                 val amt = amountInput.toDoubleOrNull() ?: 0.0
                 if (nameInput.isNotBlank() && amt > 0) {
-                    val matchedStudent = students.firstOrNull {
-                        it.fullName.equals(nameInput.trim(), ignoreCase = true) ||
-                        it.studentId.equals(nameInput.trim(), ignoreCase = true)
-                    }
+                    val matchedStudent = if (isDep) {
+                        selectedStudent ?: students.firstOrNull {
+                            it.fullName.equals(nameInput.trim(), ignoreCase = true) ||
+                                it.studentId.equals(nameInput.trim(), ignoreCase = true)
+                        }
+                    } else null
                     onSave(
                         isDep,
                         matchedStudent?.fullName ?: nameInput.trim(),
@@ -2713,7 +2999,7 @@ private fun AddFundRecordSheet(
                         matchedStudent?.profileId,
                         amt,
                         method,
-                        reasonInput.trim().ifBlank { "Batch Fund" }
+                        if (isDep) reasonInput.trim().ifBlank { "Batch Fund" } else "Batch Fund"
                     )
                 }
             },
@@ -2723,7 +3009,12 @@ private fun AddFundRecordSheet(
                 .fillMaxWidth()
                 .height(48.dp)
         ) {
-            Text("Save Transaction", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(
+                text = if (editingTx != null) "Update Transaction" else "Save Transaction",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
         }
 
         Spacer(Modifier.height(16.dp))
@@ -3066,10 +3357,9 @@ private fun TransactionDetailReceiptSheet(
     textPrimary: Color,
     textSecondary: Color,
     onClose: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
     val isExp = tx.type == "outflow"
 
     Column(
@@ -3114,30 +3404,21 @@ private fun TransactionDetailReceiptSheet(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = {
-                    val receipt = """
-                        🧾 Batch Fund Receipt
-                        Title: ${tx.title}
-                        Amount: ${formatTaka(tx.amount)}
-                        Campaign: ${tx.campaign}
-                        Method: ${tx.method}
-                        Date: ${tx.formattedDate.ifBlank { tx.dateStr }}
-                    """.trimIndent()
-                    clipboardManager.setText(AnnotatedString(receipt))
-                    android.widget.Toast.makeText(context, "Receipt copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
-                },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f).height(44.dp)
+        if (isCr || tx.canEdit) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Copy Receipt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
+                OutlinedButton(
+                    onClick = onEdit,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Color(0xFF6366F1).copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF6366F1)),
+                    modifier = Modifier.weight(1f).height(44.dp)
+                ) {
+                    Text("Edit", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
 
-            if (isCr || tx.canEdit) {
                 Button(
                     onClick = onDelete,
                     shape = RoundedCornerShape(14.dp),
@@ -3146,6 +3427,14 @@ private fun TransactionDetailReceiptSheet(
                 ) {
                     Text("Void / Delete", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
+            }
+        } else {
+            OutlinedButton(
+                onClick = onClose,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Text("Close", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
             }
         }
 

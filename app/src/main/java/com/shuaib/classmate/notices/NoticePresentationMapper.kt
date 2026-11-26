@@ -27,7 +27,8 @@ object NoticePresentationMapper {
         currentUserId: String,
         currentRole: String,
         isCr: Boolean,
-        highlightedId: String? = null
+        highlightedId: String? = null,
+        resourcesMap: Map<String, JSONObject> = emptyMap()
     ): NoticePresentationModel {
         val id = item.optString("id")
         val rawTitle = item.optString("title")
@@ -53,6 +54,9 @@ object NoticePresentationMapper {
 
         // 4. Category / Type
         val resourceId = item.optString("resource_id").takeUnless { it.isBlank() || it == "null" }
+        val resObj = resourcesMap[id]
+        val resourceFileType = resObj?.optString("file_type")?.takeUnless { it.isBlank() || it == "null" }
+        val resourceLinkUrl = resObj?.optString("link_url")?.takeUnless { it.isBlank() || it == "null" }
         val classChangeId = item.optString("class_change_id").takeUnless { it.isBlank() || it == "null" }
         val isResource = resourceId != null || rawTitle.contains("Resource:", ignoreCase = true)
         val isCancellation = !isResource && (classChangeId != null || rawTitle.contains("Cancelled", ignoreCase = true) || rawTitle.contains("Class Cancel", ignoreCase = true))
@@ -102,9 +106,9 @@ object NoticePresentationMapper {
                 id = att.optString("id"),
                 storageKey = att.optString("storage_key"),
                 fileName = att.optString("file_name").ifBlank { "Attachment" },
-                fileType = att.optString("file_type"),
+                fileType = att.optString("mime_type").ifBlank { att.optString("file_type") },
                 url = att.optString("url"),
-                sizeBytes = att.optLong("file_size", 0L)
+                sizeBytes = if (att.has("size_bytes")) att.optLong("size_bytes", 0L) else att.optLong("file_size", 0L)
             )
         }
 
@@ -125,6 +129,8 @@ object NoticePresentationMapper {
             isPoll = isPoll,
             assessmentId = assessmentId,
             resourceId = resourceId,
+            resourceFileType = resourceFileType,
+            resourceLinkUrl = resourceLinkUrl,
             classChangeId = classChangeId,
             isReadByMe = isReadByMe,
             readCount = readCount,
@@ -150,6 +156,7 @@ object NoticePresentationMapper {
         if (id.isBlank()) return null
         val question = pollJson.optString("question")
         val isMultipleChoice = pollJson.optBoolean("is_multiple_choice", false)
+        val isAnonymous = pollJson.optBoolean("is_anonymous", false)
         val isClosed = pollJson.optBoolean("is_closed", false)
         val totalVotes = pollJson.optInt("total_votes", 0)
         val totalVoters = pollJson.optInt("total_voters", 0)
@@ -191,10 +198,11 @@ object NoticePresentationMapper {
             noticeId = noticeId,
             question = question,
             isMultipleChoice = isMultipleChoice,
+            isAnonymous = isAnonymous,
             isClosed = isClosed,
             totalVoters = totalVoters,
             totalVotes = totalVotes,
-            canViewVotes = totalVotes > 0,
+            canViewVotes = totalVotes > 0 && !isAnonymous,
             mySelectedOptionIds = mySelectedOptionIds,
             options = optionsList
         )

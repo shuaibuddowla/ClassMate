@@ -58,7 +58,7 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "AssessmentReminder"
         const val PREFS_NAME = "classmate_assessment_alarms"
-        const val CHANNEL_ID = "classmate_assessments"
+        const val CHANNEL_ID = com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_ASSESSMENTS
 
         fun notificationTag(assessmentId: String, reminderType: String): String {
             return "asmt_${assessmentId}_$reminderType"
@@ -155,6 +155,7 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(context)
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_classmate_notification)
                 .setContentTitle(notifTitle)
@@ -163,7 +164,8 @@ class ClassMateAssessmentReminderReceiver : BroadcastReceiver() {
                 .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+                .setSound(com.shuaib.classmate.utils.ClassMateNotificationChannels.soundUri(context))
                 .build()
 
             val notifTag = notificationTag(assessmentId, reminderType)

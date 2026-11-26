@@ -143,7 +143,7 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadFiles(showShimmer: Boolean) = lifecycleScope.launch {
+    private fun loadFiles(showShimmer: Boolean): kotlinx.coroutines.Job = lifecycleScope.launch {
         val cacheScope = if (courseId.isBlank()) "batch_$batchId" else "course_$courseId"
 
         // Restore cached files immediately for instant 0ms offline display
@@ -225,8 +225,23 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
                 } else {
                     binding.tvFileCount.text = "Offline · No connection"
                     val safeMsg = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(error)
-                    Toast.makeText(this@ClassMateCourseFilesActivity, safeMsg, Toast.LENGTH_SHORT).show()
+                    binding.rvFiles.isVisible = false
+                    binding.layoutEmptyState.isVisible = true
+                    binding.tvEmptyTitle.text = "Unable to load files"
+                    binding.tvEmptySubtitle.text = safeMsg
+                    setEmptyButtonLabel("Try Again", R.drawable.ic_refresh)
+                    binding.btnEmptyAddFile.isVisible = true
+                    binding.btnEmptyAddFile.applyClickAnimation { loadFiles(showShimmer = true) }
                 }
+            }
+        }
+    }
+
+    private fun setEmptyButtonLabel(label: String, @androidx.annotation.DrawableRes iconRes: Int) {
+        for (i in 0 until binding.btnEmptyAddFile.childCount) {
+            when (val child = binding.btnEmptyAddFile.getChildAt(i)) {
+                is android.widget.ImageView -> child.setImageResource(iconRes)
+                is android.widget.TextView -> child.text = label
             }
         }
     }
@@ -248,15 +263,19 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             if (files.isEmpty()) {
                 binding.tvEmptyTitle.text = "No files uploaded yet"
                 binding.tvEmptySubtitle.text = "Materials, slides, and notes for this course will appear here."
+                setEmptyButtonLabel("Add file", R.drawable.ic_add)
                 binding.btnEmptyAddFile.isVisible = canUpload
+                binding.btnEmptyAddFile.applyClickAnimation { openUploadFile() }
             } else {
                 binding.tvEmptyTitle.text = "No matching files"
                 binding.tvEmptySubtitle.text = "No files matching \"$search\" were found in this course."
-                binding.btnEmptyAddFile.isVisible = false
+                setEmptyButtonLabel("Clear Search", R.drawable.ic_close)
+                binding.btnEmptyAddFile.isVisible = true
+                binding.btnEmptyAddFile.applyClickAnimation { binding.etSearch.setText("") }
             }
         }
 
-        adapter.notifyDataSetChanged()
+        adapter.submitFiles(filtered, search)
     }
 
     private fun openUploadFile() {
@@ -353,7 +372,26 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             .show()
     }
 
-    private inner class FileAdapter : RecyclerView.Adapter<FileAdapter.Holder>() {
+    private inner class FileAdapter : androidx.recyclerview.widget.ListAdapter<JSONObject, FileAdapter.Holder>(
+        object : androidx.recyclerview.widget.DiffUtil.ItemCallback<JSONObject>() {
+            override fun areItemsTheSame(oldItem: JSONObject, newItem: JSONObject): Boolean =
+                oldItem.optString("id") == newItem.optString("id")
+
+            override fun areContentsTheSame(oldItem: JSONObject, newItem: JSONObject): Boolean =
+                oldItem.toString() == newItem.toString()
+        }
+    ) {
+        private var lastQuery: String = ""
+
+        fun submitFiles(items: List<JSONObject>, query: String) {
+            val queryChanged = query != lastQuery
+            lastQuery = query
+            submitList(items.toList()) {
+                if (queryChanged && itemCount > 0) {
+                    notifyItemRangeChanged(0, itemCount)
+                }
+            }
+        }
 
         inner class Holder(val itemBinding: ItemCourseFileBinding) : RecyclerView.ViewHolder(itemBinding.root)
 
@@ -364,10 +402,8 @@ class ClassMateCourseFilesActivity : AppCompatActivity() {
             return Holder(itemBinding)
         }
 
-        override fun getItemCount() = filtered.size
-
         override fun onBindViewHolder(holder: Holder, position: Int) {
-            val file = filtered[position]
+            val file = getItem(position)
             val b = holder.itemBinding
 
             val title = file.optString("title")

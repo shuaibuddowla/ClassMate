@@ -305,6 +305,181 @@ object ClassMateAuthApi {
         notificationPrefs()?.getString("profile", null)?.let(::JSONObject)
     }.getOrNull()
 
+    fun currentAuthUid(): String? {
+        val token = accessToken
+        if (!token.isNullOrBlank()) {
+            val parts = token.split('.')
+            if (parts.size >= 2) {
+                val sub = runCatching {
+                    val decoded = android.util.Base64.decode(
+                        parts[1],
+                        android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING
+                    )
+                    JSONObject(String(decoded, Charsets.UTF_8)).optString("sub").takeIf { it.isNotBlank() }
+                }.getOrNull()
+                if (!sub.isNullOrBlank()) return sub
+            }
+        }
+        return notificationIdentity()?.optString("id")?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun uploadStagedNoticeAttachment(
+        context: Context,
+        uri: Uri,
+        fileName: String,
+        mimeType: String,
+        sizeHint: Long = 0L,
+        onProgress: (Int) -> Unit = {}
+    ): JSONObject = withContext(Dispatchers.IO) {
+        check(configured) { "Supabase URL or public key is missing" }
+        refreshIfNeeded()
+        val token = accessToken ?: throw IOException("Session expired; sign in again")
+        val uid = currentAuthUid() ?: throw IOException("User identity unavailable; sign in again")
+
+        val safeName = fileName.ifBlank { "attachment" }
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .take(160)
+
+        var tempFile: java.io.File? = null
+        var uploadMimeType = mimeType
+        var uploadFileName = if (mimeType == "application/pdf" && !safeName.endsWith(".pdf", ignoreCase = true)) {
+            "$safeName.pdf"
+        } else {
+            safeName
+        }
+        try {
+            if (mimeType.startsWith("image/") && mimeType != "image/gif") {
+                val compressed = compressNoticeImageToTempFile(context, uri, mimeType)
+                if (compressed != null && compressed.file.length() > 0L && (sizeHint <= 0L || compressed.file.length() < sizeHint)) {
+                    tempFile = compressed.file
+                    uploadMimeType = compressed.mimeType
+                    if (!uploadFileName.endsWith(".jpg", ignoreCase = true) && !uploadFileName.endsWith(".jpeg", ignoreCase = true)) {
+                        uploadFileName = uploadFileName.substringBeforeLast('.') + ".jpg"
+                    }
+                } else {
+                    compressed?.file?.delete()
+                }
+            }
+
+            val resolvedSize = when {
+                tempFile != null -> tempFile.length()
+                sizeHint > 0L -> sizeHint
+                else -> {
+                    val tmp = java.io.File.createTempFile("notice_att_", ".tmp", context.cacheDir)
+                    tempFile = tmp
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        tmp.outputStream().use { output -> input.copyTo(output) }
+                    } ?: throw IOException("Unable to read selected attachment.")
+                    tmp.length()
+                }
+            }
+            require(resolvedSize in 1L..104_857_600L) { "File must be 100 MB or smaller." }
+
+            val body = object : okhttp3.RequestBody() {
+                override fun contentType() = uploadMimeType.toMediaType()
+                override fun contentLength() = resolvedSize
+                override fun writeTo(sink: BufferedSink) {
+                    val stream = tempFile?.inputStream() ?: context.contentResolver.openInputStream(uri)
+                        ?: throw IOException("Unable to read selected attachment.")
+                    stream.use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        var sent = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            sink.write(buffer, 0, count)
+                            sent += count
+                            onProgress(((sent * 100L) / resolvedSize).toInt().coerceIn(0, 100))
+                        }
+                        sink.flush()
+                    }
+                }
+            }
+
+            val finalStorageKey = "pending/$uid/${java.util.UUID.randomUUID()}/$uploadFileName"
+            val encodedKey = finalStorageKey.split('/').joinToString("/") {
+                URLEncoder.encode(it, "UTF-8").replace("+", "%20")
+            }
+            val request = Request.Builder()
+                .url("$base/storage/v1/object/notice-images/$encodedKey")
+                .header("apikey", key)
+                .header("Authorization", "Bearer $token")
+                .header("Content-Type", uploadMimeType)
+                .header("x-upsert", "true")
+                .post(body)
+                .build()
+
+            uploadHttp.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errText = response.body?.string().orEmpty()
+                    val detail = runCatching { JSONObject(errText).optString("message") }.getOrNull()
+                    throw IOException(detail?.takeIf { it.isNotBlank() } ?: "Attachment upload failed (HTTP ${response.code}).")
+                }
+            }
+
+            JSONObject()
+                .put("storage_key", finalStorageKey)
+                .put("file_name", uploadFileName)
+                .put("mime_type", uploadMimeType)
+                .put("size_bytes", resolvedSize)
+        } finally {
+            tempFile?.delete()
+        }
+    }
+
+    private data class CompressedImageResult(val file: java.io.File, val mimeType: String)
+
+    private fun compressNoticeImageToTempFile(context: Context, uri: Uri, mimeType: String): CompressedImageResult? = runCatching {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        val srcW = bounds.outWidth
+        val srcH = bounds.outHeight
+        if (srcW <= 0 || srcH <= 0) return null
+
+        val maxDim = 1920
+        var sampleSize = 1
+        while (srcW / sampleSize > maxDim * 2 || srcH / sampleSize > maxDim * 2) {
+            sampleSize *= 2
+        }
+
+        val decodeOpts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        var bitmap = context.contentResolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, decodeOpts)
+        } ?: return null
+
+        // Preserve EXIF orientation
+        val orientation = runCatching {
+            context.contentResolver.openInputStream(uri)?.use {
+                androidx.exifinterface.media.ExifInterface(it)
+                    .getAttributeInt(androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION, androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL)
+            }
+        }.getOrNull() ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+        val matrix = android.graphics.Matrix()
+        when (orientation) {
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        }
+        val maxSide = maxOf(bitmap.width, bitmap.height)
+        if (maxSide > maxDim) {
+            val scale = maxDim.toFloat() / maxSide.toFloat()
+            matrix.postScale(scale, scale)
+        }
+        if (!matrix.isIdentity) {
+            val transformed = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (transformed != bitmap) bitmap.recycle()
+            bitmap = transformed
+        }
+
+        val outFile = java.io.File.createTempFile("notice_cmp_", ".jpg", context.cacheDir)
+        outFile.outputStream().use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+        }
+        bitmap.recycle()
+        CompressedImageResult(outFile, "image/jpeg")
+    }.getOrNull()
+
     fun signOut() {
         accessToken = null
         refreshToken = null

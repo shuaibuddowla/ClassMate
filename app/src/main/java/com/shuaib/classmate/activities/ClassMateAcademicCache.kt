@@ -63,24 +63,17 @@ internal object ClassMateAcademicCache {
             }
             if (days.isNotEmpty()) return days
         }
-        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
-        return if (email.endsWith("@ru.ac.bd")) {
-            setOf(java.time.DayOfWeek.FRIDAY, java.time.DayOfWeek.SATURDAY)
-        } else {
-            setOf(java.time.DayOfWeek.THURSDAY, java.time.DayOfWeek.FRIDAY)
-        }
+        return setOf(java.time.DayOfWeek.THURSDAY, java.time.DayOfWeek.FRIDAY)
     }
     fun hasBusTransit(context: Context): Boolean {
         val inst = institution(context)
-        if (inst != null) return inst.optBoolean("has_bus_transit", false)
-        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
-        return !email.endsWith("@ru.ac.bd")
+        if (inst != null) return inst.optBoolean("has_bus_transit", true)
+        return true
     }
     fun hasAcademicCalendar(context: Context): Boolean {
         val inst = institution(context)
-        if (inst != null) return inst.optBoolean("has_academic_calendar", false)
-        val email = home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
-        return !email.endsWith("@ru.ac.bd")
+        if (inst != null) return inst.optBoolean("has_academic_calendar", true)
+        return true
     }
     fun supportContactUrl(context: Context): String {
         return institution(context)?.optString("support_contact_url").takeIf { !it.isNullOrBlank() }
@@ -88,11 +81,11 @@ internal object ClassMateAcademicCache {
     }
     fun institutionShortName(context: Context): String {
         return institution(context)?.optString("short_name").takeIf { !it.isNullOrBlank() }
-            ?: if (home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase().endsWith("@ru.ac.bd")) "RU" else "MBSTU"
+            ?: "MBSTU"
     }
     fun institutionName(context: Context): String {
         return institution(context)?.optString("name").takeIf { !it.isNullOrBlank() }
-            ?: if (home(context)?.optJSONObject("profile")?.optString("email").orEmpty().lowercase().endsWith("@ru.ac.bd")) "University of Rajshahi" else "Mawlana Bhashani Science and Technology University"
+            ?: "Mawlana Bhashani Science and Technology University"
     }
     fun invalidateSchedules(context: Context, user: String, batch: String) {
         // Keep the last successful sync usable if the next refresh fails or goes offline.
@@ -141,5 +134,35 @@ internal object ClassMateAcademicCache {
         }
         edit.apply()
     }
+    fun clearSemesterScopedCaches(context: Context, batchId: String) {
+        if (batchId.isBlank()) return
+        val p = prefs(context)
+        val edit = p.edit()
+        p.all.keys.filter {
+            it.startsWith("timetable|$batchId|") ||
+                it.startsWith("library|$batchId|") ||
+                it.startsWith("attendance|$batchId|") ||
+                it.startsWith("course_files|")
+        }.forEach { edit.remove(it) }
+        edit.apply()
+        context.getSharedPreferences("classmate_assessments_store", Context.MODE_PRIVATE)
+            .edit()
+            .remove("assessments_$batchId")
+            .apply()
+    }
+
+    fun syncActiveSemester(context: Context, batchId: String, activeSemesterId: String) {
+        if (batchId.isBlank() || activeSemesterId.isBlank()) return
+        val p = prefs(context)
+        val key = "active_semester_$batchId"
+        val previous = p.getString(key, null)
+        if (!previous.isNullOrBlank() && previous != activeSemesterId) {
+            clearSemesterScopedCaches(context, batchId)
+        }
+        if (previous != activeSemesterId) {
+            p.edit().putString(key, activeSemesterId).apply()
+        }
+    }
+
     fun clear(context: Context) { prefs(context).edit().clear().apply() }
 }

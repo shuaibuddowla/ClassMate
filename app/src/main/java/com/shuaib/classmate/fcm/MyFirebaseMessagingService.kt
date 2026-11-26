@@ -81,8 +81,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val channelId = "classmate_notifications"
-        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(this)
+        val channelId = com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_GENERAL
+        val defaultSoundUri = com.shuaib.classmate.utils.ClassMateNotificationChannels.soundUri(this)
         
         val formattedTitle = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(this, title, isForNotification = true)
         val formattedBody = com.shuaib.classmate.activities.ClassMateNoticeText.parseMarkup(this, messageBody, isForNotification = true)

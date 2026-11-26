@@ -54,6 +54,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import com.shuaib.classmate.ui.library.CourseFileDraft
+import com.shuaib.classmate.ui.library.CourseFileOption
+import com.shuaib.classmate.ui.library.CourseFileUploadScreen
 import com.shuaib.classmate.ui.notice.NoticeAttachment
 import com.shuaib.classmate.ui.notice.NoticeCourseChoice
 import com.shuaib.classmate.ui.notice.PostNoticeScreen
@@ -123,6 +126,31 @@ class ClassMatePublishActivity : AppCompatActivity() {
     private var composeManualTitle by mutableStateOf("")
     private var composeShowManualTitleBox by mutableStateOf(false)
     private var composeVoiceState by mutableStateOf(VoiceRecordingState.IDLE)
+
+    // Compose State for CourseFileUploadScreen
+    private var composeCourseOptions by mutableStateOf<List<CourseFileOption>>(emptyList())
+    private var composeSelectedCourseId by mutableStateOf<String?>(null)
+    private var composeUploadMode by mutableStateOf("file")
+    private val composeCourseFileDrafts = mutableStateListOf<CourseFileDraft>()
+    private var composeLinkTitle by mutableStateOf("")
+    private var composeLinkUrl by mutableStateOf("")
+    private var composeUploadStatus by mutableStateOf<String?>(null)
+    private var composeUploadBusy by mutableStateOf(false)
+
+    private fun syncComposeCourseFiles() {
+        composeCourseFileDrafts.clear()
+        composeCourseFileDrafts.addAll(
+            selectedCourseFiles.map {
+                CourseFileDraft(
+                    uri = it.uri,
+                    originalFileName = it.originalFileName,
+                    title = it.title,
+                    sizeBytes = it.sizeBytes,
+                    mimeType = it.mimeType
+                )
+            }
+        )
+    }
     private var composeVoiceTimerText by mutableStateOf("0:00")
     private var composeIsSubmitting by mutableStateOf(false)
     private var composeSubmissionStepText by mutableStateOf("")
@@ -313,8 +341,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
             }
         }
 
-        if (size > 10L * 1024L * 1024L) {
-            Toast.makeText(this, "File size exceeds the 10 MB limit.", Toast.LENGTH_LONG).show()
+        val maxBytes = if (isPdf) 25L * 1024L * 1024L else 50L * 1024L * 1024L
+        if (size > maxBytes) {
+            val limitLabel = if (isPdf) "25 MB" else "50 MB"
+            Toast.makeText(this, "File size exceeds the $limitLabel limit.", Toast.LENGTH_LONG).show()
             return null
         }
 
@@ -562,7 +592,10 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         manualTitle = composeManualTitle,
                         onManualTitleChange = { composeManualTitle = it },
                         showManualTitleBox = composeShowManualTitleBox,
-                        onToggleManualTitleBox = { composeShowManualTitleBox = it },
+                        onToggleManualTitleBox = { show ->
+                            composeShowManualTitleBox = show
+                            if (!show) composeManualTitle = ""
+                        },
                         onSubmitGeneralNotice = { title, body, courseOfferingId ->
                             submitComposeGeneralNotice(title, body, courseOfferingId)
                         },
@@ -627,6 +660,159 @@ class ClassMatePublishActivity : AppCompatActivity() {
             val light = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK != android.content.res.Configuration.UI_MODE_NIGHT_YES
             isAppearanceLightStatusBars = light
             isAppearanceLightNavigationBars = light
+        }
+
+        if (upload) {
+            val isEditing = editingFile != null
+            val editRawLink = editingFile?.optString("link_url")?.trim().orEmpty()
+            val sanitizedEditLink = if (editRawLink.isBlank() || editRawLink.equals("null", ignoreCase = true)) "" else editRawLink
+            val isEditingLink = isEditing && (editingFile!!.optString("file_type") == "link" || sanitizedEditLink.isNotBlank())
+
+            if (isEditing) {
+                composeUploadMode = if (isEditingLink) "link" else "file"
+                composeLinkTitle = editingFile?.optString("title").orEmpty()
+                composeLinkUrl = sanitizedEditLink
+                composeSelectedCourseId = editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" }
+            } else {
+                val preCourse = intent.getStringExtra("course_id")?.takeIf { it.isNotBlank() && it != "null" }
+                if (preCourse != null) composeSelectedCourseId = preCourse
+                if (restoredLinkUrl.isNotBlank()) {
+                    composeUploadMode = "link"
+                    composeLinkUrl = restoredLinkUrl
+                }
+            }
+
+            syncComposeCourseFiles()
+            onPickedFileChanged = { syncComposeCourseFiles() }
+
+            onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (currentUploadTaskId != null) {
+                        Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else if (!composeUploadBusy) {
+                        finish()
+                    } else {
+                        Toast.makeText(this@ClassMatePublishActivity, "Please wait for completion", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            })
+
+            val cachedCourses = getCachedCourses(batch)
+            courses = cachedCourses
+            composeCourseOptions = cachedCourses.map { CourseFileOption(it.offeringId, it.code, it.title) }
+            if (composeSelectedCourseId == null) {
+                composeSelectedCourseId = cachedCourses.firstOrNull()?.offeringId
+            }
+            val cachedSem = getSharedPreferences("cm_publish_cache", Context.MODE_PRIVATE).getString("sem_$batch", null)
+            if (!cachedSem.isNullOrBlank()) {
+                composeSemesterLabel = cachedSem
+            }
+
+            val composeUploadView = ComposeView(this).apply {
+                setContent {
+                    CourseFileUploadScreen(
+                        batchLabel = intent.getStringExtra("batch_label").orEmpty(),
+                        semesterLabel = composeSemesterLabel,
+                        isEditing = isEditing,
+                        isEditingLink = isEditingLink,
+                        courses = composeCourseOptions,
+                        selectedCourseId = composeSelectedCourseId,
+                        onSelectCourse = { composeSelectedCourseId = it },
+                        uploadMode = composeUploadMode,
+                        onModeChange = { composeUploadMode = it },
+                        selectedFiles = composeCourseFileDrafts,
+                        onPickFiles = {
+                            pickCourseFiles.launch(
+                                arrayOf(
+                                    "application/pdf",
+                                    "application/msword",
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    "application/vnd.ms-powerpoint",
+                                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                    "image/*",
+                                    "*/*"
+                                )
+                            )
+                        },
+                        onUpdateFileTitle = { idx, newTitle ->
+                            if (idx in selectedCourseFiles.indices) {
+                                selectedCourseFiles[idx].title = newTitle
+                                composeCourseFileDrafts[idx] = composeCourseFileDrafts[idx].copy(title = newTitle)
+                            }
+                        },
+                        onRemoveFile = { idx ->
+                            if (idx in selectedCourseFiles.indices) {
+                                selectedCourseFiles.removeAt(idx)
+                                syncComposeCourseFiles()
+                            }
+                        },
+                        linkTitle = composeLinkTitle,
+                        onLinkTitleChange = { composeLinkTitle = it },
+                        linkUrl = composeLinkUrl,
+                        onLinkUrlChange = { composeLinkUrl = it },
+                        statusMessage = composeUploadStatus,
+                        isBusy = composeUploadBusy,
+                        onSubmit = { submitComposeCourseFile(isEditing) },
+                        onClose = {
+                            if (currentUploadTaskId != null) {
+                                Toast.makeText(this@ClassMatePublishActivity, "Upload continuing in background", Toast.LENGTH_SHORT).show()
+                                finish()
+                            } else if (!composeUploadBusy) {
+                                finish()
+                            }
+                        }
+                    )
+                }
+            }
+            setContentView(composeUploadView)
+
+            lifecycleScope.launch {
+                try {
+                    val semesterObj = ClassMateAuthApi.rows("semesters", "select=id,semester_number&batch_id=eq.$batch&status=eq.active&limit=1").optJSONObject(0)
+                    val semester = semesterObj?.optString("id")
+                    val semNum = semesterObj?.optInt("semester_number", 0) ?: 0
+                    val semTitle = if (semNum > 0) "Semester $semNum" else "Semester 3"
+                    composeSemesterLabel = semTitle
+                    val offerings = if (semester == null) JSONArray() else ClassMateAuthApi.rows("semester_courses", "select=id,course_id&semester_id=eq.$semester")
+                    val catalog = ClassMateCourses.catalog(batch)
+                    val catalogMap = (0 until catalog.length()).map { catalog.getJSONObject(it) }.associateBy { it.getString("id") }
+
+                    val teacher = intent.getStringExtra("role") == "teacher"
+                    val assigned = if (teacher) ClassMateAuthApi.rows("teacher_course_assignments", "select=semester_course_id&teacher_id=eq.${intent.getStringExtra("profile_id")}&active=eq.true").let { rows ->
+                        (0 until rows.length()).map { rows.getJSONObject(it).getString("semester_course_id") }.toSet()
+                    } else null
+
+                    val freshCourses = (0 until offerings.length()).map { offerings.getJSONObject(it) }
+                        .filter { assigned == null || it.getString("id") in assigned }
+                        .map { off ->
+                            val offId = off.getString("id")
+                            val cat = catalogMap[off.getString("course_id")]
+                            val code = cat?.optString("course_code") ?: "Course"
+                            val title = cat?.optString("course_title") ?: ""
+                            CourseEntry(offId, code, title)
+                        }
+
+                    var finalCourses = freshCourses
+                    editingFile?.optString("semester_course_id")?.takeIf { it.isNotBlank() && it != "null" && finalCourses.none { c -> c.offeringId == it } }?.let { id ->
+                        val offering = ClassMateAuthApi.rows("semester_courses", "select=course_id&id=eq.$id").optJSONObject(0)
+                        val cat = offering?.optString("course_id")?.let { catalogMap[it] }
+                        finalCourses = finalCourses + CourseEntry(id, cat?.optString("course_code") ?: "Course", cat?.optString("course_title") ?: "Current subject")
+                    }
+
+                    courses = finalCourses.sortedBy { it.code.trim().uppercase() }
+                    composeCourseOptions = courses.map { CourseFileOption(it.offeringId, it.code, it.title) }
+                    if (composeSelectedCourseId == null || courses.none { it.offeringId == composeSelectedCourseId }) {
+                        composeSelectedCourseId = courses.firstOrNull()?.offeringId
+                    }
+                    saveCachedCourses(batch, courses, semTitle)
+                } catch (e: Exception) {
+                    if (composeCourseOptions.isEmpty()) {
+                        composeUploadStatus = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
+                    }
+                }
+            }
+            return
         }
 
         val root = LinearLayout(this).apply {
@@ -1780,7 +1966,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            lifecycleScope.launch(Dispatchers.IO) {
                 var finalTitle = manualTitle
                 var finalBody = rawBody
 
@@ -1813,7 +1999,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     finalTitle = rawBody.lines().firstOrNull()?.trim()?.take(60) ?: "Notice"
                 }
 
+                val clientRequestId = java.util.UUID.randomUUID().toString()
+                var noticePostedOnServer = false
                 try {
+                    val stagedAttachments = stageNoticeAttachmentsForPublish { text ->
+                        runCatching { tvStepStatus.text = text }
+                    }
                     withContext(Dispatchers.Main) {
                         runCatching {
                             tvStepStatus.text = "Publishing notice to batch feed…"
@@ -1825,17 +2016,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             .put("target_course", if (courseIdParam != null) courseIdParam else JSONObject.NULL)
                             .put("notice_title", finalTitle)
                             .put("notice_body", finalBody)
+                            .put("target_attachments", stagedAttachments)
+                            .put("client_request_id", clientRequestId)
                     )
-                    val newNoticeId = postRes.optString("id").orEmpty()
+                    noticePostedOnServer = true
                     if (selectedNoticeAttachments.isNotEmpty()) {
-                        withContext(Dispatchers.Main) {
-                            runCatching {
-                                tvStepStatus.text = "Uploading attachments & syncing feed…"
-                            }
-                        }
-                        uploadNoticeAttachmentIfAny(newNoticeId) { text ->
-                            runCatching { tvStepStatus.text = text }
-                        }
+                        postRes.put("_local_attachments", buildLocalAttachmentPreviewArray())
                     }
 
                     withContext(Dispatchers.Main) {
@@ -1846,27 +2032,42 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         finish()
                     }
                 } catch (netErr: Exception) {
-                    // Network unavailable or interrupted: Queue locally for automatic background upload!
-                    com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
-                        appCtx,
-                        com.shuaib.classmate.workers.PendingNotice(
-                            batchId = batch,
-                            title = finalTitle,
-                            body = finalBody,
-                            courseId = courseIdParam,
-                            isTeacher = teacher
-                        )
+                    val isConnectivityFailure = !noticePostedOnServer && (
+                        !com.shuaib.classmate.activities.ClassMateAcademicCache.online(appCtx) ||
+                        netErr is java.io.IOException && !Regex("^4\\d\\d:").containsMatchIn(netErr.message.orEmpty())
                     )
-
-                    withContext(Dispatchers.Main) {
-                        runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
-                        Toast.makeText(
+                    if (isConnectivityFailure) {
+                        com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
                             appCtx,
-                            "Offline: Notice saved to queue. It will post automatically once connection returns.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        setResult(RESULT_OK)
-                        finish()
+                            com.shuaib.classmate.workers.PendingNotice(
+                                id = clientRequestId,
+                                batchId = batch,
+                                title = finalTitle,
+                                body = finalBody,
+                                courseId = courseIdParam,
+                                isTeacher = teacher,
+                                attachments = buildPendingAttachments()
+                            )
+                        )
+                        withContext(Dispatchers.Main) {
+                            runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
+                            Toast.makeText(
+                                appCtx,
+                                "Offline: Notice saved to queue. It will post automatically once connection returns.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            setResult(RESULT_OK)
+                            finish()
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            runCatching { if (progressDialog.isShowing) progressDialog.dismiss() }
+                            Toast.makeText(
+                                appCtx,
+                                com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(netErr),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
             }
@@ -2802,6 +3003,64 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun stageNoticeAttachmentsForPublish(onProgressText: ((String) -> Unit)? = null): JSONArray {
+        val staged = JSONArray()
+        if (selectedNoticeAttachments.isEmpty()) return staged
+        val total = selectedNoticeAttachments.size
+        selectedNoticeAttachments.forEachIndexed { index, item ->
+            val initialLabel = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
+            withContext(Dispatchers.Main) {
+                if (::status.isInitialized) {
+                    status.visibility = View.VISIBLE
+                    status.text = "$initialLabel 0%"
+                }
+                onProgressText?.invoke("$initialLabel 0%")
+            }
+            val uploaded = ClassMateAuthApi.uploadStagedNoticeAttachment(
+                context = this@ClassMatePublishActivity,
+                uri = item.uri,
+                fileName = item.name,
+                mimeType = item.mimeType,
+                sizeHint = item.sizeBytes
+            ) { pct ->
+                runOnUiThread {
+                    val label = if (item.isPdf) "Uploading PDF document…" else "Uploading photo ${index + 1} of $total…"
+                    if (::status.isInitialized) {
+                        status.text = "$label $pct%"
+                    }
+                    onProgressText?.invoke("$label $pct%")
+                }
+            }
+            staged.put(uploaded)
+        }
+        return staged
+    }
+
+    private fun buildPendingAttachments(): List<com.shuaib.classmate.workers.PendingNoticeAttachment> =
+        selectedNoticeAttachments.map {
+            com.shuaib.classmate.workers.PendingNoticeAttachment(
+                uri = it.uri.toString(),
+                name = it.name,
+                mimeType = it.mimeType,
+                sizeBytes = it.sizeBytes,
+                isPdf = it.isPdf
+            )
+        }
+
+    private fun buildLocalAttachmentPreviewArray(): JSONArray = JSONArray().apply {
+        selectedNoticeAttachments.forEachIndexed { index, draft ->
+            put(
+                JSONObject()
+                    .put("id", "local_$index")
+                    .put("storage_key", "")
+                    .put("file_name", draft.name)
+                    .put("mime_type", draft.mimeType)
+                    .put("size_bytes", draft.sizeBytes)
+                    .put("url", draft.uri.toString())
+            )
+        }
+    }
+
     private suspend fun uploadNoticeAttachmentIfAny(noticeId: String, onProgressText: ((String) -> Unit)? = null) {
         if (selectedNoticeAttachments.isEmpty() || noticeId.isBlank()) return
         val total = selectedNoticeAttachments.size
@@ -2985,11 +3244,195 @@ class ClassMatePublishActivity : AppCompatActivity() {
         }
     }
 
+    private fun submitComposeCourseFile(isEditing: Boolean) {
+        val course = courses.firstOrNull { it.offeringId == composeSelectedCourseId } ?: courses.firstOrNull()
+        if (course == null) {
+            Toast.makeText(this, "Please select a course", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val isLink = composeUploadMode == "link"
+        val kind = "notes"
+        val rawUrl = composeLinkUrl.trim()
+        val urlWithScheme = if (rawUrl.matches(Regex("(?i)^https?://.*"))) rawUrl else "https://$rawUrl"
+
+        if (!isLink && !isEditing) {
+            if (selectedCourseFiles.isEmpty()) {
+                composeUploadStatus = "Please choose at least one file to upload"
+                Toast.makeText(this, "Please choose at least one file to upload", Toast.LENGTH_SHORT).show()
+                return
+            }
+            val blankIdx = selectedCourseFiles.indexOfFirst { it.title.trim().isBlank() }
+            if (blankIdx >= 0) {
+                Toast.makeText(this, "Please enter a title for \"${selectedCourseFiles[blankIdx].originalFileName}\"", Toast.LENGTH_SHORT).show()
+                return
+            }
+            val oversize = selectedCourseFiles.firstOrNull { it.sizeBytes > 50L * 1024L * 1024L }
+            if (oversize != null) {
+                Toast.makeText(this, "\"${oversize.originalFileName}\" exceeds the 50 MB limit.", Toast.LENGTH_LONG).show()
+                return
+            }
+        }
+
+        fun executeSubmission(targetResourceId: String?) {
+            if (isLink || isEditing) {
+                val title = composeLinkTitle.trim()
+                composeUploadBusy = true
+                composeUploadStatus = if (isEditing) "Saving changes…" else "Sharing Drive link…"
+                lifecycleScope.launch {
+                    try {
+                        if (isLink) {
+                            if (targetResourceId != null || editingFile != null) {
+                                val resId = targetResourceId ?: editingFile!!.getString("id")
+                                ClassMateAuthApi.rpc(
+                                    "edit_resource_metadata",
+                                    JSONObject()
+                                        .put("target_resource", resId)
+                                        .put("target_title", title)
+                                        .put("target_category", kind)
+                                        .put("target_course", course.offeringId)
+                                        .put("target_link_url", urlWithScheme)
+                                )
+                            } else {
+                                ClassMateAuthApi.rpc(
+                                    "create_library_link",
+                                    JSONObject()
+                                        .put("target_batch", batch)
+                                        .put("target_course", course.offeringId)
+                                        .put("target_title", title)
+                                        .put("target_category", kind)
+                                        .put("target_url", urlWithScheme)
+                                )
+                            }
+                        } else {
+                            val resId = targetResourceId ?: editingFile!!.getString("id")
+                            ClassMateAuthApi.rpc(
+                                "edit_resource_metadata",
+                                JSONObject()
+                                    .put("target_resource", resId)
+                                    .put("target_title", title)
+                                    .put("target_category", kind)
+                                    .put("target_course", course.offeringId)
+                                    .put("target_link_url", JSONObject.NULL)
+                            )
+                        }
+                        Toast.makeText(this@ClassMatePublishActivity, if (isEditing) "Updated successfully!" else "Drive link shared!", Toast.LENGTH_SHORT).show()
+                        setResult(RESULT_OK)
+                        finish()
+                    } catch (e: Exception) {
+                        composeUploadBusy = false
+                        composeUploadStatus = com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
+                    }
+                }
+            } else {
+                if (composeUploadBusy) return
+                composeUploadBusy = true
+                composeUploadStatus = "Preparing upload…"
+                val totalSelectedBytes = selectedCourseFiles.sumOf { it.sizeBytes }
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val stats = runCatching { ClassMateAuthApi.rpc("get_r2_storage_stats", JSONObject()) }.getOrNull()
+                        val totalBytes = stats?.optLong("total_bytes", 0L) ?: 0L
+                        val limitBytes = stats?.optLong("limit_bytes", 10_630_044_057L) ?: 10_630_044_057L
+                        if (totalBytes >= limitBytes || totalBytes + totalSelectedBytes > limitBytes) {
+                            withContext(Dispatchers.Main) {
+                                composeUploadBusy = false
+                                composeUploadStatus = "Storage limit reached (9.9 GB). Please share via Drive Link."
+                                MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                                    .setTitle("Storage Quota Reached")
+                                    .setMessage("Cloudflare R2 free tier storage has reached the 9.9 GB limit. Direct file uploads are paused.\n\nYou can still share this resource using Drive Link!")
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                            return@launch
+                        }
+                        withContext(Dispatchers.Main) {
+                            val count = selectedCourseFiles.size
+                            var lastTaskId: String? = null
+                            for (item in selectedCourseFiles) {
+                                lastTaskId = LibraryUploadManager.enqueueUpload(
+                                    context = this@ClassMatePublishActivity,
+                                    uri = item.uri,
+                                    fileName = item.originalFileName,
+                                    batchId = batch,
+                                    courseId = course.offeringId,
+                                    courseName = course.code,
+                                    title = item.title.trim(),
+                                    mimeType = item.mimeType,
+                                    sizeBytes = item.sizeBytes,
+                                    category = kind
+                                )
+                            }
+                            currentUploadTaskId = lastTaskId
+                            Toast.makeText(
+                                this@ClassMatePublishActivity,
+                                if (count > 1) "$count files queued for background upload" else "Upload started in background",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            setResult(RESULT_OK)
+                            finish()
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            composeUploadBusy = false
+                            composeUploadStatus = "Failed to start upload: " + com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(e)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isLink && !isEditing) {
+            val title = composeLinkTitle.trim()
+            lifecycleScope.launch {
+                var duplicateId: String? = null
+                var duplicateTitle: String? = null
+                try {
+                    val checkRes = ClassMateAuthApi.rows(
+                        "file_metadata",
+                        "select=id,title&semester_course_id=eq.${course.offeringId}&batch_id=eq.$batch&status=eq.active"
+                    )
+                    val normalize = { s: String -> s.lowercase().replace(Regex("[^a-z0-9]"), "") }
+                    val inputNorm = normalize(title)
+                    for (i in 0 until checkRes.length()) {
+                        val r = checkRes.getJSONObject(i)
+                        val rTitle = r.optString("title")
+                        if (normalize(rTitle) == inputNorm) {
+                            duplicateId = r.optString("id")
+                            duplicateTitle = rTitle
+                            break
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                if (duplicateId != null && duplicateTitle != null) {
+                    MaterialAlertDialogBuilder(this@ClassMatePublishActivity)
+                        .setTitle("Similar link already exists")
+                        .setMessage("A resource titled \"$duplicateTitle\" already exists in ${course.code}.\n\nWould you like to add this as a new link, or update the existing resource instead?")
+                        .setPositiveButton("Update existing") { _, _ -> executeSubmission(targetResourceId = duplicateId) }
+                        .setNegativeButton("Add as new") { _, _ -> executeSubmission(targetResourceId = null) }
+                        .setNeutralButton("Cancel", null)
+                        .show()
+                } else {
+                    executeSubmission(targetResourceId = null)
+                }
+            }
+        } else {
+            executeSubmission(targetResourceId = null)
+        }
+    }
+
     private fun submitComposeGeneralNotice(manualTitle: String, rawBody: String, courseOfferingId: String?) {
         if (composeIsSubmitting) return
-        if (rawBody.isBlank()) {
-            Toast.makeText(this, "Write your notice message first", Toast.LENGTH_SHORT).show()
+        if (rawBody.isBlank() && selectedNoticeAttachments.isEmpty()) {
+            Toast.makeText(this, "Write a notice message or attach a file first", Toast.LENGTH_SHORT).show()
             return
+        }
+
+        val effectiveBody = rawBody.ifBlank {
+            val first = selectedNoticeAttachments.firstOrNull()
+            if (first?.isPdf == true) "Shared PDF document: ${first.name}"
+            else if (selectedNoticeAttachments.size > 1) "Shared ${selectedNoticeAttachments.size} photos"
+            else "Shared an image"
         }
 
         val appCtx = applicationContext
@@ -3001,15 +3444,16 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         composeIsSubmitting = true
         composeShowAiProgressDialog = true
-        composeSubmissionStepText = if (manualTitle.isNotBlank()) "Publishing notice to batch feed…" else "Analyzing notice content & language structure with ClassMate AI…"
+        composeSubmissionStepText = if (manualTitle.isNotBlank() || rawBody.isBlank()) "Publishing notice to batch feed…" else "Analyzing notice content & language structure with ClassMate AI…"
 
         if (!com.shuaib.classmate.activities.ClassMateAcademicCache.online(this)) {
             val pending = com.shuaib.classmate.workers.PendingNotice(
                 batchId = batch,
-                title = if (manualTitle.isNotBlank()) manualTitle else null,
-                body = rawBody,
+                title = if (manualTitle.isNotBlank()) manualTitle else if (rawBody.isBlank()) effectiveBody else null,
+                body = if (rawBody.isBlank()) "" else effectiveBody,
                 courseId = courseOfferingId,
-                isTeacher = teacher
+                isTeacher = teacher,
+                attachments = buildPendingAttachments()
             )
             com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(appCtx, pending)
             composeShowAiProgressDialog = false
@@ -3022,43 +3466,56 @@ class ClassMatePublishActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             var finalTitle = manualTitle
-            var finalBody = rawBody
+            var finalBody = if (rawBody.isBlank()) "" else effectiveBody
 
             if (finalTitle.isBlank()) {
-                try {
-                    withContext(Dispatchers.Main) {
-                        composeSubmissionStepText = "Detecting optimal title & smart category with ClassMate AI…"
+                if (rawBody.isBlank()) {
+                    finalTitle = effectiveBody
+                } else {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            composeSubmissionStepText = "Detecting optimal title & smart category with ClassMate AI…"
+                        }
+                        val reqId = java.util.UUID.randomUUID().toString()
+                        val response = ClassMateAuthApi.ai(
+                            JSONObject()
+                                .put("mode", "auto_notice")
+                                .put("batch_id", batch)
+                                .put("request_id", reqId)
+                                .put("text", effectiveBody)
+                        )
+                        val result = response.optJSONObject("result")
+                        val detected = result?.optString("title")?.trim().orEmpty()
+                        val formatted = result?.optString("body")?.trim().orEmpty()
+                        if (detected.isNotBlank()) finalTitle = detected
+                        if (formatted.isNotBlank()) finalBody = formatted
+                    } catch (e: Exception) {
+                        android.util.Log.w("ClassMatePublish", "AI title detection failed: ${e.message}")
                     }
-                    val reqId = java.util.UUID.randomUUID().toString()
-                    val response = ClassMateAuthApi.ai(
-                        JSONObject()
-                            .put("mode", "auto_notice")
-                            .put("batch_id", batch)
-                            .put("request_id", reqId)
-                            .put("text", rawBody)
-                    )
-                    val result = response.optJSONObject("result")
-                    val detected = result?.optString("title")?.trim().orEmpty()
-                    val formatted = result?.optString("body")?.trim().orEmpty()
-                    if (detected.isNotBlank()) finalTitle = detected
-                    if (formatted.isNotBlank()) finalBody = formatted
-                } catch (e: Exception) {
-                    android.util.Log.w("ClassMatePublish", "AI title detection failed: ${e.message}")
                 }
             }
 
             // Fallback check: if AI detection failed and title remains blank
             if (finalTitle.isBlank()) {
-                withContext(Dispatchers.Main) {
-                    composeIsSubmitting = false
-                    composeShowAiProgressDialog = false
-                    composeShowManualTitleBox = true
-                    Toast.makeText(appCtx, "AI title detection could not generate a title. Please enter a title manually.", Toast.LENGTH_LONG).show()
+                if (isFinishing || isDestroyed) {
+                    finalTitle = effectiveBody.lines().firstOrNull()?.trim()?.take(60)?.ifBlank { "Notice" } ?: "Notice"
+                } else {
+                    withContext(Dispatchers.Main) {
+                        composeIsSubmitting = false
+                        composeShowAiProgressDialog = false
+                        composeShowManualTitleBox = true
+                        Toast.makeText(appCtx, "AI title detection could not generate a title. Please enter a title manually.", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
                 }
-                return@launch
             }
 
+            val clientRequestId = java.util.UUID.randomUUID().toString()
+            var noticePostedOnServer = false
             try {
+                val stagedAttachments = stageNoticeAttachmentsForPublish { text ->
+                    composeSubmissionStepText = text
+                }
                 withContext(Dispatchers.Main) {
                     composeSubmissionStepText = "Publishing notice to batch feed…"
                 }
@@ -3068,17 +3525,12 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         .put("target_course", if (courseOfferingId != null) courseOfferingId else JSONObject.NULL)
                         .put("notice_title", finalTitle)
                         .put("notice_body", finalBody)
+                        .put("target_attachments", stagedAttachments)
+                        .put("client_request_id", clientRequestId)
                 )
-                val newNoticeId = postRes.optString("id").orEmpty()
+                noticePostedOnServer = true
                 if (selectedNoticeAttachments.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        composeSubmissionStepText = "Uploading attachments & syncing feed…"
-                    }
-                    uploadNoticeAttachmentIfAny(newNoticeId) { text ->
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            composeSubmissionStepText = text
-                        }
-                    }
+                    postRes.put("_local_attachments", buildLocalAttachmentPreviewArray())
                 }
 
                 withContext(Dispatchers.Main) {
@@ -3090,27 +3542,45 @@ class ClassMatePublishActivity : AppCompatActivity() {
                     finish()
                 }
             } catch (netErr: Exception) {
-                com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
-                    appCtx,
-                    com.shuaib.classmate.workers.PendingNotice(
-                        batchId = batch,
-                        title = finalTitle,
-                        body = finalBody,
-                        courseId = courseOfferingId,
-                        isTeacher = teacher
-                    )
+                val isConnectivityFailure = !noticePostedOnServer && (
+                    !com.shuaib.classmate.activities.ClassMateAcademicCache.online(appCtx) ||
+                    (netErr is java.io.IOException && !Regex("^4\\d\\d:").containsMatchIn(netErr.message.orEmpty()))
                 )
-
-                withContext(Dispatchers.Main) {
-                    composeShowAiProgressDialog = false
-                    composeIsSubmitting = false
-                    Toast.makeText(
+                if (isConnectivityFailure) {
+                    com.shuaib.classmate.workers.OfflineNoticeQueue.enqueue(
                         appCtx,
-                        "Offline: Notice saved to queue. It will post automatically once connection returns.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    setResult(RESULT_OK)
-                    finish()
+                        com.shuaib.classmate.workers.PendingNotice(
+                            id = clientRequestId,
+                            batchId = batch,
+                            title = finalTitle,
+                            body = finalBody,
+                            courseId = courseOfferingId,
+                            isTeacher = teacher,
+                            attachments = buildPendingAttachments()
+                        )
+                    )
+
+                    withContext(Dispatchers.Main) {
+                        composeShowAiProgressDialog = false
+                        composeIsSubmitting = false
+                        Toast.makeText(
+                            appCtx,
+                            "Offline: Notice saved to queue. It will post automatically once connection returns.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        setResult(RESULT_OK)
+                        finish()
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        composeShowAiProgressDialog = false
+                        composeIsSubmitting = false
+                        Toast.makeText(
+                            appCtx,
+                            com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(netErr),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }
@@ -3262,6 +3732,15 @@ class ClassMatePublishActivity : AppCompatActivity() {
                         }
                     }
 
+                    val attachmentNoticeIds = mutableSetOf<String>()
+                    details?.optJSONArray("attachments")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            arr.optJSONObject(i)?.optString("notice_id")?.takeIf { it.isNotBlank() }?.let {
+                                attachmentNoticeIds.add(it)
+                            }
+                        }
+                    }
+
                     val items = noticeList.map { n ->
                         val id = n.optString("id")
                         RecentNoticeItem(
@@ -3271,7 +3750,7 @@ class ClassMatePublishActivity : AppCompatActivity() {
                             category = parseRecentNoticeCategory(n.optString("category"), n.optString("type")),
                             authorName = resolveNoticeAuthor(n, authorsMap),
                             timeAgo = formatNoticeTimeAgo(n.optString("published_at")),
-                            hasAttachment = n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null"
+                            hasAttachment = (n.optString("resource_id").isNotBlank() && n.optString("resource_id") != "null") || id in attachmentNoticeIds
                         )
                     }
 

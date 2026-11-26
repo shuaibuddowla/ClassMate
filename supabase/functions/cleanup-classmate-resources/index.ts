@@ -17,5 +17,17 @@ Deno.serve(async request=>{
       const result=await db.from("resource_cleanup_jobs").delete().eq("object_key",job.object_key); if(!result.error) removed++;
     } catch { await db.from("resource_cleanup_jobs").update({attempts:job.attempts+1,last_error:"Protected object removal pending"}).eq("object_key",job.object_key); }
   }
-  return Response.json({removed});
+
+  // Sweep orphaned staged notice-images/pending/* uploads older than 24h
+  let stagedRemoved=0;
+  try {
+    const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const {data:orphans}=await db.rpc("list_orphaned_pending_notice_media");
+    if(Array.isArray(orphans) && orphans.length>0) {
+      const del=await admin.storage.from("notice-images").remove(orphans);
+      if(!del.error) stagedRemoved=del.data?.length ?? orphans.length;
+    }
+  } catch {}
+
+  return Response.json({removed, stagedRemoved});
 });

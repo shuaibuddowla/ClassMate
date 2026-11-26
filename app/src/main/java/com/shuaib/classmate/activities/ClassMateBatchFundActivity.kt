@@ -38,6 +38,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
     private var batchId: String = ""
     private var batchLabel: String = ""
     private var currentUserId: String = ""
+    private var currentUserFullName: String = ""
 
     private val summaryState = mutableStateOf(FundSummary())
     private val campaignsState = mutableStateListOf<FundCampaignItem>()
@@ -85,6 +86,8 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
 
         batchId = intent.getStringExtra("batch_id").orEmpty()
         batchLabel = intent.getStringExtra("batch_label").orEmpty()
+        val openAddFund = intent.getBooleanExtra("open_record_dialog", false) ||
+            intent.getBooleanExtra("open_add_fund", false)
 
         setContent {
             ClassMateBatchFundScreen(
@@ -93,6 +96,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 transactions = transactionsState,
                 students = studentsState,
                 currentUserId = currentUserId,
+                initialOpenAddFund = openAddFund,
                 onBackClick = { finish() },
                 onShareReport = { shareStatement() },
                 onUpdatePurpose = { newDesc -> updateFundPurpose(newDesc) },
@@ -108,6 +112,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 },
                 onSaveTransaction = { isDeposit, name, sId, pId, amt, method, reason ->
                     saveManualTransaction(isDeposit, name, sId, pId, amt, method, reason)
+                },
+                onUpdateTransaction = { tx, isDeposit, name, sId, pId, amt, method, reason ->
+                    updateTransaction(tx, isDeposit, name, sId, pId, amt, method, reason)
                 },
                 onDeleteTransaction = { tx ->
                     deleteTransaction(tx)
@@ -139,6 +146,9 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             val cachedProfile = ClassMateAcademicCache.home(this@ClassMateBatchFundActivity)?.optJSONObject("profile")
             currentUserId = cachedProfile?.optString("student_id").orEmpty().ifBlank {
                 cachedProfile?.optString("id").orEmpty()
+            }
+            currentUserFullName = cachedProfile?.optString("full_name").orEmpty().ifBlank {
+                cachedProfile?.optString("name").orEmpty()
             }
 
             if (batchId.isBlank()) {
@@ -434,7 +444,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                         studentProfileId = p.studentProfileId,
                         campaign = p.title,
                         formattedDate = "Today",
-                        createdByName = "You",
+                        createdByName = currentUserFullName.ifBlank { "You" },
                         amount = p.amount,
                         isOfflinePending = true,
                         canEdit = true
@@ -477,7 +487,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                             campaign = campTag,
                             dateStr = dateStr,
                             formattedDate = formatTransactionDate(dateStr),
-                            createdByName = cName?.trim()?.split(" ")?.firstOrNull() ?: "CR",
+                            createdByName = cName?.trim()?.takeIf { it.isNotEmpty() } ?: "CR",
                             createdAt = obj.optString("created_at"),
                             amount = amt,
                             isOfflinePending = isPending,
@@ -623,7 +633,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             studentProfileId = student.profileId,
             campaign = campaignName,
             formattedDate = "Today",
-            createdByName = "You",
+            createdByName = currentUserFullName.ifBlank { "You" },
             amount = perStudent,
             isOfflinePending = !NetworkMonitor.isOnline(this),
             canEdit = true
@@ -694,7 +704,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                 studentProfileId = student.profileId,
                 campaign = campaignName,
                 formattedDate = "Today",
-                createdByName = "You",
+                createdByName = currentUserFullName.ifBlank { "You" },
                 amount = amountPerStudent,
                 isOfflinePending = !NetworkMonitor.isOnline(this),
                 canEdit = true
@@ -781,7 +791,7 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
             studentProfileId = studentProfileId,
             campaign = reason,
             formattedDate = "Today",
-            createdByName = "You",
+            createdByName = currentUserFullName.ifBlank { "You" },
             amount = amount,
             isOfflinePending = !NetworkMonitor.isOnline(this),
             canEdit = true
@@ -856,6 +866,88 @@ class ClassMateBatchFundActivity : AppCompatActivity() {
                     studentProfileId = if (isDeposit) studentProfileId else null
                 )
                 OfflineFundQueue.enqueue(this@ClassMateBatchFundActivity, pendingTx)
+            }
+        }
+    }
+
+    private fun updateTransaction(
+        tx: FundTransactionItem,
+        isDeposit: Boolean,
+        name: String,
+        studentId: String?,
+        studentProfileId: String?,
+        amount: Double,
+        method: String,
+        reason: String
+    ) {
+        val type = if (isDeposit) "inflow" else "outflow"
+        val newTitle = if (isDeposit) reason else name
+        val txDate = tx.dateStr?.takeIf { it.isNotBlank() && it != "null" } ?: LocalDate.now().toString()
+
+        if (tx.isOfflinePending) {
+            val offlineId = tx.id.removePrefix("offline_")
+            OfflineFundQueue.remove(this, offlineId)
+            val pendingTx = PendingFundTransaction(
+                batchId = batchId,
+                type = type,
+                amount = amount,
+                title = newTitle,
+                studentName = if (isDeposit) name else null,
+                studentId = if (isDeposit) studentId else null,
+                studentProfileId = if (isDeposit) studentProfileId else null
+            )
+            OfflineFundQueue.enqueue(this, pendingTx)
+            val idx = transactionsState.indexOfFirst { it.id == tx.id }
+            if (idx >= 0) {
+                transactionsState[idx] = tx.copy(
+                    type = type,
+                    method = method,
+                    title = name,
+                    studentName = if (isDeposit) name else null,
+                    studentId = if (isDeposit) studentId else null,
+                    studentProfileId = if (isDeposit) studentProfileId else null,
+                    campaign = if (isDeposit) reason else "Batch Fund",
+                    amount = amount
+                )
+            }
+            Toast.makeText(this, "Offline transaction updated", Toast.LENGTH_SHORT).show()
+            loadData()
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                ClassMateAuthApi.rpc(
+                    "update_batch_fund_transaction",
+                    JSONObject().apply {
+                        put("trans_id", tx.id)
+                        put("trans_type", type)
+                        put("trans_amount", amount)
+                        put("trans_title", newTitle)
+                        put("trans_student_name", if (isDeposit) name else JSONObject.NULL)
+                        put("trans_student_id", if (isDeposit && !studentId.isNullOrBlank()) studentId else JSONObject.NULL)
+                        put("trans_date", txDate)
+                        put("trans_student_profile_id", if (isDeposit && !studentProfileId.isNullOrBlank()) studentProfileId else JSONObject.NULL)
+                    }
+                )
+                val idx = transactionsState.indexOfFirst { it.id == tx.id }
+                if (idx >= 0) {
+                    transactionsState[idx] = tx.copy(
+                        type = type,
+                        method = method,
+                        title = name,
+                        studentName = if (isDeposit) name else null,
+                        studentId = if (isDeposit) studentId else null,
+                        studentProfileId = if (isDeposit) studentProfileId else null,
+                        campaign = if (isDeposit) reason else "Batch Fund",
+                        amount = amount
+                    )
+                }
+                HapticHelper.success(this@ClassMateBatchFundActivity)
+                Toast.makeText(this@ClassMateBatchFundActivity, "Transaction updated", Toast.LENGTH_SHORT).show()
+                loadData()
+            } catch (e: Exception) {
+                Toast.makeText(this@ClassMateBatchFundActivity, "Error updating: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

@@ -37,7 +37,33 @@ internal object ClassMateWelcomeDialogs {
                 field("Department", department?.optString("name"))
                 field("Batch", batch?.let { "Batch ${it.optInt("batch_number")}" })
                 field("Session", ClassMateAcademicSession.format((if (profile.optString("role") == "student") profile else batch)?.optString("academic_session")))
-                field("Role", if(profile.optBoolean("is_cr")) "Class representative" else profile.optString("role").replaceFirstChar { it.uppercase() })
+                val isCr = profile.optBoolean("is_cr")
+                val isInterimCr = isCr && profile.optBoolean("is_interim_cr")
+                field("Role", when {
+                    isInterimCr -> "Interim Class Representative (14 days)"
+                    isCr -> "Class representative"
+                    else -> profile.optString("role").replaceFirstChar { it.uppercase() }
+                })
+                if (isInterimCr) {
+                    val infoCard = LinearLayout(activity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding((14*density).toInt(), (12*density).toInt(), (14*density).toInt(), (12*density).toInt())
+                        setBackgroundResource(R.drawable.bg_day_card_unselected)
+                    }
+                    infoCard.addView(TextView(activity).apply {
+                        text = "You're first in this batch!"
+                        textSize = 14f
+                        setTypeface(null, 1)
+                        setTextColor(activity.getColor(R.color.cm_primary))
+                    })
+                    infoCard.addView(TextView(activity).apply {
+                        text = "You've been given Interim CR access so you can activate your running semester, add courses, and set up the routine. You can transfer CR access anytime in Friends."
+                        textSize = 12.5f
+                        setPadding(0, (4*density).toInt(), 0, 0)
+                        setTextColor(activity.getColor(R.color.cm_text_secondary))
+                    })
+                    form.panel.addView(infoCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = (8*density).toInt() })
+                }
                 builder.setPositiveButton("Continue") { _,_ -> continueFlow() }
             }
             else -> {

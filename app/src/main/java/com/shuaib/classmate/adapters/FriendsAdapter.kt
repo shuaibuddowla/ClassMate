@@ -3,6 +3,8 @@ package com.shuaib.classmate.adapters
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.shuaib.classmate.R
@@ -10,11 +12,15 @@ import com.shuaib.classmate.databinding.ItemFriendBinding
 import com.shuaib.classmate.models.User
 
 class FriendsAdapter(
-    private var friends: List<User>,
+    friends: List<User>,
     private val onFriendClick: (User) -> Unit,
     private val onCallClick: (User) -> Unit,
     private val onWhatsappClick: (User) -> Unit
-) : RecyclerView.Adapter<FriendsAdapter.FriendViewHolder>() {
+) : ListAdapter<User, FriendsAdapter.FriendViewHolder>(DiffCallback) {
+
+    init {
+        submitList(friends)
+    }
 
     inner class FriendViewHolder(val binding: ItemFriendBinding) :
         RecyclerView.ViewHolder(binding.root)
@@ -27,7 +33,7 @@ class FriendsAdapter(
     }
 
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
-        val friend = friends[position]
+        val friend = getItem(position)
         holder.binding.apply {
             tvFriendName.text = friend.name
             
@@ -49,10 +55,17 @@ class FriendsAdapter(
         }
     }
 
-    override fun getItemCount(): Int = friends.size
-
     fun updateList(newList: List<User>) {
-        friends = newList
-        notifyDataSetChanged()
+        submitList(newList.toList())
+    }
+
+    companion object {
+        private val DiffCallback = object : DiffUtil.ItemCallback<User>() {
+            override fun areItemsTheSame(oldItem: User, newItem: User): Boolean =
+                oldItem.uid == newItem.uid && oldItem.studentId == newItem.studentId
+
+            override fun areContentsTheSame(oldItem: User, newItem: User): Boolean =
+                oldItem == newItem
+        }
     }
 }

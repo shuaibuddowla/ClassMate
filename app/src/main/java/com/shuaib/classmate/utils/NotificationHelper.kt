@@ -13,12 +13,13 @@ import com.shuaib.classmate.R
 
 object NotificationHelper {
 
-    private const val CHANNEL_NOTICES_ID = "classmate_notices"
-    private const val CHANNEL_CANCELLATIONS_ID = "classmate_cancellations"
-    private const val CHANNEL_GENERAL_ID = "classmate_notifications"
+    private const val CHANNEL_NOTICES_ID = ClassMateNotificationChannels.CHANNEL_NOTICES
+    private const val CHANNEL_CANCELLATIONS_ID = ClassMateNotificationChannels.CHANNEL_CANCELLATIONS
+    private const val CHANNEL_GENERAL_ID = ClassMateNotificationChannels.CHANNEL_GENERAL
 
     fun showFundSyncNotification(context: Context, title: String, body: String) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        ClassMateNotificationChannels.ensureChannels(context)
 
         val targetClass = if (com.shuaib.classmate.BuildConfig.CLASSMATE_AUTH_ENABLED) {
             com.shuaib.classmate.activities.ClassMateBatchFundActivity::class.java
@@ -82,6 +83,7 @@ object NotificationHelper {
             .setColor(color)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSound(ClassMateNotificationChannels.soundUri(context))
             .setContentIntent(pendingIntent)
             .build()
 

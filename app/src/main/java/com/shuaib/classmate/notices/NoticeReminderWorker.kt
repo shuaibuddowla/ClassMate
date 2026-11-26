@@ -39,11 +39,7 @@ class NoticeReminderWorker(
         }
 
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Notice reminders", NotificationManager.IMPORTANCE_HIGH)
-            )
-        }
+        com.shuaib.classmate.utils.ClassMateNotificationChannels.ensureChannels(applicationContext)
         
         val targetActivity = if (BuildConfig.CLASSMATE_AUTH_ENABLED) ClassMateAuthActivity::class.java else MainActivity::class.java
         val intent = Intent(applicationContext, targetActivity)
@@ -65,7 +61,8 @@ class NoticeReminderWorker(
             .setStyle(NotificationCompat.BigTextStyle().bigText(formattedBody))
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+            .setSound(com.shuaib.classmate.utils.ClassMateNotificationChannels.soundUri(applicationContext))
             .setAutoCancel(true)
             .build()
 
@@ -74,6 +71,6 @@ class NoticeReminderWorker(
     }
 
     companion object {
-        private const val CHANNEL_ID = "notice_reminders"
+        private const val CHANNEL_ID = com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_NOTICE_REMINDERS
     }
 }

@@ -577,7 +577,13 @@ fun UpcomingAssessmentsScreen(
                 onDelete = { toDelete ->
                     selectedDetailAssessment = null
                     scope.launch {
-                        repository.deleteAssessment(toDelete.id, currentBatchId)
+                        repository.deleteAssessment(toDelete.id, currentBatchId).onFailure { err ->
+                            android.widget.Toast.makeText(
+                                view.context,
+                                com.shuaib.classmate.utils.NetworkErrorSanitizer.sanitize(err),
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 },
                 courseFiles = relevantFiles,
@@ -600,9 +606,10 @@ fun UpcomingAssessmentsScreen(
                 },
                 onSubmit = { item, alsoPostNotice ->
                     // 1. Save to repository with batch isolation (instant UI update)
-                    repository.saveAssessment(item, currentBatchId)
+                    repository.saveAssessment(item, currentBatchId).getOrThrow()
 
                     // 2. Post notice in background if checked and update noticeId on assessment
+                    //    (publish_batch_notice -> post_notice already triggers the Supabase FCM push)
                     if (alsoPostNotice) {
                         scope.launch(Dispatchers.IO) {
                             val validAssessmentId = item.id.ifBlank { java.util.UUID.randomUUID().toString() }
@@ -617,14 +624,14 @@ fun UpcomingAssessmentsScreen(
                                 }
                             }
                         }
-                    }
-
-                    // 3. Send Push Notification Alert in background
-                    scope.launch(Dispatchers.IO) {
-                        onBroadcastPush(
-                            "📝 New ${item.assessmentType.displayName}: ${item.courseCode}",
-                            "${item.title} — Due ${item.getFormattedDate()} ${item.deadlineTime}"
-                        )
+                    } else if (editingAssessment == null) {
+                        // 3. Only send standalone push alert for new assessments when not already posting a notice
+                        scope.launch(Dispatchers.IO) {
+                            onBroadcastPush(
+                                "📝 New ${item.assessmentType.displayName}: ${item.courseCode}",
+                                "${item.title} — Due ${item.getFormattedDate()} ${item.deadlineTime}"
+                            )
+                        }
                     }
                 },
                 isDark = isDark

@@ -10,6 +10,32 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+data class PendingNoticeAttachment(
+    val uri: String,
+    val name: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val isPdf: Boolean = false
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("uri", uri)
+        put("name", name)
+        put("mime_type", mimeType)
+        put("size_bytes", sizeBytes)
+        put("is_pdf", isPdf)
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): PendingNoticeAttachment = PendingNoticeAttachment(
+            uri = json.optString("uri"),
+            name = json.optString("name", "attachment"),
+            mimeType = json.optString("mime_type", "image/jpeg"),
+            sizeBytes = json.optLong("size_bytes", 0L),
+            isPdf = json.optBoolean("is_pdf", false)
+        )
+    }
+}
+
 data class PendingNotice(
     val id: String = UUID.randomUUID().toString(),
     val batchId: String,
@@ -17,7 +43,8 @@ data class PendingNotice(
     val body: String,
     val courseId: String? = null,
     val isTeacher: Boolean = false,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val attachments: List<PendingNoticeAttachment> = emptyList()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -27,18 +54,33 @@ data class PendingNotice(
         put("course_id", courseId ?: "")
         put("is_teacher", isTeacher)
         put("timestamp", timestamp)
+        put("attachments", JSONArray().apply { attachments.forEach { put(it.toJson()) } })
     }
 
     companion object {
-        fun fromJson(json: JSONObject): PendingNotice = PendingNotice(
-            id = json.optString("id", UUID.randomUUID().toString()),
-            batchId = json.optString("batch_id"),
-            title = json.optString("title").takeIf { it.isNotBlank() },
-            body = json.optString("body"),
-            courseId = json.optString("course_id").takeIf { it.isNotBlank() },
-            isTeacher = json.optBoolean("is_teacher", false),
-            timestamp = json.optLong("timestamp", System.currentTimeMillis())
-        )
+        fun fromJson(json: JSONObject): PendingNotice {
+            val attArr = json.optJSONArray("attachments")
+            val atts = buildList {
+                if (attArr != null) {
+                    for (i in 0 until attArr.length()) {
+                        attArr.optJSONObject(i)?.let { obj ->
+                            val u = obj.optString("uri")
+                            if (u.isNotBlank()) add(PendingNoticeAttachment.fromJson(obj))
+                        }
+                    }
+                }
+            }
+            return PendingNotice(
+                id = json.optString("id", UUID.randomUUID().toString()),
+                batchId = json.optString("batch_id"),
+                title = json.optString("title").takeIf { it.isNotBlank() },
+                body = json.optString("body"),
+                courseId = json.optString("course_id").takeIf { it.isNotBlank() },
+                isTeacher = json.optBoolean("is_teacher", false),
+                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
+                attachments = atts
+            )
+        }
     }
 }
 
@@ -137,12 +179,27 @@ class OfflineNoticeUploadWorker(
                     finalTitle = item.body.lines().firstOrNull()?.trim()?.take(50) ?: "Notice"
                 }
 
+                val stagedAttachments = JSONArray()
+                for (att in item.attachments) {
+                    val parsedUri = runCatching { android.net.Uri.parse(att.uri) }.getOrNull() ?: continue
+                    val staged = ClassMateAuthApi.uploadStagedNoticeAttachment(
+                        context = applicationContext,
+                        uri = parsedUri,
+                        fileName = att.name,
+                        mimeType = att.mimeType,
+                        sizeHint = att.sizeBytes
+                    )
+                    stagedAttachments.put(staged)
+                }
+
                 ClassMateAuthApi.rpc(
                     "post_notice",
                     JSONObject().put("target_batch", item.batchId)
                         .put("target_course", if (item.isTeacher && !item.courseId.isNullOrBlank()) item.courseId else JSONObject.NULL)
                         .put("notice_title", finalTitle)
                         .put("notice_body", finalBody)
+                        .put("target_attachments", stagedAttachments)
+                        .put("client_request_id", item.id)
                 )
 
                 OfflineNoticeQueue.remove(applicationContext, item.id)

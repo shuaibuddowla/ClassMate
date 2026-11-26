@@ -29,8 +29,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -49,16 +55,19 @@ import com.shuaib.classmate.ui.assessment.PlusJakartaBold
 @Composable
 fun rememberThumbnailBitmap(uri: Uri): ImageBitmap? {
     val context = LocalContext.current
-    return remember(uri) {
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = 4
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = uri) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize = 4
+                    }
+                    BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
                 }
-                BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
-            }
-        }.getOrNull()
+            }.getOrNull()
+        }
     }
+    return bitmap
 }
 
 @Composable
@@ -138,6 +147,50 @@ fun NoticeAttachmentPreviews(
             }
         }
     } else {
+        var previewUri by remember { mutableStateOf<Uri?>(null) }
+
+        if (previewUri != null) {
+            Dialog(
+                onDismissRequest = { previewUri = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.92f))
+                        .clickable { previewUri = null },
+                    contentAlignment = Alignment.Center
+                ) {
+                    val fullBitmap = rememberThumbnailBitmap(previewUri!!)
+                    if (fullBitmap != null) {
+                        Image(
+                            bitmap = fullBitmap,
+                            contentDescription = "Attached photo preview",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { previewUri = null },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp)
+                            .size(40.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = "Close preview",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         // Multi-Photo Carousel Thumbnails
         LazyRow(
             modifier = modifier
@@ -161,6 +214,7 @@ fun NoticeAttachmentPreviews(
                                 .size(62.dp)
                                 .align(Alignment.BottomStart)
                                 .clip(RoundedCornerShape(10.dp))
+                                .clickable { previewUri = item.uri }
                                 .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
                         )
                     } else {

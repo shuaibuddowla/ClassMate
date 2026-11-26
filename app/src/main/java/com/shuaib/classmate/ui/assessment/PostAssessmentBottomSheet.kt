@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import com.shuaib.classmate.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -243,9 +246,7 @@ fun PostAssessmentBottomSheet(
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         containerColor = if (isDark) Color(0xFF0B1120) else Color(0xFFFFFFFF),
-        modifier = Modifier
-            .statusBarsPadding()
-            .padding(top = 24.dp),
+        modifier = Modifier.statusBarsPadding(),
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -260,6 +261,8 @@ fun PostAssessmentBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 6.dp)
         ) {
@@ -366,14 +369,22 @@ fun PostAssessmentBottomSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = selectedCourse?.let { "${it.courseCode} · ${it.courseTitle}" } ?: "Select course",
+                            text = selectedCourse?.let { "${it.courseCode} · ${it.courseTitle}" }
+                                ?: if (allCourses.isEmpty()) "No courses available" else "Select course",
                             fontSize = 13.5.sp,
                             fontFamily = PlusJakartaBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
                             color = if (selectedCourse != null) {
                                 AssessmentColors.primaryTextColor(isDark)
                             } else {
@@ -518,23 +529,24 @@ fun PostAssessmentBottomSheet(
                     OutlinedTextField(
                         value = deadlineTime,
                         onValueChange = { deadlineTime = it },
-                        placeholder = { Text("e.g. 10:00 AM", fontSize = 12.sp) },
+                        placeholder = { Text("10:00 AM", fontSize = 12.sp, maxLines = 1) },
                         singleLine = true,
                         leadingIcon = {
                             IconButton(
                                 onClick = { showTimePicker() },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_clock),
                                     contentDescription = "Pick time",
                                     tint = if (isDark) Color(0xFF818CF8) else Color(0xFF6366F1),
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = assessmentTextFieldColors
+                        colors = assessmentTextFieldColors,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
@@ -551,7 +563,7 @@ fun PostAssessmentBottomSheet(
                     OutlinedTextField(
                         value = room,
                         onValueChange = { room = it },
-                        placeholder = { Text("e.g. 338 or Online", fontSize = 12.sp) },
+                        placeholder = { Text("338 / Online", fontSize = 12.sp, maxLines = 1) },
                         singleLine = true,
                         leadingIcon = {
                             Icon(
@@ -562,7 +574,8 @@ fun PostAssessmentBottomSheet(
                             )
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = assessmentTextFieldColors
+                        colors = assessmentTextFieldColors,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

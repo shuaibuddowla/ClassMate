@@ -249,41 +249,50 @@ fun PostNoticeScreen(
                     bottom = 10.dp + if (noticeType != NoticePostingType.GENERAL) formBottomPadding else 0.dp
                 )
         ) {
-            // Notice Type Selector (Upper Three-Option System)
-            Text(
-                text = "Notice type",
-                fontSize = 12.5.sp,
-                fontFamily = PlusJakartaBold,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            NoticePostingType.values().forEach { type ->
+            // Segmented Pill Selector for Notice Type
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (isDark) Color(0xFF131A2A) else Color(0xFFF1F5F9),
+                border = BorderStroke(1.dp, if (isDark) Color(0x26FFFFFF) else Color(0x12000000)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { noticeType = type }
-                        .padding(vertical = 2.dp)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    RadioButton(
-                        selected = noticeType == type,
-                        onClick = { noticeType = type },
-                        colors = RadioButtonDefaults.colors(
-                            selectedColor = primaryColor,
-                            unselectedColor = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = type.label,
-                        fontSize = 14.5.sp,
-                        fontFamily = PlusJakartaBold,
-                        fontWeight = if (noticeType == type) FontWeight.Bold else FontWeight.Medium,
-                        color = AssessmentColors.primaryTextColor(isDark)
-                    )
+                    NoticePostingType.values().forEach { type ->
+                        val selected = noticeType == type
+                        val shortLabel = when (type) {
+                            NoticePostingType.GENERAL -> "General"
+                            NoticePostingType.CANCELLATION -> "Cancel Class"
+                            NoticePostingType.POLL -> "Poll"
+                        }
+                        Surface(
+                            onClick = { noticeType = type },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) primaryColor else Color.Transparent,
+                            shadowElevation = if (selected) 1.dp else 0.dp,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(vertical = 9.dp, horizontal = 6.dp)
+                            ) {
+                                Text(
+                                    text = shortLabel,
+                                    fontSize = 13.sp,
+                                    fontFamily = PlusJakartaBold,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (selected) Color.White
+                                    else if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -302,6 +311,46 @@ fun PostNoticeScreen(
                             isDark = isDark
                         )
                         Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // Optional Custom Title Toggle Pill
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                    ) {
+                        Surface(
+                            onClick = { onToggleManualTitleBox(!showManualTitleBox) },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (showManualTitleBox) primaryColor.copy(alpha = if (isDark) 0.22f else 0.12f)
+                            else if (isDark) Color(0xFF131A2A) else Color(0xFFF1F5F9),
+                            border = BorderStroke(
+                                1.dp,
+                                if (showManualTitleBox) primaryColor.copy(alpha = 0.45f)
+                                else if (isDark) Color(0x28FFFFFF) else Color(0x16000000)
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_sparkle),
+                                    contentDescription = null,
+                                    tint = if (showManualTitleBox) primaryColor else if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (showManualTitleBox) "Hide custom title (use AI)" else "Add custom title",
+                                    fontSize = 12.sp,
+                                    fontFamily = PlusJakartaBold,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (showManualTitleBox) primaryColor else if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+                                )
+                            }
+                        }
                     }
 
                     // Fallback / Manual Title Box (shown only if AI title detection fails or requested)
@@ -357,81 +406,6 @@ fun PostNoticeScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Recent In Batch Section (replaces bulleted Smart Notice text card)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp, bottom = 8.dp)
-                    ) {
-                        Text(
-                            text = "RECENT IN BATCH",
-                            fontSize = 11.5.sp,
-                            fontFamily = PlusJakartaBold,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        if (recentNotices.isNotEmpty()) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = primaryColor.copy(alpha = if (isDark) 0.2f else 0.1f)
-                            ) {
-                                Text(
-                                    text = "Last ${recentNotices.size}",
-                                    fontSize = 10.5.sp,
-                                    fontFamily = PlusJakartaBold,
-                                    fontWeight = FontWeight.Bold,
-                                    color = primaryColor,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (recentNotices.isNotEmpty()) {
-                        recentNotices.take(3).forEach { notice ->
-                            RecentNoticePeekCard(
-                                notice = notice,
-                                isDark = isDark,
-                                primaryColor = primaryColor,
-                                onClick = { previewNotice = notice }
-                            )
-                        }
-                    } else {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isDark) Color(0xFF1E2025) else Color(0xFFF8FAFC)
-                            ),
-                            border = BorderStroke(1.dp, if (isDark) Color(0xFF2E323B) else Color(0xFFE5E7EB)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(14.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_notice),
-                                    contentDescription = null,
-                                    tint = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "No previous notices published yet",
-                                    fontSize = 13.sp,
-                                    fontFamily = PlusJakartaBold,
-                                    color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -499,9 +473,12 @@ fun PostNoticeScreen(
 
                     OutlinedTextField(
                         value = pollQuestion,
-                        onValueChange = { pollQuestion = it },
+                        onValueChange = { if (it.length <= 500) pollQuestion = it },
                         label = { Text("Poll Question", fontFamily = PlusJakartaBold) },
-                        placeholder = { Text("What would you like to ask the batch?") },
+                        placeholder = { Text("Write your poll question (supports multiple lines)…") },
+                        supportingText = { Text("${pollQuestion.length}/500") },
+                        minLines = 2,
+                        maxLines = 5,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,

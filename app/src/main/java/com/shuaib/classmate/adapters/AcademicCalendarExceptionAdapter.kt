@@ -2,15 +2,21 @@ package com.shuaib.classmate.adapters
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.shuaib.classmate.databinding.ItemAcademicCalendarExceptionBinding
 import com.shuaib.classmate.models.AcademicCalendarException
 
 class AcademicCalendarExceptionAdapter(
-    private var items: List<AcademicCalendarException> = emptyList(),
+    items: List<AcademicCalendarException> = emptyList(),
     private val onClick: (AcademicCalendarException) -> Unit,
     private val onLongClick: (AcademicCalendarException) -> Unit
-) : RecyclerView.Adapter<AcademicCalendarExceptionAdapter.ExceptionViewHolder>() {
+) : ListAdapter<AcademicCalendarException, AcademicCalendarExceptionAdapter.ExceptionViewHolder>(DiffCallback) {
+
+    init {
+        if (items.isNotEmpty()) submitList(items)
+    }
 
     inner class ExceptionViewHolder(val binding: ItemAcademicCalendarExceptionBinding) :
         RecyclerView.ViewHolder(binding.root)
@@ -25,7 +31,7 @@ class AcademicCalendarExceptionAdapter(
     }
 
     override fun onBindViewHolder(holder: ExceptionViewHolder, position: Int) {
-        val item = items[position]
+        val item = getItem(position)
         val b = holder.binding
         b.tvTitle.text = item.title
         b.tvMeta.text = "${displayType(item.type)} - ${item.startDate} to ${item.endDate}"
@@ -39,17 +45,20 @@ class AcademicCalendarExceptionAdapter(
         }
     }
 
-    override fun getItemCount(): Int = items.size
-
-    fun submitList(newItems: List<AcademicCalendarException>) {
-        items = newItems
-        notifyDataSetChanged()
-    }
-
     private fun displayType(type: String): String = when (type) {
         AcademicCalendarException.TYPE_VACATION -> "Vacation"
         AcademicCalendarException.TYPE_HOLIDAY -> "Holiday"
         AcademicCalendarException.TYPE_CLASS_SUSPENDED -> "Classes Suspended"
         else -> type
+    }
+
+    companion object {
+        private val DiffCallback = object : DiffUtil.ItemCallback<AcademicCalendarException>() {
+            override fun areItemsTheSame(oldItem: AcademicCalendarException, newItem: AcademicCalendarException): Boolean =
+                oldItem.id == newItem.id
+
+            override fun areContentsTheSame(oldItem: AcademicCalendarException, newItem: AcademicCalendarException): Boolean =
+                oldItem == newItem
+        }
     }
 }

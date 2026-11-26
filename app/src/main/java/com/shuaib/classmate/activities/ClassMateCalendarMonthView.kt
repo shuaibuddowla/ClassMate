@@ -43,6 +43,10 @@ internal class ClassMateCalendarMonthView(
         background=RippleDrawable(ColorStateList.valueOf(color(R.color.cm_primary_container)),fill(R.color.cm_calendar_surface,24),null)
         elevation=dp(1).toFloat(); setOnClickListener { action() }
     }
+    companion object {
+        private val MONTH_NAME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM")
+    }
+
     init {
         radius=dp(28).toFloat(); cardElevation=dp(2).toFloat(); strokeWidth=dp(1)
         strokeColor=color(R.color.cm_calendar_border); setCardBackgroundColor(color(R.color.cm_calendar_shell))
@@ -52,7 +56,7 @@ internal class ClassMateCalendarMonthView(
         val header=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(20),dp(20),dp(20),dp(14)) }
         val title=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL; isFocusable=true; contentDescription="Choose month or year"; setOnClickListener { onJump() } }
         title.addView(text(month.year.toString(),11f,true,R.color.cm_calendar_muted).apply { letterSpacing=0.24f })
-        title.addView(text(month.format(DateTimeFormatter.ofPattern("MMMM")),36f,true).apply {
+        title.addView(text(month.format(MONTH_NAME_FMT),36f,true).apply {
             maxLines=1; setPadding(0,dp(4),0,dp(3))
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(this,26,36,1,android.util.TypedValue.COMPLEX_UNIT_SP)
         },LinearLayout.LayoutParams(-1,dp((48*resources.configuration.fontScale.coerceAtLeast(1f)).toInt())))
@@ -129,6 +133,7 @@ internal class ClassMateCalendarMonthView(
 
     private class Scenery(context: Context): View(context) {
         private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+        private val workPath=Path()
         init { importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_NO }
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -138,14 +143,15 @@ internal class ClassMateCalendarMonthView(
             tint(R.color.cm_calendar_sun,95); canvas.drawCircle(w*0.84f,h*0.3f,h*0.2f,paint)
             fun hill(start:Float,peak:Float,base:Float,color:Int,alpha:Int) {
                 tint(color,alpha)
-                val path=Path().apply { moveTo(w*start,h); cubicTo(w*0.70f,h*peak,w*0.83f,h*base,w,h*0.53f); lineTo(w,h); close() }
-                canvas.drawPath(path,paint)
+                workPath.reset()
+                workPath.moveTo(w*start,h); workPath.cubicTo(w*0.70f,h*peak,w*0.83f,h*base,w,h*0.53f); workPath.lineTo(w,h); workPath.close()
+                canvas.drawPath(workPath,paint)
             }
             hill(0.45f,0.16f,0.64f,R.color.cm_calendar_hill,48)
             hill(0.58f,0.42f,0.73f,R.color.cm_primary,24)
             hill(0.72f,0.80f,0.6f,R.color.cm_calendar_hill,65)
             paint.color=context.getColor(R.color.cm_calendar_hill); paint.alpha=110; paint.strokeWidth=width*0.003f; paint.style=Paint.Style.STROKE
-            val branch=Path().apply { moveTo(w*0.93f,h*0.66f); quadTo(w*0.9f,h*0.4f,w*0.89f,h*0.2f) }; canvas.drawPath(branch,paint)
+            workPath.reset(); workPath.moveTo(w*0.93f,h*0.66f); workPath.quadTo(w*0.9f,h*0.4f,w*0.89f,h*0.2f); canvas.drawPath(workPath,paint)
             paint.style=Paint.Style.FILL; tint(R.color.cm_calendar_sun,145)
             for(i in 0..2) {
                 val x=w*(0.89f+i*0.012f); val y=h*(0.27f+i*0.11f)

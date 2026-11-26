@@ -88,7 +88,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginTop="14dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:paddingHorizontal="10dp"
             android:paddingVertical="5dp"
             android:background="@drawable/bg_version_container">
@@ -124,6 +124,48 @@
                 android:textSize="12sp"
                 android:textStyle="bold"
                 tools:text="v1.1.33"/>
+        </LinearLayout>
+
+        <!-- Release Meta Strip (Date · Size · Verified Source) -->
+        <TextView
+            android:id="@+id/tvReleaseMeta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:textColor="@color/cm_text_muted"
+            android:textSize="11.5sp"
+            android:gravity="center"
+            tools:text="26 Nov 2026 · 52.4 MB · Verified GitHub Release"/>
+
+        <!-- Why Update Card -->
+        <LinearLayout
+            android:id="@+id/layoutWhyUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_changelog_card"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WHY UPDATE"
+                android:textColor="@color/cm_primary"
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginBottom="3dp"/>
+
+            <TextView
+                android:id="@+id/tvWhyUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/cm_text_secondary"
+                android:textSize="12.5sp"
+                android:lineSpacingExtra="2dp"
+                tools:text="Includes the latest features, stability fixes, and full compatibility with ClassMate services."/>
         </LinearLayout>
 
         <!-- Changelog Container (Card-in-card style) -->
@@ -186,27 +228,49 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone"
-            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_changelog_card"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="12dp"
+            android:layout_marginBottom="16dp"
             tools:visibility="visible">
 
-            <ProgressBar
-                android:id="@+id/pbDownloadProgress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="6dp"
-                android:progressDrawable="@drawable/bg_poll_progress"
-                android:max="100"
-                android:progress="0"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
-                android:id="@+id/tvDownloadProgressText"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Downloading: 0% (0.0 MB / 0.0 MB)"
-                android:textColor="@color/cm_text_secondary"
-                android:textSize="11sp"
-                android:gravity="end"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:id="@+id/tvDownloadStage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Downloading update…"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvDownloadProgressText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textColor="@color/cm_text_secondary"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/pbDownloadProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:progress="0"
+                app:trackThickness="8dp"
+                app:trackCornerRadius="6dp"
+                app:indicatorColor="@color/cm_primary"
+                app:trackColor="@color/cm_border"/>
         </LinearLayout>
 
         <!-- Action Buttons Section -->

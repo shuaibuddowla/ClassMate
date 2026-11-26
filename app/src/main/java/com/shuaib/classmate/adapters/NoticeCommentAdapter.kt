@@ -36,8 +36,14 @@ class NoticeCommentAdapter(
     private val expandedCommentIds = mutableSetOf<String>()
 
     fun setLikedCommentIds(ids: Set<String>) {
+        val changedIds = (likedCommentIds - ids) + (ids - likedCommentIds)
         likedCommentIds = ids
-        notifyDataSetChanged()
+        if (changedIds.isEmpty()) return
+        currentList.forEachIndexed { index, thread ->
+            val affected = thread.root.commentId in changedIds ||
+                thread.replies.any { it.commentId in changedIds }
+            if (affected) notifyItemChanged(index)
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CommentViewHolder {

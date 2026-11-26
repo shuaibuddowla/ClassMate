@@ -22,10 +22,10 @@ object NotificationSender {
 
     private fun getChannelIdForType(type: String): String {
         return when (type) {
-            "chat_message" -> "chat_messages"
-            "notice" -> "classmate_notices"
-            "cancellation", "substitute" -> "classmate_cancellations"
-            else -> "classmate_notifications"
+            "chat_message" -> ClassMateNotificationChannels.CHANNEL_CHAT
+            "notice" -> ClassMateNotificationChannels.CHANNEL_NOTICES
+            "cancellation", "substitute" -> ClassMateNotificationChannels.CHANNEL_CANCELLATIONS
+            else -> ClassMateNotificationChannels.CHANNEL_GENERAL
         }
     }
 

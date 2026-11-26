@@ -70,57 +70,7 @@ internal object ClassMateEmergencyDialog {
         )
     )
 
-    private val ruContacts = listOf(
-        EmergencyContact(
-            "RU Medical Centre",
-            "Campus clinic & first aid desk",
-            "01711-234567",
-            "01711234567"
-        ),
-        EmergencyContact(
-            "RU Proctor Office",
-            "Campus security & incident response",
-            "01712-345678",
-            "01712345678"
-        ),
-        EmergencyContact(
-            "Campus Ambulance Transfer",
-            "24/7 patient transport to RMCH",
-            "01715-998877",
-            "01715998877"
-        ),
-        EmergencyContact(
-            "Rajshahi Medical College Hospital (RMCH)",
-            "Tertiary emergency casualty department",
-            "025888-58000",
-            "02588858000"
-        ),
-        EmergencyContact(
-            "Motihar Police Station (Rajshahi)",
-            "Campus jurisdiction police station",
-            "01320-061685",
-            "01320061685"
-        ),
-        EmergencyContact(
-            "Fire Service & Civil Defence",
-            "Rajshahi fire station rescue unit",
-            "01730-002288",
-            "01730002288"
-        ),
-        EmergencyContact(
-            "National Emergency Service (999)",
-            "Police, Ambulance & Fire Service",
-            "999",
-            "999"
-        )
-    )
-
-    private fun getContacts(context: Context): List<EmergencyContact> {
-        val home = ClassMateAcademicCache.home(context)
-        val email = home?.optJSONObject("profile")?.optString("email").orEmpty().lowercase()
-        val isRu = email.endsWith("@ru.ac.bd") || home?.optString("batch", "")?.contains("fisheries", ignoreCase = true) == true
-        return if (isRu) ruContacts else mbstuContacts
-    }
+    private fun getContacts(context: Context): List<EmergencyContact> = mbstuContacts
 
     fun show(context: Context) {
         val dialog = BottomSheetDialog(context, R.style.Theme_ClassMate_BottomSheetDialog)

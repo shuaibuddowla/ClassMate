@@ -195,29 +195,33 @@ fun NoticeComposerBar(
         ) {
             // Main Input Bubble
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(26.dp),
                 color = if (isDark) Color(0xFF131A2A) else Color(0xFFFFFFFF),
                 border = BorderStroke(
-                    1.dp,
-                    if (voiceState == VoiceRecordingState.RECORDING) accentRed.copy(alpha = 0.6f)
-                    else if (isDark) Color(0x30FFFFFF) else Color(0x18000000)
+                    width = if (voiceState == VoiceRecordingState.RECORDING || hasContent) 1.25.dp else 1.dp,
+                    color = when {
+                        voiceState == VoiceRecordingState.RECORDING -> accentRed.copy(alpha = 0.7f)
+                        hasContent -> primaryColor.copy(alpha = if (isDark) 0.55f else 0.4f)
+                        isDark -> Color(0x2EFFFFFF)
+                        else -> Color(0x1A0F172A)
+                    }
                 ),
-                shadowElevation = if (isDark) 3.dp else 1.5.dp,
+                shadowElevation = if (isDark) 4.dp else 2.dp,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = 50.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.Bottom
                 ) {
                     // Left / Middle Content: Text Field OR Voice State
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 8.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+                            .padding(start = 6.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         when (voiceState) {
@@ -239,7 +243,7 @@ fun NoticeComposerBar(
                                     decorationBox = { innerTextField ->
                                         if (messageText.isEmpty()) {
                                             Text(
-                                                text = "Notice message · English, Banglish…",
+                                                text = if (hasAttachments) "Add a caption (optional)…" else "Notice message · English, Banglish…",
                                                 fontSize = 14.5.sp,
                                                 fontFamily = PlusJakartaBold,
                                                 fontWeight = FontWeight.Normal,
@@ -309,42 +313,47 @@ fun NoticeComposerBar(
 
                     // Inside Bubble Action Icons (📎 Document & 📷 Photos, plus 🎙️ if text present)
                     if (voiceState == VoiceRecordingState.IDLE) {
-                        IconButton(
-                            onClick = onAttachDoc,
-                            modifier = Modifier.size(34.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_attach),
-                                contentDescription = "Attach PDF",
-                                tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onAttachPhoto,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_gallery_photo),
-                                contentDescription = "Attach Photos",
-                                tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // If user already typed text, keep mic icon inside bubble so dictation is always 1-tap accessible
-                        if (hasContent) {
                             IconButton(
-                                onClick = onVoiceClick,
-                                modifier = Modifier.size(34.dp)
+                                onClick = onAttachDoc,
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_mic),
-                                    contentDescription = "Voice Dictation",
-                                    tint = primaryColor,
+                                    painter = painterResource(R.drawable.ic_attach),
+                                    contentDescription = "Attach PDF",
+                                    tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
                                     modifier = Modifier.size(20.dp)
                                 )
+                            }
+
+                            IconButton(
+                                onClick = onAttachPhoto,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_gallery_photo),
+                                    contentDescription = "Attach Photos",
+                                    tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            // If user already typed text or attached media, keep mic icon 1-tap accessible
+                            if (hasContent) {
+                                IconButton(
+                                    onClick = onVoiceClick,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_mic),
+                                        contentDescription = "Voice Dictation",
+                                        tint = primaryColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }

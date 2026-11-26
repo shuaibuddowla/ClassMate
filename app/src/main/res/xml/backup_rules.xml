@@ -8,4 +8,5 @@
     <exclude domain="sharedpref" path="classmate_notification_identity_production.xml" />
     <exclude domain="sharedpref" path="classmate_notification_identity_staging.xml" />
     <exclude domain="database" path="classmate_academic.db" />
+    <exclude domain="database" path="classmate-offline.db" />
 </full-backup-content>

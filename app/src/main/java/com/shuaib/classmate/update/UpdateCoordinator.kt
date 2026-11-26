@@ -20,6 +20,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
+enum class UpdateStage {
+    DOWNLOADING,
+    VERIFYING,
+    PREPARING_INSTALL
+}
+
 sealed class UpdateOutcome {
     data object UpToDate : UpdateOutcome()
     data class Available(val version: String) : UpdateOutcome()
@@ -106,7 +112,12 @@ object UpdateCoordinator {
         WorkManager.getInstance(app).enqueueUniqueWork(FOREGROUND_NAME, ExistingWorkPolicy.KEEP, work)
     }
 
-    suspend fun run(context: Context, manual: Boolean = false, progress: (Int) -> Unit = {}): UpdateOutcome =
+    suspend fun run(
+        context: Context,
+        manual: Boolean = false,
+        onStage: (UpdateStage) -> Unit = {},
+        progress: (Int) -> Unit = {}
+    ): UpdateOutcome =
         mutex.withLock {
             val app = context.applicationContext
             val prefs = AppPreferences(app)
@@ -126,7 +137,11 @@ object UpdateCoordinator {
                 System.currentTimeMillis() - started < TimeUnit.MINUTES.toMillis(30))
                 return@withLock UpdateOutcome.AlreadyInstalling
 
+            if (!repository.hasDownloaded(metadata)) {
+                onStage(UpdateStage.DOWNLOADING)
+            }
             val apk = repository.download(metadata, progress)
+            onStage(UpdateStage.VERIFYING)
             try { withContext(Dispatchers.IO) { ApkVerifier(app).verify(apk, metadata) } }
             catch (error: Exception) {
                 apk.delete()
@@ -147,6 +162,7 @@ object UpdateCoordinator {
                 }
                 return@withLock UpdateOutcome.PermissionRequired(metadata.versionName)
             }
+            onStage(UpdateStage.PREPARING_INSTALL)
             try {
                 prefs.setLastDownloadedVersionCode(metadata.versionCode)
                 prefs.setUpdateInstallStartedAt(System.currentTimeMillis())

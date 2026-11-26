@@ -535,6 +535,14 @@
 
             android:exported="false" />
 
+        <!-- Notice Notification Inline Like & Comment Receiver -->
+
+        <receiver
+
+            android:name=".notices.NoticeNotificationActionReceiver"
+
+            android:exported="false" />
+
 
 
         <!-- Widget Receiver -->

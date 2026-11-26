@@ -97,7 +97,6 @@ internal object ClassMateTeachersDialog {
                     "acct" -> "Accounting"
                     "eco" -> "Economics"
                     "math" -> "Math"
-                    "fisheries" -> "Fisheries"
                     else -> t.departmentCode.uppercase().takeIf { it.isNotBlank() }
                 }
                 holder.tvCourses.text = listOfNotNull(

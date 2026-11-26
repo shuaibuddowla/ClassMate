@@ -360,6 +360,27 @@ private fun ClassMateHamburgerModalSheet(
                     }
                 )
 
+                val canManageAttendance = role in setOf("admin", "teacher") || isServerOwner || isCr
+                if (canManageAttendance) {
+                    DrawerMenuItem(
+                        title = "Manage Attendance",
+                        subtitle = "Start sessions, rosters & RFID cards",
+                        iconRes = R.drawable.ic_rfid_signal,
+                        iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF059669),
+                        jakartaBold = jakartaBold,
+                        isDark = isDark,
+                        onClick = {
+                            dismissAndRun {
+                                val intent = Intent(activity, ClassMateAdminAttendanceActivity::class.java).apply {
+                                    putExtra("EXTRA_BATCH_ID", batchId())
+                                    putExtra("EXTRA_BATCH_LABEL", batchLabel())
+                                }
+                                activity.startActivity(intent)
+                            }
+                        }
+                    )
+                }
+
                 HorizontalDivider(
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     thickness = 1.dp,

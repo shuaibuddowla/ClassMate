@@ -41,6 +41,7 @@ class NoticeModernViewHolder(
 ) : RecyclerView.ViewHolder(itemView) {
 
     private var currentModel: NoticePresentationModel? = null
+    private var carouselCallback: ViewPager2.OnPageChangeCallback? = null
 
     // View References Cached Once - Zero findViewById on bind!
     val cardRoot: MaterialCardView = itemView.findViewById(R.id.cardRoot)
@@ -149,7 +150,10 @@ class NoticeModernViewHolder(
 
         if (model.isPoll) {
             ivNoticeIllustration.visibility = View.GONE
-            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
+            val pollTitleSize = if (model.title.length > 100) 16.5f else 18.5f
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, pollTitleSize)
+            tvTitle.maxLines = 8
+            tvTitle.ellipsize = null
             if (titleLp != null && titleLp.marginEnd != 0) {
                 titleLp.marginEnd = 0
                 titleContainer.layoutParams = titleLp
@@ -159,6 +163,8 @@ class NoticeModernViewHolder(
             ivNoticeIllustration.setImageResource(iconRes)
             ivNoticeIllustration.imageTintList = null
             tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
+            tvTitle.maxLines = 4
+            tvTitle.ellipsize = TextUtils.TruncateAt.END
             val defaultMargin = (8 * density).toInt()
             if (titleLp != null && titleLp.marginEnd != defaultMargin) {
                 titleLp.marginEnd = defaultMargin
@@ -166,17 +172,9 @@ class NoticeModernViewHolder(
             }
         }
 
-        // Title and Body
+        // Title and Body (bound once via applyTranslation below)
         currentModel = model
         tvTitle.text = model.title
-        val bodyText = model.cleanBody.toString()
-        com.shuaib.classmate.activities.ClassMateNoticeText.bind(
-            view = tvPreview,
-            body = bodyText,
-            query = "",
-            isExpanded = model.isExpanded,
-            onToggleExpand = { callbacks.onCardClick(model) }
-        )
 
         // Expand/Collapse click
         noticeCardSurface.setOnClickListener {
@@ -207,16 +205,23 @@ class NoticeModernViewHolder(
                 imageCarouselPager.visibility = View.VISIBLE
                 tvCarouselIndicator.visibility = View.VISIBLE
                 tvTapToView.visibility = View.VISIBLE
-                tvCarouselIndicator.text = "1 / ${imageUrls.size}"
+                if (imageCarouselPager.tag != imageUrls) {
+                    imageCarouselPager.tag = imageUrls
+                    tvCarouselIndicator.text = "1 / ${imageUrls.size}"
 
-                imageCarouselPager.adapter = NoticeImageCarouselAdapter(imageUrls) { pos ->
-                    callbacks.onOpenImages(imageUrls, pos)
-                }
-                imageCarouselPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                    override fun onPageSelected(position: Int) {
-                        tvCarouselIndicator.text = "${position + 1} / ${imageUrls.size}"
+                    carouselCallback?.let { imageCarouselPager.unregisterOnPageChangeCallback(it) }
+                    imageCarouselPager.adapter = NoticeImageCarouselAdapter(imageUrls) { pos ->
+                        callbacks.onOpenImages(imageUrls, pos)
                     }
-                })
+                    imageCarouselPager.setCurrentItem(0, false)
+                    val newCallback = object : ViewPager2.OnPageChangeCallback() {
+                        override fun onPageSelected(position: Int) {
+                            tvCarouselIndicator.text = "${position + 1} / ${imageUrls.size}"
+                        }
+                    }
+                    carouselCallback = newCallback
+                    imageCarouselPager.registerOnPageChangeCallback(newCallback)
+                }
             } else {
                 imageCarouselPager.visibility = View.GONE
                 tvCarouselIndicator.visibility = View.GONE
@@ -225,6 +230,9 @@ class NoticeModernViewHolder(
 
                 Glide.with(itemView)
                     .load(imageUrls.first())
+                    .placeholder(R.drawable.bg_notice_modern_card)
+                    .error(R.drawable.bg_notice_modern_card)
+                    .centerCrop()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(ivPreview)
 
@@ -257,9 +265,18 @@ class NoticeModernViewHolder(
         if (model.resourceId != null) {
             fileAttachmentContainer.visibility = View.VISIBLE
             tvFileName.text = model.title.removePrefix("Resource: ")
-            tvFileSize.text = "Tap to open protected file"
-            val ext = model.title.substringAfterLast('.', "").uppercase().takeIf { it.length in 2..5 } ?: "FILE"
-            tvFileExtension.text = ext
+            val linkUrl = model.resourceLinkUrl
+            val isLink = model.resourceFileType.equals("link", ignoreCase = true) || !linkUrl.isNullOrBlank()
+            if (isLink) {
+                val isGoogleDrive = linkUrl?.contains("drive.google.com", ignoreCase = true) == true ||
+                    linkUrl?.contains("docs.google.com", ignoreCase = true) == true
+                tvFileExtension.text = if (isGoogleDrive) "DRIVE" else "LINK"
+                tvFileSize.text = if (isGoogleDrive) "Google Drive Link • Tap to open" else "External Link • Tap to open"
+            } else {
+                tvFileSize.text = "Tap to open protected file"
+                val ext = model.title.substringAfterLast('.', "").uppercase().takeIf { it.length in 2..5 } ?: "FILE"
+                tvFileExtension.text = ext
+            }
 
             val openAction = View.OnClickListener {
                 callbacks.onOpenProtectedResource(model.resourceId)
@@ -299,9 +316,8 @@ class NoticeModernViewHolder(
             callbacks.onTranslateClick(m)
         }
 
-        // Social Reactions & Read Receipts
-        applyLike(model.isLiked, model.likeCount)
-        applyEngagement(model.likeCount, model.isLiked, model.commentCount)
+        // Social Reactions & Read Receipts (skip like animation on initial scroll bind)
+        applyEngagement(model.likeCount, model.isLiked, model.commentCount, animateLike = false)
         applyRead(model.isRead, model.readCount, model.seenAvatars)
 
         btnLike.setOnClickListener {
@@ -343,29 +359,40 @@ class NoticeModernViewHolder(
         }
     }
 
-    fun applyLike(isLiked: Boolean, count: Int) {
+    fun applyLike(isLiked: Boolean, count: Int, animate: Boolean = true) {
         val context = itemView.context
+        ivLikeIcon.animate().cancel()
         if (isLiked) {
             ivLikeIcon.setImageResource(R.drawable.ic_heart_filled)
             ivLikeIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.cm_notice_like))
-            ivLikeIcon.animate().cancel()
-            ivLikeIcon.scaleX = 0.2f
-            ivLikeIcon.scaleY = 0.2f
-            ivLikeIcon.alpha = 0.8f
-            ivLikeIcon.animate().scaleX(1.35f).scaleY(1.35f).alpha(1f).setDuration(160)
-                .setInterpolator(android.view.animation.OvershootInterpolator(3.5f))
-                .withEndAction {
-                    ivLikeIcon.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120)
-                        .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
-                }.start()
-            runCatching { ivLikeIcon.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP) }
+            if (animate) {
+                ivLikeIcon.scaleX = 0.2f
+                ivLikeIcon.scaleY = 0.2f
+                ivLikeIcon.alpha = 0.8f
+                ivLikeIcon.animate().scaleX(1.35f).scaleY(1.35f).alpha(1f).setDuration(160)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(3.5f))
+                    .withEndAction {
+                        ivLikeIcon.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+                    }.start()
+                runCatching { ivLikeIcon.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP) }
+            } else {
+                ivLikeIcon.scaleX = 1.0f
+                ivLikeIcon.scaleY = 1.0f
+                ivLikeIcon.alpha = 1.0f
+            }
         } else {
             ivLikeIcon.setImageResource(R.drawable.ic_heart_outline)
             ivLikeIcon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.cm_text_muted))
-            ivLikeIcon.animate().cancel()
-            ivLikeIcon.scaleX = 0.8f
-            ivLikeIcon.scaleY = 0.8f
-            ivLikeIcon.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+            if (animate) {
+                ivLikeIcon.scaleX = 0.8f
+                ivLikeIcon.scaleY = 0.8f
+                ivLikeIcon.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+            } else {
+                ivLikeIcon.scaleX = 1.0f
+                ivLikeIcon.scaleY = 1.0f
+                ivLikeIcon.alpha = 1.0f
+            }
         }
 
         if (count > 0) {
@@ -377,8 +404,8 @@ class NoticeModernViewHolder(
         }
     }
 
-    fun applyEngagement(likeCount: Int, isLiked: Boolean, commentCount: Int) {
-        applyLike(isLiked, likeCount)
+    fun applyEngagement(likeCount: Int, isLiked: Boolean, commentCount: Int, animateLike: Boolean = true) {
+        applyLike(isLiked, likeCount, animate = animateLike)
         if (commentCount > 0) {
             tvCommentCount.text = NoticePresentationMapper.compactCount(commentCount.toLong())
             tvCommentCount.visibility = View.VISIBLE
@@ -552,10 +579,21 @@ class NoticeModernViewHolder(
 
     fun applyPoll(poll: PollPresentationModel) {
         pollContainer.visibility = View.VISIBLE
-        tvPollSubtext.text = if (poll.isMultiple) "Select one or more options" else "Select one option"
+        tvPollChip.text = when {
+            poll.isClosed -> "POLL CLOSED"
+            poll.isAnonymous -> "ANONYMOUS POLL"
+            else -> "POLL"
+        }
+        tvPollSubtext.text = when {
+            poll.isClosed -> "Voting has ended"
+            poll.isAnonymous && poll.isMultiple -> "Anonymous · Select one or more options"
+            poll.isAnonymous -> "Anonymous · Select one option"
+            poll.isMultiple -> "Select one or more options"
+            else -> "Select one option"
+        }
         tvPollTotalVotes.text = "${poll.totalVoters} student${if (poll.totalVoters == 1) "" else "s"} voted (${poll.totalVotes} vote${if (poll.totalVotes == 1) "" else "s"})"
 
-        if (poll.canViewVotes) {
+        if (poll.canViewVotes && !poll.isAnonymous) {
             tvPollViewVotes.visibility = View.VISIBLE
             tvPollViewVotes.setOnClickListener {
                 callbacks.onPollViewVotesClick(poll.noticeId, poll.id)
@@ -564,12 +602,21 @@ class NoticeModernViewHolder(
             tvPollViewVotes.visibility = View.GONE
         }
 
-        pollOptionsList.removeAllViews()
         val inflater = LayoutInflater.from(itemView.context)
         val density = itemView.resources.displayMetrics.density
+        val targetCount = poll.options.size
 
-        poll.options.forEach { opt ->
+        // Reuse existing option views instead of removing & re-inflating on every scroll bind
+        while (pollOptionsList.childCount > targetCount) {
+            pollOptionsList.removeViewAt(pollOptionsList.childCount - 1)
+        }
+        while (pollOptionsList.childCount < targetCount) {
             val optView = inflater.inflate(R.layout.item_poll_option_m3, pollOptionsList, false)
+            pollOptionsList.addView(optView)
+        }
+
+        poll.options.forEachIndexed { idx, opt ->
+            val optView = pollOptionsList.getChildAt(idx)
             val cardOption = optView.findViewById<MaterialCardView>(R.id.cardPollOption)
             val track = optView.findViewById<View>(R.id.viewProgressTrack)
             val indicator = optView.findViewById<ImageView>(R.id.ivPollIndicator)
@@ -618,11 +665,10 @@ class NoticeModernViewHolder(
                 cardOption.post { applyTrackWidth() }
             }
 
+            cardOption.alpha = if (poll.isClosed) 0.78f else 1.0f
             cardOption.setOnClickListener {
                 callbacks.onPollVoteClick(poll.noticeId, poll.id, opt.id)
             }
-
-            pollOptionsList.addView(optView)
         }
     }
 

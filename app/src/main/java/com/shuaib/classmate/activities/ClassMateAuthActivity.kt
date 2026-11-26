@@ -1093,15 +1093,8 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-    private fun notificationChannelDisabled(): Boolean = Build.VERSION.SDK_INT >= 26 &&
-
-
-
-        getSystemService(android.app.NotificationManager::class.java)
-
-
-
-            .getNotificationChannel("classmate_notifications")?.importance == android.app.NotificationManager.IMPORTANCE_NONE
+    private fun notificationChannelDisabled(): Boolean =
+        com.shuaib.classmate.utils.ClassMateNotificationChannels.isGeneralChannelDisabled(this)
 
 
 
@@ -1141,7 +1134,7 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
 
-                .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, "classmate_notifications")
+                .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, com.shuaib.classmate.utils.ClassMateNotificationChannels.CHANNEL_GENERAL)
 
 
 
@@ -2224,29 +2217,29 @@ class ClassMateAuthActivity : AppCompatActivity() {
 
 
         val openUrl = { url: String ->
-
-
-
+            val parsedUri = Uri.parse(url)
             try {
-
-
-
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-
-
-
+                androidx.browser.customtabs.CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                    .launchUrl(this, parsedUri)
             } catch (_: Exception) {
-
-
-
-                Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
-
-
-
+                try {
+                    val viewIntent = Intent(Intent.ACTION_VIEW, parsedUri)
+                        .addCategory(Intent.CATEGORY_BROWSABLE)
+                    val externalPkg = packageManager.queryIntentActivities(viewIntent, 0)
+                        .firstOrNull { it.activityInfo?.packageName != packageName }
+                        ?.activityInfo?.packageName
+                    if (externalPkg != null) {
+                        viewIntent.`package` = externalPkg
+                        startActivity(viewIntent)
+                    } else {
+                        Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+                    }
+                } catch (_: Exception) {
+                    Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+                }
             }
-
-
-
         }
 
 
@@ -4073,6 +4066,10 @@ class ClassMateAuthActivity : AppCompatActivity() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 com.shuaib.classmate.fcm.ClassMateInAppPush.events.collect { event ->
+                    if (event.kind in setOf("notice", "notice_updated", "notice_deleted") && ::academicScreens.isInitialized) {
+                        academicScreens.refreshNoticesLive()
+                    }
+                    if (event.kind in setOf("notice_updated", "notice_deleted")) return@collect
                     val cleanTitle = event.title.ifBlank { "ClassMate update" }
                     val cleanBody = event.body.ifBlank { "New update available" }
                     val message = "$cleanTitle: $cleanBody"

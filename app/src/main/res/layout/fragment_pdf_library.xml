@@ -264,6 +264,13 @@
                         android:textSize="14sp"
                         android:visibility="gone" />
 
+                    <include
+                        android:id="@+id/emptySubjectsState"
+                        layout="@layout/view_empty_state"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone" />
+
                     <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvRegular" style="@style/LibraryCourseList" tools:listitem="@layout/item_subject_card" />
                     <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvLab" style="@style/LibraryCourseList" android:visibility="gone" tools:listitem="@layout/item_subject_card" />
                     <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvOther" style="@style/LibraryCourseList" android:visibility="gone" tools:listitem="@layout/item_subject_card" />

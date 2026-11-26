@@ -136,12 +136,24 @@ class UpdateActionActivity : AppCompatActivity() {
         val repository = UpdateRepository(this)
         val alreadyDownloaded = repository.hasDownloaded(metadata)
         val sizeMb = String.format(Locale.US, "%.1f MB", metadata.apkSize / (1024.0 * 1024.0))
+        val formattedDate = runCatching {
+            val instant = java.time.Instant.parse(metadata.releaseDate)
+            java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US)
+                .withZone(java.time.ZoneId.systemDefault())
+                .format(instant)
+        }.getOrElse { metadata.releaseDate.take(10) }
 
-        if (alreadyDownloaded) {
-            binding.btnUpdateNow.text = "Install Now"
+        binding.tvReleaseMeta.text = "$formattedDate · $sizeMb · Verified GitHub Release"
+        binding.tvWhyUpdate.text = if (isMandatory) {
+            "This update is required to keep your ClassMate data, notices, and batch sync working safely."
         } else {
-            binding.btnUpdateNow.text = "Update ($sizeMb)"
+            "Upgrade to get the latest ClassMate features, smoother performance, and important bug fixes."
         }
+
+        fun syncActionButton(downloaded: Boolean) {
+            binding.btnUpdateNow.text = if (downloaded) "Update Now" else "Download & Update ($sizeMb)"
+        }
+        syncActionButton(alreadyDownloaded)
 
         binding.btnUpdateNow.setOnClickListener {
             if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
@@ -150,24 +162,62 @@ class UpdateActionActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            val isReadyLocally = repository.hasDownloaded(metadata)
             binding.btnUpdateNow.isEnabled = false
             binding.btnUpdateLater.isEnabled = false
             binding.layoutDownloadProgress.visibility = View.VISIBLE
-            binding.pbDownloadProgress.progress = if (alreadyDownloaded) 100 else 0
-            binding.tvDownloadProgressText.text = if (alreadyDownloaded) "Verifying update…" else "Starting download…"
+            binding.pbDownloadProgress.isIndeterminate = isReadyLocally
+            if (!isReadyLocally) {
+                binding.pbDownloadProgress.progress = 0
+                binding.tvDownloadStage.text = "Starting download…"
+                binding.tvDownloadProgressText.text = "0%"
+                binding.btnUpdateNow.text = "Downloading…"
+            } else {
+                binding.tvDownloadStage.text = "Verifying package…"
+                binding.tvDownloadProgressText.text = sizeMb
+                binding.btnUpdateNow.text = "Verifying…"
+            }
 
             lifecycleScope.launch {
                 val result = runCatching {
-                    UpdateCoordinator.run(this@UpdateActionActivity, manual = true) { percent ->
+                    UpdateCoordinator.run(
+                        context = this@UpdateActionActivity,
+                        manual = true,
+                        onStage = { stage ->
+                            runOnUiThread {
+                                when (stage) {
+                                    UpdateStage.DOWNLOADING -> {
+                                        binding.pbDownloadProgress.isIndeterminate = false
+                                        binding.tvDownloadStage.text = "Downloading update…"
+                                    }
+                                    UpdateStage.VERIFYING -> {
+                                        binding.pbDownloadProgress.isIndeterminate = true
+                                        binding.tvDownloadStage.text = "Verifying SHA-256…"
+                                        binding.tvDownloadProgressText.text = "100% · $sizeMb"
+                                        binding.btnUpdateNow.text = "Verifying…"
+                                    }
+                                    UpdateStage.PREPARING_INSTALL -> {
+                                        binding.pbDownloadProgress.isIndeterminate = true
+                                        binding.tvDownloadStage.text = "Preparing installer…"
+                                        binding.tvDownloadProgressText.text = "Ready"
+                                        binding.btnUpdateNow.text = "Update Now"
+                                    }
+                                }
+                            }
+                        }
+                    ) { percent ->
                         runOnUiThread {
-                            binding.pbDownloadProgress.progress = percent
+                            binding.pbDownloadProgress.isIndeterminate = false
+                            binding.pbDownloadProgress.setProgressCompat(percent, true)
                             val downloadedMb = (metadata.apkSize * percent / 100.0) / (1024.0 * 1024.0)
                             val totalMb = metadata.apkSize / (1024.0 * 1024.0)
+                            binding.tvDownloadStage.text = if (percent >= 100) "Download complete" else "Downloading update…"
                             binding.tvDownloadProgressText.text = String.format(
                                 Locale.US,
-                                "Downloading: %d%% (%.1f MB / %.1f MB)",
+                                "%d%% (%.1f / %.1f MB)",
                                 percent, downloadedMb, totalMb
                             )
+                            binding.btnUpdateNow.text = if (percent >= 100) "Update Now" else "Downloading $percent%…"
                         }
                     }
                 }
@@ -176,6 +226,7 @@ class UpdateActionActivity : AppCompatActivity() {
 
                 val outcome = result.getOrNull()
                 if (outcome is UpdateOutcome.Installing) {
+                    binding.btnUpdateNow.text = "Installing…"
                     dialog.dismiss()
                     finish()
                 } else if (outcome is UpdateOutcome.PermissionRequired) {
@@ -185,11 +236,13 @@ class UpdateActionActivity : AppCompatActivity() {
                     binding.btnUpdateNow.isEnabled = true
                     binding.btnUpdateLater.isEnabled = true
                     binding.layoutDownloadProgress.visibility = View.GONE
+                    syncActionButton(repository.hasDownloaded(metadata))
                     showResult("Wi-Fi Required", "Connect to Wi-Fi to download this update, or turn off 'Wi-Fi only' in Profile.")
                 } else if (result.isFailure) {
                     binding.btnUpdateNow.isEnabled = true
                     binding.btnUpdateLater.isEnabled = true
                     binding.layoutDownloadProgress.visibility = View.GONE
+                    syncActionButton(repository.hasDownloaded(metadata))
                     showResult("Update Failed", result.exceptionOrNull()?.message ?: "Could not complete update. Please try again.")
                 } else {
                     dialog.dismiss()

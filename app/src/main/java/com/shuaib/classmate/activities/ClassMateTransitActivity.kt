@@ -112,16 +112,37 @@ class ClassMateTransitActivity : AppCompatActivity() {
 
         wv.addJavascriptInterface(bridge, "ClassMateNativeBridge")
 
+        fun isTrustedTransitOrigin(urlOrOrigin: String?): Boolean {
+            if (urlOrOrigin.isNullOrBlank()) return false
+            if (urlOrOrigin.startsWith("file:///android_asset/", ignoreCase = true) || urlOrOrigin == "file://") return true
+            val uri = runCatching { android.net.Uri.parse(urlOrOrigin) }.getOrNull() ?: return false
+            return uri.scheme.equals("https", ignoreCase = true) &&
+                uri.host?.lowercase() in setOf("classmatebd.vercel.app", "classmate-web-editor.vercel.app")
+        }
+
         wv.webChromeClient = object : android.webkit.WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
                 callback: android.webkit.GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                callback?.invoke(origin, isTrustedTransitOrigin(origin), false)
             }
         }
 
         wv.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: android.webkit.WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): Boolean {
+                val url = request?.url?.toString()
+                if (isTrustedTransitOrigin(url)) return false
+                if (!url.isNullOrBlank()) {
+                    runCatching {
+                        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                    }
+                }
+                return true
+            }
             override fun onReceivedError(
                 view: android.webkit.WebView?,
                 request: android.webkit.WebResourceRequest?,

@@ -3,8 +3,9 @@ package com.shuaib.classmate.adapters
 import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.shuaib.classmate.R
 import com.shuaib.classmate.databinding.ItemBusScheduleBinding
@@ -13,9 +14,13 @@ import com.shuaib.classmate.utils.ThemeColors
 import com.shuaib.classmate.utils.animateSpringScale
 
 class BusScheduleAdapter(
-    private var schedules: List<BusSchedule>,
+    schedules: List<BusSchedule>,
     private val onItemClick: (BusSchedule) -> Unit = {}
-) : RecyclerView.Adapter<BusScheduleAdapter.BusViewHolder>() {
+) : ListAdapter<BusSchedule, BusScheduleAdapter.BusViewHolder>(DiffCallback) {
+
+    init {
+        submitList(schedules)
+    }
 
     inner class BusViewHolder(val binding: ItemBusScheduleBinding) :
         RecyclerView.ViewHolder(binding.root)
@@ -28,7 +33,7 @@ class BusScheduleAdapter(
     }
 
     override fun onBindViewHolder(holder: BusViewHolder, position: Int) {
-        val schedule = schedules[position]
+        val schedule = getItem(position)
         val b = holder.binding
         val context = holder.itemView.context
 
@@ -66,10 +71,17 @@ class BusScheduleAdapter(
         }
     }
 
-    override fun getItemCount(): Int = schedules.size
-
     fun updateList(newSchedules: List<BusSchedule>) {
-        schedules = newSchedules
-        notifyDataSetChanged()
+        submitList(newSchedules.toList())
+    }
+
+    companion object {
+        private val DiffCallback = object : DiffUtil.ItemCallback<BusSchedule>() {
+            override fun areItemsTheSame(oldItem: BusSchedule, newItem: BusSchedule): Boolean =
+                oldItem.id == newItem.id && oldItem.time == newItem.time
+
+            override fun areContentsTheSame(oldItem: BusSchedule, newItem: BusSchedule): Boolean =
+                oldItem == newItem
+        }
     }
 }

@@ -12,9 +12,10 @@ internal object ClassMateCourses {
         "batch_course_catalog", JSONObject().put("target_batch",batch)))
 
     fun intent(activity: AppCompatActivity,batch: String,label: String,role: String,profile: String,
-               mode: String="courses") = Intent(activity,ClassMateConfigurationActivity::class.java)
+               mode: String="courses",isServerOwner: Boolean=false,isCr: Boolean=false) = Intent(activity,ClassMateConfigurationActivity::class.java)
         .putExtra("batch_id",batch).putExtra("batch_label",label).putExtra("role",role)
         .putExtra("profile_id",profile).putExtra("mode",mode)
+        .putExtra("is_server_owner",isServerOwner).putExtra("is_cr",isCr)
 
     fun prompt(activity: AppCompatActivity,start: ()->Unit) {
         MaterialAlertDialogBuilder(activity).setTitle("Set up your batch courses")
