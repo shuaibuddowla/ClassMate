@@ -30,6 +30,7 @@ import {
   Menu,
 } from "lucide-react";
 import { rpc, supabase, edge, openFile, uploadFile, type Row } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import { type R2StorageStats, formatBytes } from "./r2-storage-modal";
 import type { Context } from "./app";
 import { Confirm, Empty, ErrorBox, Form, Modal, Skeleton } from "./ui";
@@ -218,7 +219,15 @@ export function Library({ ctx }: { ctx: Context }) {
         <div className={`card file-row ${external ? "file-row-link" : ""}`} key={f.id}>
           <button
             className="file-open"
-            onClick={() => openFile(f).catch(setError)}
+            onClick={() => {
+              trackEvent("resource_open", {
+                resource_id: f.id,
+                title: f.title,
+                type: external ? (isDrive ? "gdrive" : "external_link") : "file",
+                course_id: f.course_id,
+              });
+              openFile(f).catch(setError);
+            }}
           >
             <span className={`file-icon ${fileIconClass}`}>
               {fileIconNode}
@@ -390,6 +399,9 @@ export function Library({ ctx }: { ctx: Context }) {
                   (c.course_code && c.course_code.toLowerCase().includes(q));
                 return matchesType && matchesSearch;
               })
+              .sort((a, b) =>
+                String(a.course_code || "").localeCompare(String(b.course_code || ""), undefined, { numeric: true, sensitivity: "base" })
+              )
               .map((c) => (
                 <button
                   className={`card course-tile ${course === c.offering_id ? "active" : ""}`}
@@ -455,7 +467,7 @@ export function Library({ ctx }: { ctx: Context }) {
         </Modal>
       )}
       {upload && (
-        <Modal title="Share a resource" close={() => setUpload(false)}>
+        <Modal title="Course File" close={() => setUpload(false)}>
           <UploadForm
             ctx={ctx}
             permissions={permissions.data}
@@ -468,7 +480,7 @@ export function Library({ ctx }: { ctx: Context }) {
         </Modal>
       )}
       {editing && (
-        <Modal title="Edit resource" close={() => setEditing(null)}>
+        <Modal title="Edit Course File" close={() => setEditing(null)}>
           <Form
             fields={[
               {
@@ -908,9 +920,12 @@ function UploadForm({
                   {permissions?.general && <option value="">General (No specific subject)</option>}
                   {ctx.courses
                     .filter((c) => permissions?.courses[c.offering_id])
+                    .sort((a, b) =>
+                      String(a.course_code || "").localeCompare(String(b.course_code || ""), undefined, { numeric: true, sensitivity: "base" })
+                    )
                     .map((c) => (
                       <option key={c.offering_id} value={c.offering_id}>
-                        {c.course_title}
+                        {c.course_code ? `${c.course_code} • ${c.course_title}` : c.course_title}
                       </option>
                     ))}
                 </select>
@@ -1059,50 +1074,61 @@ function UploadForm({
           </form>
         </div>
       ) : (
-        <Form
-          label="Share Drive Link"
-          fields={[
-            {
-              name: "title",
-              label: "Resource Title",
-              required: true,
-              placeholder: "e.g. Lecture Slides / Lab Manual",
-            },
-            {
-              name: "url",
-              label: "Google Drive or Resource Link",
-              required: true,
-              placeholder: "https://drive.google.com/...",
-            },
-            {
-              name: "course",
-              label: "Subject",
-              value: defaultCourse || undefined,
-              required: !permissions?.general,
-              options: ctx.courses
-                .filter((c) => permissions?.courses[c.offering_id])
-                .map((c) => ({ value: c.offering_id, label: c.course_title })),
-            },
-          ]}
-          submit={async (d) => {
-            const rawUrl = (d.url || "").trim();
-            if (!rawUrl) throw new Error("Please enter a Google Drive or resource link.");
-            const urlWithScheme = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-            try {
-              new URL(urlWithScheme);
-            } catch {
-              throw new Error("Please enter a valid link URL (e.g. https://drive.google.com/...)");
-            }
-            await rpc("create_library_link", {
-              target_batch: ctx.batch,
-              target_course: d.course || null,
-              target_title: d.title.trim(),
-              target_category: "notes",
-              target_url: urlWithScheme,
-            });
-            await done();
-          }}
-        />
+        <>
+          <div style={{ padding: "10px 12px", borderRadius: "10px", background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.2)", fontSize: "12px", color: "var(--muted)", marginBottom: "12px" }}>
+            Sharing a Drive Link automatically posts a resource notice to your batch feed so classmates can open it in one tap.
+          </div>
+          <Form
+            label="Share Drive Link"
+            fields={[
+              {
+                name: "title",
+                label: "Resource Title",
+                required: true,
+                placeholder: "e.g. Lecture Slides / Lab Manual",
+              },
+              {
+                name: "url",
+                label: "Google Drive or Resource Link",
+                required: true,
+                placeholder: "https://drive.google.com/...",
+              },
+              {
+                name: "course",
+                label: "Subject",
+                value: defaultCourse || undefined,
+                required: !permissions?.general,
+                options: ctx.courses
+                  .filter((c) => permissions?.courses[c.offering_id])
+                  .sort((a, b) =>
+                    String(a.course_code || "").localeCompare(String(b.course_code || ""), undefined, { numeric: true, sensitivity: "base" })
+                  )
+                  .map((c) => ({
+                    value: c.offering_id,
+                    label: c.course_code ? `${c.course_code} • ${c.course_title}` : c.course_title,
+                  })),
+              },
+            ]}
+            submit={async (d) => {
+              const rawUrl = (d.url || "").trim();
+              if (!rawUrl) throw new Error("Please enter a Google Drive or resource link.");
+              const urlWithScheme = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+              try {
+                new URL(urlWithScheme);
+              } catch {
+                throw new Error("Please enter a valid link URL (e.g. https://drive.google.com/...)");
+              }
+              await rpc("create_library_link", {
+                target_batch: ctx.batch,
+                target_course: d.course || null,
+                target_title: d.title.trim(),
+                target_category: "notes",
+                target_url: urlWithScheme,
+              });
+              await done();
+            }}
+          />
+        </>
       )}
     </div>
   );

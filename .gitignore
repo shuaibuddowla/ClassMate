@@ -84,10 +84,13 @@ attendance_tracker_presentation.html
 /*.xml
 /*.mp4
 /*.docx
+/*.pdf
+/DELIVERABLE_*.md
+/FIX_SUMMARY.md
+/scratch/
 /scratch_*/
 /.codex-attachments/
 /notification_previews/
-
-
-
-scratch/
+/hs_err_pid*.log
+/replay_pid*.log
+/ui-testing/

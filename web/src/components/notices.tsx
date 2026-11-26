@@ -17,6 +17,7 @@ import {
   Plus,
   Search,
   ExternalLink,
+  Link2 as Link,
   Copy,
   Check,
   Languages,
@@ -33,6 +34,7 @@ import {
   Menu,
 } from "lucide-react";
 import { WhatsAppText } from "@/lib/whatsapp-formatter";
+import { trackEvent } from "@/lib/analytics";
 import { edge, rpc, supabase, mutation, openFile, type Row } from "@/lib/api";
 import { readAcademic, saveAcademic } from "@/lib/cache";
 import { dhakaToday, formatStamp, parseDate, dateKey } from "@/lib/calendar";
@@ -374,7 +376,6 @@ export function Notices({
         } else {
           selectedIds = [...currentVotes, optionId];
         }
-        if (selectedIds.length === 0) return;
       }
       await rpc("cast_poll_vote", {
         target_poll: pollId,
@@ -1984,19 +1985,31 @@ function NoticeCard({
           </button>
         </div>
         <ErrorBox error={translationError} />
-        {n.resource_id && (
-          <button
-            className="quick-file"
-            onClick={() => {
-              const bodySlugMatch = n.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(n.body) : null;
-              const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : n.resource_id);
-              window.open(`/r/${slug}`, "_blank");
-            }}
-          >
-            <FileText size={18} />
-            {resource?.title ? resource.title : "Open resource"} <ExternalLink size={14} />
-          </button>
-        )}
+        {n.resource_id && (() => {
+          const isLink = resource?.file_type === "link" || Boolean(resource?.link_url);
+          const isDrive = Boolean(resource?.link_url && /drive\.google\.com|docs\.google\.com/i.test(resource.link_url));
+          return (
+            <button
+              className="quick-file"
+              onClick={() => {
+                if (isLink && resource?.link_url) {
+                  window.open(resource.link_url, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                const bodySlugMatch = n.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(n.body) : null;
+                const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : n.resource_id);
+                window.open(`/r/${slug}`, "_blank");
+              }}
+            >
+              {isLink ? <Link size={17} /> : <FileText size={18} />}
+              <span>
+                {resource?.title ? resource.title : "Open resource"}
+                {isDrive ? " · Google Drive" : isLink ? " · External Link" : ""}
+              </span>
+              <ExternalLink size={14} />
+            </button>
+          );
+        })()}
         {!poll && (
           <img
             className="notice-illustration"
@@ -2465,6 +2478,15 @@ export function NoticeDetailModal({
     initialIndex: number;
   } | null>(null);
 
+  useEffect(() => {
+    if (notice?.id) {
+      trackEvent("notice_detail_view", {
+        notice_id: notice.id,
+        category: notice.category || "general",
+      });
+    }
+  }, [notice?.id]);
+
   const copyNotice = async () => {
     let text = `${notice.title || ""}\n\n${notice.body || ""}`.replace(/\s*\[assessment_id:[^\]]*\]\s*/g, "").trim();
     const m = String(notice.body).match(/\[assessment_id:([^\]]+)\]/);
@@ -2558,35 +2580,43 @@ export function NoticeDetailModal({
             />
           )}
 
-          {notice.resource_id && (
-            <div className="notice-detail-resource-card">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <FileText size={22} style={{ color: "var(--primary)" }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                    {resource?.title || "Attached Resource"}
+          {notice.resource_id && (() => {
+            const isLink = resource?.file_type === "link" || Boolean(resource?.link_url);
+            const isDrive = Boolean(resource?.link_url && /drive\.google\.com|docs\.google\.com/i.test(resource.link_url));
+            return (
+              <div className="notice-detail-resource-card">
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {isLink ? <Link size={22} style={{ color: "var(--primary)" }} /> : <FileText size={22} style={{ color: "var(--primary)" }} />}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                      {resource?.title || "Attached Resource"}
+                    </div>
+                    <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                      {resource?.course_code ? `${resource.course_code} · ` : ""}
+                      {isDrive ? "Google Drive Link" : isLink ? "External Link" : (resource?.file_type ? resource.file_type.toUpperCase() : "Resource")}
+                      {!isLink && resource?.size_bytes ? ` · ${Math.ceil(resource.size_bytes / 1024)} KB` : ""}
+                    </small>
                   </div>
-                  <small style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
-                    {resource?.course_code ? `${resource.course_code} · ` : ""}
-                    {resource?.file_type ? resource.file_type.toUpperCase() : "Resource"}
-                    {resource?.size_bytes ? ` · ${Math.ceil(resource.size_bytes / 1024)} KB` : ""}
-                  </small>
                 </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ padding: "6px 14px", fontSize: "0.8rem" }}
+                  onClick={() => {
+                    if (isLink && resource?.link_url) {
+                      window.open(resource.link_url, "_blank", "noopener,noreferrer");
+                      return;
+                    }
+                    const bodySlugMatch = notice.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(notice.body) : null;
+                    const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : notice.resource_id);
+                    window.open(`/r/${slug}`, "_blank");
+                  }}
+                >
+                  {isLink ? "Open Link" : "View Resource"} <ExternalLink size={14} style={{ marginLeft: 4 }} />
+                </button>
               </div>
-              <button
-                type="button"
-                className="secondary"
-                style={{ padding: "6px 14px", fontSize: "0.8rem" }}
-                onClick={() => {
-                  const bodySlugMatch = notice.body ? /https:\/\/classmatebd\.vercel\.app\/r\/([a-zA-Z0-9_\-]+)/.exec(notice.body) : null;
-                  const slug = resource?.slug || (bodySlugMatch ? bodySlugMatch[1] : notice.resource_id);
-                  window.open(`/r/${slug}`, "_blank");
-                }}
-              >
-                View Resource <ExternalLink size={14} style={{ marginLeft: 4 }} />
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         <div className="notice-detail-footer">

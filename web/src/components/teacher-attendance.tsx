@@ -514,6 +514,8 @@ export function FullscreenSessionDashboard({
   const [filterMode, setFilterMode] = useState<"all" | "present" | "absent">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [closing, setClosing] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [actionBanner, setActionBanner] = useState<string | null>(null);
   const [togglingStudentId, setTogglingStudentId] = useState<string | null>(null);
 
   const client = supabase();
@@ -570,16 +572,14 @@ export function FullscreenSessionDashboard({
 
   // Handle Close Session
   const handleCloseSession = async () => {
-    if (!window.confirm("Finish and close attendance session? This will lock attendance for this class and unlink the RFID reader.")) {
-      return;
-    }
     try {
       setClosing(true);
+      setActionBanner(null);
       await rpc("close_attendance_session", { target_session: sessionId });
       await fetchSummary(false);
       onSessionClosed();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to close session");
+      setActionBanner(err instanceof Error ? err.message : "Failed to close session");
     } finally {
       setClosing(false);
     }
@@ -624,7 +624,7 @@ export function FullscreenSessionDashboard({
       // Refresh to confirm
       await fetchSummary(false);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to update attendance for student");
+      setActionBanner(err instanceof Error ? err.message : "Failed to update attendance for student");
       await fetchSummary(false);
     } finally {
       setTogglingStudentId(null);
@@ -708,7 +708,7 @@ export function FullscreenSessionDashboard({
               type="button"
               className="finish-session-btn danger"
               disabled={closing}
-              onClick={handleCloseSession}
+              onClick={() => setConfirmCloseOpen(true)}
             >
               <CheckCircle2 size={16} />
               <span>{closing ? "Closing..." : "Finish & Close Attendance Session"}</span>
@@ -716,6 +716,41 @@ export function FullscreenSessionDashboard({
           )}
         </div>
       </header>
+
+      {actionBanner && (
+        <div style={{ margin: "12px 20px 0", padding: "10px 14px", borderRadius: 10, background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#ef4444", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionBanner}</span>
+          <button type="button" onClick={() => setActionBanner(null)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}><X size={14} /></button>
+        </div>
+      )}
+
+      {confirmCloseOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "var(--surface, #fff)", border: "1px solid var(--border, #e2e8f0)", borderRadius: 20, maxWidth: 420, width: "100%", padding: 24, boxShadow: "0 20px 50px rgba(0,0,0,0.35)" }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800 }}>Finish & Close Attendance Session?</h3>
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              This will lock attendance for <strong>{summary?.course_code || "this class"}</strong> ({presentCount}/{totalEnrolled} present) and unlink the RFID reader.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="secondary" style={{ flex: 1 }} onClick={() => setConfirmCloseOpen(false)} disabled={closing}>
+                Keep Open
+              </button>
+              <button
+                type="button"
+                className="primary"
+                style={{ flex: 1, background: "#ef4444", borderColor: "#ef4444" }}
+                disabled={closing}
+                onClick={async () => {
+                  setConfirmCloseOpen(false);
+                  await handleCloseSession();
+                }}
+              >
+                {closing ? "Closing..." : "Close Session"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="fullscreen-main-content">

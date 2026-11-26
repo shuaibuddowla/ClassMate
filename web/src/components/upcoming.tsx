@@ -924,8 +924,10 @@ function PostAssessmentModal({
     message: string;
   } | null>(null);
 
-  // Available courses for active batch
-  const courses = ctx.courses || [];
+  // Available courses for active batch (sorted by course code)
+  const courses = [...(ctx.courses || [])].sort((a, b) =>
+    String(a.course_code || "").localeCompare(String(b.course_code || ""), undefined, { numeric: true, sensitivity: "base" })
+  );
 
   // When both course and deadlineDate are selected, query routine slots for autofill
   useEffect(() => {

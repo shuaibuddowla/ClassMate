@@ -338,7 +338,7 @@ export default function Manage({
                       fields: [
                         {
                           name: "target_semester",
-                          label: "Select new running semester",
+                          label: "Select new running semester (previous semester courses & timetable will switch; notices stay intact)",
                           required: true,
                           value: activeSemester.id,
                           options: (semesters.data || []).map((s) => ({
@@ -1110,10 +1110,12 @@ function Overrides({
     queryFn: () => rpc<Row[]>("available_batches"),
   });
 
-  const batchOptions = (batches.data || []).map((b) => ({
-    value: b.id,
-    label: `${b.departments?.code?.toUpperCase() || ""} Batch ${b.batch_number}${b.academic_session ? ` (${academicSession(b.academic_session)})` : ""}`,
-  }));
+  const batchOptions = (batches.data || [])
+    .filter((b) => ctx.owner || b.id === ctx.batch)
+    .map((b) => ({
+      value: b.id,
+      label: `${b.departments?.code?.toUpperCase() || ""} Batch ${b.batch_number}${b.academic_session ? ` (${academicSession(b.academic_session)})` : ""}`,
+    }));
 
   const openForm = (initial?: Row) => {
     open({
@@ -1128,10 +1130,12 @@ function Overrides({
         },
         {
           name: "target_batch",
-          label: "Effective batch",
+          label: ctx.owner ? "Effective batch" : "Effective batch (Your batch)",
           required: true,
-          value: initial?.effective_batch_id || (batchOptions[0]?.value ?? ""),
-          options: batchOptions,
+          value: initial?.effective_batch_id || ctx.batch || (batchOptions[0]?.value ?? ""),
+          options: batchOptions.length > 0
+            ? batchOptions
+            : [{ value: ctx.batch, label: "Current Batch" }],
         },
         {
           name: "target_reason",

@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 import "./globals.css";
 
 const siteUrl = "https://classmatebd.vercel.app";
@@ -167,6 +169,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
+        <Suspense fallback={null}>
+          <AnalyticsTracker />
+        </Suspense>
         {children}
         <Analytics />
         <SpeedInsights />

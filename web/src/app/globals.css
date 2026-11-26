@@ -14131,3 +14131,216 @@ dialog:has(.notice-detail-modal-shell) > header {
   cursor: pointer;
   min-height: unset !important;
 }
+
+
+/* ClassMate Web Batch Fund Fintech Hero & Carousel Overrides */
+.fund-hero-card {
+  background: linear-gradient(135deg, #1e1b4b 0%, #171c3a 55%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 20px 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+}
+
+.fund-hero-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.fund-balance-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(199, 210, 254, 0.85);
+  letter-spacing: 0.9px;
+}
+
+.fund-privacy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #c7d2fe;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fund-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e0e7ff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.fund-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #34d399;
+}
+
+.fund-breakdown-grid,
+.fund-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fund-flow-grid {
+  margin-top: 10px;
+}
+
+.fund-breakdown-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.fund-breakdown-tile span {
+  display: block;
+  font-size: 10.5px;
+  color: rgba(199, 210, 254, 0.78);
+}
+
+.fund-breakdown-tile strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.fund-breakdown-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fund-breakdown-icon.cash {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.fund-breakdown-icon.mfs {
+  background: rgba(236, 72, 153, 0.2);
+  color: #f472b6;
+}
+
+.fund-flow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 13px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fund-flow-btn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.fund-flow-btn.inflow {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  color: #a7f3d0;
+}
+
+.fund-flow-btn.inflow strong {
+  color: #6ee7b7;
+}
+
+.fund-flow-btn.outflow {
+  background: rgba(244, 63, 94, 0.14);
+  border: 1px solid rgba(251, 113, 133, 0.24);
+  color: #fecdd3;
+}
+
+.fund-flow-btn.outflow strong {
+  color: #fda4af;
+}
+
+.fund-carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 18px;
+  scroll-snap-type: x mandatory;
+}
+
+.fund-slide-card {
+  min-width: 220px;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 18px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fund-slide-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.fund-slide-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.fund-slide-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.fund-slide-paid {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.fund-slide-title {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fg, #0f172a);
+}
+
+.fund-slide-amount {
+  font-size: 14px;
+  font-weight: 800;
+}

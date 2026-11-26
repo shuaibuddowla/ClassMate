@@ -25,8 +25,8 @@ This memory file serves as the definitive engineering knowledge base and memory 
 ## 1. High-Level Overview & Core Concepts
 
 - **Upcoming Assessment Deadline Reminders (100% On-Device Zero-Compute Engine)**:
-  - **Zero Supabase Compute Guarantee**: All server-side polling and pg_cron scheduling (`classmate-assessment-reminders`) are completely unscheduled and disabled (migration `202611240002_unschedule_assessment_reminders_cron.sql`). This ensures Supabase never wakes up or expends free compute quota for assessment polling.
-  - **On-Device Hybrid Engine**: Reminders are scheduled locally on the student's Android device using `AlarmManager.setExactAndAllowWhileIdle()` with `WorkManager` fallback (`ClassMateAssessmentReminderScheduler`).
+  - **Zero Supabase Compute Guarantee**: All server-side polling and pg_cron scheduling (`classmate-assessment-reminders`) are completely unscheduled and disabled (migration `202611240002_unschedule_assessment_reminders_cron.sql`, with `trigger_sync_assessment_reminders` dropped and `process_due_assessment_reminders()` turned into a 0-cost no-op). This ensures Supabase never wakes up or expends free compute quota for assessment polling.
+  - **On-Device Hybrid Engine**: Reminders are scheduled locally on the student's Android device using `AlarmManager.setExactAndAllowWhileIdle()` with `WorkManager` fallback (`ClassMateAssessmentReminderScheduler`) and deduplicated via `classmate_assessment_alarms` (`ClassMateAssessmentReminderReceiver`).
   - **Alert Cadence**: Fires exactly 24 hours (deadline - 24h) and 2 hours (deadline - 2h) before the deadline in Asia/Dhaka timezone.
   - **100% Offline Capable**: Fires even when mobile data or campus Wi-Fi is completely disconnected.
   - **Lifecycle & Persistence**:
@@ -35,16 +35,9 @@ This memory file serves as the definitive engineering knowledge base and memory 
     - Reboot persistence: Rescheduled on device reboot via `BootReceiver`.
     - Channel: `classmate_assessments` (High priority).
     - Tapping opens `ClassMateAuthActivity` to `R.id.nav_upcoming` and presents the assessment detail bottom sheet.
-  - Automatically schedules 24-hour and 2-hour deadline alerts in Asia/Dhaka time (BST, UTC+6) via classmate.assessment_reminders table and trigger classmate.sync_assessment_reminders().
-  - Batch isolation is strictly enforced across all 3 tiers:
-    1. *Database Queue & Recipient Filtering*: classmate.process_due_assessment_reminders() stamps atch_id on the outbox row. classmate.notification_recipients() verifies p.batch_id = b.id AND p.department_id = b.department_id, completely preventing cross-batch push delivery.
-    2. *Context Resolution*: classmate.academic_notification_job_context validates that the recipient's atch_id matches the assessment's atch_id before building the rich reminder message.
-    3. *Client-side Enforcement*: ClassMatePushWorker.kt checks ClassMatePushPolicy.addressedToCurrentUser(eventBatch) before displaying any system notification, ensuring that even if an outdated or mismatched token receives a message, it is silently dropped on-device.
-  - Periodic queue processing runs every 5 minutes via pg_cron job classmate-assessment-reminders.
-  - Edge function dispatch-classmate-notifications v25 forwards ssessment_id and navigates on notification tap:
-    - Android: ClassMateAuthActivity opens directly to R.id.nav_upcoming and presents the assessment detail bottom sheet in place.
-    - Web companion: web/src/worker.ts opens /#upcoming?id={assessment_id}.
-
+  - **Batch Isolation & Announcement Deep-Linking**:
+    - `ClassMatePushWorker.kt` checks `ClassMatePushPolicy.addressedToCurrentUser(eventBatch)` before displaying any system notification, silently dropping mismatched-batch pushes on-device.
+    - Edge function `dispatch-classmate-notifications` forwards `assessment_id` for immediate assessment announcements, routing Android taps to `R.id.nav_upcoming` and Web (`web/src/worker.ts`) to `/#upcoming?id={assessment_id}`.
 
 
 
@@ -150143,3 +150136,342 @@ Between Sessions 151 and 153 (November 23–24, 2026), full-stack engineering ef
 ```
 
 All source code, layouts, drawables, database migrations, and documentation references are certified synchronized bit-for-bit across both repository trees.
+
+---
+
+## 458. Master Production State v458: Sessions 154–156 Transcripts Retrospective, 100% On-Device Zero-Compute Reminders, Clean Compose Post Notice, Unified Notification Prompting, Batchmates Dark-Mode Recovery, Fintech Batch Fund Compose UI, Web GA4 Analytics & Supabase Security Hardening (Issues 756–765)
+
+### 458.1 Executive Engineering Summary & Transcripts Review (Sessions 154–156)
+
+Between November 24, 2026 (09:39 BST) and November 25, 2026 (00:21 BST), three concurrent engineering sessions (`47ed2188`, `7bf9b1c9`, and `b447abdd`) delivered ten major feature upgrades, UI migrations, and production security/reliability fixes across the Android APK (`D:\Code & Scripts\ClassMate-main`, `versionCode 49` / `1.1.49`), Next.js Web companion (`web/`), and Supabase production database (`cbskpifgbdbgdmnnxfrh`):
+
+1. **Notice Feed Seen Avatar Cap, Alignment & Poll Title Expansion (`18764c3`)**: Capped rendered seen avatars to at most 3 photos plus a 4th `+N` circular overflow counter, locked computed pixel width inside symmetric 16dp card padding, and expanded poll notice headers to full width (`20sp` auto-size max) when no illustration is shown.
+2. **Duplicate Assessment Reminder Elimination & `pg_cron` Compute Shutdown (`1c8c005`, `17b8445`)**: Diagnosed twin notifications firing at the 24h mark from both Supabase `pg_cron` FCM and on-device `AlarmManager`; implemented unified 12h deduplication (`classmate_assessment_alarms`), shared tag/ID slots, and then completely unscheduled `classmate-assessment-reminders` and dropped `trigger_sync_assessment_reminders` (`202611240002_unschedule_assessment_reminders_cron.sql`) to eliminate all Supabase compute wakeups.
+3. **Clean Compose Post Notice Screen, Recent Batch Peek & Keyboard Inset Recovery (`a6c9d1d`, `1d9a4c1`)**: Stripped cluttered onboarding copy from `PostNoticeScreen.kt` in favor of a 3-card `RecentNoticePeekCard` strip backed by zero-latency `NoticeCacheStore`, eliminated duplicate `"NOTICE"` / `"Class Notice"` labels, added a top-right `[ Semester 3 ]` badge, and resolved both the Courses tab disappearing segment indicator and the Post Notice IME soft-keyboard occlusion bug.
+4. **Notification Permission Overhaul for Android & Web (`b447abdd`, committed in `a6c9d1d` & `1d9a4c1`)**: Wired previously dead `requestNotificationPermissionIfNeeded()` on Android sign-in/home/resume, removed `welcomeStep == 0` and teacher role exclusions from prompting and `registerFcmToken()`, added permanent-denial `"Open Settings"` fallback, and opened a follow-up item for teacher notification delivery.
+5. **Hamburger Drawer Prioritization (`64cfd72`)**: Promoted **BATCH HUB** (`Batchmates`, `Student Fund`) to the top of `ClassMateHamburgerSheet`, ahead of **CAMPUS & ACADEMIC** and **CAMPUS UTILITIES**.
+6. **Batchmates Dark/Light Mode & Search/Back Recovery (`abe65c4`)**: Replaced unstyled platform `PopupMenu` with themed `androidx.appcompat.widget.PopupMenu` (`Theme.ClassMate.PopupMenu`), tinted 3-dot and chevron icons, created `drawable-night/` ban sheet assets, added adaptive search/back buttons with clear (`X`), and wired `OnBackPressedCallback` so back dismisses keyboard -> collapses search -> exits.
+7. **Fintech Batch Fund Compose Rewrite, Instagram Carousel & CSE-22 Accuracy Fix (`7b2eac3`, `39b46b3`, `1665e9d`)**: Rewrote `ClassMateBatchFundScreen.kt` in Jetpack Compose matching `batch_fund_cse_22_mbstu.html`, replaced static campaign chips with a snapping `HorizontalPager` carousel + scroll-to-top FAB, switched per-student fee calculation from mean (`৳ 962`) to mode (`deduceCampaignPerStudent` -> `৳ 1,000`), and raised `page_limit` from `100` to `1000` so all 167 CSE-22 transactions (and all 4 expenses totaling `৳ 69,080`) load completely.
+8. **Cross-Platform Web Firebase Analytics (GA4) (`7bf9b1c9`, uncommitted in `D:`)**: Connected Next.js `web/` to the same Firebase/GA4 project (`web/src/lib/analytics.ts`, `AnalyticsTracker`) tracking `page_view`, `login`, `logout`, `tab_view`, `notice_detail_view`, and `resource_open`.
+9. **Supabase Production Linter Security Remediation (`7bf9b1c9`, applied live, migration untracked in `D:`)**: Resolved all 3 linter `ERROR`s (`security_definer_view` on 2 views, `rls_disabled_in_public` on `preseeded_student_roster`) and security `WARN`s (12 mutable `search_path` signatures, 3 public bucket listing policies, 49 `anon` executes, and 10 worker RPCs restricted to `service_role`/`postgres`) via `202611250001_fix_supabase_linter_security_warnings.sql`.
+
+---
+
+### 458.2 In-Situ Field Debugging & Production Incident Resolution Runbook (Issues 756–765)
+
+#### Issue 756: Notice Seen Counter Avatar Cap, Right-Edge Alignment & Poll Title Expansion (`NoticeModernViewHolder.kt`, `item_notice_modern.xml` — Commit `18764c3`)
+- **Incident Analysis & Operational Problem**:
+  - Notice cards displayed more than 3 reader profile avatars, overflowing toward/past the bottom-right 20dp rounded card edge. Poll notice cards omitted the right-hand illustration icon yet kept extra end margin, leaving poll questions cramped.
+- **Architectural Resolutions Deployed**:
+  - *3-Avatar + Overflow Counter Cap*: In `NoticeModernViewHolder.kt`, capped rendered reader avatar photos to `minOf(3, count)` and rendered the 4th bubble as a white circular overflow badge displaying `+N` (e.g., `+7`, `+24`), guaranteeing at most 4 total bubbles.
+  - *Card Padding & Pixel Width Locking*: Set symmetric `paddingEnd="16dp"` in `item_notice_modern.xml`, added `paddingEnd="6dp"` and `layout_marginEnd="4dp"` on `btnReadReceipts`, and locked computed pixel width on `seenAvatars` (`((totalBubbles - 1) * overlap) + avatarSize`).
+  - *Poll Header Expansion*: When `isPoll` is true (illustration omitted), cleared title container end margin (`0dp`) and increased `app:autoSizeMaxTextSize="20sp"`.
+- **Verification**: `.\gradlew testDebugUnitTest` passed; installed and visually verified on `CPH2621`.
+
+#### Issue 757: Elimination of Duplicate Assessment Reminders & Unscheduling Server `pg_cron` (`ClassMateAssessmentReminderReceiver.kt`, `ClassMatePushWorker.kt`, `202611240001`, `202611240002` — Commits `1c8c005`, `17b8445`)
+- **Incident Analysis & Operational Problem**:
+  - Students received twin notifications at the exact 24-hour mark before an exam:
+    1. Remote FCM Push: `"Reminder: Class Test Tomorrow"` (`CSE2109 - Sociology & Economics tomorrow at 11:00 AM in Room 338. Tap to view details and syllabus.`).
+    2. Local `AlarmManager`: `"Reminder: CT tomorrow at 11:00 AM"` (`CSE2109 · Sociology & Economics in Room 338. Tap to review details.`).
+  - Moreover, the server `pg_cron` job (`classmate-assessment-reminders`) woke Supabase every 5 minutes (~8,640 wakeups/month), draining Free Plan compute hours and blocking auto-pause.
+- **Root Cause Analysis**:
+  - Uncoordinated dual pipelines posted with different notification IDs (`assessment_id.hashCode()` vs `requestCode(assessmentId, reminderType)`), no shared notification tag, disconnected deduplication (`ClassMatePushWorker` never wrote `classmate_assessment_alarms`), and `"reminder_type"` missing from `ClassMatePushWorker` WorkManager whitelist.
+- **Architectural Resolutions Deployed**:
+  - *Phase 1 — Unified Deduplication & Slot Sharing (`1c8c005`)*:
+    - Shared `classmate_assessment_alarms` 12-hour registry via `ClassMateAssessmentReminderReceiver.isReminderAlreadyDelivered()` and `markReminderDelivered()`.
+    - Added `ClassMateAssessmentReminderScheduler.cancelSingle(context, assessmentId, reminderType)` and unified notification slot (`notificationTag(assessmentId, reminderType)` = `asmt_${id}_${type}`, ID = `requestCode(id, type)`).
+    - Preserved `"reminder_type"` in `ClassMatePushWorker` whitelist, added `ClassMateAssessmentReminderReceiverTest.kt`, and added `202611240001_fix_assessment_reminder_event_id.sql`.
+  - *Phase 2 — 100% On-Device Zero-Compute Enforcement (`17b8445`)*:
+    - Created and ran `202611240002_unschedule_assessment_reminders_cron.sql` on live Supabase:
+      - Unscheduled `classmate-assessment-reminders` from `cron.job`.
+      - Dropped `trigger_sync_assessment_reminders` on `classmate.assessments`.
+      - Replaced `classmate.process_due_assessment_reminders()` with a no-op returning `0`.
+      - Truncated stale rows in `classmate.assessment_reminders`.
+    - Assessment deadline reminders now run 100% locally via `AlarmManager.setExactAndAllowWhileIdle()` / `WorkManager` + `BootReceiver` (offline capable, $0 server compute).
+
+#### Issue 758: Clean Jetpack Compose Post Notice Screen, Recent Batch Notices Peek & IME Docking Fix (`PostNoticeScreen.kt`, `ClassMatePublishActivity.kt` — Commits `a6c9d1d`, `1d9a4c1`)
+- **Incident Analysis & Operational Problem**:
+  - The Compose Post Notice screen showed bulky instructional bullet points (`"ClassMate Smart Notice"`). After replacing them with recent notice peek cards, two issues surfaced: (1) peek cards repeated `"NOTICE"` top-left and `"Class Notice"` bottom-left while the header duplicated semester text, and (2) tapping the notice composer caused the input bar to stay **behind** the soft keyboard.
+- **Root Cause Analysis & Debugging Lesson (Keyboard Insets vs `adjustResize`)**:
+  - Across concurrent sessions `7bf9b1c9` and `47ed2188`, `PostNoticeScreen.kt` went through two inset corrections:
+    - Earlier (`7bf9b1c9`), `if (imeBottom > 0) 4.dp else navBottom.toDp()` was added to prevent a ~350dp double-padding gap when `adjustResize` resized the layout.
+    - On live device testing (`47ed2188`, Nov 24 18:23 BST), `4.dp` left the composer hidden behind the soft keyboard under edge-to-edge window bounds!
+  - Also encountered Gradle desugar cache corruption (`FileNotFoundException` in `app\build\intermediates\desugar_graph`), cleared by deleting `app\build\intermediates\desugar_graph` and `dex`.
+- **Architectural Resolutions Deployed**:
+  - *Clean Recent Notices Peek (`a6c9d1d`)*: Removed bullet-point onboarding copy (and legacy `silentHint` `"Banglish auto-converts..."`), added `RecentNoticePeekCard` showing the latest 2–3 batch notices modeled on `item_missed_notice_peek.xml`, hydrated immediately from `NoticeCacheStore.readCache` with background sync and tap-to-preview modal.
+  - *Visual Hierarchy & Header Polish (`1d9a4c1`)*:
+    - Normalized top-left category badges (`GENERAL`, `CLASS TEST`, `ASSIGNMENT`, `CLASS CANCEL`, `POLL`, `ROUTINE`), eliminating generic `"NOTICE"`.
+    - Replaced `"Class Notice"` fallback with resolved author names (`"By <Author Name>"` / `"By Class Representative"`).
+    - Extracted semester into a dedicated top-right pill (`[ Semester 3 ]`) with clean `CSE Batch 22 · Session 24-25` subtitle.
+  - *Keyboard Docking Fix (`1d9a4c1`)*: Updated bottom padding in `PostNoticeScreen.kt` to `if (imeBottom > 0) imeBottomDp + 6.dp else navBottomDp + 6.dp`, sliding the composer bar flush above the raised keyboard.
+
+#### Issue 759: Courses Tab Disappearing Segmented Toggle Indicator (`ClassMateAcademicScreensSupabase.kt`, `fragment_pdf_library.xml` — Committed in `1d9a4c1`)
+- **Incident Analysis & Operational Problem**:
+  - Switching to the Courses tab showed the `"Theory"` vs `"Practical / Lab"` segmented control without its active indicator pill (`libraryCategoryIndicator`) until the user tapped a segment.
+- **Root Cause Analysis**:
+  - `libraryCategoryIndicator` starts with `0dp` width and relies on `updateLibrarySegment(root, animate)` computing `(track.width - padding) / 2`. Because the Courses view was prewarmed while `View.GONE`, `track.width` was `0`, causing `updateLibrarySegment` to return early without retrying when `selectHomeTab(R.id.nav_pdf)` made the view visible.
+- **Architectural Resolutions Deployed**:
+  - Attached an `OnLayoutChangeListener` to `libraryCategoryToggle`, called `updateLibrarySegment(root, false)` in `selectHomeTab(R.id.nav_pdf)`, and updated `updateLibrarySegment` to re-post (`track.post { updateLibrarySegment(root, false) }`) whenever `width <= 0`. Verified on `CPH2621`.
+
+#### Issue 760: Push Notification Permission Overhaul & Open Teacher Notification Report (`ClassMateAuthActivity.kt`, `web/src/components/app.tsx` — Commits `a6c9d1d`, `1d9a4c1`)
+- **Incident Analysis & Operational Problem**:
+  - Newly installed Android clients did not display a notification permission prompt right after sign-in, and approved teachers were excluded from both permission prompts and FCM token registration.
+- **Root Causes Identified**:
+  1. `requestNotificationPermissionIfNeeded()` existed as dead code and was never invoked.
+  2. Prompts were gated behind multi-step `ClassMateWelcomeDialogs` and skipped when `profileComplete == true` on fresh device installs.
+  3. `welcomeStep == 0` guard in `showHome()` and `onResume()` suppressed prompts when `welcomeStep` was non-zero.
+  4. Hardcoded `if (profile?.optString("role") == "teacher") return` blocked both `offerNotificationPermission()` and `registerFcmToken()` for teachers.
+- **Architectural Resolutions Deployed**:
+  - *Android (`ClassMateAuthActivity.kt`)*: Invoked `requestNotificationPermissionIfNeeded()` from `loadProfile()`, `showHome()`, and `onResume()`, removed `welcomeStep == 0` and teacher exclusions (`offerNotificationPermission()` now delegates directly to `requestNotificationPermissionIfNeeded()`), launched native `POST_NOTIFICATIONS` on Android 13+, persisted `hasRequestedNotificationPermission` in `AppPreferences`, and added `"Enable Notifications"` -> `"Open Settings"` fallback when permanently denied. Verified with `.\gradlew testDebugUnitTest` and `.\gradlew assembleDebug`.
+  - *Web (`web/src/components/app.tsx`)*: Removed `p.role !== "teacher"` and `signed`-only gating on the notification modal, tracking `"Not now"` per session via `sessionStorage.getItem("classmate:notif-dismissed")`. (`vercel deploy` in `b447abdd` returned `Not authorized`, awaiting authorized Vercel deploy.)
+- **Open Follow-Up (`b447abdd` Step 32279, Nov 24 19:09 BST)**:
+  - User reported: *"Brother, teachers will get a notification. Also, they are not getting the notification."* — This message has not yet been answered; server/edge-function recipient routing (`notification_recipients` / `dispatch-classmate-notifications`) for teachers requires investigation and implementation.
+
+#### Issue 761: Hamburger Drawer Reordering — Batch Hub Prioritization (`ClassMateHamburgerSheet.kt`, `dialog_classmate_hamburger_drawer.xml` — Commit `64cfd72`)
+- **Architectural Resolutions Deployed**:
+  - Reordered sections in `dialog_classmate_hamburger_drawer.xml` and `ClassMateHamburgerSheet.kt` so **BATCH HUB** (`Batchmates`, `Student Fund`) appears at the top, followed by **CAMPUS & ACADEMIC** (`MBSTU Bus Transit`, `Teachers Directory`, `App Guide`) and **CAMPUS UTILITIES** (`Export Class Routine`, `Blood Donor Directory`, `Emergency Hotlines`). Installed and verified on device.
+
+#### Issue 762: Batchmates Screen Dark/Light Mode Contrast, Action Popup, Search Bar & Back Navigation (`ClassMateFriendsScreen.kt`, `ClassMateBatchActivity.kt`, `themes.xml`, `dialog_ban_student_sheet.xml` — Commit `abe65c4`)
+- **Incident Analysis & Operational Problem**:
+  - On the Batchmates screen: (1) 3-dot action icons turned black-on-black in dark mode, (2) tapping row actions opened an unreadable black popup menu, (3) search/back buttons had hardcoded `#E8F0FF` backgrounds and white row chevrons disappeared in light mode, (4) system back exited the activity instead of closing active search, and (5) the Restrict Student Access sheet had bright white boxes in dark mode.
+- **Architectural Resolutions Deployed**:
+  - Tinted `ic_more_vert` with `@color/cm_text_primary` and row chevrons with `@color/cm_text_muted`.
+  - Replaced platform `android.widget.PopupMenu` with `androidx.appcompat.widget.PopupMenu` wrapped in `ContextThemeWrapper(activity, R.style.Theme_ClassMate_PopupMenu)` inheriting `Theme.ClassMate`.
+  - Converted `btnBackNav` and `btnSearch` to adaptive `@color/cm_surface`/`@color/cm_border` surfaces; added leading `ivSearchIcon` and dynamic `btnClear` (`X`).
+  - Integrated `OnBackPressedCallback` across `ClassMateFriendsScreen.kt` and `ClassMateBatchActivity.kt` (first back dismisses keyboard, second collapses search bar and resets roster, third navigates back).
+  - Created `drawable-night/` drawables (`bg_ban_badge_red.xml`, `bg_ban_card_notice.xml`, `bg_ban_card_permanent.xml`, `bg_ban_role_pill.xml`), mapped semantic colors in `dialog_ban_student_sheet.xml`, and switched duration dropdown to `@layout/item_course_dropdown`. Verified in Light and Dark mode on device.
+
+#### Issue 763: Fintech Batch Fund Compose UI, Instagram-Style Collection Carousel & CSE-22 Fee/Expense Truncation Fix (`ClassMateBatchFundScreen.kt`, `ClassMateBatchFundActivity.kt`, `BatchFundModels.kt` — Commits `7b2eac3`, `39b46b3`, `1665e9d`)
+- **Architectural Resolutions Deployed**:
+  - *Fintech Jetpack Compose Migration (`7b2eac3`)*: Built `ClassMateBatchFundScreen.kt`, `BatchFundModels.kt`, and 8 `ic_fund_*.xml` vector icons matching `D:\Code & Scripts\batch_fund_cse_22_mbstu.html` while preserving Supabase RPCs, permissions, and `ClassMateBatchFundCache`:
+    - Wallet Hero Card (`#1C2042` -> `#151830` -> `#0E1120`, 28dp corners) with privacy eye toggle (`৳ •••••`), Cash/MFS pills, and Inflow/Outflow summary.
+    - 4-column Action Dock (CR vs Student actions), unified `Activity | Dues` workspace, Quick Collect Desk, Add Fund/Expense sheets, Treasury Analytics Canvas bar chart, Payment Receipt modal, and Undo toast.
+  - *Instagram-Style Swipeable Collection Carousel & Scroll-to-Top FAB (`39b46b3`)*:
+    - Replaced campaign filter chips and stacked `+55` avatars with a snapping `HorizontalPager` carousel (most recent first) + pagination dots + CR `"Add New Collection"` slide. Swiping focuses that collection and syncs Activity & Dues feeds (`Focused Campaign -> All Activity -> Inflow -> Outflow`).
+    - Added 46dp scroll-to-top FAB (`ic_chevron_up`, shown when `firstVisibleItemIndex > 1`, calling `listState.animateScrollToItem(0)`).
+  - *Per-Student Mode Deduction & 100-Transaction Truncation Fix (`1665e9d`)*:
+    - **Root Cause 1 (`৳ 962/student`)**: Dividing total collected (`৳ 50,000`) by paid students (`52`) averaged 48 full payments (`৳ 1,000`) with 4 partial payments (`৳ 500`), giving `961.54 ≈ ৳ 962`. Implemented `deduceCampaignPerStudent(campaignTitle, coll, paid)` using statistical mode with clean denomination snapping, restoring **`৳ 1,000/student`** and target **`৳ 58,000` (`52 paid • 6 unpaid`)**.
+    - **Root Cause 2 (Missing Expenses)**: `loadTransactions()` hardcoded `"page_limit", 100`, while CSE-22 had **167 total transactions**, truncating earlier October expenses (`-৳ 500`, `-৳ 1,800`). Increased `page_limit` to `1000` so all 167 transactions and all 4 expenses totaling **`৳ 69,080`** load, and made Hero Card `In`/`Out` totals clickable to jump directly to Inflow/Outflow activity. Verified live on device.
+
+#### Issue 764: Web Companion Firebase Analytics (GA4) Cross-Platform Integration (`web/src/lib/analytics.ts`, `analytics-tracker.tsx`, `layout.tsx`, `app.tsx`, `notices.tsx`, `library.tsx` — Uncommitted in `D:`)
+- **Architectural Resolutions Deployed**:
+  - Reused existing `"firebase": "^12.0.0"` and `NEXT_PUBLIC_FIREBASE_CONFIG` (already carrying GA4 `measurementId`) in `web/src/lib/analytics.ts` with `isSupported()` client guard (safe under SSR and ad-blockers).
+  - Added `<AnalyticsTracker />` inside `<Suspense>` in `web/src/app/layout.tsx` for automatic `page_view` logging.
+  - Wired `trackUser`, `trackUserProperties` (`role`, `verification_status`, `batch`), `login`, `logout`, `tab_view` in `app.tsx`; `notice_detail_view` in `notices.tsx`; and `resource_open` in `library.tsx`.
+  - Verified `npm run build` in `web/` succeeded (`15/15` routes generated, 0 errors). Pending git commit and Vercel deployment (ensure `NEXT_PUBLIC_FIREBASE_CONFIG` is present in Vercel Environment Variables).
+
+#### Issue 765: Supabase Production Database Linter Security Remediation (`supabase/migrations/202611250001_fix_supabase_linter_security_warnings.sql` — Live Applied to `cbskpifgbdbgdmnnxfrh`, Untracked in `D:`)
+- **Architectural Resolutions Deployed**:
+  - **`security_definer_view` (2 ERRORs)**: Altered `classmate.notice_attachments` and `classmate.v_course_attendance_sessions` to `SET (security_invoker = true)`.
+  - **`rls_disabled_in_public` (1 ERROR)**: Enabled RLS on `classmate.preseeded_student_roster`, revoked `anon`/`public`, and created scoped `SELECT` (`email`, `student_id`, `classmate.is_owner()`) and `service_role` policies.
+  - **`function_search_path_mutable` (11 functions / 12 signatures WARN)**: Set explicit `search_path` on `canonical_fund_title`, `get_r2_storage_stats`, `get_public_resource` (4 signatures), `set_resource_slug_trigger`, `generate_unique_resource_slug`, `trigger_broadcast_resource_telegram`, `broadcast_resource_to_telegram`, `slugify`, `trg_enforce_session_course_and_batch`.
+  - **`public_bucket_allows_listing` (3 buckets WARN)**: Dropped open `SELECT` listing policies on `storage.objects` (`"Public apk-builds access"`, `"Public avatar access"`, `"users download visible notice images"`), preserving direct public URL asset fetches.
+  - **`anon_security_definer_function_executable` & Worker RPCs**: Revoked `anon`/`public` execute on 49 sensitive/internal RPCs (retaining only the 8 `get_public_notice` / `get_public_resource` overloads), added `ALTER DEFAULT PRIVILEGES IN SCHEMA classmate REVOKE EXECUTE ON FUNCTIONS FROM public`, and restricted 10 queue/cron/worker functions to `service_role, postgres`.
+  - **Note**: `auth_leaked_password_protection` (HaveIBeenPwned check) remains unenabled because Supabase restricts it to Pro Plans (`HTTP 402: Payment Required`).
+
+---
+
+### 458.3 Production Architectural Topology & Pending Action Register (Session 156)
+
+```
++---------------------------------------------------------------------------------------------------+
+|                        CLASSMATE PRODUCTION SUBSYSTEM HEALTH MATRIX (v458)                        |
++------------------------------------+---------------+----------------------------------------------+
+| Subsystem / Architecture Layer     | Target State  | Verification & Operational Status            |
++------------------------------------+---------------+----------------------------------------------+
+| Assessment Reminders & Compute     | 100% On-Device| Healthy (pg_cron unscheduled; $0 DB compute) |
+| Notice Feed Avatars & Poll Card    | 3+1 Cap / Wide| Healthy (18764c3 verified live on device)    |
+| Compose Post Notice & Recent Peek  | Jetpack Comp. | Healthy (1d9a4c1 zero-gap IME & hierarchy)   |
+| Courses Tab Segment Pill           | Auto-Measure  | Healthy (OnLayoutChange + post retry)        |
+| Notification Prompt (Android/Web)  | Unified Flow  | Android built; teacher delivery open (b447)  |
+| Batchmates Dark/Light & Back Nav   | Themed + Back | Healthy (abe65c4 verified light/dark on dev) |
+| Batch Fund Compose & Carousel      | Pager + Mode  | Healthy (1665e9d: ৳1,000/st & 167 txns live) |
+| Web Firebase Analytics (GA4)       | Uncommitted D:| Built (npm run build 15/15); pending push    |
+| Supabase Linter Security Hardening | Live Applied  | Verified on prod; SQL file untracked in D:   |
++------------------------------------+---------------+----------------------------------------------+
+```
+
+**Tracked Pending Actions Observed in Transcripts**:
+1. **Teacher Notification Delivery (`b447abdd` step 32279)**: Investigate and wire backend recipient selection / Edge Function dispatch so approved teachers receive notifications after client-side exclusion removal.
+2. **Git & Vercel Synchronization (`D:` -> `origin/main` & Vercel)**: Commit and push the 7 uncommitted/untracked files in `D:\Code & Scripts\ClassMate-main` (`web/` GA4 analytics + `202611250001_fix_supabase_linter_security_warnings.sql`), re-authenticate Vercel CLI (`vercel deploy` hit `Not authorized`), and verify `NEXT_PUBLIC_FIREBASE_CONFIG` in Vercel env vars.
+3. **Workspace `C:` Code Sync**: `C:\Users\USER\AndroidStudioProjects\ClassMate` retains synchronized `classmate-memory.md`, while active Android/Web/Supabase code commits live in `D:\Code & Scripts\ClassMate-main`.
+
+---
+
+### 458.4 Physical & Remote Device Verification Matrix (Sessions 154–156)
+
+| Test Subject / Feature Area | Target Verification Subsystem | Physical / Automated Evidence | Status Verdict |
+| :--- | :--- | :--- | :--- |
+| **Notice Seen Avatars & Poll Header** | `NoticeModernViewHolder.kt` & `item_notice_modern.xml` | `testDebugUnitTest` passed; verified 3 avatars + `+N` bubble & wide poll header on `CPH2621`. | **PASS (`18764c3`)** |
+| **Duplicate Reminder Deduplication** | `ClassMateAssessmentReminderReceiver.kt`, `ClassMatePushWorker.kt` | `testDebugUnitTest` (incl. `ClassMateAssessmentReminderReceiverTest`) & `assembleDebug` passed; `pg_cron` dropped live. | **PASS (`1c8c005`, `17b8445`)** |
+| **Post Notice Peek, IME & Courses Pill** | `PostNoticeScreen.kt`, `ClassMateAcademicScreensSupabase.kt` | `compileDebugKotlin` & `assembleDebug` passed; installed & verified on device (`adb-6478ab80-yrTZ4i`). | **PASS (`a6c9d1d`, `1d9a4c1`)** |
+| **Notification Prompt Flow** | `ClassMateAuthActivity.kt`, `web/src/components/app.tsx` | `testDebugUnitTest` & `assembleDebug` passed; `vercel deploy` blocked (`Not authorized`); teacher push delivery open. | **PARTIAL (Open item)** |
+| **Hamburger Drawer Priority** | `ClassMateHamburgerSheet.kt` | `assembleDebug` passed; installed & verified Batch Hub at top on device. | **PASS (`64cfd72`)** |
+| **Batchmates Dark/Light & Back Nav** | `ClassMateFriendsScreen.kt`, `ClassMateBatchActivity.kt` | `assembleDebug` passed; tested Light & Dark mode popups, ban sheet, search & back nav on device. | **PASS (`abe65c4`)** |
+| **Fintech Batch Fund Compose & Carousel** | `ClassMateBatchFundScreen.kt`, `ClassMateBatchFundActivity.kt` | `assembleDebug` passed; verified Hero privacy eye, `HorizontalPager`, FAB, `৳ 1,000/student`, and 4 expenses (`৳ 69,080`) on device. | **PASS (`7b2eac3`..`1665e9d`)** |
+| **Web Firebase Analytics (GA4)** | `web/src/lib/analytics.ts`, `layout.tsx`, `app.tsx`, `notices.tsx`, `library.tsx` | `npm run build` passed (`15/15` routes, 0 errors); uncommitted in `D:` & not yet deployed to Vercel. | **BUILD PASS (Pending push/deploy)** |
+| **Supabase Security Linter Migration** | `202611250001_fix_supabase_linter_security_warnings.sql` | Applied & verified live against `cbskpifgbdbgdmnnxfrh` (2 views, 1 RLS table, 12 search paths, storage, RPC grants); file untracked in `D:`. | **LIVE VERIFIED (Pending commit)** |
+
+
+---
+
+## 459. Master Production State v459: Sessions 157–158 Transcripts Retrospective, Atomic Upload-First Notice Pipeline, Live Notification Shade Sync, Courses & Attendance Overhaul, MBSTU Single-Tenant Cleanup, Interim CR Wizard & Security Hardening (Issues 766–776)
+
+### 459.1 Executive Engineering Summary & Transcripts Review (Sessions 157–158)
+
+Between November 25, 2026 (17:14 BST) and November 26, 2026 (02:56 BST), two engineering sessions (`7bf9b1c9-a2d1-40c9-a995-c810deb70c60` steps 18019–18825 and `0da9724f-505f-4bd8-815a-81bfba78b0c1` steps 182–215) resolved eleven major architectural, reliability, UI/UX, and security initiatives across the Android APK (`D:\Code & Scripts\ClassMate-main`, `versionCode 49` / `1.1.49`), Web companion (`web/`), Supabase Edge Functions, and live production PostgreSQL database (`cbskpifgbdbgdmnnxfrh`):
+
+1. **Atomic Upload-First Notice Attachment Pipeline (`202611250002`)**: Eliminated duplicate notices, twin push notifications, and blank feed images by staging media into `notice-images/pending/<uid>/...` using the authenticated user's JWT (with 1920px JPEG compression), committing notice + attachments + outbox atomically via `client_request_id` idempotency, preserving attachments inside `OfflineNoticeQueue`, fixing `NoticePresentationMapper` (`mime_type`/`size_bytes`), rendering `_local_attachments` immediately in `onNoticeCreated`, and fixing `ViewPager2` callback leaks in `NoticeModernViewHolder`.
+2. **Live Notice Edit/Delete Notification Sync & 24h Orphaned Media Sweep (`202611250003`, `202611250006`, `cleanup-classmate-resources` v15)**: Added `notice_updated` (silent in-place shade update when active) and `notice_deleted` (shade cancellation + empty group cleanup + live `refreshNoticesLive()` sync), plus automated 24-hour cleanup of unreferenced `notice-images/pending/*` uploads.
+3. **Compose Notice Posting & Assessment Flow Fixes (`PostNoticeScreen.kt`, `AssessmentRepository.kt`)**: Removed the redundant `RECENT IN BATCH` strip, upgraded notice type selection to a 3-segment pill bar, moved thumbnail decoding off the main thread (`produceState` + tap-to-preview `Dialog`), fixed custom-title toggle clearing and background AI-failure fallback, and eliminated both an `assessments` upsert `notice_id` race condition and duplicate assessment+notice pushes.
+4. **Courses Tab Zero-Latency Refactor (`ClassMateAcademicScreensSupabase.kt`)**: Extracted `renderLibrarySnapshot()` for 0 ms instant local search/filtering/starring/deletion, fixed category filter chips (`Notes`, `Slides`, `Questions`, `Starred`), honored `semester_courses` overrides (`code_override`, `title_override`), raised `file_metadata` limit from `100` to `500`, and refreshed attendance counts on pull-to-refresh.
+5. **University of Rajshahi Removal (`202611250004`)**: Purged all RU/`fisheries`/`@ru.ac.bd` data, dropped `classmate.preseeded_student_roster`, and simplified onboarding/UI across PostgreSQL, Android, and Web to focus exclusively on **MBSTU**.
+6. **Interim CR Clarity, 3-Step Batch Setup Wizard & Catalog Conflict Resolution (`202611250005`)**: Introduced `is_interim_cr` with 14-day expiry (`cr_valid_until`) and auto-clear on official CR assignment/transfer, resolved `add_batch_course` department catalog conflicts via `semester_courses` overrides, and added a 3-step setup checklist, multi-select catalog picker (`quickSelectCatalogCourses()`), and instant course-code auto-suggest.
+7. **Cleanup, `DiffUtil` Performance & Role-Aware Empty States**: Deleted dead `NoticeAdapter.kt.backup` (64 KB), replaced `GlobalScope` with `lifecycleScope`, migrated `BusScheduleAdapter`, `FriendsAdapter`, `AcademicCalendarExceptionAdapter`, and `ClassMateCourseFilesActivity.FileAdapter` to `ListAdapter` + `DiffUtil`, guarded redundant `liveOpenSessionsMap` timetable rebinds, and wired `EmptyStateHelper` across Courses, Notices, Attendance, and Course Files.
+8. **Manage Attendance UI/UX Overhaul & `162% Avg` Fix (`202611260001`, `ClassMateAdminAttendanceActivity.kt`, `ClassMateHamburgerSheet.kt`)**: Fixed Cartesian row multiplication in `teacher_course_attendance_overview` caused by outer joining `routine_slots`, grouped courses into `SESSIONS TAKEN` vs `NOT STARTED YET`, replaced `AlertDialog` with a `BottomSheetDialog` picker + session-start confirmation, added **Start Attendance** to the speed-dial FAB (`layout_speed_dial.xml`), and exposed **Manage Attendance** in the Hamburger Drawer & Profile tab for admins, CRs, and teachers.
+9. **Multi-Tier Security Audit Fixes (`0da9724f`)**: Quarantined 4 Firebase/GCP JSON key files into `$HOME\.classmate_secure_keys\`, locked `web/src/app/api/scan/route.ts` to fail closed, excluded `classmate-offline.db` from Android cloud backups/device transfers, and added ProGuard rules to strip debug/verbose `Log` calls in release APKs.
+
+---
+
+### 459.2 In-Situ Field Debugging & Production Incident Resolution Runbook (Issues 766–776)
+
+#### Issue 766: Atomic Upload-First Notice Pipeline — Eliminating Duplicate Notices, Twin Pushes & Blank Feed Images (`202611250002`, `ClassMateAuthApi.kt`, `ClassMatePublishActivity.kt`, `OfflineNoticeUploadWorker.kt`, `NoticePresentationMapper.kt`, `NoticeModernViewHolder.kt`)
+- **Incident Analysis & Operational Problem**:
+  - Posting a notice with an image attachment triggered two separate push notifications and created two notices in the feed: one blank/text-only notice with an AI-generated title, and one notice referencing an image that rendered blank in the feed (`audit_log` recorded two notices `26a46e6e-...` and `7ce6a068-...`, while `storage.objects` contained zero uploaded files).
+- **Root Causes Identified**:
+  1. **Publish-Then-Upload Race**: `ClassMatePublishActivity.kt` called `ClassMateAuthApi.rpc("post_notice", ...)` **first**, which immediately fired `AFTER INSERT` trigger `notice_outbox` (`enqueue_notice()`), queueing Notification #1 before any media upload started.
+  2. **Unauthenticated Storage Upload + Blind Offline Fallback**: `SupabaseNoticeFeed.uploadNoticeImage()` uploaded with the anon publishable key instead of the user's JWT. Any upload or `prepare_notice_image` exception inside the same `try/catch` block fell through to `OfflineNoticeQueue.enqueue(PendingNotice)` — which stored no attachments and ran immediately on the online device, posting Notice #2 + Notification #2 without media.
+  3. **Premature `notice_attachments` Row & Mapper Mismatch**: `prepare_notice_image` inserted rows into `public.notice_attachments` before upload completion, `NoticePresentationMapper.kt` read `file_type`/`file_size` instead of `mime_type`/`size_bytes` returned by `notice_feed_details`, `NoticeModernViewHolder.kt` lacked Glide `.placeholder`/`.error` states, and `onNoticeCreated` prepended raw `postRes` without attachments.
+- **Architectural Resolutions Deployed**:
+  - *Database (`202611250002_atomic_notice_posting_and_staging.sql`, live on `cbskpifgbdbgdmnnxfrh`)*:
+    - Added `client_request_id uuid` + partial unique index `notices_author_client_request_id_uq` on `(author_id, client_request_id)`.
+    - Added user-scoped Storage RLS policy `"authenticated manage own staged notice media"` on `storage.objects` for `notice-images/pending/<auth.uid()>/...`.
+    - Upgraded `classmate.post_notice(target_batch, target_course, notice_title, notice_body, target_attachments jsonb DEFAULT '[]', client_request_id uuid DEFAULT NULL)` to return idempotent matches on duplicate `client_request_id`, verify every attachment exists in `storage.objects` (max 5 attachments, up to 100 MB, JPG/PNG/WebP or single PDF), and insert `notices` + `public.notice_attachments` + `notification_outbox` in one atomic transaction.
+  - *Upload-First & Compression (`ClassMateAuthApi.kt`)*: Added `currentAuthUid()`, `uploadStagedNoticeAttachment()` using `Bearer $accessToken` and `uploadHttp`, plus `compressNoticeImageToTempFile()` (downscaling images to max `1920px`, preserving EXIF orientation, compressing to `85%` JPEG when smaller).
+  - *Offline Queue & Publish Flow (`ClassMatePublishActivity.kt`, `OfflineNoticeUploadWorker.kt`)*: Added `PendingNoticeAttachment` to `PendingNotice`; separated `stageNoticeAttachmentsForPublish` before `post_notice` with `clientRequestId` UUID; restricted offline queueing strictly to pre-commit connectivity failures (`!noticePostedOnServer`).
+  - *Feed Rendering & Carousel Leak Fix (`NoticePresentationMapper.kt`, `NoticeModernViewHolder.kt`, `ClassMateAcademicScreensSupabase.kt`)*: Fixed mapper to prefer `mime_type`/`size_bytes` (with legacy fallbacks), added Glide `.placeholder(R.drawable.bg_notice_modern_card)` / `.error(...)` / `.centerCrop()`, tracked & unregistered `carouselCallback` (`OnPageChangeCallback`) on `ViewPager2` rebind (calling `setCurrentItem(0, false)`), and hydrated `_local_attachments` (`buildLocalAttachmentPreviewArray()`) in `onNoticeCreated` for instant pre-notice local URI previews.
+
+#### Issue 767: Live Notification Shade Edit/Delete Sync, Realtime Notice Feed & 24h Orphaned Media Cleanup (`202611250003`, `202611250006`, `cleanup-classmate-resources`, `ClassMatePushWorker.kt`)
+- **Architectural Resolutions Deployed**:
+  - *Notice Edit/Delete Outbox Events (`202611250003_notice_edit_delete_notifications.sql`, live)*:
+    - `classmate.edit_notice`: Enqueues `'notice_updated'` into `classmate.notification_outbox` when a non-silent notice's title or body changes.
+    - `classmate.delete_notice`: Clears pending `'notice'`/`'notice_updated'` outbox entries for `target_id` and enqueues `'notice_deleted'`.
+    - `classmate.academic_notification_job_context`: Emits updated payload for `'notice_updated'` and silent cancel payload (`title: ''`, `body: ''`, `kind: 'notice_deleted'`) for `'notice_deleted'`.
+  - *Android Shade Sync & Live Feed Refresh (`ClassMatePushWorker.kt`, `ClassMateAuthActivity.kt`, `ClassMateAcademicScreensSupabase.kt`)*:
+    - On `notice_updated`: Checks `manager.activeNotifications` for `record_id.hashCode()`; if still active in the shade, updates in place with `setSilent(true)` and `setOnlyAlertOnce(true)`.
+    - On `notice_deleted`: Calls `manager.cancel(record_id.hashCode())` and cancels the `classmate_group_batch_<batchId>` summary notification if `remainingInGroup == 0`.
+    - Emits `ClassMateInAppPush` events for `notice`, `notice_updated`, and `notice_deleted` (even when dismissed from shade), triggering `academicScreens.refreshNoticesLive()` in `ClassMateAuthActivity.kt` without noisy snackbars for silent updates/deletes.
+  - *24-Hour Abandoned Pending Media Sweep (`202611250006_pending_notice_media_cleanup_rpc.sql`, `cleanup-classmate-resources/index.ts`)*:
+    - Added `service_role`-only `classmate.list_orphaned_pending_notice_media()` returning up to 50 unreferenced `notice-images/pending/%` objects older than 24 hours, and wired `admin.storage.from("notice-images").remove(orphans)` into `cleanup-classmate-resources` (deployed to production, version `15`, `ACTIVE`).
+
+#### Issue 768: Compose Notice Posting Screen Polish, Custom Title Safeguards & AI Failure Fallback (`PostNoticeScreen.kt`, `NoticeComposerBar.kt`, `NoticeAttachmentPreviews.kt`, `ClassMatePublishActivity.kt`)
+- **Architectural Resolutions Deployed**:
+  - *Cleaner Compose Canvas (`PostNoticeScreen.kt`)*: Removed the redundant `RECENT IN BATCH` preview strip and replaced the tall vertical radio selector with a compact 3-segment pill selector (`General`, `Cancel Class`, `Poll`).
+  - *Composer & Attachment UX (`NoticeComposerBar.kt`, `NoticeAttachmentPreviews.kt`)*: Added dynamic focus/recording border highlights, bottom-aligned `36.dp` action icons so multi-line text expands smoothly, context-aware `"Add a caption (optional)…"` placeholder, attachment-only automatic fallback titles (`"Shared an image"`, `"Shared X photos"`, `"Shared PDF document: ..."`), off-main-thread thumbnail decoding (`produceState` + `Dispatchers.IO`), and tap-to-preview full-screen photo `Dialog`.
+  - *Custom Title & AI Failure Edge Cases (`ClassMatePublishActivity.kt`)*: Tapping `"Hide custom title (use AI)"` (`onToggleManualTitleBox(false)`) now clears `composeManualTitle = ""` so hidden text cannot silently override AI generation. If `auto_notice` AI fails after the user tapped `"Run in background"` (`isFinishing || isDestroyed`), `submitComposeGeneralNotice` falls back to the first line (`take(60)`, default `"Notice"`) instead of silently dropping the post; if the screen is still open, it opens the manual title box with a toast prompt.
+
+#### Issue 769: Assessment Sync Race Condition & Duplicate Assessment+Notice Push Fix (`AssessmentRepository.kt`, `UpcomingAssessmentsScreen.kt`)
+- **Incident Analysis & Operational Problem**:
+  - `AssessmentRepository.saveAssessment()` launched Supabase `assessments` upsert inside a fire-and-forget coroutine while `UpcomingAssessmentsScreen` concurrently posted a notice and updated `notice_id`, risking `notice_id` being overwritten back to `NULL`. Additionally, when `"Also post notice"` was checked (or when editing an assessment), `onBroadcastPush` (`NotificationSender.sendToBatch`) fired alongside `publish_batch_notice` -> `post_notice`.
+- **Architectural Resolutions Deployed**:
+  - Updated `AssessmentRepository.saveAssessment()` to await `ClassMateAuthApi.upsert("assessments", payload)` before returning (keeping Firestore mirror sync asynchronous).
+  - Updated `UpcomingAssessmentsScreen.kt` so standalone `onBroadcastPush` only runs when `editingAssessment == null` and `!alsoPostNotice`.
+
+#### Issue 770: Courses Tab Zero-Latency Snapshot Rendering, Filter Chips, Overrides & Truncation Fix (`ClassMateAcademicScreensSupabase.kt`)
+- **Incident Analysis & Operational Problem**:
+  - In the Courses tab (`library`), category filter chips (`All`, `Notes`, `Slides`, `Questions`, `Starred`) updated state without filtering `visibleFiles`; every keystroke, filter tap, Theory/Lab toggle switch, and star action re-fetched 4+ Supabase endpoints; `semester_courses` ignored `code_override` and `title_override`; `file_metadata` was truncated at `limit=100`; singular grammar showed `"1 files"`; and `swipeRefresh` skipped `refreshAttendanceCount()`.
+- **Architectural Resolutions Deployed**:
+  - Extracted `renderLibrarySnapshot(root, snapshot)` in `ClassMateAcademicScreensSupabase.kt` so search, filter chips (`Notes`, `Slides`, `Questions` incl. `syllabus`, `Starred`), Theory/Lab toggle, starring, and deletion update UI in `0 ms` locally and persist to cache.
+  - Added `code_override,title_override` to `semester_courses` queries, increased `file_metadata` fetch limit from `100` to `500`, fixed `"1 file"`/`"1 course"` pluralization, wired `refreshAttendanceCount()` into `swipeRefresh`, and wrapped star/delete RPCs in `runCatching`.
+
+#### Issue 771: Complete University of Rajshahi Removal — Exclusive MBSTU Focus (`202611250004_remove_rajshahi_university.sql`, Android & Web)
+- **Architectural Resolutions Deployed**:
+  - *Database (`202611250004_remove_rajshahi_university.sql`, live on `cbskpifgbdbgdmnnxfrh`)*:
+    - Purged all RU (`ru.ac.bd`, `fisheries`, Batch `25`) records across `notification_outbox`, `notices`, `routine_slots`, `semester_courses`, `semesters`, `courses`, `teacher_allowlist`, `cr_allowlist`, `teacher_directory`, `batch_overrides` (including `added_by` FK references), `device_tokens`, `profiles`, `auth.users`, `batches`, `departments`, and `institutions`, and dropped `classmate.preseeded_student_roster`.
+    - Simplified `classmate.create_or_initialize_profile()` and `classmate.complete_student_onboarding()` to support `@mbstu.ac.bd` and approved teacher Gmail accounts only. Verified `0` `@ru.ac.bd` accounts and single active `MBSTU` institution remain.
+  - *Android & Web Cleanup*:
+    - Removed `@ru.ac.bd`, `ruContacts`, and `"fisheries"` branches from `ClassMateAcademicCache.kt`, `ClassMateEmergencyDialog.kt`, `ClassMateConfigurationActivity.kt`, `ClassMateTeachersDialog.kt`, `PeriodCompanionBottomSheet.kt`, and Web `app.tsx`, `hamburger-drawer.tsx`, `schedule.tsx`, `teachers-directory.tsx`. (`web/` `npm run build` passed 15/15 routes; Android `:app:compileDebugKotlin` passed.)
+
+#### Issue 772: First-Time CSE Batch Setup, Interim CR Mode & Catalog Conflict Fix (`202611250005_interim_cr_and_catalog_friction_fix.sql`, `ClassMateWelcomeDialogs.kt`, `ClassMateConfigurationActivity.kt`)
+- **Incident Analysis & Operational Problem**:
+  - When the first student of a new batch signed in, `auto_assign_first_batch_cr()` silently granted permanent (`cr_valid_until = null`) CR status with no onboarding explanation or self-handoff guidance, while `add_batch_course()` rejected adding department course codes if another batch had used a slightly different title/type, and `ClassMateConfigurationActivity` offered no multi-select batch setup or auto-fill.
+- **Architectural Resolutions Deployed**:
+  - *Database (`202611250005_interim_cr_and_catalog_friction_fix.sql`, live)*:
+    - Added `is_interim_cr boolean NOT NULL DEFAULT false` to `classmate.profiles`; updated `auto_assign_first_batch_cr()` to grant a 14-day interim window (`is_interim_cr = true`, `cr_valid_until = now() + interval '14 days'`), and updated `assign_cr`, `set_batch_cr`, and `transfer_batch_cr` to clear `is_interim_cr = false`.
+    - Upgraded `classmate.add_batch_course()` to link existing department `courses` rows into `semester_courses` and store batch-specific title/type/credit differences in `title_override`, `type_override`, and `credit_override`.
+  - *Android Setup Wizard & Welcome Guidance*:
+    - `ClassMateWelcomeDialogs.kt`: Displays `"Interim Class Representative (14 days)"` with guidance on semester/course/routine setup and CR transfer in Friends.
+    - `ClassMateConfigurationActivity.kt`: Added a 3-step **Quick Batch Setup** checklist (`wizardCard` / `updateSetupWizardCard()`), multi-select catalog picker (`quickSelectCatalogCourses()`), and instant course-code auto-suggest preloading department catalog metadata.
+
+#### Issue 773: Codebase Cleanup, `DiffUtil` ListAdapter Migrations & Polling Optimization (`ClassMateAcademicScreensSupabase.kt`, `ClassMatePublishActivity.kt`, `ClassMateCourseFilesActivity.kt`, Adapters)
+- **Architectural Resolutions Deployed**:
+  - Deleted dead 64 KB backup file `app/src/main/java/com/shuaib/classmate/adapters/NoticeAdapter.kt.backup`.
+  - Replaced unscoped `kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO)` in `ClassMatePublishActivity.kt` with `lifecycleScope.launch(Dispatchers.IO)`.
+  - Converted `BusScheduleAdapter.kt`, `FriendsAdapter.kt`, `AcademicCalendarExceptionAdapter.kt`, and `ClassMateCourseFilesActivity.FileAdapter` from `notifyDataSetChanged()` to `ListAdapter` + `DiffUtil.ItemCallback` (preserving original constructor parameter names `schedules` and `friends`), and updated `NoticeCommentAdapter.setLikedCommentIds()` to issue targeted `notifyItemChanged(index)` calls.
+  - Added equality check (`if (latestMap != liveOpenSessionsMap)`) in `ClassMateAcademicScreensSupabase.kt` before updating timetable attendance indicators so unchanged polls skip full `rvPeriods` rebinds.
+
+#### Issue 774: Role-Aware Empty & Error States Overhaul (`fragment_pdf_library.xml`, `ClassMateAcademicScreensSupabase.kt`, `ClassMateCourseFilesActivity.kt`)
+- **Architectural Resolutions Deployed**:
+  - *Courses Tab*: Added `emptySubjectsState` (`@layout/view_empty_state`) in `fragment_pdf_library.xml` and wired `EmptyStateHelper.show(...)` with **Clear Search**, **Set Up Courses** (CR/Admin), **Refresh** (Student/Teacher), or **View Lab/Theory Courses** switcher, plus context-aware `tvRecentEmpty` copy.
+  - *Attendance & Notices Tabs*: Replaced Attendance's plain programmatic `TextView` with inflated `R.layout.view_empty_state` via `EmptyStateHelper.show(...)`; wired `btnEmptyReset` (**Clear Search**) and `btnEmptyPost` (**Post First Notice**) in `emptyNoticeState`.
+  - *Course Files (`ClassMateCourseFilesActivity.kt`)*: Added `setEmptyButtonLabel(label, iconRes)` (`ic_refresh` for **Try Again** offline/error recovery, `ic_close` for **Clear Search**, and `ic_add` for **Add file**).
+
+#### Issue 775: Manage Attendance UI/UX Overhaul, `162% Avg` SQL Fix, FAB Shortcut & Hamburger Menu Integration (`202611260001`, `ClassMateAdminAttendanceActivity.kt`, `layout_speed_dial.xml`, `ClassMateHamburgerSheet.kt`)
+- **Incident Analysis & Operational Problem**:
+  - Manage Attendance listed all courses flatly (showing `162% Avg` on multi-slot courses like Computer Organization and Architecture), used an `AlertDialog` dropdown for picking courses, omitted system bar safe insets, lacked a quick FAB shortcut, and was absent from the Hamburger Drawer and non-admin Profile views for CRs/Teachers.
+- **Root Cause (`162% Avg`)**:
+  - In `classmate.teacher_course_attendance_overview` (`202611160002`), an outer `left join` on `routine_slots` multiplied each `attendance_sessions` row by the number of weekly slots (e.g., 2×). `count(distinct s.id)` kept the denominator (`total_sessions`) accurate while `sum(sess_stat.pres)` summed present counts multiple times (`81% × 2 = 162%`).
+- **Architectural Resolutions Deployed**:
+  - *Database (`202611260001_fix_attendance_overview_avg_percentage.sql`, applied live via `supabase db query --linked`)*: Rewrote aggregation using a `lateral` subquery over distinct `(id, started_at)` sessions and `count(distinct r.student_id)`, clamped via `least(100.0, ...)`.
+  - *Manage Attendance Grouping & Bottom Sheet (`ClassMateAdminAttendanceActivity.kt`, `activity_admin_attendance.xml`)*: Added safe system bar inset padding, highlighted active `cardHardwareStation` (`2dp` emerald border) + double-tap protection, live course search (`etCourseSearch`) + batch summary header + `EmptyStateHelper` (`emptyCoursesState`) + `X/Y Cards Registered`, grouped courses under **SESSIONS TAKEN** (`total_sessions > 0`) first and **NOT STARTED YET** (`total_sessions == 0`) second, and replaced the `AlertDialog` with a `BottomSheetDialog` (`showTakeAttendanceCoursePicker`) followed by `confirmStartAdHocSession` confirmation.
+  - *FAB & Hamburger Menu (`layout_speed_dial.xml`, `bg_speed_dial_icon_attendance.xml`, `ClassMateHamburgerSheet.kt`, `ClassMateAcademicScreensSupabase.kt`)*: Added `btnSpeedDialStartAttendance` (`Start Attendance` -> `EXTRA_AUTO_START_ATTENDANCE = true`) on Timetable/Notices/Courses for authorized users; added **Manage Attendance** (`ic_rfid_signal`) to **BATCH HUB** in `ClassMateHamburgerSheet.kt` and enabled `cardProfileAttendance` in Profile for `admin`, `teacher`, server owner, and CR (`canManageAttendance = isAdmin || isServerOwner || canManage`).
+
+#### Issue 776: Security Audit Code & Credential Remediations (`0da9724f`: `web/src/app/api/scan/route.ts`, `backup_rules.xml`, `data_extraction_rules.xml`, `app/proguard-rules.pro`)
+- **Architectural Resolutions Deployed**:
+  - *Quarantined Host Keys*: Moved 4 unprotected Firebase/GCP JSON credential files (`classmate-a016a-91685e655d7f.json`, `client_secret_867335626494-...json`, and two `mbstu-cse-archive-260908-firebase-adminsdk-*.json` files) from `D:\Code & Scripts\` to `C:\Users\USER\.classmate_secure_keys\`.
+  - *Fail-Closed `/api/scan` (`web/src/app/api/scan/route.ts`)*: Removed the unauthenticated fallback that allowed requests whenever `device_id` started with `ESP32` or `SCANNER` while `HARDWARE_DEVICE_SECRET` was unset; verified `web/` TypeScript compilation (`tsc --noEmit` exit 0).
+  - *Android Cloud Backup & Release Log Hygiene*: Added `<exclude domain="database" path="classmate-offline.db" />` to `backup_rules.xml` and both `<cloud-backup>`/`<device-transfer>` blocks in `data_extraction_rules.xml`; added ProGuard/R8 `-assumenosideeffects` rules in `app/proguard-rules.pro` stripping `android.util.Log.isLoggable`, `d`, and `v` in release builds.
+
+---
+
+### 459.3 Production Architectural Topology & Pending Action Register (Session 158)
+
+```
++---------------------------------------------------------------------------------------------------+
+|                        CLASSMATE PRODUCTION SUBSYSTEM HEALTH MATRIX (v459)                        |
++------------------------------------+---------------+----------------------------------------------+
+| Subsystem / Architecture Layer     | Target State  | Verification & Operational Status            |
++------------------------------------+---------------+----------------------------------------------+
+| Atomic Notice Staging & Feeds      | Upload-First  | Live DB (202611250002) + Android APK built   |
+| Live Notification Edit/Delete Sync | In-Place/Drop | Live DB (202611250003) + Android APK built   |
+| Orphaned Pending Media Cleanup     | 24h Sweep     | Live DB (202611250006) + Edge fn v15 ACTIVE  |
+| Courses Tab Snapshot & Empty State | 0ms Local     | Compiled & built in Android debug APK        |
+| University Scope (MBSTU Only)      | Single-Univ   | RU purged live (202611250004); Web/App built |
+| Interim CR & Batch Setup Wizard    | 14d + 3-Step  | Live DB (202611250005) + Android compiled    |
+| Manage Attendance & AVG% RPC       | Grouped/Sheet | Live DB (202611260001) + assembleDebug PASS  |
+| RFID Scan Auth & Key Quarantine    | Fail-Closed   | Patched locally in D:; awaiting Vercel deploy|
+| Pending Git Commit & Workspace C:  | Uncommitted D:| 43 modified + 9 untracked files in D:        |
++------------------------------------+---------------+----------------------------------------------+
+```
+
+**Tracked Pending Actions Observed in Transcripts**:
+1. **Commit & Push Uncommitted Work in `D:\Code & Scripts\ClassMate-main`**: Stage, review, and commit the 43 modified and 9 untracked files (Nov 25–26 Android changes, Web GA4 analytics + RU cleanup + fail-closed `/api/scan`, Edge Function `cleanup-classmate-resources`, and SQL migrations `202611250001`–`202611260001`).
+2. **ESP32 Firmware & Vercel Environment Secret Before `web/` Deploy (`0da9724f`)**: Because `web/src/app/api/scan/route.ts` is now fail-closed, configure `HARDWARE_DEVICE_SECRET` in Vercel environment variables and ensure `firmware/esp32_rfid_attendance.ino` sends `x-device-key: <HARDWARE_DEVICE_SECRET>` before deploying `web/` to production (also re-authenticate Vercel CLI and confirm `NEXT_PUBLIC_FIREBASE_CONFIG`).
+3. **Teacher Notification Delivery Follow-Up (`b447abdd` step 32279)**: Remains open — investigate backend recipient selection / Edge Function dispatch so approved teachers receive push notifications.
+4. **Install Latest Attendance Build & Sync Workspace `C:`**: Build/install from `D:\Code & Scripts\ClassMate-main` (last `assembleDebug` with `202611260001`/hamburger/bottom-sheet updates succeeded at `2026-11-26 02:56 BST`, awaiting final `adb install`), and decide whether to sync `C:\Users\USER\AndroidStudioProjects\ClassMate` (172+ commits behind `D:`/`origin/main`).
+
+---
+
+### 459.4 Physical & Automated Verification Matrix (Sessions 157–158)
+
+| Test Subject / Feature Area | Target Verification Subsystem | Physical / Automated Evidence | Status Verdict |
+| :--- | :--- | :--- | :--- |
+| **Atomic Upload-First Notice Pipeline** | `202611250002`, `ClassMatePublishActivity`, `ClassMateAuthApi` | Applied live; DB rejected unuploaded key atomically; `compileDebugKotlin` & `CPH2621` install passed. | **PASS (Live + Device)** |
+| **Notice Edit/Delete Shade Sync** | `202611250003`, `ClassMatePushWorker.kt` | Applied live; `assembleDebug` (1m 31s) & `adb install -r` passed on `CPH2621`. | **PASS (Live + Device)** |
+| **24h Pending Media Sweep & Realtime** | `202611250006`, `cleanup-classmate-resources` v15 | `list_orphaned_pending_notice_media()` verified live; Edge fn deployed (`HTTP 201`, `ACTIVE`); Kotlin compiled. | **PASS (Live + Build)** |
+| **Compose Post Notice & Assessment Sync** | `PostNoticeScreen.kt`, `AssessmentRepository.kt`, `UpcomingAssessmentsScreen.kt` | `compileDebugKotlin` & `assembleDebug` (21s) passed; installed via ADB on `CPH2621`. | **PASS (Device)** |
+| **Courses Tab Snapshot & Empty States** | `ClassMateAcademicScreensSupabase.kt`, `ClassMateCourseFilesActivity.kt` | `compileDebugKotlin` & `assembleDebug` passed cleanly after `DiffUtil` & `EmptyStateHelper` wiring. | **PASS (Build)** |
+| **Rajshahi University Removal** | `202611250004`, Android & Web tenants | Verified 0 `@ru.ac.bd` in `auth.users`, 1 institution (`MBSTU`); `compileDebugKotlin` & Web `npm run build` (15/15) passed. | **PASS (Live + Full Build)** |
+| **Interim CR & 3-Step Batch Setup Wizard** | `202611250005`, `ClassMateConfigurationActivity.kt`, `ClassMateWelcomeDialogs.kt` | Applied live on production DB; `compileDebugKotlin` (1m 18s) passed. | **PASS (Live + Build)** |
+| **Manage Attendance Grouping, Sheet & `avg%`** | `202611260001`, `ClassMateAdminAttendanceActivity.kt`, `ClassMateHamburgerSheet.kt` | `supabase db query --linked` succeeded; `assembleDebug` passed (earlier FAB build installed on `CPH2621`). | **PASS (Live + Build)** |
+| **RFID `/api/scan` Fail-Closed & Hardening** | `web/src/app/api/scan/route.ts`, `backup_rules.xml`, `proguard-rules.pro` | `tsc --noEmit` in `web/` exited 0; 4 JSON keys quarantined to `$HOME\.classmate_secure_keys\`. | **PASS (Build; deploy pending)** |

@@ -28,6 +28,8 @@ import {
   Activity,
   Copy,
   ExternalLink,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { downloadCourseMatrixExcel, isRecordPresent } from "@/lib/attendance-excel";
 import { FullscreenSessionDashboard } from "./teacher-attendance";
@@ -92,6 +94,8 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
   } | null>(null);
   const [activeSessionLoading, setActiveSessionLoading] = useState(true);
   const [stoppingSession, setStoppingSession] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [matrixEditMode, setMatrixEditMode] = useState(false);
 
   // Take Attendance Modal
   const [takeModalOpen, setTakeModalOpen] = useState(false);
@@ -179,7 +183,10 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
         });
       if (err) throw err;
       if (data) {
-        setCourses(data);
+        const sorted = [...data].sort((a: CourseItem, b: CourseItem) =>
+          String(a.course_code || "").localeCompare(String(b.course_code || ""), undefined, { numeric: true, sensitivity: "base" })
+        );
+        setCourses(sorted);
       }
     } catch (e: any) {
       console.error("Error fetching courses:", e);
@@ -224,7 +231,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
         present: willBePresent,
       });
     } catch (err: any) {
-      alert(err.message || "Failed to update attendance");
+      setError(err.message || "Failed to update attendance");
       if (selectedCourseRoster) {
         fetchMatrix(selectedCourseRoster.semester_course_id);
       }
@@ -679,14 +686,15 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
             </div>
           </div>
 
-          {/* Search Box */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 420 }}>
+          {/* Search & Matrix Edit Mode Lock */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
-                flex: 1,
+                flex: "1 1 260px",
+                maxWidth: 420,
                 background: "var(--surface)",
                 border: "1px solid var(--border)",
                 borderRadius: 10,
@@ -717,6 +725,28 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 </button>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setMatrixEditMode((v) => !v)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: matrixEditMode ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid var(--border)",
+                background: matrixEditMode ? "rgba(245, 158, 11, 0.14)" : "var(--surface)",
+                color: matrixEditMode ? "#f59e0b" : "var(--muted)",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+              title={matrixEditMode ? "Lock matrix cells to prevent accidental edits" : "Unlock matrix cells for quick attendance edits"}
+            >
+              {matrixEditMode ? <Unlock size={14} /> : <Lock size={14} />}
+              <span>{matrixEditMode ? "Matrix Edits Unlocked" : "Matrix View-Only (Locked)"}</span>
+            </button>
           </div>
 
           {/* Single Matrix Table */}
@@ -875,7 +905,13 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                             <td key={sess.session_id} style={{ padding: "6px 8px", textAlign: "center" }}>
                               <button
                                 type="button"
-                                onClick={() => handleToggleMatrixCell(sess.session_id, st.student_id, isPresent)}
+                                onClick={() => {
+                                  if (!matrixEditMode) {
+                                    setInspectSessionId(sess.session_id);
+                                  } else {
+                                    handleToggleMatrixCell(sess.session_id, st.student_id, isPresent);
+                                  }
+                                }}
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
@@ -887,11 +923,20 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                                   background: isPresent ? "rgba(16, 185, 129, 0.15)" : "var(--surface)",
                                   color: isPresent ? "#10b981" : "var(--muted)",
                                   cursor: "pointer",
+                                  opacity: matrixEditMode ? 1 : 0.85,
                                   transition: "all 0.12s ease",
                                   padding: 0,
                                 }}
-                                title={`Click to mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`}
-                                aria-label={`Mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`}
+                                title={
+                                  matrixEditMode
+                                    ? `Click to mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`
+                                    : "Locked: click to inspect session or unlock matrix edits above"
+                                }
+                                aria-label={
+                                  matrixEditMode
+                                    ? `Mark ${st.full_name} as ${isPresent ? "Absent" : "Present"}`
+                                    : `Inspect session for ${st.full_name}`
+                                }
                               >
                                 {isPresent ? <CheckSquare size={16} /> : <Square size={16} />}
                               </button>
@@ -1127,7 +1172,7 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
               </button>
               <button
                 type="button"
-                onClick={handleCloseSession}
+                onClick={() => setConfirmCloseOpen(true)}
                 disabled={stoppingSession}
                 style={{
                   display: "inline-flex",
@@ -1908,6 +1953,83 @@ export default function AdminAttendance({ ctx }: { ctx: Context }) {
                 }}
               >
                 {startingSession ? "Starting..." : "Begin Session"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Close Live Session Modal */}
+      {confirmCloseOpen && activeSession && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.55)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 20,
+              border: "1px solid var(--border)",
+              width: "100%",
+              maxWidth: 420,
+              padding: 24,
+              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px 0", fontSize: 17, fontWeight: 800, color: "var(--text)" }}>
+              Close Live Attendance Session?
+            </h3>
+            <p style={{ margin: "0 0 18px 0", fontSize: 13.5, color: "var(--muted)", lineHeight: 1.5 }}>
+              This will end live RFID scanning for <strong>{activeSession.course_code}</strong> ({activeSession.course_title}) and unlink the reader.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmCloseOpen(false)}
+                disabled={stoppingSession}
+                style={{
+                  flex: 1,
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  background: "var(--card)",
+                  color: "var(--text)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Keep Open
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setConfirmCloseOpen(false);
+                  await handleCloseSession();
+                }}
+                disabled={stoppingSession}
+                style={{
+                  flex: 1,
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#ef4444",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: stoppingSession ? "not-allowed" : "pointer",
+                }}
+              >
+                {stoppingSession ? "Closing..." : "Close Session"}
               </button>
             </div>
           </div>

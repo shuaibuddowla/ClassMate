@@ -12,6 +12,15 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 async function isAuthorized(request: Request, deviceId?: string): Promise<boolean> {
   const deviceSecret = process.env.HARDWARE_DEVICE_SECRET;
   const clientDeviceKey =
@@ -20,7 +29,7 @@ async function isAuthorized(request: Request, deviceId?: string): Promise<boolea
 
   // 1. If a dedicated hardware secret is configured and client sent matching key, approve
   if (deviceSecret && clientDeviceKey) {
-    return clientDeviceKey === deviceSecret;
+    return timingSafeEqualStr(clientDeviceKey, deviceSecret);
   }
 
   // 2. Cryptographic session verification for web/app users if Bearer token is provided
@@ -37,11 +46,23 @@ async function isAuthorized(request: Request, deviceId?: string): Promise<boolea
       if (supabaseUrl && supabaseAnonKey) {
         try {
           const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+            db: { schema: "classmate" },
+            global: { headers: { Authorization: `Bearer ${token}` } },
             auth: { persistSession: false },
           });
           const { data: { user }, error } = await authClient.auth.getUser(token);
           if (!error && user) {
-            return true;
+            // Only allow privileged attendance managers (admin, teacher, or CR) to invoke /api/scan via Bearer JWT
+            const { data: profile } = await authClient
+              .from("profiles")
+              .select("role, is_cr")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (profile && (profile.role === "admin" || profile.role === "teacher" || profile.is_cr === true)) {
+              return true;
+            }
+            console.warn(`[RFID Auth] Forbidden non-manager Bearer attempt by user ${user.id}`);
+            return false;
           }
         } catch (e) {
           console.error("[RFID Auth] Bearer verification failed:", e);
@@ -52,17 +73,9 @@ async function isAuthorized(request: Request, deviceId?: string): Promise<boolea
     return false;
   }
 
-  // 3. If a hardware secret is configured on the server, reject any request missing or failing the secret
-  if (deviceSecret) {
-    return false;
-  }
-
-  // 4. Fallback for unconfigured dev/field environments: allow recognized reader prefixes
-  const dev = (deviceId || "").trim().toUpperCase();
-  if (dev.startsWith("ESP32") || dev.startsWith("SCANNER")) {
-    return true;
-  }
-
+  // 3. Fail-Closed Security: Hardware secret or privileged Bearer token is strictly mandatory.
+  // Never allow unauthenticated requests based on client-supplied device ID strings.
+  console.warn(`[RFID Auth] Unauthorized access attempt for device: ${deviceId || "UNKNOWN"}`);
   return false;
 }
 

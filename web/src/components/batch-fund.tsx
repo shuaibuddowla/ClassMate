@@ -25,6 +25,11 @@ import {
   Check,
   X,
   UserCheck,
+  Eye,
+  EyeOff,
+  Banknote,
+  Smartphone,
+  ChevronRight,
 } from "lucide-react";
 import { rpc, type Row } from "@/lib/api";
 import type { RosterStudent } from "@/lib/batch-fund-parser";
@@ -40,6 +45,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
   const [showEditDescModal, setShowEditDescModal] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Row | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [hideBalance, setHideBalance] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<string>("all");
   const [addFundPrefill, setAddFundPrefill] = useState<{
     student?: { id: string; full_name: string; student_id?: string | null } | null;
@@ -69,7 +75,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
   const collections = useQuery({
     queryKey: [ctx.user, ctx.batch, "batch-fund-collections"],
     queryFn: () => rpc<Row[]>("batch_fund_collections", { target_batch: ctx.batch }),
-    enabled: !!ctx.batch && activeTab === "payers",
+    enabled: !!ctx.batch,
   });
 
   const payers = useQuery({
@@ -86,6 +92,30 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
   const currentBalance = Number(summary.data?.current_balance || 0);
   const totalCollected = Number(summary.data?.total_collected || 0);
   const totalSpent = Number(summary.data?.total_spent || 0);
+  const txCount = Number(summary.data?.transaction_count || transactions.data?.length || 0);
+  const { cashBalance, mfsBalance } = useMemo(() => {
+    const txs = transactions.data || [];
+    let mfs = 0;
+    for (const tx of txs) {
+      const titleLower = String(tx.title || "").toLowerCase();
+      const isMfs = titleLower.includes("bkash") || titleLower.includes("nagad") || titleLower.includes("rocket");
+      if (isMfs) {
+        const amt = Number(tx.amount || 0);
+        mfs += tx.type === "outflow" ? -amt : amt;
+      }
+    }
+    const clampedMfs = Math.max(0, Math.min(currentBalance, mfs));
+    return {
+      mfsBalance: clampedMfs,
+      cashBalance: Math.max(0, currentBalance - clampedMfs),
+    };
+  }, [transactions.data, currentBalance]);
+
+  const collectionTitles = useMemo(() => {
+    return (collections.data || [])
+      .map((c) => String(c.title || c.collection_title || "").trim())
+      .filter(Boolean);
+  }, [collections.data]);
   const fundDescription =
     summary.data?.fund_description ||
     "Used for mess, events, jersey, and other batch expenses.";
@@ -147,24 +177,80 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
 
       {/* Hero Balance Card */}
       <section className="fund-hero-card">
+        <div className="fund-hero-glow" aria-hidden="true" />
         <div className="fund-hero-top">
-          <span className="fund-balance-label">Current Balance</span>
-          <div className="fund-hero-badge" aria-hidden="true">
-            <Wallet size={20} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="fund-balance-label">AVAILABLE BALANCE</span>
+            <button
+              type="button"
+              className="fund-privacy-btn"
+              onClick={() => setHideBalance((v) => !v)}
+              aria-label={hideBalance ? "Show balance" : "Hide balance"}
+            >
+              {hideBalance ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+          <span className="fund-live-pill">
+            <span className="fund-live-dot" />
+            Live • {txCount} entries
+          </span>
+        </div>
+
+        <div className="fund-hero-amount">
+          {hideBalance ? (
+            "৳ •••••"
+          ) : (
+            <>
+              <span className="taka-symbol">৳</span>{" "}
+              {currentBalance.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+            </>
+          )}
+        </div>
+
+        <div className="fund-breakdown-grid">
+          <div className="fund-breakdown-tile">
+            <div className="fund-breakdown-icon cash">
+              <Banknote size={15} />
+            </div>
+            <div>
+              <span>Cash</span>
+              <strong>{hideBalance ? "••••" : `৳ ${cashBalance.toLocaleString()}`}</strong>
+            </div>
+          </div>
+          <div className="fund-breakdown-tile">
+            <div className="fund-breakdown-icon mfs">
+              <Smartphone size={15} />
+            </div>
+            <div>
+              <span>MFS</span>
+              <strong>{hideBalance ? "••••" : `৳ ${mfsBalance.toLocaleString()}`}</strong>
+            </div>
           </div>
         </div>
-        <div className="fund-hero-amount">
-          <span className="taka-symbol">৳</span>{" "}
-          {currentBalance.toLocaleString("en-US", { minimumFractionDigits: 0 })}
-        </div>
-        <div className="fund-hero-meta">
-          <span>
-            Total Collected: <strong>৳ {totalCollected.toLocaleString()}</strong>
-          </span>
-          <span className="dot-sep">•</span>
-          <span>
-            Total Spent: <strong>৳ {totalSpent.toLocaleString()}</strong>
-          </span>
+
+        <div className="fund-flow-grid">
+          <button
+            type="button"
+            className="fund-flow-btn inflow"
+            onClick={() => {
+              setLedgerFilter("inflow");
+              setActiveTab("ledger");
+            }}
+          >
+            <span><ArrowDownLeft size={14} /> Inflow</span>
+            <strong>{hideBalance ? "••••" : `৳ ${totalCollected.toLocaleString()}`}</strong>
+          </button>
+          <button
+            type="button"
+            className="fund-flow-btn outflow"
+            onClick={() => {
+              setLedgerFilter("outflow");
+              setActiveTab("ledger");
+            }}
+          >
+            <span><ArrowUpRight size={14} /> Outflow</span>
+            <strong>{hideBalance ? "••••" : `৳ ${totalSpent.toLocaleString()}`}</strong>
+          </button>
         </div>
       </section>
 
@@ -220,6 +306,44 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
       {/* Main Content Area based on activeTab */}
       {activeTab === "home" && (
         <>
+          {/* Collection Carousel */}
+          {collectionTitles.length > 0 && (
+            <section className="fund-carousel" aria-label="Collections">
+              {(collections.data || []).map((c, idx) => {
+                const colTitle = String(c.title || c.collection_title || "").trim();
+                if (!colTitle) return null;
+                const collected = Number(c.total_amount || c.total_collected || 0);
+                const paid = Number(c.payment_count || c.paid_count || 0);
+                const accentColors = ["#6366f1", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"];
+                const accent = accentColors[idx % accentColors.length];
+                return (
+                  <div
+                    key={colTitle}
+                    className="fund-slide-card"
+                    style={{ borderColor: `${accent}33` }}
+                    onClick={() => {
+                      setSelectedCollection(colTitle);
+                      setActiveTab("payers");
+                    }}
+                  >
+                    <div className="fund-slide-top">
+                      <span className="fund-slide-tag" style={{ color: accent, background: `${accent}1a` }}>
+                        COLLECTION
+                      </span>
+                      <span className="fund-slide-paid" style={{ color: accent }}>
+                        {paid} paid <ChevronRight size={13} />
+                      </span>
+                    </div>
+                    <h4 className="fund-slide-title">{colTitle}</h4>
+                    <div className="fund-slide-amount" style={{ color: accent }}>
+                      ৳ {collected.toLocaleString()}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
           {/* Recent Activity */}
           <section className="fund-recent-section">
             <div className="section-header">
@@ -534,6 +658,7 @@ export function BatchFund({ ctx, onBack }: { ctx: Context; onBack: () => void })
           }}
           initialStudent={addFundPrefill?.student}
           initialTitle={addFundPrefill?.title}
+          collectionTitles={collectionTitles}
           onSuccess={() => {
             qc.invalidateQueries({
               queryKey: [ctx.user, ctx.batch, "batch-fund-summary"],
@@ -681,12 +806,14 @@ function AddFundModal({
   onSuccess,
   initialStudent,
   initialTitle,
+  collectionTitles = [],
 }: {
   batchId: string;
   close: () => void;
   onSuccess: () => void;
   initialStudent?: { id: string; full_name: string; student_id?: string | null } | null;
   initialTitle?: string | null;
+  collectionTitles?: string[];
 }) {
   const [transType, setTransType] = useState<"inflow" | "outflow">("inflow");
   const [selectedStudent, setSelectedStudent] = useState<RosterStudent | null>(
@@ -701,7 +828,7 @@ function AddFundModal({
   const [studentSearch, setStudentSearch] = useState(initialStudent?.full_name || "");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [title, setTitle] = useState(initialTitle || "");
+  const [title, setTitle] = useState(initialTitle || collectionTitles[0] || "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -715,14 +842,16 @@ function AddFundModal({
     }
   }, [initialStudent]);
 
-  const commonReasons = [
-    "Monthly Fund",
-    "Jersey",
-    "Tour",
-    "Picnic",
-    "Farewell",
-    "Batch Feast",
-  ];
+  const commonReasons = useMemo(() => {
+    const defaults = ["Monthly Fund", "Jersey", "Tour", "Picnic", "Farewell", "Batch Feast"];
+    const merged: string[] = [];
+    for (const r of [...collectionTitles, ...defaults]) {
+      if (r && !merged.some((m) => m.toLowerCase() === r.toLowerCase())) {
+        merged.push(r);
+      }
+    }
+    return merged.slice(0, 8);
+  }, [collectionTitles]);
 
   // Query verified student roster for the active batch
   const rosterQuery = useQuery({
@@ -746,16 +875,24 @@ function AddFundModal({
       }));
   }, [rosterQuery.data]);
 
-  // Filter students based on studentSearch
+  // Filter students with word-by-word prefix priority
   const filteredStudents = useMemo(() => {
     const q = studentSearch.trim().toLowerCase();
     if (!q) return roster.slice(0, 10);
     return roster
-      .filter(
-        (s) =>
-          s.full_name.toLowerCase().includes(q) ||
-          (s.student_id && s.student_id.toLowerCase().includes(q))
-      )
+      .map((s) => {
+        const fullLower = s.full_name.toLowerCase();
+        const sidLower = (s.student_id || "").toLowerCase();
+        const words = fullLower.split(/[\s._-]+/);
+        const startsNameOrId = fullLower.startsWith(q) || sidLower.startsWith(q);
+        const wordPrefix = words.some((w) => w.startsWith(q));
+        const contains = fullLower.includes(q) || sidLower.includes(q);
+        const rank = startsNameOrId ? 0 : wordPrefix ? 1 : contains ? 2 : 99;
+        return { s, rank };
+      })
+      .filter((item) => item.rank < 99)
+      .sort((a, b) => a.rank - b.rank || a.s.full_name.localeCompare(b.s.full_name))
+      .map((item) => item.s)
       .slice(0, 12);
   }, [roster, studentSearch]);
 

@@ -63,6 +63,7 @@ import { HamburgerDrawer } from "./hamburger-drawer";
 import { BatchFund } from "./batch-fund";
 import { BloodNetwork } from "./blood-network";
 import { enablePush, removePush, restorePush, syncPushIdentity } from "@/lib/push";
+import { trackEvent, trackUser, trackUserProperties } from "@/lib/analytics";
 const ClassMateAI = lazy(() => import("./classmate-ai"));
 const Manage = lazy(() => import("./manage"));
 const TeacherAttendance = lazy(() => import("./teacher-attendance"));
@@ -233,6 +234,8 @@ function SessionApp() {
         setUser(null);
         clearAcademic();
         clearIdentity();
+        trackUser(null);
+        trackEvent("logout");
       }
       if (event === "SIGNED_IN" && session) {
         if (activeUser.current && activeUser.current !== session.user.id) {
@@ -259,29 +262,18 @@ function SessionApp() {
         };
         if (p.role === "student" && !p.department_id) {
           const emailLower = String(p.email || "").toLowerCase();
-          if (emailLower.endsWith("@ru.ac.bd")) {
-            const ruDepts = await rows("departments", { is_active: true, code: "fisheries" }, "id");
-            if (ruDepts.length === 1) {
+          const prefix = /^([a-z]+)[0-9]{2}[0-9]{3,4}@[a-z0-9.-]+\.ac\.bd$/.exec(emailLower)?.[1];
+          if (prefix) {
+            const matches = (
+              await rows("departments", { is_active: true }, "id,email_prefix")
+            ).filter((d) => d.email_prefix === prefix);
+            if (matches.length === 1) {
               p = {
                 ...(await rpc<Row>("complete_student_onboarding", {
-                  selected_department: ruDepts[0].id,
+                  selected_department: matches[0].id,
                 })),
                 avatar_url: p.avatar_url,
               };
-            }
-          } else {
-            const prefix = /^([a-z]+)[0-9]{2}[0-9]{3,4}@[a-z0-9.-]+\.ac\.bd$/.exec(emailLower)?.[1];
-            if (prefix) {
-              const matches = (
-                await rows("departments", { is_active: true }, "id,email_prefix")
-              ).filter((d) => d.email_prefix === prefix);
-              if (matches.length === 1)
-                p = {
-                  ...(await rpc<Row>("complete_student_onboarding", {
-                    selected_department: matches[0].id,
-                  })),
-                  avatar_url: p.avatar_url,
-                };
             }
           }
         }
@@ -294,6 +286,13 @@ function SessionApp() {
         if (!live) return;
         setUser(id);
         setProfile(p);
+        trackUser(id);
+        trackUserProperties({
+          role: String(p.role || "student"),
+          verification_status: String(p.verification_status || "pending"),
+          batch: String(p.batch_id || ""),
+        });
+        trackEvent("login", { method: "oauth", role: p.role });
         const ban = await rpc<Row | null>("active_student_ban").catch(() => null);
         setActiveBan(ban);
         saveIdentity(p);
@@ -1193,6 +1192,11 @@ function Home({
     );
   }, [batches.data, profile, user, teacherEntered]);
   useEffect(() => {
+    if (tab) {
+      trackEvent("tab_view", { tab_name: tab, role: profile.role, batch_id: batch });
+    }
+  }, [tab, profile.role, batch]);
+  useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     update();
     window.addEventListener("online", update);
@@ -1227,10 +1231,7 @@ function Home({
     };
   }, [user, batch, qc]);
   const info = batches.data?.find((b) => b.id === batch) || {};
-  const hasBusTransit = Boolean(
-    (info as Row)?.institution?.has_bus_transit ??
-    ((info as Row)?.departments?.code !== "fisheries" && !profile?.email?.toLowerCase().endsWith("@ru.ac.bd"))
-  );
+  const hasBusTransit = Boolean((info as Row)?.institution?.has_bus_transit ?? true);
   useEffect(() => {
     let live = true;
     const navigate = async () => {

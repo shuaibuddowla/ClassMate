@@ -537,10 +537,7 @@ export function Schedule({ ctx }: { ctx: Context }) {
     },
   });
   const weekendDays = ((ctx.batchInfo?.institution as Row)?.weekend_days as number[]) || [4, 5];
-  const hasTransit = Boolean(
-    (ctx.batchInfo?.institution as Row)?.has_bus_transit ??
-    ((ctx.batchInfo?.departments as Row)?.code !== "fisheries" && !ctx.profile?.email?.toLowerCase().endsWith("@ru.ac.bd"))
-  );
+  const hasTransit = Boolean((ctx.batchInfo?.institution as Row)?.has_bus_transit ?? true);
   const kind = busKind(date, events, weekendDays),
     day = parseDate(date).getDay(),
     closed = classesClosed(date, events, weekendDays);
@@ -1005,16 +1002,6 @@ export function Schedule({ ctx }: { ctx: Context }) {
                                         <strong className="bus-name-bn">
                                           {bus.nameBn || info.nameBn}
                                         </strong>
-                                        <span
-                                          className="bus-id-tag"
-                                          style={{
-                                            color: info.color,
-                                            borderColor: `${info.color}40`,
-                                            backgroundColor: `${info.color}15`,
-                                          }}
-                                        >
-                                          #{bus.busId}
-                                        </span>
                                       </div>
                                       <span className="bus-name-en">{info.nameEn}</span>
                                     </div>
@@ -1543,12 +1530,20 @@ function CalendarPanel({
   routineSlots?: Row[];
   weekendDays?: number[];
 }) {
-  const count = events.filter(
-    (e) =>
-      e.start_date <=
-        dateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0)) &&
-      e.end_date >= dateKey(new Date(month.getFullYear(), month.getMonth(), 1)),
-  ).length;
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const monthStartKey = useMemo(() => dateKey(new Date(year, monthIndex, 1)), [year, monthIndex]);
+  const monthEndKey = useMemo(() => dateKey(new Date(year, monthIndex + 1, 0)), [year, monthIndex]);
+  const monthEvents = useMemo(
+    () => events.filter((e) => e.start_date <= monthEndKey && e.end_date >= monthStartKey),
+    [events, monthStartKey, monthEndKey]
+  );
+  const count = monthEvents.length;
+  const cells = useMemo(() => monthCells(year, monthIndex), [year, monthIndex]);
+  const routineDays = useMemo(
+    () => new Set(routineSlots.map((s) => Number(s.day_of_week))),
+    [routineSlots]
+  );
   return (
     <section className="calendar-surface">
       <div className="calendar-heading">
@@ -1557,9 +1552,9 @@ function CalendarPanel({
           <b />
           <span />
         </div>
-        <span className="eyebrow">{month.getFullYear()}</span>
+        <span className="eyebrow">{year}</span>
         <h2>{month.toLocaleDateString("en", { month: "long" })}</h2>
-        <p>{count} events this month</p>
+        <p>{count} {count === 1 ? "event" : "events"} this month</p>
         <div className="calendar-controls">
           <button
             className="today"
@@ -1576,7 +1571,7 @@ function CalendarPanel({
               className="circle"
               aria-label="Previous month"
               onClick={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
+                setMonth(new Date(year, monthIndex - 1, 1))
               }
             >
               <ChevronLeft />
@@ -1585,7 +1580,7 @@ function CalendarPanel({
               className="circle"
               aria-label="Next month"
               onClick={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
+                setMonth(new Date(year, monthIndex + 1, 1))
               }
             >
               <ChevronRight />
@@ -1595,48 +1590,44 @@ function CalendarPanel({
       </div>
       <div
         className="calendar-grid"
-        key={`${month.getFullYear()}-${month.getMonth()}`}
+        key={`${year}-${monthIndex}`}
       >
         {weekdays.map((d) => (
           <span key={d} className="weekday">
             {d.toUpperCase()}
           </span>
         ))}
-        {monthCells(month.getFullYear(), month.getMonth()).map((d, i) => {
-          const scopes = d ? scopesFor(d, events) : new Set();
-          return d ? (
+        {cells.map((d, i) => {
+          if (!d) return <span key={`empty-${i}`} />;
+          const scopes = scopesFor(d, monthEvents);
+          const parsed = parseDate(d);
+          const dayOfWeek = parsed.getDay();
+          const isClosed = classesClosed(d, monthEvents, weekendDays);
+          const hasClasses = !isClosed && routineDays.has(dayOfWeek);
+          return (
             <button
               key={d}
-              className={`date-cell ${date === d ? "selected" : classesClosed(d, events, weekendDays) ? "closed" : ""}`}
+              className={`date-cell ${date === d ? "selected" : isClosed ? "closed" : ""}`}
               aria-pressed={date === d}
-              aria-label={`${d}${classesClosed(d, events, weekendDays) ? ", closed" : ""}`}
+              aria-label={`${d}${isClosed ? ", closed" : ""}`}
               onClick={() => setDate(d)}
             >
-              <strong>{parseDate(d).getDate()}</strong>
-              {(() => {
-                const dayOfWeek = parseDate(d).getDay();
-                const isClosed = classesClosed(d, events, weekendDays);
-                const hasClasses = !isClosed && routineSlots.some((s) => s.day_of_week === dayOfWeek);
-                return (
-                  <span className="dots">
-                    {isClosed ? (
-                      <i
-                        className={
-                          scopes.has("classes") && !scopes.has("university")
-                            ? "green"
-                            : "red"
-                        }
-                      />
-                    ) : hasClasses ? (
-                      <i className="blue" />
-                    ) : null}
-                    {scopes.has("observance") && <i className="event" />}
-                  </span>
-                );
-              })()}
+              <strong>{parsed.getDate()}</strong>
+              <span className="dots">
+                {isClosed ? (
+                  <i
+                    className={
+                      scopes.has("classes") && !scopes.has("university")
+                        ? "green"
+                        : "red"
+                    }
+                  />
+                ) : hasClasses ? (
+                  <i className="blue" />
+                ) : null}
+                {scopes.has("observance") && <i className="event" />}
+              </span>
             </button>
-          ) : (
-            <span className="date-empty" key={i} />
           );
         })}
       </div>

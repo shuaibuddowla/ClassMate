@@ -80,10 +80,7 @@ export function HamburgerDrawer({
     [deptCode, batchNum].filter(Boolean).join(" ") ||
     (batchInfo?.academic_session ? `Session ${academicSession(batchInfo.academic_session)}` : "MBSTU");
 
-  const hasTransit = Boolean(
-    batchInfo?.institution?.has_bus_transit ??
-      (batchInfo?.departments?.code !== "fisheries" && !profile?.email?.toLowerCase()?.endsWith("@ru.ac.bd"))
-  );
+  const hasTransit = Boolean(batchInfo?.institution?.has_bus_transit ?? true);
 
   const roleBadge = isServerOwner
     ? { label: "Admin", color: "#fb923c", bg: "rgba(251, 146, 60, 0.16)" }

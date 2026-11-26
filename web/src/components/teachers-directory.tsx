@@ -153,7 +153,7 @@ export function TeachersDirectory({ ctx }: { ctx: Context }) {
                 name: "target_email",
                 label: "Teacher email (University or personal)",
                 type: "email",
-                placeholder: "e.g. thegalib@ru.ac.bd",
+                placeholder: "e.g. faculty@mbstu.ac.bd",
               },
             ]}
             label="Add Teacher"
