@@ -23,7 +23,6 @@ export default function robots(): MetadataRoute.Robots {
           "/auth/",
           "/api/",
           "/download/android",
-          "/_next/",
         ],
       },
       {
@@ -44,7 +43,6 @@ export default function robots(): MetadataRoute.Robots {
           "/auth/",
           "/api/",
           "/download/android",
-          "/_next/",
         ],
       },
     ],
