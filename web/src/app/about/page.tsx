@@ -15,14 +15,14 @@ export const metadata: Metadata = {
       "Learn about ClassMate, an independent smart campus companion for Mawlana Bhashani Science and Technology University (MBSTU) providing automated RFID attendance, class routines, bus tracking, and notices.",
     url: "https://classmatebd.vercel.app/about",
     siteName: "ClassMate",
-    images: [{ url: "/logo.png", width: 512, height: 512, alt: "ClassMate About" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "About ClassMate" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "About ClassMate · MBSTU Smart Campus Companion",
     description:
       "Learn about ClassMate, an independent smart campus companion for MBSTU students and faculty.",
-    images: ["/logo.png"],
+    images: ["/opengraph-image"],
   },
 };
 

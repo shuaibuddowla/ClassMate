@@ -84,7 +84,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           changeFrequency: "weekly" as const,
           priority: 0.7,
         }));
-        return [...staticEntries, ...noticeEntries];
+
+        const { data: resources } = await db
+          .schema("classmate")
+          .from("file_metadata")
+          .select("id, slug, created_at")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        const resourceEntries: MetadataRoute.Sitemap = (resources ?? [])
+          .filter((r) => Boolean(r.slug || r.id))
+          .map((r) => ({
+            url: `${baseUrl}/r/${r.slug || r.id}`,
+            lastModified: r.created_at ? new Date(r.created_at) : new Date(),
+            changeFrequency: "monthly" as const,
+            priority: 0.6,
+          }));
+
+        return [...staticEntries, ...noticeEntries, ...resourceEntries];
       }
     }
   } catch {

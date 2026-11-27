@@ -24,14 +24,14 @@ export const metadata: Metadata = {
       "Get ClassMate for Android. Automated RFID attendance, live class timetables, bus schedules, and academic notices for MBSTU.",
     url: "https://classmatebd.vercel.app/download",
     siteName: "ClassMate",
-    images: [{ url: "/logo.png", width: 512, height: 512, alt: "ClassMate App Icon" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "ClassMate Android APK Download" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Download ClassMate - Official Android APK & Web App",
     description:
       "Get ClassMate for Android. Automated RFID attendance, live class timetables, bus schedules, and academic notices for MBSTU.",
-    images: ["/logo.png"],
+    images: ["/opengraph-image"],
   },
 };
 
@@ -42,11 +42,11 @@ const downloadJsonLd = {
       "@type": "SoftwareApplication",
       "@id": "https://classmatebd.vercel.app/download#app",
       "name": "ClassMate Android App",
-      "operatingSystem": "Android 7.0 and up",
+      "operatingSystem": "Android 8.0 and up",
       "applicationCategory": "EducationalApplication",
       "downloadUrl": "https://classmatebd.vercel.app/download/android",
       "installUrl": "https://classmatebd.vercel.app/download",
-      "softwareVersion": "1.1.26",
+      "softwareVersion": "1.1.50",
       "fileFormat": "application/vnd.android.package-archive",
       "offers": {
         "@type": "Offer",
@@ -115,7 +115,7 @@ export default function DownloadPage() {
           <strong>Download Latest Android APK</strong>
         </a>
         <p style={{ marginTop: "12px", color: "var(--text-muted, #64748b)", fontSize: "0.9rem" }}>
-          Direct download · Safe, virus-free, signed by developer · Version 1.1.26+
+          Direct download · Safe, virus-free, signed by developer · Version 1.1.50 (Android 8.0+)
         </p>
       </section>
 
